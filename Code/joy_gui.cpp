@@ -2,7 +2,7 @@
 #include "joy_defines.h"
 
 // NOTE(Dima): Returns newly pushed window array
-INTERNAL_FUNCTION gui_window* GuiAppendToWindowFreePool(gui_state* Gui, memory_region* Mem,  int Count){
+INTERNAL_FUNCTION gui_window* GuiGrowWindowFreePool(gui_state* Gui, memory_region* Mem,  int Count){
     gui_window* WindowFreePoolArray = PushArray(Mem, gui_window, Count);
     
     for(int Index = 0; 
@@ -24,16 +24,27 @@ INTERNAL_FUNCTION gui_window* GuiAppendToWindowFreePool(gui_state* Gui, memory_r
 }
 
 inline gui_window* GuiPopFromReturnList(gui_state* Gui){
-    gui_window* Result = Gui->WindowSentinel4Returning.NextBro;
+    gui_window* Result = Gui->WindowSentinel4Returning.Next;
     
     // NOTE(Dima): deleting from return list
-    Result->NextBro->PrevBro = Result->PrevBro;
-    Result->PrevBro->NextBro = Result->NextBro;
+    Result->Next->Prev = Result->Prev;
+    Result->Prev->Next = Result->Next;
     
-    Result->NextBro = 0;
-    Result->PrevBro = 0;
+    Result->Next = 0;
+    Result->Prev = 0;
     
     return(Result);
+}
+
+inline void GuiDeallocateWindow(gui_state* Gui, gui_window* Todo){
+    Todo->NextAlloc->PrevAlloc = Todo->PrevAlloc;
+    Todo->PrevAlloc->NextAlloc = Todo->NextAlloc;
+    
+    Todo->NextAlloc = Gui->WindowFreeSentinel.NextAlloc;
+    Todo->PrevAlloc = &Gui->WindowFreeSentinel;
+    
+    Todo->NextAlloc->PrevAlloc = Todo;
+    Todo->PrevAlloc->NextAlloc = Todo;
 }
 
 // NOTE(Dima): This function allocates as much windows as we need and 
@@ -57,11 +68,11 @@ INTERNAL_FUNCTION gui_window* GuiAllocateWindows(gui_state* Gui, int Count)
     
     int ToAllocateCount = Max(128, Count - CanAllocateCount);
     if(!CanAllocateArray){
-        GuiAppendToWindowFreePool(Gui, Gui->Mem, ToAllocateCount);
+        GuiGrowWindowFreePool(Gui, Gui->Mem, ToAllocateCount);
     }
     
     // NOTE(Dima): Return list shoud be empty before return
-    Assert(Gui->WindowSentinel4Returning.NextBro == &Gui->WindowSentinel4Returning);
+    Assert(Gui->WindowSentinel4Returning.Next == &Gui->WindowSentinel4Returning);
     
     for(int AddIndex = 0;
         AddIndex < Count;
@@ -86,14 +97,14 @@ INTERNAL_FUNCTION gui_window* GuiAllocateWindows(gui_state* Gui, int Count)
         AddWindow->PrevAlloc->NextAlloc = AddWindow;
         
         // NOTE(Dima): Inserting to return list
-        AddWindow->NextBro = &Gui->WindowSentinel4Returning;
-        AddWindow->PrevBro = Gui->WindowSentinel4Returning.PrevBro;
+        AddWindow->Next = &Gui->WindowSentinel4Returning;
+        AddWindow->Prev = Gui->WindowSentinel4Returning.Prev;
         
-        AddWindow->NextBro->PrevBro = AddWindow;
-        AddWindow->PrevBro->NextBro = AddWindow;
+        AddWindow->Next->Prev = AddWindow;
+        AddWindow->Prev->Next = AddWindow;
     }
     
-    gui_window* Result = Gui->WindowSentinel4Returning.NextBro;
+    gui_window* Result = Gui->WindowSentinel4Returning.Next;
     
     return(Result);
 }
@@ -104,7 +115,7 @@ INTERNAL_FUNCTION gui_window* GuiAllocateWindow(gui_state* Gui){
     gui_window* Result = GuiPopFromReturnList(Gui);
     
     // NOTE(Dima): Return list shoud be empty before return
-    Assert(Gui->WindowSentinel4Returning.NextBro == &Gui->WindowSentinel4Returning);
+    Assert(Gui->WindowSentinel4Returning.Next == &Gui->WindowSentinel4Returning);
     
     return(Result);
 }
@@ -112,22 +123,13 @@ INTERNAL_FUNCTION gui_window* GuiAllocateWindow(gui_state* Gui){
 inline void GuiAddWindowToList(gui_window* Window, 
                                gui_window* Sentinel)
 {
-    Window->NextBro = Sentinel;
-    Window->PrevBro = Sentinel->PrevBro;
+    Window->Next = Sentinel;
+    Window->Prev = Sentinel->Prev;
     
-    Window->NextBro->PrevBro = Window;
-    Window->PrevBro->NextBro = Window;
+    Window->Next->Prev = Window;
+    Window->Prev->Next = Window;
 }
 
-inline void GuiAddWindowToLeafs(gui_state* Gui, 
-                                gui_window* Window)
-{
-    Window->NextLeaf = &Gui->WindowLeafSentinel;
-    Window->PrevLeaf = Gui->WindowLeafSentinel.PrevLeaf;
-    
-    Window->NextLeaf->PrevLeaf = Window;
-    Window->PrevLeaf->NextLeaf = Window;
-}
 
 void InitGui(
 gui_state* Gui, 
@@ -163,20 +165,20 @@ int Height)
     Gui->WindowFreeSentinel.NextAlloc = &Gui->WindowFreeSentinel;
     Gui->WindowFreeSentinel.PrevAlloc = &Gui->WindowFreeSentinel;
     
-    GuiAppendToWindowFreePool(Gui, Mem, 128);
+    GuiGrowWindowFreePool(Gui, Mem, 128);
     
     // NOTE(Dima): Init window sentinel for returning windows
     // NOTE(Dima): as list when we allocate multiple of them.
-    Gui->WindowSentinel4Returning.NextBro = &Gui->WindowSentinel4Returning;
-    Gui->WindowSentinel4Returning.PrevBro = &Gui->WindowSentinel4Returning;
+    Gui->WindowSentinel4Returning.Next = &Gui->WindowSentinel4Returning;
+    Gui->WindowSentinel4Returning.Prev = &Gui->WindowSentinel4Returning;
     
     // NOTE(Dima): Init window leaf sentinel
-    Gui->WindowLeafSentinel.NextLeaf = &Gui->WindowLeafSentinel;
-    Gui->WindowLeafSentinel.PrevLeaf = &Gui->WindowLeafSentinel;
+    Gui->WindowLeafSentinel.Next = &Gui->WindowLeafSentinel;
+    Gui->WindowLeafSentinel.Prev = &Gui->WindowLeafSentinel;
     
     Gui->TempWindow1 = GuiAllocateWindow(Gui);
     Gui->TempWindow1->Rect = RcMinDim(V2(10, 10), V2(1000, 600));
-    GuiAddWindowToLeafs(Gui, Gui->TempWindow1);
+    GuiAddWindowToList(Gui->TempWindow1, &Gui->WindowLeafSentinel);
     
     // NOTE(Dima): Initializing colors
     Gui->Colors[GuiColor_Text] = V4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -434,10 +436,6 @@ INTERNAL_FUNCTION void GuiSplitWindow(gui_state* Gui,
                                       int PartsCount, 
                                       rc2* PartsRects)
 {
-    Window->ChildrenSentinel = GuiAllocateWindow(Gui);
-    Window->ChildrenSentinel->PrevBro = Window->ChildrenSentinel;
-    Window->ChildrenSentinel->NextBro = Window->ChildrenSentinel;
-    
     GuiAllocateWindows(Gui, PartsCount);
     
     for(int NewWindowIndex = 0;
@@ -446,41 +444,27 @@ INTERNAL_FUNCTION void GuiSplitWindow(gui_state* Gui,
     {
         gui_window* NewWindow = GuiPopFromReturnList(Gui);
         
-        // NOTE(Dima): Setting parent
-        NewWindow->Parent = Window;
-        
-        // NOTE(Dima): Inserting to list
-        NewWindow->NextBro = Window->ChildrenSentinel;
-        NewWindow->PrevBro = Window->ChildrenSentinel->PrevBro;
-        
-        NewWindow->NextBro->PrevBro = NewWindow;
-        NewWindow->PrevBro->NextBro = NewWindow;
-        
         // NOTE(Dima): Adding children to leafs
-        NewWindow->NextLeaf = Gui->WindowLeafSentinel.NextLeaf;
-        NewWindow->PrevLeaf = &Gui->WindowLeafSentinel;
+        NewWindow->Next = Gui->WindowLeafSentinel.Next;
+        NewWindow->Prev = &Gui->WindowLeafSentinel;
         
-        NewWindow->NextLeaf->PrevLeaf = NewWindow;
-        NewWindow->PrevLeaf->NextLeaf = NewWindow;
+        NewWindow->Next->Prev = NewWindow;
+        NewWindow->Prev->Next = NewWindow;
         
         NewWindow->Rect = PartsRects[NewWindowIndex];
     }
     
+    // NOTE(Dima): Deallocating parent because it is not visible
+    Window->Next->Prev = Window->Prev;
+    Window->Prev->Next = Window->Next;
     
-    /*
-     Now we need to set leafs. To do this we remove
-     parent from leafs and add new childrent there.
-     (Because parent is not visible now)
-    */
-    Window->NextLeaf->PrevLeaf = Window->PrevLeaf;
-    Window->PrevLeaf->NextLeaf = Window->NextLeaf;
+    Window->Next = 0;
+    Window->Prev = 0;
     
-    Window->NextLeaf = 0;
-    Window->PrevLeaf = 0;
-    
+    GuiDeallocateWindow(Gui, Window);
     
     // NOTE(Dima): Return list shoud be empty after usage in this function
-    Assert(Gui->WindowSentinel4Returning.NextBro == &Gui->WindowSentinel4Returning);
+    Assert(Gui->WindowSentinel4Returning.Next == &Gui->WindowSentinel4Returning);
 }
 
 INTERNAL_FUNCTION void GuiUpdateWindow(gui_state* Gui, gui_window* Window){
@@ -552,9 +536,9 @@ INTERNAL_FUNCTION void GuiUpdateWindow(gui_state* Gui, gui_window* Window){
 }
 
 void GuiUpdateWindows(gui_state* Gui){
-    gui_window* UpdateAt = Gui->WindowLeafSentinel.NextLeaf;
+    gui_window* UpdateAt = Gui->WindowLeafSentinel.Next;
     while(UpdateAt != &Gui->WindowLeafSentinel){
-        gui_window* TempNext = UpdateAt->NextLeaf;
+        gui_window* TempNext = UpdateAt->Next;
         
         GuiUpdateWindow(Gui, UpdateAt);
         

@@ -56,17 +56,11 @@ struct gui_page{
 };
 
 struct gui_window{
-    gui_window* Parent;
-    gui_window* ChildrenSentinel;
-    
     gui_window* NextAlloc;
     gui_window* PrevAlloc;
     
-    gui_window* NextLeaf;
-    gui_window* PrevLeaf;
-    
-    gui_window* NextBro;
-    gui_window* PrevBro;
+    gui_window* Next;
+    gui_window* Prev;
     
     rc2 Rect;
 };
