@@ -82,9 +82,25 @@ struct gui_element{
     gui_element* Prev;
 };
 
+
+enum gui_advance_type{
+    GuiAdvanceType_Column,
+    GuiAdvanceType_Row,
+};
+
+struct gui_advance_ctx{
+    u32 Type;
+    float RememberValue;
+    float Baseline;
+    float Maximum;
+};
+
 struct gui_layout{
     v2 Start;
     v2 At;
+    
+    gui_advance_ctx AdvanceRememberStack[16];
+    int StackCurrentIndex;
 };
 
 struct gui_state{
@@ -165,6 +181,11 @@ void GuiEndLayout(gui_state* Gui, gui_layout* Layout);
 
 void GuiBeginPage(gui_state* Gui, char* Name);
 void GuiEndPage(gui_state* Gui);
+
+void GuiBeginRow(gui_state* Gui);
+void GuiEndRow(gui_state* Gui);
+void GuiBeginColumn(gui_state* Gui);
+void GuiEndColumn(gui_state* Gui);
 
 void GuiText(gui_state* Gui, char* Text);
 b32 GuiButton(gui_state* Gui, char* ButtonName);

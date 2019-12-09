@@ -329,8 +329,7 @@ rc2 PrintTextCenteredInRect(gui_state* Gui, char* Text, rc2 Rect, float Scale, v
 }
 
 void GuiBeginLayout(gui_state* Gui, gui_layout* Layout){
-    Layout->At = V2(10.0f, 10.0f);
-    
+    Layout->At = V2(0.0f, 0.0f);
     
     Gui->CurrentLayout = Layout;
 }
@@ -546,12 +545,104 @@ void GuiUpdateWindows(gui_state* Gui){
     }
 }
 
+// NOTE(Dima): Default advance type is Column advance
 inline void GuiPreAdvance(gui_state* Gui, gui_layout* Layout){
-    Layout->At.y += GuiGetBaseline(Gui);
+    gui_advance_ctx* Ctx = &Layout->AdvanceRememberStack[Layout->StackCurrentIndex];
+    b32 RowStarted = Ctx->Type == GuiAdvanceType_Row;
+    
+    float RememberValue = Ctx->RememberValue;
+    
+    if(RowStarted){
+        Layout->At.y = Ctx->Baseline;
+    }
+    else{
+        Layout->At.x = Ctx->Baseline;
+        Layout->At.y += GuiGetBaseline(Gui);
+    }
 }
 
 inline void GuiPostAdvance(gui_state* Gui, gui_layout* Layout, rc2 ElementRect){
-    Layout->At.y = ElementRect.Max.y + GetLineAdvance(Gui->MainFont, Gui->FontScale) * 0.2f;
+    gui_advance_ctx* Ctx = &Layout->AdvanceRememberStack[Layout->StackCurrentIndex];
+    b32 RowStarted = (Ctx->Type == GuiAdvanceType_Row);
+    
+    float RememberValue = Ctx->RememberValue;
+    
+    float ToX = ElementRect.Max.x + GetScaledAscender(Gui->MainFont, Gui->FontScale) * 0.5f;
+    float ToY = ElementRect.Max.y + GetLineAdvance(Gui->MainFont, Gui->FontScale) * 0.2f;
+    
+    if(RowStarted){
+        Layout->At.x = ToX;
+        Ctx->Maximum = Max(Ctx->Maximum, ToY);
+    }
+    else{
+        Layout->At.y = ToY;
+        Ctx->Maximum = Max(Ctx->Maximum, ToX);
+    }
+}
+
+
+inline gui_advance_ctx GuiRowAdvanceCtx(float RememberX, float Baseline){
+    gui_advance_ctx Ctx = {};
+    
+    Ctx.Type = GuiAdvanceType_Row;
+    Ctx.RememberValue = RememberX;
+    Ctx.Baseline = Baseline;
+    
+    return(Ctx);
+}
+
+inline gui_advance_ctx GuiColumnAdvanceCtx(float RememberY, float Baseline){
+    gui_advance_ctx Ctx = {};
+    
+    Ctx.Type = GuiAdvanceType_Column;
+    Ctx.RememberValue = RememberY;
+    Ctx.Baseline = Baseline;
+    
+    return(Ctx);
+}
+
+void GuiBeginRow(gui_state* Gui){
+    gui_layout* Layout = GetFirstLayout(Gui);
+    
+    Assert(Layout->StackCurrentIndex < ArrayCount(Layout->AdvanceRememberStack));
+    
+    Layout->AdvanceRememberStack[++Layout->StackCurrentIndex] = GuiRowAdvanceCtx(
+        Layout->At.x, Layout->At.y + GuiGetBaseline(Gui));
+}
+
+
+void GuiBeginColumn(gui_state* Gui){
+    gui_layout* Layout = GetFirstLayout(Gui);
+    
+    Assert(Layout->StackCurrentIndex < ArrayCount(Layout->AdvanceRememberStack));
+    
+    Layout->AdvanceRememberStack[++Layout->StackCurrentIndex] = GuiColumnAdvanceCtx(
+        Layout->At.y,
+        Layout->At.x);
+}
+
+void GuiEndRow(gui_state* Gui){
+    gui_layout* Layout = GetFirstLayout(Gui);
+    
+    Assert(Layout->StackCurrentIndex >= 1);
+    
+    gui_advance_ctx* Ctx = &Layout->AdvanceRememberStack[Layout->StackCurrentIndex--];
+    Assert(Ctx->Type == GuiAdvanceType_Row);
+    
+    Layout->At.x = Ctx->RememberValue;
+    Layout->At.y = Ctx->Maximum;
+}
+
+void GuiEndColumn(gui_state* Gui){
+    gui_layout* Layout = GetFirstLayout(Gui);
+    
+    Assert(Layout->StackCurrentIndex >= 1);
+    
+    gui_advance_ctx* Ctx = &Layout->AdvanceRememberStack[Layout->StackCurrentIndex--];
+    Assert(Ctx->Type == GuiAdvanceType_Column);
+    
+    Layout->At.y = Ctx->RememberValue;
+    Layout->At.x = Ctx->Maximum;
 }
 
 void GuiText(gui_state* Gui, char* Text){
@@ -573,7 +664,7 @@ b32 GuiButton(gui_state* Gui, char* ButtonName){
     
     // NOTE(Dima): Printing button and text
     rc2 TextRc = GetTextRect(Gui, ButtonName, Layout->At);
-    rc2 TempTextRc = GrowRectByScaledValue(TextRc, V2(4.0f, 0.0f), Gui->FontScale);
+    rc2 TempTextRc = GrowRectByScaledValue(TextRc, V2(4.0f, 2.0f), Gui->FontScale);
     TextRc.Max = TextRc.Min + GetRectDim(TempTextRc);
     PushRect(Gui->Stack, TextRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
     PushRectOutline(Gui->Stack, TextRc, 1, GUI_GETCOLOR(GuiColor_Borders));
@@ -602,7 +693,7 @@ void GuiBoolButton(gui_state* Gui, char* ButtonName, b32* Value){
     
     // NOTE(Dima): Printing button and text
     rc2 TextRc = GetTextRect(Gui, ButtonName, Layout->At);
-    rc2 TempTextRc = GrowRectByScaledValue(TextRc, V2(4.0f, 0.0f), Gui->FontScale);
+    rc2 TempTextRc = GrowRectByScaledValue(TextRc, V2(4.0f, 2.0f), Gui->FontScale);
     TextRc.Max = TextRc.Min + GetRectDim(TempTextRc);
     PushRect(Gui->Stack, TextRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
     PushRectOutline(Gui->Stack, TextRc, 1, GUI_GETCOLOR(GuiColor_Borders));
@@ -637,7 +728,7 @@ void GuiBoolButtonOnOff(gui_state* Gui, char* ButtonName, b32* Value){
     // NOTE(Dima): Button printing
     rc2 ButRc = GetTextRect(Gui, "OFF", Layout->At);
     v2 ButTextDim = GetRectDim(ButRc);
-    rc2 TempButRc = GrowRectByScaledValue(ButRc, V2(4.0f, 0.0f), Gui->FontScale);
+    rc2 TempButRc = GrowRectByScaledValue(ButRc, V2(4.0f, 2.0f), Gui->FontScale);
     v2 TempButRcDim = GetRectDim(TempButRc);
     ButRc.Max = ButRc.Min + TempButRcDim;
     PushRect(Gui->Stack, ButRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
@@ -645,7 +736,7 @@ void GuiBoolButtonOnOff(gui_state* Gui, char* ButtonName, b32* Value){
     
     // NOTE(Dima): Button name text printing
     float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, ButRc, Gui->FontScale);
-    v2 NameStart = V2(ButRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->FontScale), NameStartY);
+    v2 NameStart = V2(ButRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->FontScale) * 0.5f, NameStartY);
     rc2 NameRc = PrintText(Gui, ButtonName, NameStart, GUI_GETCOLOR(GuiColor_Text));
     
     // NOTE(Dima): Event processing
@@ -687,7 +778,7 @@ void GuiCheckbox(gui_state* Gui, char* Name, b32* Value){
     rc2 CheckRect;
     CheckRect.Min = V2(Layout->At.x, Layout->At.y - GetScaledAscender(Gui->MainFont, Gui->FontScale));
     CheckRect.Max = CheckRect.Min + V2(CheckboxSize, CheckboxSize);
-    rc2 TempButRc = GrowRectByScaledValue(CheckRect, V2(0.0f, 0.0f), Gui->FontScale);
+    rc2 TempButRc = GrowRectByScaledValue(CheckRect, V2(2.0f, 2.0f), Gui->FontScale);
     CheckRect.Max = CheckRect.Min + GetRectDim(TempButRc);
     
     // NOTE(Dima): Event processing
@@ -712,7 +803,7 @@ void GuiCheckbox(gui_state* Gui, char* Name, b32* Value){
     
     // NOTE(Dima): Button name text printing
     float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, CheckRect, Gui->FontScale);
-    v2 NameStart = V2(CheckRect.Max.x + GetScaledAscender(Gui->MainFont, Gui->FontScale), NameStartY);
+    v2 NameStart = V2(CheckRect.Max.x + GetScaledAscender(Gui->MainFont, Gui->FontScale) * 0.5f, NameStartY);
     rc2 NameRc = PrintText(Gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
     
     rc2 AdvanceRect = GetBoundingRect(CheckRect, NameRc);

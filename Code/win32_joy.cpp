@@ -567,6 +567,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         GuiText(Gui, "I wish joy and happiness for everyone");
         
         LOCAL_AS_GLOBAL int RectCount = 0;
+        GuiBeginRow(Gui);
         if(GuiButton(Gui, "Add")){
             RectCount++;
         }
@@ -576,28 +577,37 @@ int APIENTRY WinMain(HINSTANCE hInstance,
                 RectCount = 0;
             }
         }
+        GuiEndRow(Gui);
         for(int i = 0; i < RectCount; i++){
             PushRect(RenderStack, RcMinDim(V2(100 + i * 50, 100), V2(40, 40)));
         }
         
         static b32 BoolButtonValue;
+        GuiBeginRow(Gui);
         GuiBoolButton(Gui, "BoolButton", &BoolButtonValue);
         GuiBoolButton(Gui, "BoolButton123", &BoolButtonValue);
         GuiBoolButton(Gui, "BoolButton1234", &BoolButtonValue);
         GuiBoolButton(Gui, "BoolButtonasdfga", &BoolButtonValue);
         GuiBoolButton(Gui, "BoolButtonzxcvzxcb", &BoolButtonValue);
+        GuiEndRow(Gui);
         
         static b32 BoolButtonOnOffValue;
+        GuiBeginRow(Gui);
+        GuiBeginColumn(Gui);
         GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &BoolButtonValue);
         GuiBoolButtonOnOff(Gui, "BoolButtonOnOff1", &BoolButtonValue);
         GuiBoolButtonOnOff(Gui, "BoolButtonOnOff2", &BoolButtonValue);
         GuiBoolButtonOnOff(Gui, "BoolButtonOnOff3", &BoolButtonValue);
+        GuiEndColumn(Gui);
         
         static b32 CheckboxValue;
+        GuiBeginColumn(Gui);
         GuiCheckbox(Gui, "Checkbox", &CheckboxValue);
         GuiCheckbox(Gui, "Checkbox1", &CheckboxValue);
         GuiCheckbox(Gui, "Checkbox2", &CheckboxValue);
         GuiCheckbox(Gui, "Checkbox3", &CheckboxValue);
+        GuiEndColumn(Gui);
+        GuiEndRow(Gui);
         
         GuiEndLayout(&GlobalGui, Lay);
 #endif
