@@ -3,6 +3,7 @@
 
 #include "joy_defines.h"
 #include <stdint.h>
+#include <string.h>
 
 struct memory_region{
     void* Base;
@@ -33,6 +34,9 @@ inline void* PushSomeMem(memory_region* Region, size_t Size, size_t Align = 8){
     
     Region->Used = NewUsedCount;
     
+    int Temp = (size_t)Result & (Align - 1);
+    Assert(Temp == 0);
+    
     return(Result);
 }
 
@@ -49,5 +53,7 @@ inline memory_region SplitMemoryRegion(memory_region* Region, size_t NewStackSiz
 #define PushSize(region, size) PushSomeMem(region, size)
 #define PushStruct(region, type) (type*)PushSomeMem(region, sizeof(type))
 #define PushArray(region, type, count) (type*)PushSomeMem(region, sizeof(type) * count)
+#define PushString(region, text) (char*)PushSomeMem(region, strlen(text) + 1)
+#define PushStringSize(region, text, textlen) (char*)PushSomeMem(region, (textlen) + 1)
 
 #endif

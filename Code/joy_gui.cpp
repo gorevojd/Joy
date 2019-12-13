@@ -140,7 +140,7 @@ render_stack* Stack,
 int Width,
 int Height)
 {
-    Gui->MainFont = &Assets->LiberationMono;
+    Gui->MainFont = &Assets->InconsolataBold;
     Gui->CheckboxMark = &Assets->CheckboxMark;
     Gui->FontScale = 1.0f;
     
@@ -181,22 +181,24 @@ int Height)
     GuiAddWindowToList(Gui->TempWindow1, &Gui->WindowLeafSentinel);
     
     // NOTE(Dima): Initializing colors
-    Gui->Colors[GuiColor_Text] = V4(1.0f, 1.0f, 1.0f, 1.0f);
-    Gui->Colors[GuiColor_HotText] = V4(1.0f, 1.0f, 0.0f, 1.0f);
-    Gui->Colors[GuiColor_Borders] = V4(0.0f, 0.0f, 0.0f, 1.0f);
+    InitColorsState(&Gui->ColorState, Mem);
+#define GUI_GETCOLOR_COLSYS(index) Gui->ColorState.ColorTable[index].Color
+#define GUI_COLORHEX(str) ColorFromHex(str)
+    Gui->Colors[GuiColor_Text] = GUI_GETCOLOR_COLSYS(Color_White);
+    Gui->Colors[GuiColor_HotText] = GUI_GETCOLOR_COLSYS(Color_Yellow);
+    Gui->Colors[GuiColor_Borders] = GUI_GETCOLOR_COLSYS(Color_Black);
     
-    Gui->Colors[GuiColor_ButtonBackground] = V4(0.0f, 0.5f, 1.0f, 1.0f);
-    Gui->Colors[GuiColor_ButtonBackgroundHot] = V4(0.2f, 0.7f, 1.0f, 1.0f);
-    Gui->Colors[GuiColor_ButtonForeground] = V4(1.0f, 1.0f, 1.0f, 1.0f);
-    float Disabled01 = 0.75f;
-    Gui->Colors[GuiColor_ButtonForegroundDisabled] = V4(Disabled01, Disabled01, Disabled01, 1.0f);
-    Gui->Colors[GuiColor_ButtonForegroundHot] = V4(1.0f, 1.0f, 0.0f, 1.0f);
+    Gui->Colors[GuiColor_ButtonBackground] = GUI_COLORHEX("#337733");
+    Gui->Colors[GuiColor_ButtonBackgroundHot] = GUI_GETCOLOR_COLSYS(Color_Cyan);
+    Gui->Colors[GuiColor_ButtonForeground] = GUI_GETCOLOR_COLSYS(Color_White);
+    Gui->Colors[GuiColor_ButtonForegroundHot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
+    Gui->Colors[GuiColor_ButtonForegroundDisabled] = Gui->Colors[GuiColor_ButtonForeground] * 0.75f;
     
     Gui->WindowAlpha = 0.85f;
     Gui->Colors[GuiColor_WindowBackground] = V4(0.0f, 0.0f, 0.0f, Gui->WindowAlpha);
-    Gui->Colors[GuiColor_WindowBorder] = V4(0.0f, 0.0f, 0.0f, 1.0f);
-    Gui->Colors[GuiColor_WindowBorderHot] = V4(1.0f, 0.0f, 1.0f, 1.0f);
-    Gui->Colors[GuiColor_WindowBorderActive] = V4(0.0f, 1.0f, 0.0f, 1.0f);
+    Gui->Colors[GuiColor_WindowBorder] = GUI_GETCOLOR_COLSYS(Color_Black);
+    Gui->Colors[GuiColor_WindowBorderHot] = GUI_GETCOLOR_COLSYS(Color_Magenta);
+    Gui->Colors[GuiColor_WindowBorderActive] = GUI_GETCOLOR_COLSYS(Color_Blue);
 }
 
 rc2 PrintTextInternal(font_info* FontInfo, render_stack* Stack, char* Text, v2 P, u32 TextOp, float Scale, v4 Color){
@@ -643,6 +645,23 @@ void GuiEndColumn(gui_state* Gui){
     
     Layout->At.y = Ctx->RememberValue;
     Layout->At.x = Ctx->Maximum;
+}
+
+void GuiPreRender(gui_state* Gui){
+    for(int TooltipIndex = 0; TooltipIndex < GUI_MAX_TOOLTIPS; TooltipIndex++){
+        gui_tooltip* Tooltip = &Gui->Tooltips[TooltipIndex];
+        
+        PrintText(Gui, Tooltip->Text, Tooltip->At, GUI_GETCOLOR(GuiColor_Text), 1.0f);
+    }
+    Gui->TooltipIndex = 0;
+}
+
+void GuiTooltip(gui_state* Gui, char* TooltipText, v2 At){
+    Assert(Gui->TooltipIndex < GUI_MAX_TOOLTIPS);
+    gui_tooltip* Tooltip = &Gui->Tooltips[Gui->TooltipIndex++];
+    
+    CopyStrings(Tooltip->Text, GUI_TOOLTIP_MAX_SIZE, TooltipText);
+    Tooltip->At = At;
 }
 
 void GuiText(gui_state* Gui, char* Text){

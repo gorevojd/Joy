@@ -156,6 +156,13 @@ u32 Flags)
 		&CharWidth, &CharHeight,
 		&XOffset, &YOffset);
     
+    if(CharWidth > 9999){
+        CharWidth = 0;
+    }
+    if(CharHeight > 9999){
+        CharHeight = 0;
+    }
+    
     int CharBorder = 1;
     int ShadowOffset = 0;
     

@@ -53,9 +53,9 @@ struct render_entry_bitmap{
 };
 
 struct render_entry_rect{
+    v4 ModulationColor01;
     v2 P;
     v2 Dim;
-    v4 ModulationColor01;
 };
 
 struct render_entry_glyph{
@@ -98,24 +98,27 @@ inline void PushBitmap(render_stack* Stack, bmp_info* Bitmap, v2 P, float Height
     Entry->ModulationColor01 = MultColor;
 }
 
-inline void PushRect(render_stack* Stack, v2 P, v2 Dim, v4 MultColor = V4(1.0f, 1.0f, 1.0f, 1.0f)) {
+inline void PushRect(
+render_stack* Stack, 
+rc2 Rect, 
+v4 MultColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
+{
     render_entry_rect* Entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Rect, render_entry_rect);
     
-	Entry->P = P;
-	Entry->Dim = Dim;
+    Rect = RectNormalizeSubpixel(Rect);
+    
+	Entry->P = Rect.Min;
+	Entry->Dim = GetRectDim(Rect);
 	Entry->ModulationColor01 = MultColor;
-    
-    
-#if 0    
-    Entry->Dim.x = Floor(Entry->Dim.x);
-    Entry->Dim.y = Floor(Entry->Dim.y);
-    Entry->P.x = Floor(Entry->P.x);
-    Entry->P.y = Floor(Entry->P.y);
-#endif
 }
 
-inline void PushRect(render_stack* Stack, rc2 Rect, v4 MultColor = V4(1.0f, 1.0f, 1.0f, 1.0f)){
-    PushRect(Stack, Rect.Min, GetRectDim(Rect), MultColor);
+inline void PushRect(render_stack* Stack, 
+                     v2 P, v2 Dim,
+                     v4 MultColor = V4(1.0f, 1.0f, 1.0f, 1.0f)) 
+{
+    rc2 Rect = RcMinDim(P, Dim);
+    
+    PushRect(Stack, Rect, MultColor);
 }
 
 inline void PushRectOutline(render_stack* Stack, v2 P, v2 Dim, int PixelWidth, v4 MultColor = V4(0.0f, 0.0f, 0.0f, 1.0f)) {
@@ -131,14 +134,6 @@ inline void PushRectOutline(render_stack* Stack, rc2 Rect, int PixelWidth, v4 Mu
     v2 P = Rect.Min;
     v2 Dim = GetRectDim(Rect);
     
-    
-#if 0    
-    Dim.x = Floor(Dim.x);
-    Dim.y = Floor(Dim.y);
-    P.x = Floor(P.x);
-    P.y = Floor(P.y);
-#endif
-    
 	v2 WidthQuad = V2(PixelWidth, PixelWidth);
 	PushRect(Stack, V2(P.x - PixelWidth, P.y - PixelWidth), V2(Dim.x + 2.0f * PixelWidth, PixelWidth), MultColor);
 	PushRect(Stack, V2(P.x - PixelWidth, P.y), V2(PixelWidth, Dim.y + PixelWidth), MultColor);
@@ -149,13 +144,6 @@ inline void PushRectOutline(render_stack* Stack, rc2 Rect, int PixelWidth, v4 Mu
 inline void PushRectInnerOutline(render_stack* Stack, rc2 Rect, int PixelWidth, v4 Color = V4(0.0f, 0.0f, 0.0f, 1.0f)) {
 	v2 Dim = GetRectDim(Rect);
 	v2 P = Rect.Min;
-    
-#if 0    
-    Dim.x = Floor(Dim.x);
-    Dim.y = Floor(Dim.y);
-    P.x = Floor(P.x);
-    P.y = Floor(P.y);
-#endif
     
 	PushRect(Stack, V2(P.x, P.y), V2(Dim.x, PixelWidth), Color);
 	PushRect(Stack, V2(P.x, P.y + PixelWidth), V2(PixelWidth, Dim.y - PixelWidth), Color);

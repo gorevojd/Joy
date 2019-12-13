@@ -1024,4 +1024,14 @@ inline rc2 GrowRectByPixels(rc2 A, int PixelsCount){
     return(Result);
 }
 
+#define JOY_MATH_RCNORMSUBPX_VAL(v) v = (int)(v + 0.5f);
+inline rc2 RectNormalizeSubpixel(rc2 A){
+    JOY_MATH_RCNORMSUBPX_VAL(A.Min.x);
+    JOY_MATH_RCNORMSUBPX_VAL(A.Min.y);
+    JOY_MATH_RCNORMSUBPX_VAL(A.Max.x);
+    JOY_MATH_RCNORMSUBPX_VAL(A.Max.y);
+    
+    return(A);
+}
+
 #endif

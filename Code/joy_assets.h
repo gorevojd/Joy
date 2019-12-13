@@ -20,6 +20,9 @@ struct assets{
     bmp_info CheckboxMark;
     
     font_info LiberationMono;
+    font_info LilitaOne;
+    font_info InconsolataBold;
+    
 };
 
 void InitAssets(assets* Assets);

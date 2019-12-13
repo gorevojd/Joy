@@ -4,6 +4,12 @@
 
 #include <intrin.h>
 
+
+#define STB_SPRINTF_STATIC
+#define STB_SPRINTF_IMPLEMENTATION
+#include "stb_sprintf.h"
+
+
 #define MM(mm, i) (mm).m128_f32[i]
 #define MMI(mm, i) (mm).m128i_u32[i]
 
@@ -876,13 +882,19 @@ struct render_queue_rgba2bgra_work{
 PLATFORM_CALLBACK(RenderQueueRGBA2BGRAWork){
     render_queue_rgba2bgra_work* Work = (render_queue_rgba2bgra_work*)Data;
     
+#if 0    
+    char Text[256];
+    stbsp_sprintf(Text, "Hello world from: %d\n", GetThreadID());
+    PlatformAPI.OutputString(Text);
+#endif
+    
     RenderRGBA2BGRASSE(Work->Buffer, Work->ClipRect);
 }
 
 #define TILES_COUNT 32
 void RenderMultithreaded(platform_job_queue* Queue, render_stack* Stack, bmp_info* Buffer) {
     
-#if 1
+#if 0
 	rc2 ClipRect;
 	ClipRect.Min = V2(0, 0);
 	ClipRect.Max = V2(Buffer->Width, Buffer->Height);
@@ -970,6 +982,7 @@ void RenderMultithreadedRGBA2BGRA(platform_job_queue* Queue, bmp_info* Buffer) {
     
     render_queue_rgba2bgra_work Works[TILES_COUNT];
     
+#if 1
     int PreferableTileHeight = Buffer->Height / TILES_COUNT;
     if(PreferableTileHeight < 16){
         PreferableTileHeight = 16;
@@ -1004,4 +1017,6 @@ void RenderMultithreadedRGBA2BGRA(platform_job_queue* Queue, bmp_info* Buffer) {
     }
     
     PlatformWaitForCompletion(Queue);
+#endif
+    
 }

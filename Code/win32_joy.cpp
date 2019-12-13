@@ -1,5 +1,6 @@
 #include "win32_joy.h"
 
+#define STB_SPRINTF_STATIC
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
 
@@ -118,6 +119,10 @@ PLATFORM_SHOW_ERROR(Win32ShowError){
     }
     
     MessageBoxA(0, Text, CaptionText, MessageBoxType);
+}
+
+PLATFORM_DEBUG_OUTPUT_STRING(Win32DebugOutputString){
+    OutputDebugString(Text);
 }
 
 INTERNAL_FUNCTION void
@@ -495,6 +500,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     PlatformAPI.WriteFile = Win32WriteFile;
     PlatformAPI.FreeFileMemory = Win32FreeFileMemory;
     PlatformAPI.ShowError = Win32ShowError;
+    PlatformAPI.OutputString = Win32DebugOutputString;
     
     // NOTE(Dima): Initializing engine systems
     InitAssets(&GlobalAssets);
@@ -529,6 +535,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         RenderStackBeginFrame(RenderStack);
         
         PushClearColor(RenderStack, V3(1.0f, 0.5f, 0.0f));
+        
         PushBitmap(RenderStack, &GlobalAssets.Sunset, V2(100.0f, Sin(Time * 1.0f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
         PushBitmap(RenderStack, &GlobalAssets.SunsetOrange, V2(200.0f, Sin(Time * 1.1f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
         PushBitmap(RenderStack, &GlobalAssets.SunsetField, V2(300.0f, Sin(Time * 1.2f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -539,6 +546,13 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         
         char FPSBuf[64];
         stbsp_sprintf(FPSBuf, "FPS %.2f, ms %.3f", 1.0f / DeltaTime, DeltaTime);
+        
+        static int LastFrameEntryCount = 0;
+        static int LastFrameBytesUsed = 0;
+        char StackInfo[256];
+        stbsp_sprintf(StackInfo, "EntryCount: %d; BytesUsed: %d;", 
+                      LastFrameEntryCount, 
+                      LastFrameBytesUsed);
         
 #if 1
         gui_state* Gui = &GlobalGui;
@@ -558,11 +572,12 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         GuiBeginPage(Gui, "GUI");
         GuiEndPage(Gui);
         
-        GuiUpdateWindows(Gui);
+        //GuiUpdateWindows(Gui);
         
         GuiBeginLayout(Gui, Lay);
         GuiText(Gui, "Hello world");
         GuiText(Gui, FPSBuf);
+        GuiText(Gui, StackInfo);
         GuiText(Gui, "I love Kate");
         GuiText(Gui, "I wish joy and happiness for everyone");
         
@@ -600,17 +615,27 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         GuiBoolButtonOnOff(Gui, "BoolButtonOnOff3", &BoolButtonValue);
         GuiEndColumn(Gui);
         
-        static b32 CheckboxValue;
         GuiBeginColumn(Gui);
-        GuiCheckbox(Gui, "Checkbox", &CheckboxValue);
-        GuiCheckbox(Gui, "Checkbox1", &CheckboxValue);
-        GuiCheckbox(Gui, "Checkbox2", &CheckboxValue);
-        GuiCheckbox(Gui, "Checkbox3", &CheckboxValue);
+        static b32 CheckboxValue1;
+        static b32 CheckboxValue2;
+        static b32 CheckboxValue3;
+        static b32 CheckboxValue4;
+        GuiCheckbox(Gui, "Checkbox", &CheckboxValue1);
+        GuiCheckbox(Gui, "Checkbox1", &CheckboxValue2);
+        GuiCheckbox(Gui, "Checkbox2", &CheckboxValue3);
+        GuiCheckbox(Gui, "Checkbox3", &CheckboxValue4);
         GuiEndColumn(Gui);
         GuiEndRow(Gui);
         
+        GuiTooltip(Gui, "Hello world!", GlobalInput.MouseP);
+        
+        GuiPreRender(Gui);
+        
         GuiEndLayout(&GlobalGui, Lay);
 #endif
+        
+        LastFrameBytesUsed = RenderStack->Data.Used;
+        LastFrameEntryCount = RenderStack->EntryCount;
         
         RenderMultithreaded(&PlatformAPI.HighPriorityQueue, RenderStack, &Win32.Bitmap);
         RenderMultithreadedRGBA2BGRA(&PlatformAPI.HighPriorityQueue, &Win32.Bitmap);

@@ -9,18 +9,22 @@ PLATFORM_ADD_ENTRY(PlatformAddEntry){
     BeginTicketMutex(&Queue->AddMutex);
 #endif
     
-    uint32_t OldAddIndex = Queue->AddIndex.load();
-    Queue->AddIndex.store((OldAddIndex + 1) % Queue->JobsCount);
+    uint32_t OldAddIndex = Queue->AddIndex.load(std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_acquire);
+    
+    uint32_t NewAddIndex = (OldAddIndex + 1) % Queue->JobsCount;
     // NOTE(Dima): We should not overlap
-    //Assert(Queue->AddIndex.load() != Queue->DoIndex.load());
+    Assert(NewAddIndex != Queue->DoIndex.load(std::memory_order_acquire));
     
     platform_job* Job = &Queue->Jobs[OldAddIndex];
     Job->Callback = Callback;
     Job->Data = Data;
     
-    Queue->Started.fetch_add(1, std::memory_order_release);
-    Queue->ConditionVariable.notify_all();
+    std::atomic_thread_fence(std::memory_order_release);
+    Queue->AddIndex.store(NewAddIndex, std::memory_order_relaxed);
+    Queue->Started.fetch_add(1);
     
+    Queue->ConditionVariable.notify_all();
 #if PLATFORM_USE_STD_MUTEX
     Queue->AddMutexSTD.unlock();
 #else
@@ -31,18 +35,10 @@ PLATFORM_ADD_ENTRY(PlatformAddEntry){
 InternalFunction b32 PlatformDoWorkerWork(platform_job_queue* Queue){
     b32 Result = 0;
     
-#if 0
-    std::uint32_t A = Queue->AddIndex.load(std::memory_order_relaxed);
-    std::uint32_t D = Queue->DoIndex.load(std::memory_order_relaxed);
-    std::atomic_thread_fence(std::memory_order_acquire);
-#else
-    std::uint32_t A = Queue->AddIndex.load();
     std::uint32_t D = Queue->DoIndex.load();
-#endif
-    std::uint32_t NextDoIndex = (D + 1) % Queue->JobsCount;
     
-    if(A != D){
-        
+    if(D != Queue->AddIndex.load(std::memory_order_acquire)){
+        std::uint32_t NextDoIndex = (D + 1) % Queue->JobsCount;
         if(Queue->DoIndex.compare_exchange_weak(D, NextDoIndex)){
             platform_job* Job = &Queue->Jobs[D];
             
@@ -122,12 +118,11 @@ static void FreeJobQueue(platform_job_queue* Queue){
 }
 
 void InitDefaultPlatformAPI(platform_api* API){
-    InitJobQueue(&API->HighPriorityQueue, 2048, 6);
+    InitJobQueue(&API->HighPriorityQueue, 2048, 8);
     InitJobQueue(&API->LowPriorityQueue, 2048, 2);
     
     API->AddEntry = PlatformAddEntry;
     API->WaitForCompletion = PlatformWaitForCompletion;
-    
 }
 
 void FreePlatformAPI(platform_api* API){

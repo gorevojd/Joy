@@ -6,7 +6,7 @@
 #include "joy_math.h"
 #include "joy_render_stack.h"
 #include "joy_strings.h"
-
+#include "joy_colors.h"
 
 inline float GetBaseline(font_info* FontInfo, float Scale = 1.0f){
     float Result = (FontInfo->AscenderHeight + FontInfo->LineGap) * Scale;
@@ -103,6 +103,12 @@ struct gui_layout{
     int StackCurrentIndex;
 };
 
+#define GUI_TOOLTIP_MAX_SIZE 256
+struct gui_tooltip{
+    char Text[GUI_TOOLTIP_MAX_SIZE];
+    v2 At;
+};
+
 struct gui_state{
     font_info* MainFont;
     float FontScale;
@@ -110,6 +116,7 @@ struct gui_state{
     render_stack* Stack;
     input* Input;
     memory_region* Mem;
+    
     
     gui_layout Layout;
     gui_layout* CurrentLayout;
@@ -127,8 +134,13 @@ struct gui_state{
     int Width;
     int Height;
     
+#define GUI_MAX_TOOLTIPS 256
+    gui_tooltip Tooltips[GUI_MAX_TOOLTIPS];
+    int TooltipIndex;
+    
     bmp_info* CheckboxMark;
     
+    color_state ColorState;
     v4 Colors[GuiColor_Count];
     float WindowAlpha;
 };
@@ -187,6 +199,9 @@ void GuiEndRow(gui_state* Gui);
 void GuiBeginColumn(gui_state* Gui);
 void GuiEndColumn(gui_state* Gui);
 
+void GuiPreRender(gui_state* Gui);
+
+void GuiTooltip(gui_state* Gui, char* TooltipText, v2 At);
 void GuiText(gui_state* Gui, char* Text);
 b32 GuiButton(gui_state* Gui, char* ButtonName);
 void GuiBoolButton(gui_state* Gui, char* ButtonName, b32* Value);

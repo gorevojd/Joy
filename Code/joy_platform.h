@@ -12,6 +12,49 @@
 #include <vector>
 #include <condition_variable>
 
+
+
+#if defined(_WIN32) || defined(_WIN64)
+
+#define PLATFORM_WINDOWS
+#if defined(_WIN64)
+#define PLATFORM_WINDOWS_X64
+#else
+#define PLATFORM_WINDOWS_X32
+#endif
+
+#elif defined(unix) || defined(__unix) || defined(__unix__)
+
+#define PLATFORM_UNIX_BASED
+#if defined(__linux__)
+#define PLATFORM_LINUX
+#elif defined(__APPLE__) || defined(__MACH__)
+#define PLATFORM_MACOSX
+#endif
+
+#endif
+
+
+#if defined(PLATFORM_WINDOWS)
+#if defined(PLATFORM_WINDOWS_X64)
+inline u16 GetThreadID(){
+    __int64 Result = __readgsqword(0x48);
+    
+    return((u16)Result);
+}
+#else
+inline u16 GetThreadID(){
+    unsigned long Result = __readfsdword(0x24);
+    
+    return((u16)Result);
+}
+#endif
+
+#else
+// NOTE(Dima): Other platforms
+#endif
+
+
 struct platform_read_file_result{
     void* Data;
     u64 DataSize;
@@ -50,6 +93,9 @@ enum platform_error_type{
 
 #define PLATFORM_SHOW_ERROR(name) void name(u32 Type, char* Text)
 typedef PLATFORM_SHOW_ERROR(platform_show_error);
+
+#define PLATFORM_DEBUG_OUTPUT_STRING(name) void name(char* Text)
+typedef PLATFORM_DEBUG_OUTPUT_STRING(platform_debug_output_string);
 
 #define PLATFORM_CALLBACK(name) void name(void* Data)
 typedef PLATFORM_CALLBACK(platform_callback);
@@ -92,6 +138,7 @@ struct platform_api{
     platform_free_file_memory* FreeFileMemory;
     
     platform_show_error* ShowError;
+    platform_debug_output_string* OutputString;
     
     platform_job_queue HighPriorityQueue;
     platform_job_queue LowPriorityQueue;
