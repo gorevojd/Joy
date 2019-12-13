@@ -46,6 +46,8 @@ enum gui_color_type{
 };
 
 #define GUI_GETCOLOR(color) Gui->Colors[color]
+#define GUI_GETCOLOR_COLSYS(index) Gui->ColorState.ColorTable[index].Color
+#define GUI_COLORHEX(str) ColorFromHex(str)
 
 struct gui_page{
     char Name[128];

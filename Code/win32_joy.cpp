@@ -348,16 +348,15 @@ Win32ProcessInput(input* Input)
 INTERNAL_FUNCTION void
 Win32DisplayBitmapInWindow(
 win32_state* Win,
+HDC WindowDС,
 int WindowWidth,
 int WindowHeight)
 {
-    HDC DC = GetDC(Win->Window);
-    
     DWORD Style = GetWindowLong(Win->Window, GWL_STYLE);
     if (Style & WS_OVERLAPPEDWINDOW)
     {
         StretchDIBits(
-            DC,
+            WindowDС,
             0, 0, WindowWidth, WindowHeight,
             0, 0, Win->Bitmap.Width, Win->Bitmap.Height,
             Win->Bitmap.Pixels, &Win->BMI,
@@ -368,7 +367,7 @@ int WindowHeight)
         MONITORINFO MonitorInfo = { sizeof(MonitorInfo) };
         GetMonitorInfo(MonitorFromWindow(Win->Window, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo);;
         StretchDIBits(
-            DC,
+            WindowDС,
             MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
             MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
             MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
@@ -376,8 +375,6 @@ int WindowHeight)
             Win->Bitmap.Pixels, &Win->BMI,
             DIB_RGB_COLORS, SRCCOPY);
     }
-    
-    ReleaseDC(Win->Window, DC);
 }
 
 LRESULT CALLBACK
@@ -489,9 +486,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     BMIHeader->biCompression = BI_RGB;
     BMIHeader->biSizeImage = 0;
     
-#if USE_VULKAN
-    Win32InitVulkan(&Win32.Vulkan, &GlobalMem);
-#endif
+    HDC GlDC = GetDC(Win32.Window);
+    Win32.RenderContext = Win32InitOpenGL(GlDC);
     
     // NOTE(Dima): Initializing platform API
     InitDefaultPlatformAPI(&PlatformAPI);
@@ -640,13 +636,18 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         RenderMultithreaded(&PlatformAPI.HighPriorityQueue, RenderStack, &Win32.Bitmap);
         RenderMultithreadedRGBA2BGRA(&PlatformAPI.HighPriorityQueue, &Win32.Bitmap);
         
-        Win32DisplayBitmapInWindow(&Win32, WindowWidth, WindowHeight);
+        //Win32DisplayBitmapInWindow(&Win32, GlDC, WindowWidth, WindowHeight);
+        
+        glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
         
         LARGE_INTEGER EndClockLI;
         QueryPerformanceCounter(&EndClockLI);
         u64 ClocksElapsed = EndClockLI.QuadPart - BeginClockLI.QuadPart;
         DeltaTime = (float)ClocksElapsed * Win32.OneOverPerformanceFreq;
         Time += DeltaTime;
+        
+        SwapBuffers(GlDC);
     }
     
     //NOTE(dima): Cleanup
@@ -655,6 +656,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 #endif
     
     FreePlatformAPI(&PlatformAPI);
+    Win32FreeOpenGL(Win32.RenderContext);
+    ReleaseDC(Win32.Window, GlDC);
     DestroyWindow(Win32.Window);
     VirtualFree(MemoryBlock, 0, MEM_RELEASE);
     

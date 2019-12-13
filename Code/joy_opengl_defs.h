@@ -1,10 +1,16 @@
 #ifndef JOY_OPENGL_DEFS_H
 #define JOY_OPENGL_DEFS_H
 
+#ifdef JOY_OPENGL_DEFS_DECLARATION
+#define JOY_GL_TYPES_INCLUDE_SPEC
+#else
+#define JOY_GL_TYPES_INCLUDE_SPEC extern
+#endif
+
 #include <stdint.h>
+#include <GL/gl.h>
 
-#define GLFUN(fun) PFN_##fun* fun
-
+#define GLFUN(fun) JOY_GL_TYPES_INCLUDE_SPEC PFN_##fun* fun
 
 typedef size_t GLsizeiptr;
 typedef intptr_t GLintptr;

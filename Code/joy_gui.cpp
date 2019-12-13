@@ -182,8 +182,6 @@ int Height)
     
     // NOTE(Dima): Initializing colors
     InitColorsState(&Gui->ColorState, Mem);
-#define GUI_GETCOLOR_COLSYS(index) Gui->ColorState.ColorTable[index].Color
-#define GUI_COLORHEX(str) ColorFromHex(str)
     Gui->Colors[GuiColor_Text] = GUI_GETCOLOR_COLSYS(Color_White);
     Gui->Colors[GuiColor_HotText] = GUI_GETCOLOR_COLSYS(Color_Yellow);
     Gui->Colors[GuiColor_Borders] = GUI_GETCOLOR_COLSYS(Color_Black);

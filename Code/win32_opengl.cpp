@@ -1,6 +1,38 @@
 #include "win32_opengl.h"
+#include "joy_defines.h"
+
+#define JOY_OPENGL_DEFS_DECLARATION
+#include "joy_opengl_defs.h"
 
 #define GETGLFUN(fun) fun = (PFN_##fun*)wglGetProcAddress(#fun)
+#define WGLGETFUN(fun) fun = (PFN_##fun)wglGetProcAddress(#fun);
+
+
+typedef BOOL (WINAPI * PFN_wglChoosePixelFormatARB) (HDC hdc, 
+                                                     const int* piAttribIList, 
+                                                     const FLOAT *pfAttribFList, 
+                                                     UINT nMaxFormats, 
+                                                     int *piFormats, 
+                                                     UINT *nNumFormats);
+
+typedef HGLRC (WINAPI * PFN_wglCreateContextAttribsARB) (HDC hDC, 
+                                                         HGLRC hShareContext, 
+                                                         const int* attribList);
+
+typedef const char* (WINAPI * PFN_wglGetExtensionStringARB) (HDC hdc);
+typedef const char* (WINAPI * PFN_wglGetExtensionStringEXT) (void);
+
+typedef int (WINAPI * PFN_wglGetSwapIntervalEXT) (void);
+typedef BOOL (WINAPI * PFN_wglSwapIntervalEXT) (int interval);
+
+#define WGLFUN(fun) PFN_##fun fun;
+WGLFUN(wglChoosePixelFormatARB);
+WGLFUN(wglCreateContextAttribsARB);
+WGLFUN(wglGetExtensionStringARB);
+WGLFUN(wglGetExtensionStringEXT);
+WGLFUN(wglGetSwapIntervalEXT);
+WGLFUN(wglSwapIntervalEXT);
+
 
 LRESULT CALLBACK
 TmpOpenGLWndProc(
@@ -12,7 +44,8 @@ LPARAM LParam)
     return DefWindowProc(Window, Message, WParam, LParam);
 }
 
-void Win32LoadOpenglExtensions(){
+// NOTE(Dima): This function used to load wgl extensions
+static void Win32LoadOpenglExtensions(){
     WNDCLASSA WndClass = {};
     WndClass.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
     WndClass.lpfnWndProc = TmpOpenGLWndProc;
@@ -34,10 +67,44 @@ void Win32LoadOpenglExtensions(){
         WndClass.hInstance,
         0);
     
-    //.....
+    HDC TmpDC = GetDC(TempWND);
+    
+    PIXELFORMATDESCRIPTOR pfd = {
+        sizeof(pfd),
+        1,
+        PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+        PFD_TYPE_RGBA,
+        32,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        24,
+        8,
+        0,
+        PFD_MAIN_PLANE,
+        0, 0, 0, 0
+    };
+    int PixelFormat = ChoosePixelFormat(TmpDC, &pfd);
+    DescribePixelFormat(TmpDC, PixelFormat, sizeof(pfd), &pfd);
+    BOOL SetPixelFormatResult = SetPixelFormat(TmpDC, PixelFormat, &pfd);
+    Assert(SetPixelFormatResult);
+    
+    HGLRC TmpRenderCtx = wglCreateContext(TmpDC);
+    BOOL MakeCurrentResult = wglMakeCurrent(TmpDC, TmpRenderCtx);
+    Assert(MakeCurrentResult);
+    
+    WGLGETFUN(wglChoosePixelFormatARB);
+    WGLGETFUN(wglCreateContextAttribsARB);
+    WGLGETFUN(wglGetExtensionStringARB);
+    WGLGETFUN(wglGetExtensionStringEXT);
+    WGLGETFUN(wglGetSwapIntervalEXT);
+    WGLGETFUN(wglSwapIntervalEXT);
+    
+    wglMakeCurrent(TmpDC, 0);
+    wglDeleteContext(TmpRenderCtx);
+    ReleaseDC(TempWND, TmpDC);
+    DestroyWindow(TempWND);
 }
 
-void Win32GetOpenglFunctions(){
+static void Win32GetOpenglFunctions(){
     GETGLFUN(glDrawRangeElements);
     GETGLFUN(glTexImage3D);
     GETGLFUN(glTexSubImage3D);
@@ -739,4 +806,53 @@ void Win32GetOpenglFunctions(){
     GETGLFUN(glMultiDrawArraysIndirectCount);
     GETGLFUN(glMultiDrawElementsIndirectCount);
     GETGLFUN(glPolygonOffsetClamp);
+}
+
+// NOTE(Dima): Thanks https://gist.github.com/nickrolfe/1127313ed1dbf80254b614a721b3ee9c
+HGLRC Win32InitOpenGL(HDC RealDC){
+    Win32LoadOpenglExtensions();
+    
+    const int PixelFormatAttribs[] = {
+        WGL_DRAW_TO_WINDOW_ARB,     GL_TRUE,
+        WGL_SUPPORT_OPENGL_ARB,     GL_TRUE,
+        WGL_DOUBLE_BUFFER_ARB,      GL_TRUE,
+        WGL_ACCELERATION_ARB,       WGL_FULL_ACCELERATION_ARB,
+        WGL_PIXEL_TYPE_ARB,         WGL_TYPE_RGBA_ARB,
+        WGL_COLOR_BITS_ARB,         32,
+        WGL_DEPTH_BITS_ARB,         24,
+        WGL_STENCIL_BITS_ARB,       8,
+        0,
+    };
+    
+    int PixelFormat;
+    UINT NumFormats = 0;
+    wglChoosePixelFormatARB(RealDC, PixelFormatAttribs, 0, 1, &PixelFormat, &NumFormats);
+    Assert(NumFormats);
+    
+    PIXELFORMATDESCRIPTOR pfd;
+    DescribePixelFormat(RealDC, PixelFormat, sizeof(pfd), &pfd);
+    BOOL SetPFResult = SetPixelFormat(RealDC, PixelFormat, &pfd);
+    Assert(SetPFResult);
+    
+    // Specify that we want to create an OpenGL 3.3 core profile context
+    const int Attribs[] = {
+        WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+        WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+        WGL_CONTEXT_PROFILE_MASK_ARB,  WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+        0,
+    };
+    
+    HGLRC ResultContext = wglCreateContextAttribsARB(RealDC, 0, Attribs);
+    Assert(ResultContext);
+    
+    BOOL MakeCurrentResult = wglMakeCurrent(RealDC, ResultContext);
+    Assert(MakeCurrentResult);
+    
+    Win32GetOpenglFunctions();
+    
+    return(ResultContext);
+}
+
+void Win32FreeOpenGL(HGLRC RenderContext){
+    wglDeleteContext(RenderContext);
 }
