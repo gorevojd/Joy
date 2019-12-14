@@ -20,6 +20,7 @@ GLOBAL_VARIABLE b32 GlobalRunning;
 GLOBAL_VARIABLE input GlobalInput;
 GLOBAL_VARIABLE assets GlobalAssets;
 GLOBAL_VARIABLE gui_state GlobalGui;
+GLOBAL_VARIABLE gl_state GlobalGL;
 
 platform_api PlatformAPI;
 
@@ -837,6 +838,8 @@ HGLRC Win32InitOpenGL(HDC RealDC){
     BOOL MakeCurrentResult = wglMakeCurrent(RealDC, ResultContext);
     Assert(MakeCurrentResult);
     
+    wglSwapIntervalEXT(0);
+    
     Win32GetOpenglFunctions();
     
     return(ResultContext);
@@ -1322,6 +1325,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     PlatformAPI.OutputString = Win32DebugOutputString;
     
     // NOTE(Dima): Initializing engine systems
+    GL_Init(&GlobalGL);
     InitAssets(&GlobalAssets);
     render_stack RenderStack_ = InitRenderStack(&GlobalMem, Megabytes(1));
     render_stack* RenderStack = &RenderStack_;
@@ -1457,12 +1461,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         LastFrameEntryCount = RenderStack->EntryCount;
         
         RenderMultithreaded(&PlatformAPI.HighPriorityQueue, RenderStack, &Win32.Bitmap);
-        RenderMultithreadedRGBA2BGRA(&PlatformAPI.HighPriorityQueue, &Win32.Bitmap);
         
-        Win32DisplayBitmapInWindow(&Win32, GlDC, WindowWidth, WindowHeight);
-        
-        glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        GL_OutputRender(&GlobalGL, &Win32.Bitmap);
         
         LARGE_INTEGER EndClockLI;
         QueryPerformanceCounter(&EndClockLI);
@@ -1470,13 +1470,11 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         DeltaTime = (float)ClocksElapsed * Win32.OneOverPerformanceFreq;
         Time += DeltaTime;
         
-        //SwapBuffers(GlDC);
+        SwapBuffers(GlDC);
     }
     
     //NOTE(dima): Cleanup
-#if USE_VULKAN
-    Win32CleanupVulkan(&Win32.Vulkan);
-#endif
+    GL_Free(&GlobalGL);
     
     FreePlatformAPI(&PlatformAPI);
     Win32FreeOpenGL(Win32.RenderContext);

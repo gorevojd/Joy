@@ -18,7 +18,9 @@
 #include "joy_platform.h"
 #include "joy_gui.h"
 
+#define JOY_OPENGL_DEFS_DECLARATION
 #include "joy_opengl_defs.h"
+
 #include "joy_opengl.h"
 
 #ifndef WGL_ARB_multisample
