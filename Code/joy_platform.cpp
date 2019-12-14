@@ -2,6 +2,50 @@
 
 #define PLATFORM_USE_STD_MUTEX 1
 
+PLATFORM_READ_FILE(PlatformReadFile) {
+	platform_read_file_result Result = {};
+    
+	FILE* fp = fopen(FilePath, "rb");
+    
+	if (fp) {
+		fseek(fp, 0, 2);
+		u64 FileSize = ftell(fp);
+		fseek(fp, 0, 0);
+        
+		Result.DataSize = FileSize;
+		Result.Data = (u8*)calloc(FileSize + 1, 1);
+        
+		fread(Result.Data, 1, FileSize, fp);
+        
+		fclose(fp);
+	}
+    
+	return(Result);
+}
+
+PLATFORM_WRITE_FILE(PlatformWriteFile) {
+	FILE* File = (FILE*)fopen(FilePath, "wb");
+    
+    b32 Result = 0;
+    
+	if (File) {
+		size_t ElementsWritten = fwrite(Data, 1, Size, File);
+        
+        Result = (ElementsWritten == Size);
+        
+		fclose(File);
+	}
+    
+    return(Result);
+}
+
+PLATFORM_FREE_FILE_MEMORY(PlatformFreeFileMemory) {
+	if (FileReadResult->Data) {
+		free(FileReadResult->Data);
+	}
+	FileReadResult->Data = 0;
+}
+
 PLATFORM_ADD_ENTRY(PlatformAddEntry){
 #if PLATFORM_USE_STD_MUTEX
     Queue->AddMutexSTD.lock();
@@ -123,9 +167,14 @@ void InitDefaultPlatformAPI(platform_api* API){
     
     API->AddEntry = PlatformAddEntry;
     API->WaitForCompletion = PlatformWaitForCompletion;
+    
+    API->ReadFile = PlatformReadFile;
+    API->WriteFile = PlatformWriteFile;
+    API->FreeFileMemory = PlatformFreeFileMemory;
 }
 
 void FreePlatformAPI(platform_api* API){
     FreeJobQueue(&API->HighPriorityQueue);
     FreeJobQueue(&API->LowPriorityQueue);
 }
+

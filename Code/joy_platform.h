@@ -12,8 +12,6 @@
 #include <vector>
 #include <condition_variable>
 
-
-
 #if defined(_WIN32) || defined(_WIN64)
 
 #define PLATFORM_WINDOWS
@@ -78,12 +76,15 @@ inline void EndTicketMutex(ticket_mutex* Mutex){
 
 #define PLATFORM_READ_FILE(name) platform_read_file_result name(char* FilePath)
 typedef PLATFORM_READ_FILE(platform_read_file);
+PLATFORM_READ_FILE(PlatformReadFile);
 
 #define PLATFORM_WRITE_FILE(name) b32 name(char* FilePath, void* Data, u64 Size)
 typedef PLATFORM_WRITE_FILE(platform_write_file);
+PLATFORM_WRITE_FILE(PlatformWriteFile);
 
-#define PLATFORM_FREE_FILE_MEMORY(name) void name(platform_read_file_result* ReadFileResult)
+#define PLATFORM_FREE_FILE_MEMORY(name) void name(platform_read_file_result* FileReadResult)
 typedef PLATFORM_FREE_FILE_MEMORY(platform_free_file_memory);
+PLATFORM_FREE_FILE_MEMORY(PlatformFreeFileMemory);
 
 enum platform_error_type{
     PlatformError_Error,
