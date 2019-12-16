@@ -1,6 +1,7 @@
 #include "joy_asset_util.h"
 #include "joy_software_renderer.h"
 #include "joy_defines.h"
+#include "joy_render_blur.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -135,7 +136,9 @@ int Codepoint,
 int* AtlasWidth, 
 int* AtlasHeight,
 float FontScale,
-u32 Flags)
+u32 Flags,
+int BlurRadius,
+float* GaussianBox)
 {
     int GlyphIndex = FontInfo->GlyphCount++;
     glyph_info* Glyph = &FontInfo->Glyphs[GlyphIndex];
@@ -163,7 +166,7 @@ u32 Flags)
         CharHeight = 0;
     }
     
-    int CharBorder = 1;
+    int CharBorder = 3;
     int ShadowOffset = 0;
     
     if(Flags & LoadFont_BakeShadow){
@@ -218,6 +221,101 @@ u32 Flags)
 		}
 	}
     
+    //NOTE(dima): Render blur if needed
+	if (Flags & LoadFont_BakeBlur) {
+		bmp_info ToBlur = AssetAllocateBitmap(
+			2 * CharBorder + CharWidth,
+			2 * CharBorder + CharHeight);
+        
+		bmp_info BlurredResult = AssetAllocateBitmap(
+			2 * CharBorder + CharWidth,
+			2 * CharBorder + CharHeight);
+        
+		bmp_info TempBitmap = AssetAllocateBitmap(
+			2 * CharBorder + CharWidth,
+			2 * CharBorder + CharHeight);
+        
+		RenderOneBitmapIntoAnother(
+			&ToBlur,
+			&CharBitmap,
+			CharBorder,
+			CharBorder,
+			V4(1.0f, 1.0f, 1.0f, 1.0f));
+        
+#if 1
+		BlurBitmapExactGaussian(
+			&ToBlur,
+			BlurredResult.Pixels,
+			ToBlur.Width,
+			ToBlur.Height,
+			BlurRadius,
+			GaussianBox);
+        
+        
+		for (int Y = 0; Y < ToBlur.Height; Y++) {
+			for (int X = 0; X < ToBlur.Width; X++) {
+				u32* FromPix = (u32*)BlurredResult.Pixels + Y * BlurredResult.Width + X;
+				u32* ToPix = (u32*)ToBlur.Pixels + Y * ToBlur.Width + X;
+                
+				v4 FromColor = UnpackRGBA(*FromPix);
+                
+				v4 ResultColor = FromColor;
+				if (ResultColor.a > 0.05f) {
+					ResultColor.a = 1.0f;
+				}
+                
+				*ToPix = PackRGBA(ResultColor);
+			}
+		}
+        
+		BlurBitmapExactGaussian(
+			&ToBlur,
+			BlurredResult.Pixels,
+			ToBlur.Width,
+			ToBlur.Height,
+			BlurRadius,
+			GaussianBox);
+        
+#else
+		BlurBitmapApproximateGaussian(
+			&ToBlur,
+			BlurredResult.Pixels,
+			TempBitmap.Pixels,
+			ToBlur.Width,
+			ToBlur.Height,
+			BlurRadius);
+		for (int Y = 0; Y < ToBlur.Height; Y++) {
+			for (int X = 0; X < ToBlur.Width; X++) {
+				u32* FromPix = (u32*)BlurredResult.Pixels + Y * BlurredResult.Width + X;
+				u32* ToPix = (u32*)ToBlur.Pixels + Y * ToBlur.Width + X;
+				v4 FromColor = UnpackRGBA(*FromPix);
+				v4 ResultColor = FromColor;
+				if (ResultColor.a > 0.05f) {
+					ResultColor.a = 1.0f;
+				}
+				*ToPix = PackRGBA(ResultColor);
+			}
+		}
+		BlurBitmapApproximateGaussian(
+			&ToBlur,
+			BlurredResult.Pixels,
+			TempBitmap.Pixels,
+			ToBlur.Width,
+			ToBlur.Height,
+			BlurRadius);
+#endif
+        
+		RenderOneBitmapIntoAnother(
+			&Glyph->Bitmap,
+			&BlurredResult,
+			0, 0,
+			V4(0.0f, 0.0f, 0.0f, 1.0f));
+        
+		AssetDeallocateBitmap(&TempBitmap);
+		AssetDeallocateBitmap(&ToBlur);
+		AssetDeallocateBitmap(&BlurredResult);
+	}
+    
     if(Flags & LoadFont_BakeShadow){
         
         RenderOneBitmapIntoAnother(
@@ -268,6 +366,15 @@ font_info LoadFont(char* FilePath, float Height, u32 Flags){
     int AtlasWidth = 0;
     int AtlasHeight = 0;
     
+    //NOTE(dima): This is for blurring
+	int BlurRadius = 2;
+	float GaussianBox[256];
+	if (Flags & LoadFont_BakeBlur) {
+        
+		u32 GaussianBoxCompCount = Calcualte2DGaussianBoxComponentsCount(BlurRadius);
+		Calculate2DGaussianBox(GaussianBox, BlurRadius);
+	}
+    
     for(int Codepoint = ' ';
         Codepoint <= '~';
         Codepoint++)
@@ -279,7 +386,9 @@ font_info LoadFont(char* FilePath, float Height, u32 Flags){
             &AtlasWidth,
             &AtlasHeight,
             Scale,
-            Flags);
+            Flags,
+            BlurRadius,
+            GaussianBox);
     }
     
     //NOTE(dima): Processing kerning

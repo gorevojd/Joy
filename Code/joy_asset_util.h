@@ -12,7 +12,7 @@ struct data_buffer {
 
 enum load_font_flags{
     LoadFont_BakeShadow = 1,
-    LoadFont_Blur = 2,
+    LoadFont_BakeBlur = 2,
 };
 
 // NOTE(Dima): Data buffers utility functions

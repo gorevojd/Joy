@@ -1171,38 +1171,6 @@ Win32ProcessInput(input* Input)
     }
 }
 
-INTERNAL_FUNCTION void
-Win32DisplayBitmapInWindow(
-win32_state* Win,
-HDC WindowDС,
-int WindowWidth,
-int WindowHeight)
-{
-    DWORD Style = GetWindowLong(Win->Window, GWL_STYLE);
-    if (Style & WS_OVERLAPPEDWINDOW)
-    {
-        StretchDIBits(
-            WindowDС,
-            0, 0, WindowWidth, WindowHeight,
-            0, 0, Win->Bitmap.Width, Win->Bitmap.Height,
-            Win->Bitmap.Pixels, &Win->BMI,
-            DIB_RGB_COLORS, SRCCOPY);
-    }
-    else
-    {
-        MONITORINFO MonitorInfo = { sizeof(MonitorInfo) };
-        GetMonitorInfo(MonitorFromWindow(Win->Window, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo);;
-        StretchDIBits(
-            WindowDС,
-            MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
-            MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
-            MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
-            0, 0, Win->Bitmap.Width, Win->Bitmap.Height,
-            Win->Bitmap.Pixels, &Win->BMI,
-            DIB_RGB_COLORS, SRCCOPY);
-    }
-}
-
 LRESULT CALLBACK
 Win32WindowProcessing(
 HWND Window,
