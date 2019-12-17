@@ -12,6 +12,7 @@ enum render_entry_type{
     RenderEntry_Rect,
     RenderEntry_Glyph,
     RenderEntry_Mesh,
+    RenderEntry_Gradient,
 };
 
 struct render_entry_header{
@@ -19,6 +20,7 @@ struct render_entry_header{
     u32 DataSize;
 };
 
+#define RENDER_GET_ENTRY(type) type* Entry = (type*)At
 struct render_stack{
     memory_region Data;
     
@@ -50,6 +52,18 @@ struct render_entry_bitmap{
     v2 TopLeftP;
     float PixelHeight;
     v4 ModulationColor01;
+};
+
+enum render_entry_gradient_type{
+    RenderEntryGradient_Horizontal,
+    RenderEntryGradient_Vertical,
+};
+
+struct render_entry_gradient{
+    rc2 Rc;
+    v3 Color1;
+    v3 Color2;
+    u32 GradientType;
 };
 
 struct render_entry_rect{
@@ -96,6 +110,20 @@ inline void PushBitmap(render_stack* Stack, bmp_info* Bitmap, v2 P, float Height
     Entry->TopLeftP = P;
     Entry->PixelHeight = Height;
     Entry->ModulationColor01 = MultColor;
+}
+
+inline void PushGradient(render_stack* Stack, 
+                         rc2 Rc, 
+                         v3 Color1, 
+                         v3 Color2, 
+                         u32 GradientType)
+{
+    render_entry_gradient* Entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Gradient, render_entry_gradient);
+    
+    Entry->Rc = Rc;
+    Entry->Color1 = Color1;
+    Entry->Color2 = Color2;
+    Entry->GradientType = GradientType;
 }
 
 inline void PushRect(

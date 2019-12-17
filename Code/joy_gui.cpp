@@ -684,7 +684,7 @@ b32 GuiButton(gui_state* Gui, char* ButtonName){
     rc2 TempTextRc = GrowRectByScaledValue(TextRc, V2(4.0f, 2.0f), Gui->FontScale);
     TextRc.Max = TextRc.Min + GetRectDim(TempTextRc);
     PushRect(Gui->Stack, TextRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
-    PushRectOutline(Gui->Stack, TextRc, 1, GUI_GETCOLOR(GuiColor_Borders));
+    //PushRectOutline(Gui->Stack, TextRc, 1, GUI_GETCOLOR(GuiColor_Borders));
     
     // NOTE(Dima): Event processing
     v4 TextColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
@@ -713,7 +713,7 @@ void GuiBoolButton(gui_state* Gui, char* ButtonName, b32* Value){
     rc2 TempTextRc = GrowRectByScaledValue(TextRc, V2(4.0f, 2.0f), Gui->FontScale);
     TextRc.Max = TextRc.Min + GetRectDim(TempTextRc);
     PushRect(Gui->Stack, TextRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
-    PushRectOutline(Gui->Stack, TextRc, 1, GUI_GETCOLOR(GuiColor_Borders));
+    //PushRectOutline(Gui->Stack, TextRc, 1, GUI_GETCOLOR(GuiColor_Borders));
     
     v4 TextColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
     
@@ -749,7 +749,7 @@ void GuiBoolButtonOnOff(gui_state* Gui, char* ButtonName, b32* Value){
     v2 TempButRcDim = GetRectDim(TempButRc);
     ButRc.Max = ButRc.Min + TempButRcDim;
     PushRect(Gui->Stack, ButRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
-    PushRectOutline(Gui->Stack, ButRc, 1, GUI_GETCOLOR(GuiColor_Borders));
+    //PushRectOutline(Gui->Stack, ButRc, 1, GUI_GETCOLOR(GuiColor_Borders));
     
     // NOTE(Dima): Button name text printing
     float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, ButRc, Gui->FontScale);
@@ -816,7 +816,7 @@ void GuiCheckbox(gui_state* Gui, char* Name, b32* Value){
         PushBitmap(Gui->Stack, Gui->CheckboxMark, CheckRect.Min, GetRectHeight(CheckRect), V4(1.0f, 1.0f, 1.0f, 1.0f));
     }
     
-    PushRectOutline(Gui->Stack, CheckRect, 1, GUI_GETCOLOR(GuiColor_Borders));
+    //PushRectOutline(Gui->Stack, CheckRect, 1, GUI_GETCOLOR(GuiColor_Borders));
     
     // NOTE(Dima): Button name text printing
     float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, CheckRect, Gui->FontScale);

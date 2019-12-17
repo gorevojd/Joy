@@ -22,13 +22,15 @@ int StartX,
 int StartY,
 v4 ModulationColor);
 
-void RenderRGBA2BGRA(
-bmp_info* Buffer, 
-rc2 ClipRect);
+void RenderRGBA2BGRA(bmp_info* Buffer, rc2 ClipRect);
+void RenderRGBA2BGRASSE(bmp_info* Buffer, rc2 ClipRect);
 
-void RenderRGBA2BGRASSE(
-bmp_info* Buffer, 
-rc2 ClipRect);
+void RenderGradientHorz(bmp_info* Buffer, v3 Color, rc2 ClipRect);
+void RenderGradientHorzSSE(bmp_info* Buffer, v3 Color, rc2 ClipRect);
+
+void RenderGradientVert(bmp_info* Buffer, v3 Color, rc2 ClipRect);
+void RenderGradientVertSSE(bmp_info* Buffer, v3 Color, rc2 ClipRect);
+
 
 void RenderBitmap(
 bmp_info* Buffer,
