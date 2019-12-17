@@ -67,25 +67,35 @@ struct color_slot {
 enum color_table_type {
 	Color_Black,
 	Color_White,
-    
 	Color_Red,
 	Color_Green,
 	Color_Blue,
-    
 	Color_Yellow,
 	Color_Magenta,
 	Color_Cyan,
-    
 	Color_PrettyBlue,
 	Color_Purple,
-    
 	Color_Orange,
 	Color_Brown,
 	Color_Amber,
-    
 	Color_Burlywood,
 	Color_DarkGoldenrod,
 	Color_OliveDrab,
+    
+    Color_Thistle,
+    Color_Plum,
+    Color_Violet,
+    Color_Orchid,
+    Color_Fuchsia,
+    Color_MediumOrchid,
+    Color_MediumPurple,
+    Color_BlueViolet,
+    Color_DarkViolet,
+    Color_DarkOrchid,
+    Color_DarkMagenta,
+    Color_Indigo,
+    Color_SlateBlue,
+    Color_DarkSlateBlue,
     
 	ColorExt_AliceBlue,
 	ColorExt_AntiqueWhite,
