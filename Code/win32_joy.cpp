@@ -1327,8 +1327,12 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         
         PushClearColor(RenderStack, V3(1.0f, 0.5f, 0.0f));
         
-        PushGradient(RenderStack, RcMinDim(V2(10, 10), V2(900, 600)), V3(1.0f, 0.2f, 0.0f), V3(0.2f, 0.8f, 1.0f), RenderEntryGradient_Horizontal);
-        PushGradient(RenderStack, RcMinDim(V2(100, 100), V2(500, 900)), V3(1.0f, 0.2f, 0.0f), V3(0.2f, 0.8f, 1.0f), RenderEntryGradient_Vertical);
+        PushGradient(RenderStack, RcMinDim(V2(10, 10), V2(900, 300)), 
+                     ColorFromHex("#FF00FF"), ColorFromHex("#4b0082"),
+                     RenderEntryGradient_Horizontal);
+        PushGradient(RenderStack, RcMinDim(V2(100, 400), V2(900, 300)), 
+                     ColorFromHex("#FF00FF"), ColorFromHex("#4b0082"), 
+                     RenderEntryGradient_Vertical);
         
         PushBitmap(RenderStack, &GlobalAssets.Sunset, V2(100.0f, Sin(Time * 1.0f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
         PushBitmap(RenderStack, &GlobalAssets.SunsetOrange, V2(200.0f, Sin(Time * 1.1f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));

@@ -126,6 +126,20 @@ inline void PushGradient(render_stack* Stack,
     Entry->GradientType = GradientType;
 }
 
+inline void PushGradient(render_stack* Stack, 
+                         rc2 Rc, 
+                         v4 Color1, 
+                         v4 Color2, 
+                         u32 GradientType)
+{
+    render_entry_gradient* Entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Gradient, render_entry_gradient);
+    
+    Entry->Rc = Rc;
+    Entry->Color1 = Color1.rgb;
+    Entry->Color2 = Color2.rgb;
+    Entry->GradientType = GradientType;
+}
+
 inline void PushRect(
 render_stack* Stack, 
 rc2 Rect, 
