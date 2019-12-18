@@ -919,7 +919,6 @@ PLATFORM_WRITE_FILE(Win32WriteFile){
         //TODO(Dima): Logging
     }
     
-    
     return(Result);
 }
 
