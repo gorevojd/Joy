@@ -131,23 +131,42 @@ WGLFUN(wglGetExtensionStringEXT);
 WGLFUN(wglGetSwapIntervalEXT);
 WGLFUN(wglSwapIntervalEXT);
 
-struct win32_state{
-	HWND Window;
-    int WindowWidth;
-    int WindowHeight;
+struct Win_Memory_Region{
+    // NOTE(Dima): Size of memory that we can actually use
+    mi size;
+    // NOTE(Dima): Total commited size
+    mi totalCommittedSize;
+    // NOTE(Dima): This is base address of the memory that we can
+    // NOTE(Dima): actually use
+    void* baseAddress;
+    // NOTE(Dima): Allocation block is total block with guard pages
+    // NOTE(Dima): at begin and end, and additional info page
+    void* baseAddressOfAllocationBlock;
     
-    WINDOWPLACEMENT WindowPlacement;
-    
-    HGLRC RenderContext;
-    
-    bmp_info Bitmap;
-    BITMAPINFO BMI;
-    
-    LARGE_INTEGER PerformanceFreqLI;
-    float OneOverPerformanceFreq;
+    Win_Memory_Region* next;
+    Win_Memory_Region* prev;
 };
 
-HGLRC Win32InitOpenGL(HDC RealDC);
-void Win32FreeOpenGL(HGLRC RenderContext);
+struct Win_State{
+	HWND window;
+    int windowWidth;
+    int windowHeight;
+    
+    WINDOWPLACEMENT windowPlacement;
+    
+    HGLRC renderCtx;
+    
+    Bmp_Info bitmap;
+    BITMAPINFO bmi;
+    
+    TicketMutex memoryMutex;
+    Win_Memory_Region memorySentinel;
+    
+    LARGE_INTEGER performanceFreqLI;
+    float oneOverPerformanceFreq;
+};
+
+HGLRC Win32InitOpenGL(HDC realDC);
+void Win32FreeOpenGL(HGLRC renderContext);
 
 #endif

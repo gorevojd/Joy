@@ -7,39 +7,39 @@
 #include "joy_opengl_defs.h"
 #include "joy_render.h"
 
-#define GLGETU(uniftext) GL_GetUniform(GL->Programs[Result.ProgramIndex], uniftext)
-#define GLGETP(index) GL->Programs[index]
-#define GLGETPID(shader) GL->Programs[(shader).ProgramIndex].ID
+#define GLGETU(uniftext) Gl_GetUniform(gl->programs[result.programIndex], uniftext)
+#define GLGETP(index) gl->programs[index]
+#define GLGETPID(shader) gl->programs[(shader).programIndex].id
 
-struct gl_program{
-    GLuint ID;
+struct Gl_Program{
+    GLuint id;
 };
 
-inline GLint GL_GetUniform(gl_program Program, char* Text){
-    GLint Result = glGetUniformLocation(Program.ID, Text);
+inline GLint Gl_GetUniform(Gl_Program program, char* text){
+    GLint result = glGetUniformLocation(program.id, text);
     
-    return(Result);
+    return(result);
 }
 
 
-struct gl_screen_shader{
-    int ProgramIndex;
+struct Gl_Screen_Shader{
+    int programIndex;
     
-    GLint ScreenTextureLoc;
+    GLint screenTextureLoc;
 };
 
-struct gl_state{
-    gl_program Programs[256];
-    int ProgramsCount;
+struct Gl_State{
+    Gl_Program programs[256];
+    int programsCount;
     
-    gl_screen_shader ScreenShader;
+    Gl_Screen_Shader screenShader;
     
-    GLuint ScreenVAO;
-    GLuint ScreenVBO;
+    GLuint screenVAO;
+    GLuint screenVBO;
 };
 
-void GL_Init(gl_state* GL);
-void GL_Free(gl_state* GL);
-void GL_OutputRender(gl_state* GL, bmp_info* BlitBMP);
+void GlInit(Gl_State* gl);
+void GlFree(Gl_State* gl);
+void GlOutputRender(Gl_State* GL, Bmp_Info* blitBMP);
 
 #endif

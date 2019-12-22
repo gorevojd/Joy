@@ -1,43 +1,43 @@
 #ifndef JOY_ASSET_TYPES_H
 #define JOY_ASSET_TYPES_H
 
-struct bmp_info{
-    void* Pixels;
-    int Width;
-    int Height;
-    int Pitch;
-    float WidthOverHeight;
+struct Bmp_Info{
+    void* pixels;
+    int width;
+    int height;
+    int pitch;
+    float widthOverHeight;
 };
 
-struct glyph_info{
-    int Codepoint;
+struct Glyph_Info{
+    int codepoint;
     
-    int Width;
-    int Height;
+    int width;
+    int height;
     
-    bmp_info Bitmap;
+    Bmp_Info bitmap;
     
     /*Theese are offset from glyph origin to top-left of bitmap*/
-	float XOffset;
-	float YOffset;
-	float Advance;
-	float LeftBearingX;
+	float xOffset;
+	float yOffset;
+	float advance;
+	float leftBearingX;
 };
 
 #define FONT_INFO_MAX_GLYPH_COUNT 256
-struct font_info{
-    float AscenderHeight;
-	float DescenderHeight;
-	float LineGap;
+struct Font_Info{
+    float ascenderHeight;
+	float descenderHeight;
+	float lineGap;
     
-    float* KerningPairs;
+    float* kerningPairs;
     
-    glyph_info Glyphs[FONT_INFO_MAX_GLYPH_COUNT];
-    int GlyphCount;
+    Glyph_Info glyphs[FONT_INFO_MAX_GLYPH_COUNT];
+    int glyphCount;
     
-    int Codepoint2Glyph[FONT_INFO_MAX_GLYPH_COUNT];
+    int codepoint2Glyph[FONT_INFO_MAX_GLYPH_COUNT];
     
-    bmp_info AtlasImage;
+    Bmp_Info atlasImage;
 };
 
 #endif

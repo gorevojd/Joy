@@ -15,100 +15,100 @@
 #define STB_IMAGE_STATIC
 #include "stb_image.h"
 
-data_buffer ReadFileToDataBuffer(char* FileName){
-	data_buffer Result = {};
+Data_Buffer ReadFileToDataBuffer(char* fileName){
+	Data_Buffer res = {};
     
-	FILE* fp = fopen(FileName, "rb");
+	FILE* fp = fopen(fileName, "rb");
 	if (fp) {
 		fseek(fp, 0, 2);
-		u64 FileSize = ftell(fp);
+		u64 fileSize = ftell(fp);
 		fseek(fp, 0, 0);
         
-		Result.Size = FileSize;
-		Result.Data = (u8*)calloc(FileSize, 1);
+		res.size = fileSize;
+		res.data = (u8*)calloc(fileSize, 1);
         
-		fread(Result.Data, 1, FileSize, fp);
+		fread(res.data, 1, fileSize, fp);
         
 		fclose(fp);
 	}
     
-	return(Result);
+	return(res);
 }
 
-void FreeDataBuffer(data_buffer* DataBuffer){
-	if (DataBuffer->Data) {
-		free(DataBuffer->Data);
+void FreeDataBuffer(Data_Buffer* dataBuffer){
+	if (dataBuffer->data) {
+		free(dataBuffer->data);
 	}
 }
 
 
-bmp_info AssetAllocateBitmapInternal(u32 Width, u32 Height, void* PixelsData) {
-	bmp_info Result = {};
+Bmp_Info AssetAllocateBitmapInternal(u32 width, u32 height, void* pixelsData) {
+	Bmp_Info res = {};
     
-	Result.Width = Width;
-	Result.Height = Height;
-	Result.Pitch = 4 * Width;
+	res.width = width;
+	res.height = height;
+	res.pitch = 4 * width;
     
-	Result.WidthOverHeight = (float)Width / (float)Height;
+	res.widthOverHeight = (float)width / (float)height;
     
-	Result.Pixels = (u8*)PixelsData;
+	res.pixels = (u8*)pixelsData;
     
-	return(Result);
+	return(res);
 }
 
-bmp_info AssetAllocateBitmap(u32 Width, u32 Height) {
-	u32 BitmapDataSize = Width * Height * 4;
+Bmp_Info AssetAllocateBitmap(u32 width, u32 height) {
+	u32 BitmapDataSize = width * height * 4;
 	void* PixelsData = calloc(BitmapDataSize, 1);
     
 	memset(PixelsData, 0, BitmapDataSize);
     
-	bmp_info Result = AssetAllocateBitmapInternal(Width, Height, PixelsData);
+	Bmp_Info res = AssetAllocateBitmapInternal(width, height, PixelsData);
     
-	return(Result);
+	return(res);
 }
 
-void AssetCopyBitmapData(bmp_info* Dst, bmp_info* Src) {
-	Assert(Dst->Width == Src->Width);
-	Assert(Dst->Height == Src->Height);
+void AssetCopyBitmapData(Bmp_Info* Dst, Bmp_Info* Src) {
+	Assert(Dst->width == Src->width);
+	Assert(Dst->height == Src->height);
     
-	u32* DestOut = (u32*)Dst->Pixels;
-	u32* ScrPix = (u32*)Src->Pixels;
-	for (int j = 0; j < Src->Height; j++) {
-		for (int i = 0; i < Src->Width; i++) {
+	u32* DestOut = (u32*)Dst->pixels;
+	u32* ScrPix = (u32*)Src->pixels;
+	for (int j = 0; j < Src->height; j++) {
+		for (int i = 0; i < Src->width; i++) {
 			*DestOut++ = *ScrPix++;
 		}
 	}
 }
 
-void AssetDeallocateBitmap(bmp_info* Buffer) {
-	if (Buffer->Pixels) {
-		free(Buffer->Pixels);
+void AssetDeallocateBitmap(Bmp_Info* Buffer) {
+	if (Buffer->pixels) {
+		free(Buffer->pixels);
 	}
 }
 
 
-bmp_info LoadBMP(char* FilePath){
-    bmp_info Result = {};
+Bmp_Info LoadBMP(char* FilePath){
+    Bmp_Info res = {};
     
-    int Width;
-    int Height;
+    int width;
+    int height;
     int Channels;
     
     unsigned char* Image = stbi_load(
         FilePath,
-        &Width,
-        &Height,
+        &width,
+        &height,
         &Channels,
         STBI_rgb_alpha);
     
-    int PixelsCount = Width * Height;
-    int ImageSize = PixelsCount * 4;
+    int pixelsCount = width * height;
+    int ImageSize = pixelsCount * 4;
     
     void* OurImageMem = malloc(ImageSize);
-    Result = AssetAllocateBitmapInternal(Width, Height, OurImageMem);
+    res = AssetAllocateBitmapInternal(width, height, OurImageMem);
     
     for(int PixelIndex = 0;
-        PixelIndex < PixelsCount;
+        PixelIndex < pixelsCount;
         PixelIndex++)
     {
         u32 Pix = *((u32*)Image + PixelIndex);
@@ -120,17 +120,17 @@ bmp_info LoadBMP(char* FilePath){
         
         u32 PackedColor = PackRGBA(Color);
         
-        *((u32*)Result.Pixels + PixelIndex) = PackedColor;
+        *((u32*)res.pixels + PixelIndex) = PackedColor;
     }
     
     stbi_image_free(Image);
     
-    return(Result);
+    return(res);
 }
 
 
 void LoadFontAddCodepoint(
-font_info* FontInfo, 
+Font_Info* FontInfo, 
 stbtt_fontinfo* STBFont,
 int Codepoint, 
 int* AtlasWidth, 
@@ -140,10 +140,10 @@ u32 Flags,
 int BlurRadius,
 float* GaussianBox)
 {
-    int GlyphIndex = FontInfo->GlyphCount++;
-    glyph_info* Glyph = &FontInfo->Glyphs[GlyphIndex];
+    int glyphIndex = FontInfo->glyphCount++;
+    Glyph_Info* glyph = &FontInfo->glyphs[glyphIndex];
     
-    FontInfo->Codepoint2Glyph[Codepoint] = GlyphIndex;
+    FontInfo->codepoint2Glyph[Codepoint] = glyphIndex;
     
     int CharWidth;
 	int CharHeight;
@@ -178,22 +178,22 @@ float* GaussianBox)
     
     stbtt_GetCodepointHMetrics(STBFont, Codepoint, &Advance, &LeftBearingX);
     
-    Glyph->Width = CharBmpWidth + ShadowOffset;
-	Glyph->Height = CharBmpHeight + ShadowOffset;
-	Glyph->Bitmap = AssetAllocateBitmap(Glyph->Width, Glyph->Height);
-	Glyph->Advance = Advance * FontScale;
-	Glyph->LeftBearingX = LeftBearingX * FontScale;
-	Glyph->XOffset = XOffset - CharBorder;
-	Glyph->YOffset = YOffset - CharBorder;
-	Glyph->Codepoint = Codepoint;
+    glyph->width = CharBmpWidth + ShadowOffset;
+	glyph->height = CharBmpHeight + ShadowOffset;
+	glyph->bitmap = AssetAllocateBitmap(glyph->width, glyph->height);
+	glyph->advance = Advance * FontScale;
+	glyph->leftBearingX = LeftBearingX * FontScale;
+	glyph->xOffset = XOffset - CharBorder;
+	glyph->yOffset = YOffset - CharBorder;
+	glyph->codepoint = Codepoint;
     
-    *AtlasWidth += Glyph->Width;
-	*AtlasHeight = Max(*AtlasHeight, Glyph->Height);
+    *AtlasWidth += glyph->width;
+	*AtlasHeight = Max(*AtlasHeight, glyph->height);
     
     //NOTE(dima): Clearing the image bytes
-	u32* Pixel = (u32*)Glyph->Bitmap.Pixels;
-	for (int Y = 0; Y < Glyph->Height; Y++) {
-		for (int X = 0; X < Glyph->Width; X++) {
+	u32* Pixel = (u32*)glyph->bitmap.pixels;
+	for (int Y = 0; Y < glyph->height; Y++) {
+		for (int X = 0; X < glyph->width; X++) {
 			*Pixel++ = 0;
 		}
 	}
@@ -201,37 +201,37 @@ float* GaussianBox)
     //NOTE(dima): Forming char bitmap
 	float OneOver255 = 1.0f / 255.0f;
     
-    bmp_info CharBitmap= AssetAllocateBitmap(CharWidth, CharHeight);
+    Bmp_Info CharBitmap= AssetAllocateBitmap(CharWidth, CharHeight);
 	
 	for (int j = 0; j < CharHeight; j++) {
 		for (int i = 0; i < CharWidth; i++) {
 			u8 Grayscale = *((u8*)Bitmap + j * CharWidth + i);
 			float Grayscale01 = (float)Grayscale * OneOver255;
             
-			v4 ResultColor = V4(1.0f, 1.0f, 1.0f, Grayscale01);
+			v4 resColor = V4(1.0f, 1.0f, 1.0f, Grayscale01);
             
 			/*Alpha premultiplication*/
-			ResultColor.r *= ResultColor.a;
-			ResultColor.g *= ResultColor.a;
-			ResultColor.b *= ResultColor.a;
+			resColor.r *= resColor.a;
+			resColor.g *= resColor.a;
+			resColor.b *= resColor.a;
             
-			u32 ColorValue = PackRGBA(ResultColor);
-			u32* TargetPixel = (u32*)((u8*)CharBitmap.Pixels + j* CharBitmap.Pitch + i * 4);
+			u32 ColorValue = PackRGBA(resColor);
+			u32* TargetPixel = (u32*)((u8*)CharBitmap.pixels + j* CharBitmap.pitch + i * 4);
 			*TargetPixel = ColorValue;
 		}
 	}
     
     //NOTE(dima): Render blur if needed
 	if (Flags & LoadFont_BakeBlur) {
-		bmp_info ToBlur = AssetAllocateBitmap(
+		Bmp_Info ToBlur = AssetAllocateBitmap(
 			2 * CharBorder + CharWidth,
 			2 * CharBorder + CharHeight);
         
-		bmp_info BlurredResult = AssetAllocateBitmap(
+		Bmp_Info BlurredResult = AssetAllocateBitmap(
 			2 * CharBorder + CharWidth,
 			2 * CharBorder + CharHeight);
         
-		bmp_info TempBitmap = AssetAllocateBitmap(
+		Bmp_Info TempBitmap = AssetAllocateBitmap(
 			2 * CharBorder + CharWidth,
 			2 * CharBorder + CharHeight);
         
@@ -245,68 +245,68 @@ float* GaussianBox)
 #if 1
 		BlurBitmapExactGaussian(
 			&ToBlur,
-			BlurredResult.Pixels,
-			ToBlur.Width,
-			ToBlur.Height,
+			BlurredResult.pixels,
+			ToBlur.width,
+			ToBlur.height,
 			BlurRadius,
 			GaussianBox);
         
         
-		for (int Y = 0; Y < ToBlur.Height; Y++) {
-			for (int X = 0; X < ToBlur.Width; X++) {
-				u32* FromPix = (u32*)BlurredResult.Pixels + Y * BlurredResult.Width + X;
-				u32* ToPix = (u32*)ToBlur.Pixels + Y * ToBlur.Width + X;
+		for (int Y = 0; Y < ToBlur.height; Y++) {
+			for (int X = 0; X < ToBlur.width; X++) {
+				u32* FromPix = (u32*)BlurredResult.pixels + Y * BlurredResult.width + X;
+				u32* ToPix = (u32*)ToBlur.pixels + Y * ToBlur.width + X;
                 
 				v4 FromColor = UnpackRGBA(*FromPix);
                 
-				v4 ResultColor = FromColor;
-				if (ResultColor.a > 0.05f) {
-                    ResultColor.a = 1.0f;
+				v4 resColor = FromColor;
+				if (resColor.a > 0.05f) {
+                    resColor.a = 1.0f;
 				}
                 
-				*ToPix = PackRGBA(ResultColor);
+				*ToPix = PackRGBA(resColor);
 			}
 		}
         
 		BlurBitmapExactGaussian(
 			&ToBlur,
-			BlurredResult.Pixels,
-			ToBlur.Width,
-			ToBlur.Height,
+			BlurredResult.pixels,
+			ToBlur.width,
+			ToBlur.height,
 			BlurRadius,
 			GaussianBox);
         
 #else
 		BlurBitmapApproximateGaussian(
 			&ToBlur,
-			BlurredResult.Pixels,
-			TempBitmap.Pixels,
-			ToBlur.Width,
-			ToBlur.Height,
+			BlurredResult.pixels,
+			TempBitmap.pixels,
+			ToBlur.width,
+			ToBlur.height,
 			BlurRadius);
-		for (int Y = 0; Y < ToBlur.Height; Y++) {
-			for (int X = 0; X < ToBlur.Width; X++) {
-				u32* FromPix = (u32*)BlurredResult.Pixels + Y * BlurredResult.Width + X;
-				u32* ToPix = (u32*)ToBlur.Pixels + Y * ToBlur.Width + X;
+		for (int Y = 0; Y < ToBlur.height; Y++) {
+			for (int X = 0; X < ToBlur.width; X++) {
+				u32* FromPix = (u32*)BlurredResult.pixels + Y * BlurredResult.width + X;
+				u32* ToPix = (u32*)ToBlur.pixels + Y * ToBlur.width + X;
 				v4 FromColor = UnpackRGBA(*FromPix);
-				v4 ResultColor = FromColor;
-				if (ResultColor.a > 0.05f) {
-					ResultColor.a = 1.0f;
+				v4 resColor = FromColor;
+				if (resColor.a > 0.05f) {
+					resColor.a = 1.0f;
 				}
-				*ToPix = PackRGBA(ResultColor);
+				*ToPix = PackRGBA(resColor);
 			}
 		}
 		BlurBitmapApproximateGaussian(
 			&ToBlur,
-			BlurredResult.Pixels,
-			TempBitmap.Pixels,
-			ToBlur.Width,
-			ToBlur.Height,
+			BlurredResult.pixels,
+			TempBitmap.pixels,
+			ToBlur.width,
+			ToBlur.height,
 			BlurRadius);
 #endif
         
 		RenderOneBitmapIntoAnother(
-			&Glyph->Bitmap,
+			&glyph->bitmap,
 			&BlurredResult,
 			0, 0,
 			V4(0.0f, 0.0f, 0.0f, 1.0f));
@@ -319,7 +319,7 @@ float* GaussianBox)
     if(Flags & LoadFont_BakeShadow){
         
         RenderOneBitmapIntoAnother(
-            &Glyph->Bitmap,
+            &glyph->bitmap,
             &CharBitmap,
             CharBorder + ShadowOffset,
             CharBorder + ShadowOffset,
@@ -328,7 +328,7 @@ float* GaussianBox)
     }
     
     RenderOneBitmapIntoAnother(
-        &Glyph->Bitmap,
+        &glyph->bitmap,
         &CharBitmap,
         CharBorder,
         CharBorder,
@@ -338,16 +338,16 @@ float* GaussianBox)
     stbtt_FreeBitmap(Bitmap, 0);
 }
 
-font_info LoadFont(char* FilePath, float Height, u32 Flags){
-    font_info Result = {};
+Font_Info LoadFont(char* FilePath, float height, u32 Flags){
+    Font_Info res = {};
     
     stbtt_fontinfo STBFont;
     
-    data_buffer TTFBuffer = ReadFileToDataBuffer(FilePath);
-    stbtt_InitFont(&STBFont, TTFBuffer.Data, 
-                   stbtt_GetFontOffsetForIndex(TTFBuffer.Data, 0));
+    Data_Buffer TTFBuffer = ReadFileToDataBuffer(FilePath);
+    stbtt_InitFont(&STBFont, TTFBuffer.data, 
+                   stbtt_GetFontOffsetForIndex(TTFBuffer.data, 0));
     
-    float Scale = stbtt_ScaleForPixelHeight(&STBFont, Height);
+    float Scale = stbtt_ScaleForPixelHeight(&STBFont, height);
     
     int AscenderHeight;
 	int DescenderHeight;
@@ -359,9 +359,9 @@ font_info LoadFont(char* FilePath, float Height, u32 Flags){
 		&DescenderHeight,
 		&LineGap);
     
-    Result.AscenderHeight = (float)AscenderHeight * Scale;
-	Result.DescenderHeight = (float)DescenderHeight * Scale;
-	Result.LineGap = (float)LineGap * Scale;
+    res.ascenderHeight = (float)AscenderHeight * Scale;
+	res.descenderHeight = (float)DescenderHeight * Scale;
+	res.lineGap = (float)LineGap * Scale;
     
     int AtlasWidth = 0;
     int AtlasHeight = 0;
@@ -380,7 +380,7 @@ font_info LoadFont(char* FilePath, float Height, u32 Flags){
         Codepoint++)
     {
         LoadFontAddCodepoint(
-            &Result, 
+            &res, 
             &STBFont,
             Codepoint,
             &AtlasWidth,
@@ -392,23 +392,23 @@ font_info LoadFont(char* FilePath, float Height, u32 Flags){
     }
     
     //NOTE(dima): Processing kerning
-	Result.KerningPairs = (float*)malloc(sizeof(float) * Result.GlyphCount * Result.GlyphCount);
+	res.kerningPairs = (float*)malloc(sizeof(float) * res.glyphCount * res.glyphCount);
     
-	for (int FirstGlyphIndex = 0; FirstGlyphIndex < Result.GlyphCount; FirstGlyphIndex++) {
-		for (int SecondGlyphIndex = 0; SecondGlyphIndex < Result.GlyphCount; SecondGlyphIndex++) {
-			u32 KerningIndex = SecondGlyphIndex * Result.GlyphCount + FirstGlyphIndex;
+	for (int firstIndex = 0; firstIndex < res.glyphCount; firstIndex++) {
+		for (int secondIndex = 0; secondIndex < res.glyphCount; secondIndex++) {
+			u32 KerningIndex = secondIndex * res.glyphCount + firstIndex;
             
-			int FirstCodepoint = Result.Glyphs[FirstGlyphIndex].Codepoint;
-			int SecondCodepoint = Result.Glyphs[SecondGlyphIndex].Codepoint;
+			int FirstCodepoint = res.glyphs[firstIndex].codepoint;
+			int SecondCodepoint = res.glyphs[secondIndex].codepoint;
             
 			int Kern = stbtt_GetGlyphKernAdvance(&STBFont, FirstCodepoint, SecondCodepoint);
             
-			Result.KerningPairs[KerningIndex] = (float)Kern * Scale;
+			res.kerningPairs[KerningIndex] = (float)Kern * Scale;
 		}
 	}
     
     FreeDataBuffer(&TTFBuffer);
     
-    return(Result);
+    return(res);
 }
 

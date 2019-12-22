@@ -29,7 +29,7 @@ typedef union v2 {
 		float y;
 	};
     
-	float E[2];
+	float e[2];
 } v2;
 
 typedef union v3 {
@@ -51,7 +51,7 @@ typedef union v3 {
 		float C;
 	};
     
-	float E[3];
+	float e[3];
 } v3;
 
 typedef union v4 {
@@ -97,24 +97,24 @@ typedef union v4 {
 		float D;
 	};
     
-	float E[4];
+	float e[4];
 } v4;
 
 typedef struct rc2{
-    v2 Min;
-    v2 Max;
+    v2 min;
+    v2 max;
 } rc2;
 
 typedef union m33 {
-    float E[9];
-    float E2[3][3];
-    v3 Rows[3];
+    float e[9];
+    float e2[3][3];
+    v3 rows[3];
 } m33;
 
 typedef union m44 {
-	float E[16];
-    float E2[4][4];
-	v4 Rows[4];
+	float e[16];
+    float e2[4][4];
+	v4 rows[4];
 #if JOY_ENABLE_SIMD_MATH
     __m128 mmRows[4];
 #endif
@@ -140,81 +140,81 @@ typedef union quat {
 
 //NOTE(dima): Helper functions
 inline float Sqrt(float Value) {
-	float Result;
-	Result = sqrtf(Value);
-	return(Result);
+	float res;
+	res = sqrtf(Value);
+	return(res);
 }
 
 inline float RSqrt(float Value) {
-	float Result;
-	Result = 1.0f / sqrtf(Value);
-	return(Result);
+	float res;
+	res = 1.0f / sqrtf(Value);
+	return(res);
 }
 
 inline float Floor(float Value) {
-	float Result = floorf(Value);
-	return(Result);
+	float res = floorf(Value);
+	return(res);
 }
 
 inline float Ceil(float Value) {
-	float Result = ceilf(Value);
-	return(Result);
+	float res = ceilf(Value);
+	return(res);
 }
 
 inline float Sin(float Rad) {
-	float Result = sinf(Rad);
-	return(Result);
+	float res = sinf(Rad);
+	return(res);
 }
 
 inline float Cos(float Rad) {
-	float Result = cosf(Rad);
-	return(Result);
+	float res = cosf(Rad);
+	return(res);
 }
 
 inline float Tan(float Rad) {
-	float Result = tanf(Rad);
-	return(Result);
+	float res = tanf(Rad);
+	return(res);
 }
 
 inline float ASin(float Value) {
-	float Result = asinf(Value);
-	return(Result);
+	float res = asinf(Value);
+	return(res);
 }
 
 inline float ACos(float Value) {
-	float Result = acosf(Value);
-	return(Result);
+	float res = acosf(Value);
+	return(res);
 }
 
 inline float ATan(float Value) {
-	float Result = atan(Value);
-	return(Result);
+	float res = atan(Value);
+	return(res);
 }
 
 inline float ATan2(float Y, float X) {
-	float Result = atan2f(Y, X);
-	return(Result);
+	float res = atan2f(Y, X);
+	return(res);
 }
 
 inline float Exp(float Value) {
-	float Result = expf(Value);
-	return(Result);
+	float res = expf(Value);
+	return(res);
 }
 
 inline float Log(float Value) {
-	float Result = logf(Value);
-	return(Result);
+	float res = logf(Value);
+	return(res);
 }
 
 inline float Pow(float a, float b) {
-	float Result = powf(a, b);
-	return(Result);
+	float res = powf(a, b);
+	return(res);
 }
 
 inline float Lerp(float a, float b, float t) {
-	float Result = a + (b - a) * t;
+	float res = a + (b - a) * t;
     
-	return(Result);
+	return(res);
 }
 
 inline float Clamp01(float Val) {
@@ -255,125 +255,125 @@ inline int Clamp(int Val, int Min, int Max) {
 
 //NOTE(dima): Constructors
 inline v2 V2(float Value){
-	v2 Result;
+	v2 res;
     
-	Result.x = Value;
-	Result.y = Value;
+	res.x = Value;
+	res.y = Value;
     
-	return(Result);
+	return(res);
 }
 
 inline v2 V2(float x, float y) {
-	v2 Result;
+	v2 res;
     
-	Result.x = x;
-	Result.y = y;
+	res.x = x;
+	res.y = y;
     
-	return(Result);
+	return(res);
 }
 
 inline v3 V3(v2 xy, float z) {
-	v3 Result;
+	v3 res;
     
-	Result.x = xy.x;
-	Result.y = xy.y;
-	Result.z = z;
+	res.x = xy.x;
+	res.y = xy.y;
+	res.z = z;
     
-	return(Result);
+	return(res);
 }
 
 inline v3 V3(float x, float y, float z) {
-	v3 Result;
+	v3 res;
     
-	Result.x = x;
-	Result.y = y;
-	Result.z = z;
+	res.x = x;
+	res.y = y;
+	res.z = z;
     
-	return(Result);
+	return(res);
 }
 
 inline v4 V4(float Value) {
-	v4 Result;
-	Result.x = Value;
-	Result.y = Value;
-	Result.z = Value;
-	Result.w = Value;
-	return(Result);
+	v4 res;
+	res.x = Value;
+	res.y = Value;
+	res.z = Value;
+	res.w = Value;
+	return(res);
 }
 
 inline v4 V4(float x, float y, float z, float w) {
-	v4 Result;
+	v4 res;
     
-	Result.x = x;
-	Result.y = y;
-	Result.z = z;
-	Result.w = w;
+	res.x = x;
+	res.y = y;
+	res.z = z;
+	res.w = w;
     
-	return(Result);
+	return(res);
 }
 
 inline v4 V4(v3 InitVector, float w) {
-	v4 Result;
-	Result.x = InitVector.x;
-	Result.y = InitVector.y;
-	Result.z = InitVector.z;
-	Result.w = w;
-	return(Result);
+	v4 res;
+	res.x = InitVector.x;
+	res.y = InitVector.y;
+	res.z = InitVector.z;
+	res.w = w;
+	return(res);
 }
 
 inline quat QuatI(){
-	quat Result;
+	quat res;
     
-	Result.x = 0.0f;
-	Result.y = 0.0f;
-	Result.z = 0.0f;
-	Result.w = 1.0f;
+	res.x = 0.0f;
+	res.y = 0.0f;
+	res.z = 0.0f;
+	res.w = 1.0f;
     
-	return(Result);
+	return(res);
 }
 
 inline quat Quat(float x, float y, float z, float w){
-	quat Result;
+	quat res;
     
-	Result.x = x;
-	Result.y = y;
-	Result.z = z;
-	Result.w = w;
+	res.x = x;
+	res.y = y;
+	res.z = z;
+	res.w = w;
     
-	return(Result);
+	return(res);
 }
 
 inline quat Quat(v3 Axis, float Angle){
-	quat Result;
+	quat res;
     
 	float S = Sin(Angle);
-	Result.x = Axis.x * S;
-	Result.y = Axis.y * S;
-	Result.z = Axis.z * S;
-	Result.w = Angle * Cos(Angle);
+	res.x = Axis.x * S;
+	res.y = Axis.y * S;
+	res.z = Axis.z * S;
+	res.w = Angle * Cos(Angle);
     
-	return(Result);
+	return(res);
 }
 
 inline m33 M33I(){
-    m33 Result;
+    m33 res;
     
-    Result.Rows[0] = {1.0f, 0.0f, 0.0f};
-    Result.Rows[1] = {0.0f, 1.0f, 0.0f};
-    Result.Rows[2] = {0.0f, 0.0f, 1.0f};
+    res.rows[0] = {1.0f, 0.0f, 0.0f};
+    res.rows[1] = {0.0f, 1.0f, 0.0f};
+    res.rows[2] = {0.0f, 0.0f, 1.0f};
     
-    return(Result);
+    return(res);
 }
 
 inline m44 M44I(){
-    m44 Result;
+    m44 res;
     
-    Result.Rows[0] = { 1.0f, 0.0f, 0.0f, 0.0f };
-    Result.Rows[1] = { 0.0f, 1.0f, 0.0f, 0.0f };
-    Result.Rows[2] = { 0.0f, 0.0f, 1.0f, 0.0f };
-    Result.Rows[3] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    res.rows[0] = { 1.0f, 0.0f, 0.0f, 0.0f };
+    res.rows[1] = { 0.0f, 1.0f, 0.0f, 0.0f };
+    res.rows[2] = { 0.0f, 0.0f, 1.0f, 0.0f };
+    res.rows[3] = { 0.0f, 0.0f, 0.0f, 1.0f };
     
-    return(Result);
+    return(res);
 }
 
 /*Dot operations*/
@@ -526,57 +526,57 @@ inline __m128 MulVecMatSSE(__m128 V, const m44& M){
     __m128 vZ = _mm_shuffle_ps(V, V, 0xAA);
     __m128 vW = _mm_shuffle_ps(V, V, 0xFF);
     
-    __m128 Result = _mm_mul_ps(vX, M.mmRows[0]);
-    Result = _mm_add_ps(Result, _mm_mul_ps(vY, M.mmRows[1]));
-    Result = _mm_add_ps(Result, _mm_mul_ps(vZ, M.mmRows[2]));
-    Result = _mm_add_ps(Result, _mm_mul_ps(vW, M.mmRows[3]));
+    __m128 res = _mm_mul_ps(vX, M.mmRows[0]);
+    res = _mm_add_ps(res, _mm_mul_ps(vY, M.mmRows[1]));
+    res = _mm_add_ps(res, _mm_mul_ps(vZ, M.mmRows[2]));
+    res = _mm_add_ps(res, _mm_mul_ps(vW, M.mmRows[3]));
     
-    return(Result);
+    return(res);
 }
 #endif
 
 inline m44 Mul(m44 A, m44 B) {
-    m44 Result = {};
+    m44 res = {};
     
 #if JOY_ENABLE_SIMD_MATH
-    Result.mmRows[0] = MulVecMatSSE(A.mmRows[0], B);
-    Result.mmRows[1] = MulVecMatSSE(A.mmRows[1], B);
-    Result.mmRows[2] = MulVecMatSSE(A.mmRows[2], B);
-    Result.mmRows[3] = MulVecMatSSE(A.mmRows[3], B);
+    res.mmRows[0] = MulVecMatSSE(A.mmRows[0], B);
+    res.mmRows[1] = MulVecMatSSE(A.mmRows[1], B);
+    res.mmRows[2] = MulVecMatSSE(A.mmRows[2], B);
+    res.mmRows[3] = MulVecMatSSE(A.mmRows[3], B);
 #else
-    Result.E[0] = A.E[0] * B.E[0] + A.E[1] * B.E[4] + A.E[2] * B.E[8] + A.E[3] * B.E[12];
-    Result.E[1] = A.E[0] * B.E[1] + A.E[1] * B.E[5] + A.E[2] * B.E[9] + A.E[3] * B.E[13];
-    Result.E[2] = A.E[0] * B.E[2] + A.E[1] * B.E[6] + A.E[2] * B.E[10] + A.E[3] * B.E[14];
-    Result.E[3] = A.E[0] * B.E[3] + A.E[1] * B.E[7] + A.E[2] * B.E[11] + A.E[3] * B.E[15];
+    res.e[0] = A.e[0] * B.e[0] + A.e[1] * B.e[4] + A.e[2] * B.e[8] + A.e[3] * B.e[12];
+    res.e[1] = A.e[0] * B.e[1] + A.e[1] * B.e[5] + A.e[2] * B.e[9] + A.e[3] * B.e[13];
+    res.e[2] = A.e[0] * B.e[2] + A.e[1] * B.e[6] + A.e[2] * B.e[10] + A.e[3] * B.e[14];
+    res.e[3] = A.e[0] * B.e[3] + A.e[1] * B.e[7] + A.e[2] * B.e[11] + A.e[3] * B.e[15];
     
-    Result.E[4] = A.E[4] * B.E[0] + A.E[5] * B.E[4] + A.E[6] * B.E[8] + A.E[7] * B.E[12];
-    Result.E[5] = A.E[4] * B.E[1] + A.E[5] * B.E[5] + A.E[6] * B.E[9] + A.E[7] * B.E[13];
-    Result.E[6] = A.E[4] * B.E[2] + A.E[5] * B.E[6] + A.E[6] * B.E[10] + A.E[7] * B.E[14];
-    Result.E[7] = A.E[4] * B.E[3] + A.E[5] * B.E[7] + A.E[6] * B.E[11] + A.E[7] * B.E[15];
+    res.e[4] = A.e[4] * B.e[0] + A.e[5] * B.e[4] + A.e[6] * B.e[8] + A.e[7] * B.e[12];
+    res.e[5] = A.e[4] * B.e[1] + A.e[5] * B.e[5] + A.e[6] * B.e[9] + A.e[7] * B.e[13];
+    res.e[6] = A.e[4] * B.e[2] + A.e[5] * B.e[6] + A.e[6] * B.e[10] + A.e[7] * B.e[14];
+    res.e[7] = A.e[4] * B.e[3] + A.e[5] * B.e[7] + A.e[6] * B.e[11] + A.e[7] * B.e[15];
     
-    Result.E[8] = A.E[8] * B.E[0] + A.E[9] * B.E[4] + A.E[10] * B.E[8] + A.E[11] * B.E[12];
-    Result.E[9] = A.E[8] * B.E[1] + A.E[9] * B.E[5] + A.E[10] * B.E[9] + A.E[11] * B.E[13];
-    Result.E[10] = A.E[8] * B.E[2] + A.E[9] * B.E[6] + A.E[10] * B.E[10] + A.E[11] * B.E[14];
-    Result.E[11] = A.E[8] * B.E[3] + A.E[9] * B.E[7] + A.E[10] * B.E[11] + A.E[11] * B.E[15];
+    res.e[8] = A.e[8] * B.e[0] + A.e[9] * B.e[4] + A.e[10] * B.e[8] + A.e[11] * B.e[12];
+    res.e[9] = A.e[8] * B.e[1] + A.e[9] * B.e[5] + A.e[10] * B.e[9] + A.e[11] * B.e[13];
+    res.e[10] = A.e[8] * B.e[2] + A.e[9] * B.e[6] + A.e[10] * B.e[10] + A.e[11] * B.e[14];
+    res.e[11] = A.e[8] * B.e[3] + A.e[9] * B.e[7] + A.e[10] * B.e[11] + A.e[11] * B.e[15];
     
-    Result.E[12] = A.E[12] * B.E[0] + A.E[13] * B.E[4] + A.E[14] * B.E[8] + A.E[15] * B.E[12];
-    Result.E[13] = A.E[12] * B.E[1] + A.E[13] * B.E[5] + A.E[14] * B.E[9] + A.E[15] * B.E[13];
-    Result.E[14] = A.E[12] * B.E[2] + A.E[13] * B.E[6] + A.E[14] * B.E[10] + A.E[15] * B.E[14];
-    Result.E[15] = A.E[12] * B.E[3] + A.E[13] * B.E[7] + A.E[14] * B.E[11] + A.E[15] * B.E[15];
+    res.e[12] = A.e[12] * B.e[0] + A.e[13] * B.e[4] + A.e[14] * B.e[8] + A.e[15] * B.e[12];
+    res.e[13] = A.e[12] * B.e[1] + A.e[13] * B.e[5] + A.e[14] * B.e[9] + A.e[15] * B.e[13];
+    res.e[14] = A.e[12] * B.e[2] + A.e[13] * B.e[6] + A.e[14] * B.e[10] + A.e[15] * B.e[14];
+    res.e[15] = A.e[12] * B.e[3] + A.e[13] * B.e[7] + A.e[14] * B.e[11] + A.e[15] * B.e[15];
 #endif
     
-    return(Result);
+    return(res);
 }
 
 inline v4 Mul(v4 V, m44 M) {
-    v4 Result;
+    v4 res;
     
-    Result.E[0] = V.E[0] * M.E[0] + V.E[1] * M.E[4] + V.E[2] * M.E[8] + V.E[3] * M.E[12];
-    Result.E[1] = V.E[0] * M.E[1] + V.E[1] * M.E[5] + V.E[2] * M.E[9] + V.E[3] * M.E[13];
-    Result.E[2] = V.E[0] * M.E[2] + V.E[1] * M.E[6] + V.E[2] * M.E[10] + V.E[3] * M.E[14];
-    Result.E[3] = V.E[0] * M.E[3] + V.E[1] * M.E[7] + V.E[2] * M.E[11] + V.E[3] * M.E[15];
+    res.e[0] = V.e[0] * M.e[0] + V.e[1] * M.e[4] + V.e[2] * M.e[8] + V.e[3] * M.e[12];
+    res.e[1] = V.e[0] * M.e[1] + V.e[1] * M.e[5] + V.e[2] * M.e[9] + V.e[3] * M.e[13];
+    res.e[2] = V.e[0] * M.e[2] + V.e[1] * M.e[6] + V.e[2] * M.e[10] + V.e[3] * M.e[14];
+    res.e[3] = V.e[0] * M.e[3] + V.e[1] * M.e[7] + V.e[2] * M.e[11] + V.e[3] * M.e[15];
     
-    return(Result);
+    return(res);
 }
 
 
@@ -711,15 +711,15 @@ inline quat operator*(quat A, quat B) { return(Mul(A, B)); }
 
 /*Matrix operator overloading*/
 inline v4 operator*(v4 A, m44 B){
-    v4 Result = Mul(A, B);
+    v4 res = Mul(A, B);
     
-    return(Result);
+    return(res);
 }
 
 inline m44 operator*(m44 A, m44 B){
-    m44 Result = Mul(A, B);
+    m44 res = Mul(A, B);
     
-    return(Result);
+    return(res);
 }
 
 /*Normalization operations*/
@@ -740,60 +740,60 @@ inline v4 Lerp(v4 A, v4 B, float t) { return((1.0f - t) * A + B * t); }
 
 /*Quaternion operations*/
 inline quat Conjugate(quat Q){
-    quat Result = {};
+    quat res = {};
     
-    Result.xyz = -Q.xyz;
-    Result.w = Q.w;
+    res.xyz = -Q.xyz;
+    res.w = Q.w;
     
-    return(Result);
+    return(res);
 }
 
 inline quat Inverse(quat Q){
-    quat Result = Conjugate(Q) / Dot(Q, Q);
+    quat res = Conjugate(Q) / Dot(Q, Q);
     
-    return(Result);
+    return(res);
 }
 
 inline quat Lerp(quat A, quat B, float t) {
-    quat Result;
+    quat res;
     
     
     
-    return(Result);
+    return(res);
 }
 
 inline quat Slerp(quat A, quat B, float t){
-    quat Result;
+    quat res;
     
     
     
-    return(Result);
+    return(res);
 }
 
 /*Conversions*/
-inline m44 MatrixFromRows(v4 R1, v4 R2, v4 R3, v4 R4){
-    m44 Result = {};
+inline m44 MatrixFromrows(v4 R1, v4 R2, v4 R3, v4 R4){
+    m44 res = {};
     
-    Result.Rows[0] = R1;
-    Result.Rows[1] = R2;
-    Result.Rows[2] = R3;
-    Result.Rows[3] = R4;
+    res.rows[0] = R1;
+    res.rows[1] = R2;
+    res.rows[2] = R3;
+    res.rows[3] = R4;
     
-    return(Result);
+    return(res);
 }
 
 inline m33 MatrixFromRows(v3 R1, v3 R2, v3 R3){
-    m33 Result = {};
+    m33 res = {};
     
-    Result.Rows[0] = R1;
-    Result.Rows[1] = R2;
-    Result.Rows[2] = R3;
+    res.rows[0] = R1;
+    res.rows[1] = R2;
+    res.rows[2] = R3;
     
-    return(Result);
+    return(res);
 }
 
 inline m33 QuatToM33(quat Q){
-    m33 Res = {};
+    m33 res = {};
     
     float x2 = Q.x * Q.x;
     float y2 = Q.y * Q.y;
@@ -806,23 +806,23 @@ inline m33 QuatToM33(quat Q){
     float yz = Q.y * Q.z;
     float xw = Q.x * Q.w;
     
-    Res.E[0] = 1.0f - 2.0f * (y2 + z2);
-    Res.E[1] = 2.0f * (xy + zw);
-    Res.E[2] = 2.0f * (xz - yw);
+    res.e[0] = 1.0f - 2.0f * (y2 + z2);
+    res.e[1] = 2.0f * (xy + zw);
+    res.e[2] = 2.0f * (xz - yw);
     
-    Res.E[3] = 2.0f * (xy - zw);
-    Res.E[4] = 1.0f - 2.0f * (x2 + z2);
-    Res.E[5] = 2.0f * (yz + xw);
+    res.e[3] = 2.0f * (xy - zw);
+    res.e[4] = 1.0f - 2.0f * (x2 + z2);
+    res.e[5] = 2.0f * (yz + xw);
     
-    Res.E[6] = 2.0f * (xz + yw);
-    Res.E[7] = 2.0f * (yz - xw);
-    Res.E[8] = 1.0f - 2.0f * (x2 + y2);
+    res.e[6] = 2.0f * (xz + yw);
+    res.e[7] = 2.0f * (yz - xw);
+    res.e[8] = 1.0f - 2.0f * (x2 + y2);
     
-    return(Res);
+    return(res);
 }
 
 inline m44 QuatToM44(quat Q){
-    m44 Res = {};
+    m44 res = {};
     
     float x2 = Q.x * Q.x;
     float y2 = Q.y * Q.y;
@@ -835,68 +835,68 @@ inline m44 QuatToM44(quat Q){
     float yz = Q.y * Q.z;
     float xw = Q.x * Q.w;
     
-    Res.E[0] = 1.0f - 2.0f * (y2 + z2);
-    Res.E[1] = 2.0f * (xy + zw);
-    Res.E[2] = 2.0f * (xz - yw);
-    Res.E[3] = 0.0f;
+    res.e[0] = 1.0f - 2.0f * (y2 + z2);
+    res.e[1] = 2.0f * (xy + zw);
+    res.e[2] = 2.0f * (xz - yw);
+    res.e[3] = 0.0f;
     
-    Res.E[4] = 2.0f * (xy - zw);
-    Res.E[5] = 1.0f - 2.0f * (x2 + z2);
-    Res.E[6] = 2.0f * (yz + xw);
-    Res.E[7] = 0.0f;
+    res.e[4] = 2.0f * (xy - zw);
+    res.e[5] = 1.0f - 2.0f * (x2 + z2);
+    res.e[6] = 2.0f * (yz + xw);
+    res.e[7] = 0.0f;
     
-    Res.E[8] = 2.0f * (xz + yw);
-    Res.E[9] = 2.0f * (yz - xw);
-    Res.E[10] = 1.0f - 2.0f * (x2 + y2);
-    Res.E[11] = 0.0f;
+    res.e[8] = 2.0f * (xz + yw);
+    res.e[9] = 2.0f * (yz - xw);
+    res.e[10] = 1.0f - 2.0f * (x2 + y2);
+    res.e[11] = 0.0f;
     
-    Res.E[12] = 0.0f;
-    Res.E[13] = 0.0f;
-    Res.E[14] = 0.0f;
-    Res.E[15] = 1.0f;
+    res.e[12] = 0.0f;
+    res.e[13] = 0.0f;
+    res.e[14] = 0.0f;
+    res.e[15] = 1.0f;
     
-    return(Res);
+    return(res);
 }
 
 inline quat QuatFrom2DArray(float A[3][3]){
-    quat Result;
+    quat res;
     
     float Trace = A[0][0] + A[1][1] + A[2][2]; // I removed + 1.0f; see discussion with Ethan
     if( Trace > 0 ) {// I changed M_EPSILON to 0
         float S = 0.5f / sqrtf(Trace + 1.0f);
-        Result.w = 0.25f / S;
-        Result.x = ( A[2][1] - A[1][2] ) * S;
-        Result.y = ( A[0][2] - A[2][0] ) * S;
-        Result.z = ( A[1][0] - A[0][1] ) * S;
+        res.w = 0.25f / S;
+        res.x = ( A[2][1] - A[1][2] ) * S;
+        res.y = ( A[0][2] - A[2][0] ) * S;
+        res.z = ( A[1][0] - A[0][1] ) * S;
     } else {
         if ( A[0][0] > A[1][1] && A[0][0] > A[2][2] ) {
             float S = 2.0f * sqrtf( 1.0f + A[0][0] - A[1][1] - A[2][2]);
-            Result.w = (A[2][1] - A[1][2] ) / S;
-            Result.x = 0.25f * S;
-            Result.y = (A[0][1] + A[1][0] ) / S;
-            Result.z = (A[0][2] + A[2][0] ) / S;
+            res.w = (A[2][1] - A[1][2] ) / S;
+            res.x = 0.25f * S;
+            res.y = (A[0][1] + A[1][0] ) / S;
+            res.z = (A[0][2] + A[2][0] ) / S;
         } else if (A[1][1] > A[2][2]) {
             float S = 2.0f * sqrtf( 1.0f + A[1][1] - A[0][0] - A[2][2]);
-            Result.w = (A[0][2] - A[2][0] ) / S;
-            Result.x = (A[0][1] + A[1][0] ) / S;
-            Result.y = 0.25f * S;
-            Result.z = (A[1][2] + A[2][1] ) / S;
+            res.w = (A[0][2] - A[2][0] ) / S;
+            res.x = (A[0][1] + A[1][0] ) / S;
+            res.y = 0.25f * S;
+            res.z = (A[1][2] + A[2][1] ) / S;
         } else {
             float S = 2.0f * sqrtf( 1.0f + A[2][2] - A[0][0] - A[1][1] );
-            Result.w = (A[1][0] - A[0][1] ) / S;
-            Result.x = (A[0][2] + A[2][0] ) / S;
-            Result.y = (A[1][2] + A[2][1] ) / S;
-            Result.z = 0.25f * S;
+            res.w = (A[1][0] - A[0][1] ) / S;
+            res.x = (A[0][2] + A[2][0] ) / S;
+            res.y = (A[1][2] + A[2][1] ) / S;
+            res.z = 0.25f * S;
         }
     }
     
-    return(Result);
+    return(res);
 }
 
 inline quat QuatFromM33(m33 Mat){
-    quat Result = QuatFrom2DArray(Mat.E2);
+    quat res = QuatFrom2DArray(Mat.e2);
     
-    return(Result);
+    return(res);
 }
 
 inline quat QuatLookAt(v3 Front, v3 Up){
@@ -906,91 +906,91 @@ inline quat QuatLookAt(v3 Front, v3 Up){
     
     m33 Mat = MatrixFromRows(Lft, Up, Fwd);
     
-    quat Result = QuatFromM33(Mat);
+    quat res = QuatFromM33(Mat);
     
-    return(Result);
+    return(res);
 }
 
 /* Color math */
 inline uint32_t PackRGBA(v4 Color){
-    uint32_t Result = 
+    uint32_t res = 
         (uint32_t)((Color.r * 255.0f + 0.5f)) |
         ((uint32_t)((Color.g * 255.0f) + 0.5f) << 8) |
         ((uint32_t)((Color.b * 255.0f) + 0.5f) << 16) |
         ((uint32_t)((Color.a * 255.0f) + 0.5f) << 24);
     
-    return(Result);
+    return(res);
 }
 
 inline v4 UnpackRGBA(uint32_t Color){
-    v4 Result;
+    v4 res;
     
-    Result.r = (float)(Color & 0xFF) * JOY_ONE_OVER_255;
-    Result.g = (float)((Color >> 8) & 0xFF) * JOY_ONE_OVER_255;
-    Result.b = (float)((Color >> 16) & 0xFF) * JOY_ONE_OVER_255;
-    Result.a = (float)((Color >> 24) & 0xFF) * JOY_ONE_OVER_255;
+    res.r = (float)(Color & 0xFF) * JOY_ONE_OVER_255;
+    res.g = (float)((Color >> 8) & 0xFF) * JOY_ONE_OVER_255;
+    res.b = (float)((Color >> 16) & 0xFF) * JOY_ONE_OVER_255;
+    res.a = (float)((Color >> 24) & 0xFF) * JOY_ONE_OVER_255;
     
-    return(Result);
+    return(res);
 }
 
 /* Rectangle math */
 inline rc2 RcMinMax(v2 Min, v2 Max){
-    rc2 Result;
+    rc2 res;
     
-    Result.Min = Min;
-    Result.Max = Max;
+    res.min = Min;
+    res.max = Max;
     
-    return(Result);
+    return(res);
 }
 
 inline rc2 RcMinDim(v2 Min, v2 Dim){
-    rc2 Result;
+    rc2 res;
     
-    Result.Min = Min;
-    Result.Max = Min + Dim;
+    res.min = Min;
+    res.max = Min + Dim;
     
-    return(Result);
+    return(res);
 }
 
 inline v2 GetRectDim(rc2 A){
-    v2 Result = V2(abs(A.Max.x - A.Min.x),
-                   abs(A.Max.y - A.Min.y));
+    v2 res = V2(abs(A.max.x - A.min.x),
+                abs(A.max.y - A.min.y));
     
-    return(Result);
+    return(res);
 }
 
 inline float GetRectWidth(rc2 A){
-    float Result = A.Max.x - A.Min.x;
+    float res = A.max.x - A.min.x;
     
-    return(Result);
+    return(res);
 }
 
 inline float GetRectHeight(rc2 A){
-    float Result = A.Max.y - A.Min.y;
+    float res = A.max.y - A.min.y;
     
-    return(Result);
+    return(res);
 }
 
 inline v2 GetRectCenter(rc2 A){
-    v2 Result = A.Min + GetRectDim(A) * 0.5f;
+    v2 res = A.min + GetRectDim(A) * 0.5f;
     
-    return(Result);
+    return(res);
 }
 
 inline v2 ClampInRect(v2 P, rc2 A){
-    v2 Result;
-    Result.x = Clamp(P.x, A.Min.x, A.Max.x);
-    Result.y = Clamp(P.y, A.Min.y, A.Max.y);
-    return(Result);
+    v2 res;
+    res.x = Clamp(P.x, A.min.x, A.max.x);
+    res.y = Clamp(P.y, A.min.y, A.max.y);
+    return(res);
 }
 
 inline rc2 GetBoundingRect(rc2 A, rc2 B){
-    rc2 Result;
-    Result.Min.x = JOY_MATH_MIN(A.Min.x, B.Min.x);
-    Result.Min.y = JOY_MATH_MIN(A.Min.y, B.Min.y);
-    Result.Max.x = JOY_MATH_MAX(A.Max.x, B.Max.x);
-    Result.Max.y = JOY_MATH_MAX(A.Max.y, B.Max.y);
-    return(Result);
+    rc2 res;
+    res.min.x = JOY_MATH_MIN(A.min.x, B.min.x);
+    res.min.y = JOY_MATH_MIN(A.min.y, B.min.y);
+    res.max.x = JOY_MATH_MAX(A.max.x, B.max.x);
+    res.max.y = JOY_MATH_MAX(A.max.y, B.max.y);
+    return(res);
 }
 
 inline rc2 GrowRectByScale(rc2 A, v2 Scale){
@@ -998,38 +998,38 @@ inline rc2 GrowRectByScale(rc2 A, v2 Scale){
     v2 NewDim;
     NewDim.x = RectDim.x * Scale.x;
     NewDim.y = RectDim.y * Scale.y;
-    v2 Center = A.Min + RectDim * 0.5f;
-    rc2 Result;
-    Result.Min = Center - NewDim * 0.5f;
-    Result.Max = Result.Min + NewDim;
-    return(Result);
+    v2 Center = A.min + RectDim * 0.5f;
+    rc2 res;
+    res.min = Center - NewDim * 0.5f;
+    res.max = res.min + NewDim;
+    return(res);
 }
 
 inline rc2 GrowRectByScaledValue(rc2 A, v2 Value, float Scale){
-    rc2 Result;
+    rc2 res;
     
     v2 ValueScaled = Value * Scale;
-    Result.Min.x = A.Min.x - ValueScaled.x;
-    Result.Min.y = A.Min.y - ValueScaled.y;
-    Result.Max.x = A.Max.x + ValueScaled.x;
-    Result.Max.y = A.Max.y + ValueScaled.y;
+    res.min.x = A.min.x - ValueScaled.x;
+    res.min.y = A.min.y - ValueScaled.y;
+    res.max.x = A.max.x + ValueScaled.x;
+    res.max.y = A.max.y + ValueScaled.y;
     
-    return(Result);
+    return(res);
 }
 
 inline rc2 GrowRectByPixels(rc2 A, int PixelsCount){
-    rc2 Result;
-    Result.Min -= V2(PixelsCount, PixelsCount);
-    Result.Max += V2(PixelsCount, PixelsCount);
-    return(Result);
+    rc2 res;
+    res.min -= V2(PixelsCount, PixelsCount);
+    res.max += V2(PixelsCount, PixelsCount);
+    return(res);
 }
 
 #define JOY_MATH_RCNORMSUBPX_VAL(v) v = (int)(v + 0.5f);
 inline rc2 RectNormalizeSubpixel(rc2 A){
-    JOY_MATH_RCNORMSUBPX_VAL(A.Min.x);
-    JOY_MATH_RCNORMSUBPX_VAL(A.Min.y);
-    JOY_MATH_RCNORMSUBPX_VAL(A.Max.x);
-    JOY_MATH_RCNORMSUBPX_VAL(A.Max.y);
+    JOY_MATH_RCNORMSUBPX_VAL(A.min.x);
+    JOY_MATH_RCNORMSUBPX_VAL(A.min.y);
+    JOY_MATH_RCNORMSUBPX_VAL(A.max.x);
+    JOY_MATH_RCNORMSUBPX_VAL(A.max.y);
     
     return(A);
 }

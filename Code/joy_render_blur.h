@@ -19,15 +19,15 @@ u32 Calcualte2DGaussianBoxComponentsCount(int Radius);
 void Normalize2DGaussianBox(float* Box, int Radius);
 void Calculate2DGaussianBox(float* Box, int Radius);
 
-bmp_info BlurBitmapApproximateGaussian(
-bmp_info* BitmapToBlur,
+Bmp_Info BlurBitmapApproximateGaussian(
+Bmp_Info* BitmapToBlur,
 void* ResultBitmapMem,
 void* TempBitmapMem,
 int Width, int Height,
 int BlurRadius);
 
-bmp_info BlurBitmapExactGaussian(
-bmp_info* BitmapToBlur,
+Bmp_Info BlurBitmapExactGaussian(
+Bmp_Info* BitmapToBlur,
 void* ResultBitmapMem,
 int Width, int Height,
 int BlurRadius,

@@ -15,14 +15,14 @@ Software 3d renderer
 dima privet , kak dela? i tebia lybly
 */
 
-GLOBAL_VARIABLE win32_state Win32;
-GLOBAL_VARIABLE b32 GlobalRunning;
-GLOBAL_VARIABLE input GlobalInput;
-GLOBAL_VARIABLE assets GlobalAssets;
-GLOBAL_VARIABLE gui_state GlobalGui;
-GLOBAL_VARIABLE gl_state GlobalGL;
+GLOBAL_VARIABLE Win_State win32;
+GLOBAL_VARIABLE b32 gRunning;
+GLOBAL_VARIABLE Input gInput;
+GLOBAL_VARIABLE Assets gAssets;
+GLOBAL_VARIABLE Gui_State gGui;
+GLOBAL_VARIABLE Gl_State gGL;
 
-platform_api PlatformAPI;
+Platform platform;
 
 LRESULT CALLBACK
 TmpOpenGLWndProc(
@@ -44,7 +44,7 @@ INTERNAL_FUNCTION void Win32LoadOpenglExtensions(){
     
     RegisterClassA(&WndClass);
     
-    HWND TempWND = CreateWindowExA(
+    HWND tmpWND = CreateWindowExA(
         0,
         WndClass.lpszClassName,
         "TmpWindow",
@@ -57,7 +57,7 @@ INTERNAL_FUNCTION void Win32LoadOpenglExtensions(){
         WndClass.hInstance,
         0);
     
-    HDC TmpDC = GetDC(TempWND);
+    HDC tmpDC = GetDC(tmpWND);
     
     PIXELFORMATDESCRIPTOR pfd = {
         sizeof(pfd),
@@ -72,13 +72,13 @@ INTERNAL_FUNCTION void Win32LoadOpenglExtensions(){
         PFD_MAIN_PLANE,
         0, 0, 0, 0
     };
-    int PixelFormat = ChoosePixelFormat(TmpDC, &pfd);
-    DescribePixelFormat(TmpDC, PixelFormat, sizeof(pfd), &pfd);
-    BOOL SetPixelFormatResult = SetPixelFormat(TmpDC, PixelFormat, &pfd);
+    int pFormat = ChoosePixelFormat(tmpDC, &pfd);
+    DescribePixelFormat(tmpDC, pFormat, sizeof(pfd), &pfd);
+    BOOL SetPixelFormatResult = SetPixelFormat(tmpDC, pFormat, &pfd);
     Assert(SetPixelFormatResult);
     
-    HGLRC TmpRenderCtx = wglCreateContext(TmpDC);
-    BOOL MakeCurrentResult = wglMakeCurrent(TmpDC, TmpRenderCtx);
+    HGLRC TmpRenderCtx = wglCreateContext(tmpDC);
+    BOOL MakeCurrentResult = wglMakeCurrent(tmpDC, TmpRenderCtx);
     Assert(MakeCurrentResult);
     
     WGLGETFUN(wglChoosePixelFormatARB);
@@ -88,10 +88,10 @@ INTERNAL_FUNCTION void Win32LoadOpenglExtensions(){
     WGLGETFUN(wglGetSwapIntervalEXT);
     WGLGETFUN(wglSwapIntervalEXT);
     
-    wglMakeCurrent(TmpDC, 0);
+    wglMakeCurrent(tmpDC, 0);
     wglDeleteContext(TmpRenderCtx);
-    ReleaseDC(TempWND, TmpDC);
-    DestroyWindow(TempWND);
+    ReleaseDC(tmpWND, tmpDC);
+    DestroyWindow(tmpWND);
 }
 
 INTERNAL_FUNCTION void Win32GetOpenglFunctions(){
@@ -799,10 +799,10 @@ INTERNAL_FUNCTION void Win32GetOpenglFunctions(){
 }
 
 // NOTE(Dima): Thanks https://gist.github.com/nickrolfe/1127313ed1dbf80254b614a721b3ee9c
-HGLRC Win32InitOpenGL(HDC RealDC){
+HGLRC Win32InitOpenGL(HDC realDC){
     Win32LoadOpenglExtensions();
     
-    const int PixelFormatAttribs[] = {
+    const int pFormatAttribs[] = {
         WGL_DRAW_TO_WINDOW_ARB,     GL_TRUE,
         WGL_SUPPORT_OPENGL_ARB,     GL_TRUE,
         WGL_DOUBLE_BUFFER_ARB,      GL_TRUE,
@@ -814,73 +814,73 @@ HGLRC Win32InitOpenGL(HDC RealDC){
         0,
     };
     
-    int PixelFormat;
-    UINT NumFormats = 0;
-    wglChoosePixelFormatARB(RealDC, PixelFormatAttribs, 0, 1, &PixelFormat, &NumFormats);
-    Assert(NumFormats);
+    int pFormat;
+    UINT nFormats = 0;
+    wglChoosePixelFormatARB(realDC, pFormatAttribs, 0, 1, &pFormat, &nFormats);
+    Assert(nFormats);
     
     PIXELFORMATDESCRIPTOR pfd;
-    DescribePixelFormat(RealDC, PixelFormat, sizeof(pfd), &pfd);
-    BOOL SetPFResult = SetPixelFormat(RealDC, PixelFormat, &pfd);
-    Assert(SetPFResult);
+    DescribePixelFormat(realDC, pFormat, sizeof(pfd), &pfd);
+    BOOL setPFResult = SetPixelFormat(realDC, pFormat, &pfd);
+    Assert(setPFResult);
     
     // Specify that we want to create an OpenGL 3.3 core profile context
-    const int Attribs[] = {
+    const int attribs[] = {
         WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
         WGL_CONTEXT_MINOR_VERSION_ARB, 3,
         WGL_CONTEXT_PROFILE_MASK_ARB,  WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
         0,
     };
     
-    HGLRC ResultContext = wglCreateContextAttribsARB(RealDC, 0, Attribs);
-    Assert(ResultContext);
+    HGLRC resCtx = wglCreateContextAttribsARB(realDC, 0, attribs);
+    Assert(resCtx);
     
-    BOOL MakeCurrentResult = wglMakeCurrent(RealDC, ResultContext);
+    BOOL MakeCurrentResult = wglMakeCurrent(realDC, resCtx);
     Assert(MakeCurrentResult);
     
     wglSwapIntervalEXT(0);
     
     Win32GetOpenglFunctions();
     
-    return(ResultContext);
+    return(resCtx);
 }
 
-void Win32FreeOpenGL(HGLRC RenderContext){
-    wglDeleteContext(RenderContext);
+void Win32FreeOpenGL(HGLRC renderCtx){
+    wglDeleteContext(renderCtx);
 }
 
 PLATFORM_FREE_FILE_MEMORY(Win32FreeFileMemory){
-    if (FileReadResult->Data != 0){
-        VirtualFree(FileReadResult->Data, 0, MEM_RELEASE);
+    if (fileReadResult->data != 0){
+        VirtualFree(fileReadResult->data, 0, MEM_RELEASE);
     }
     
-    FileReadResult->Data = 0;
-    FileReadResult->DataSize = 0;
+    fileReadResult->data = 0;
+    fileReadResult->dataSize = 0;
 }
 
 PLATFORM_READ_FILE(Win32ReadFile){
-    platform_read_file_result Res = {};
+    Platform_Read_File_Result res = {};
     
-    HANDLE FileHandle = CreateFileA(
-        FilePath,
+    HANDLE fileHandle = CreateFileA(
+        filePath,
         GENERIC_READ,
         FILE_SHARE_READ,
         0,
         OPEN_EXISTING,
         0, 0);
     
-    if (FileHandle != INVALID_HANDLE_VALUE){
-        LARGE_INTEGER FileSizeLI;
-        if (GetFileSizeEx(FileHandle, &FileSizeLI)){
-            u32 FileSize = (FileSizeLI.QuadPart & 0xFFFFFFFF);
-            Res.Data = VirtualAlloc(0, FileSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-            if (Res.Data){
-                DWORD BytesRead;
-                if (ReadFile(FileHandle, Res.Data, FileSize, &BytesRead, 0) && (FileSize == BytesRead)){
-                    Res.DataSize = FileSize;
+    if (fileHandle != INVALID_HANDLE_VALUE){
+        LARGE_INTEGER fileSizeLI;
+        if (GetFileSizeEx(fileHandle, &fileSizeLI)){
+            u32 fileSize = (fileSizeLI.QuadPart & 0xFFFFFFFF);
+            res.data = VirtualAlloc(0, fileSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+            if (res.data){
+                DWORD bytesRead;
+                if (ReadFile(fileHandle, res.data, fileSize, &bytesRead, 0) && (fileSize == bytesRead)){
+                    res.dataSize = fileSize;
                 }
                 else{
-                    Win32FreeFileMemory(&Res);
+                    Win32FreeFileMemory(&res);
                 }
             }
             else{
@@ -891,223 +891,289 @@ PLATFORM_READ_FILE(Win32ReadFile){
             //TODO(Dima): Logging. Can't get file size
         }
         
-        CloseHandle(FileHandle);
+        CloseHandle(fileHandle);
     }
     else{
         //TODO(Dima): Logging. Can't open file
     }
     
-    return(Res);
+    return(res);
 }
 
 PLATFORM_WRITE_FILE(Win32WriteFile){
-    b32 Result = 0;
+    b32 result = 0;
     
-    HANDLE FileHandle = CreateFileA(FilePath, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
-    if (FileHandle != INVALID_HANDLE_VALUE){
-        DWORD BytesWritten;
-        if (WriteFile(FileHandle, Data, Size, &BytesWritten, 0)){
-            Result = (BytesWritten == Size);
+    HANDLE fileHandle = CreateFileA(filePath, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+    if (fileHandle != INVALID_HANDLE_VALUE){
+        DWORD bytesWritten;
+        if (WriteFile(fileHandle, data, size, &bytesWritten, 0)){
+            result = (bytesWritten == size);
         }
         else{
             //TODO(Dima): Logging
         }
         
-        CloseHandle(FileHandle);
+        CloseHandle(fileHandle);
     }
     else{
         //TODO(Dima): Logging
     }
     
-    return(Result);
+    return(result);
 }
 
 PLATFORM_SHOW_ERROR(Win32ShowError){
-    char* CaptionText = "Error";
-    u32 MessageBoxType = MB_OK;
+    char* captionText = "Error";
+    u32 mbType = MB_OK;
     
-    switch(Type){
+    switch(type){
         case PlatformError_Error:{
-            CaptionText = "Error";
-            MessageBoxType |= MB_ICONERROR;
+            captionText = "Error";
+            mbType |= MB_ICONERROR;
         }break;
         
         case PlatformError_Warning:{
-            CaptionText = "Warning";
-            MessageBoxType |= MB_ICONWARNING;
+            captionText = "Warning";
+            mbType |= MB_ICONWARNING;
         }break;
         
         case PlatformError_Information:{
-            CaptionText = "Information";
-            MessageBoxType |= MB_ICONINFORMATION;
+            captionText = "Information";
+            mbType |= MB_ICONINFORMATION;
         }break;
     }
     
-    MessageBoxA(0, Text, CaptionText, MessageBoxType);
+    MessageBoxA(0, text, captionText, mbType);
 }
 
 PLATFORM_DEBUG_OUTPUT_STRING(Win32DebugOutputString){
-    OutputDebugString(Text);
+    OutputDebugString(text);
+}
+
+PLATFORM_MEMALLOC(Win32MemAlloc){
+    
+    // NOTE(Dima): I'll allocate 1 extra page to hold info
+    // NOTE(Dima): about allocation & win32_memory_block structure
+    const mi pageSize = 4096;
+    const mi pageSizeMask = 4095;
+    mi toAllocSize = size + pageSize;
+    
+    // NOTE(Dima): Always put guards at the beginning and at the end
+    // NOTE(Dima): For begin&end guard pages
+    toAllocSize += 2 * pageSize;
+    
+    void* allocatedMemory = VirtualAlloc(0, toAllocSize, 
+                                         MEM_COMMIT | MEM_RESERVE, 
+                                         PAGE_READWRITE);
+    Assert(allocatedMemory);
+    
+    Win_Memory_Region* region = (Win_Memory_Region*)allocatedMemory;
+    
+    
+    void* beginGuardPage = (u8*)region + pageSize;
+    DWORD oldProtectBegin;
+    VirtualProtect(beginGuardPage, pageSize, PAGE_NOACCESS, &oldProtectBegin);
+    
+    void* result = (u8*)beginGuardPage + pageSize;
+    
+    void* endGuardPage = (u8*)result + ((size + pageSizeMask) & (~(pageSizeMask)));
+    DWORD oldProtectEnd;
+    VirtualProtect(endGuardPage, pageSize, PAGE_NOACCESS, &oldProtectEnd);
+    
+    // NOTE(Dima): Inserting region to list
+    region->prev = &win32.memorySentinel;
+    BeginTicketMutex(&win32.memoryMutex);
+    region->next = win32.memorySentinel.next;
+    
+    region->prev->next = region;
+    region->next->prev = region;
+    EndTicketMutex(&win32.memoryMutex);
+    
+    // NOTE(Dima): Initializing region
+    region->totalCommittedSize = (toAllocSize + pageSizeMask) & (~pageSizeMask);
+    region->size = size;
+    region->baseAddress = result;
+    region->baseAddressOfAllocationBlock = allocatedMemory;
+    
+    return(result);
+}
+
+PLATFORM_MEMFREE(Win32MemFree){
+    if(toFree){
+        const mi pageSize = 4096;
+        void* actualToFree = (void*)((u8*)toFree - 2 * pageSize);
+        
+        Win_Memory_Region* region = (Win_Memory_Region*)actualToFree;
+        
+        // NOTE(Dima): Removing from list
+        BeginTicketMutex(&win32.memoryMutex);
+        region->next->prev = region->prev;
+        region->prev->next = region->next;
+        EndTicketMutex(&win32.memoryMutex);
+        
+        VirtualFree(toFree, 0, MEM_RELEASE);
+        
+    }
 }
 
 INTERNAL_FUNCTION void
-Win32ToggleFullscreen(win32_state* Win32)
+Win32ToggleFullscreen(Win_State* win32)
 {
-    DWORD Style = GetWindowLong(Win32->Window, GWL_STYLE);
-    if (Style & WS_OVERLAPPEDWINDOW)
+    DWORD style = GetWindowLong(win32->window, GWL_STYLE);
+    if (style & WS_OVERLAPPEDWINDOW)
     {
-        MONITORINFO MonitorInfo = { sizeof(MonitorInfo) };
-        if (GetWindowPlacement(Win32->Window, &Win32->WindowPlacement) &&
-            GetMonitorInfo(MonitorFromWindow(Win32->Window, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo))
+        MONITORINFO monInfo = { sizeof(monInfo) };
+        if (GetWindowPlacement(win32->window, &win32->windowPlacement) &&
+            GetMonitorInfo(MonitorFromWindow(win32->window, MONITOR_DEFAULTTOPRIMARY), &monInfo))
         {
-            SetWindowLong(Win32->Window, GWL_STYLE, Style & ~WS_OVERLAPPEDWINDOW);
-            SetWindowPos(Win32->Window, HWND_TOP,
-                         MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
-                         MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
-                         MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
+            SetWindowLong(win32->window, GWL_STYLE, style & ~WS_OVERLAPPEDWINDOW);
+            SetWindowPos(win32->window, HWND_TOP,
+                         monInfo.rcMonitor.left, monInfo.rcMonitor.top,
+                         monInfo.rcMonitor.right - monInfo.rcMonitor.left,
+                         monInfo.rcMonitor.bottom - monInfo.rcMonitor.top,
                          SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
         }
     }
     else
     {
-        SetWindowLong(Win32->Window, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
-        SetWindowPlacement(Win32->Window, &Win32->WindowPlacement);
-        SetWindowPos(Win32->Window, 0, 0, 0, 0, 0,
+        SetWindowLong(win32->window, GWL_STYLE, style | WS_OVERLAPPEDWINDOW);
+        SetWindowPlacement(win32->window, &win32->windowPlacement);
+        SetWindowPos(win32->window, 0, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
                      SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
     }
 }
 
-inline void Win32ProcessKey(key_state* Key, b32 IsDown){
-    if(Key->EndedDown != IsDown){
-        Key->EndedDown = IsDown;
+inline void Win32ProcessKey(KeyState* key, b32 isDown){
+    if(key->endedDown != isDown){
+        key->endedDown = isDown;
         
-        Key->TransitionHappened = 1;
+        key->transitionHappened = 1;
     }
 }
 
 INTERNAL_FUNCTION void 
-Win32ProcessMessages(input* Input){
-    MSG Msg;
-    while(PeekMessageA(&Msg, 0, 0, 0, PM_REMOVE)){
-        switch(Msg.message){
+Win32ProcessMessages(Input* input){
+    MSG msg;
+    while(PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)){
+        switch(msg.message){
             case WM_SYSKEYDOWN:
             case WM_SYSKEYUP:
             case WM_KEYDOWN:
             case WM_KEYUP:
             {
-                u32 VKey = (u32)Msg.wParam;
-                b32 WasDown = ((Msg.lParam & (1 << 30)) != 0);
-                b32 IsDown = ((Msg.lParam & (1 << 31)) == 0);
-                b32 AltKeyWasDown = ((Msg.lParam & (1 << 29)) != 0);
+                u32 vKey = (u32)msg.wParam;
+                b32 wasDown = ((msg.lParam & (1 << 30)) != 0);
+                b32 isDown = ((msg.lParam & (1 << 31)) == 0);
+                b32 altKeyWasDown = ((msg.lParam & (1 << 29)) != 0);
                 
                 //NOTE(dima): If state of key was changed
-                if(WasDown != IsDown){
-                    u32 KeyType;
-                    switch(VKey){
-                        case VK_LBUTTON: { KeyType = KeyMouse_Left; }break;
-                        case VK_RBUTTON: { KeyType = KeyMouse_Right; }break;
-                        case VK_MBUTTON: { KeyType = KeyMouse_Middle; }break;
-                        case VK_XBUTTON1: { KeyType = KeyMouse_X1; }break;
-                        case VK_XBUTTON2: { KeyType = KeyMouse_X2; }break;
-                        case VK_LEFT: { KeyType = Key_Left; }break;
-                        case VK_RIGHT: { KeyType = Key_Right; }break;
-                        case VK_UP: { KeyType = Key_Up; }break;
-                        case VK_DOWN: { KeyType = Key_Down; }break;
-                        case VK_BACK: { KeyType = Key_Backspace; }break;
-                        case VK_TAB: { KeyType = Key_Tab; }break;
-                        case VK_RETURN: { KeyType = Key_Return; }break;
-                        case VK_SHIFT: { KeyType = Key_Shift; }break;
-                        case VK_CONTROL: { KeyType = Key_Control; }break;
-                        case VK_ESCAPE: { KeyType= Key_Escape; }break;
-                        case VK_SPACE: { KeyType = Key_Space; }break;
-                        case VK_HOME: { KeyType = Key_Home; }break;
-                        case VK_END: { KeyType = Key_End; }break;
-                        case VK_INSERT: { KeyType = Key_Insert; }break;
-                        case VK_DELETE: { KeyType = Key_Delete; }break;
-                        case VK_HELP: { KeyType = Key_Help; }break;
+                if(wasDown != isDown){
+                    u32 keyType;
+                    switch(vKey){
+                        case VK_LBUTTON: { keyType = KeyMouse_Left; }break;
+                        case VK_RBUTTON: { keyType = KeyMouse_Right; }break;
+                        case VK_MBUTTON: { keyType = KeyMouse_Middle; }break;
+                        case VK_XBUTTON1: { keyType = KeyMouse_X1; }break;
+                        case VK_XBUTTON2: { keyType = KeyMouse_X2; }break;
+                        case VK_LEFT: { keyType = Key_Left; }break;
+                        case VK_RIGHT: { keyType = Key_Right; }break;
+                        case VK_UP: { keyType = Key_Up; }break;
+                        case VK_DOWN: { keyType = Key_Down; }break;
+                        case VK_BACK: { keyType = Key_Backspace; }break;
+                        case VK_TAB: { keyType = Key_Tab; }break;
+                        case VK_RETURN: { keyType = Key_Return; }break;
+                        case VK_SHIFT: { keyType = Key_Shift; }break;
+                        case VK_CONTROL: { keyType = Key_Control; }break;
+                        case VK_ESCAPE: { keyType= Key_Escape; }break;
+                        case VK_SPACE: { keyType = Key_Space; }break;
+                        case VK_HOME: { keyType = Key_Home; }break;
+                        case VK_END: { keyType = Key_End; }break;
+                        case VK_INSERT: { keyType = Key_Insert; }break;
+                        case VK_DELETE: { keyType = Key_Delete; }break;
+                        case VK_HELP: { keyType = Key_Help; }break;
                         
-                        case 0x30:{ KeyType = Key_0; }break;
-                        case 0x31:{ KeyType = Key_1; }break;
-                        case 0x32:{ KeyType = Key_2; }break;
-                        case 0x33:{ KeyType = Key_3; }break;
-                        case 0x34:{ KeyType = Key_4; }break;
-                        case 0x35:{ KeyType = Key_5; }break;
-                        case 0x36:{ KeyType = Key_6; }break;
-                        case 0x37:{ KeyType = Key_7; }break;
-                        case 0x38:{ KeyType = Key_8; }break;
-                        case 0x39:{ KeyType = Key_9; }
+                        case 0x30:{ keyType = Key_0; }break;
+                        case 0x31:{ keyType = Key_1; }break;
+                        case 0x32:{ keyType = Key_2; }break;
+                        case 0x33:{ keyType = Key_3; }break;
+                        case 0x34:{ keyType = Key_4; }break;
+                        case 0x35:{ keyType = Key_5; }break;
+                        case 0x36:{ keyType = Key_6; }break;
+                        case 0x37:{ keyType = Key_7; }break;
+                        case 0x38:{ keyType = Key_8; }break;
+                        case 0x39:{ keyType = Key_9; }
                         
-                        case 'A':{ KeyType = Key_A; }break;
-                        case 'B':{ KeyType = Key_B; }break;
-                        case 'C':{ KeyType = Key_C; }break;
-                        case 'D':{ KeyType = Key_D; }break;
-                        case 'E':{ KeyType = Key_E; }break;
-                        case 'F':{ KeyType = Key_F; }break;
-                        case 'G':{ KeyType = Key_G; }break;
-                        case 'H':{ KeyType = Key_H; }break;
-                        case 'I':{ KeyType = Key_I; }break;
-                        case 'J':{ KeyType = Key_J; }break;
-                        case 'K':{ KeyType = Key_K; }break;
-                        case 'L':{ KeyType = Key_L; }break;
-                        case 'M':{ KeyType = Key_M; }break;
-                        case 'N':{ KeyType = Key_N; }break;
-                        case 'O':{ KeyType = Key_O; }break;
-                        case 'P':{ KeyType = Key_P; }break;
-                        case 'Q':{ KeyType = Key_Q; }break;
-                        case 'R':{ KeyType = Key_R; }break;
-                        case 'S':{ KeyType = Key_S; }break;
-                        case 'T':{ KeyType = Key_T; }break;
-                        case 'U':{ KeyType = Key_U; }break;
-                        case 'V':{ KeyType = Key_V; }break;
-                        case 'W':{ KeyType = Key_W; }break;
-                        case 'X':{ KeyType = Key_X; }break;
-                        case 'Y':{ KeyType = Key_Y; }break;
-                        case 'Z':{ KeyType = Key_Z; }break;
+                        case 'A':{ keyType = Key_A; }break;
+                        case 'B':{ keyType = Key_B; }break;
+                        case 'C':{ keyType = Key_C; }break;
+                        case 'D':{ keyType = Key_D; }break;
+                        case 'E':{ keyType = Key_E; }break;
+                        case 'F':{ keyType = Key_F; }break;
+                        case 'G':{ keyType = Key_G; }break;
+                        case 'H':{ keyType = Key_H; }break;
+                        case 'I':{ keyType = Key_I; }break;
+                        case 'J':{ keyType = Key_J; }break;
+                        case 'K':{ keyType = Key_K; }break;
+                        case 'L':{ keyType = Key_L; }break;
+                        case 'M':{ keyType = Key_M; }break;
+                        case 'N':{ keyType = Key_N; }break;
+                        case 'O':{ keyType = Key_O; }break;
+                        case 'P':{ keyType = Key_P; }break;
+                        case 'Q':{ keyType = Key_Q; }break;
+                        case 'R':{ keyType = Key_R; }break;
+                        case 'S':{ keyType = Key_S; }break;
+                        case 'T':{ keyType = Key_T; }break;
+                        case 'U':{ keyType = Key_U; }break;
+                        case 'V':{ keyType = Key_V; }break;
+                        case 'W':{ keyType = Key_W; }break;
+                        case 'X':{ keyType = Key_X; }break;
+                        case 'Y':{ keyType = Key_Y; }break;
+                        case 'Z':{ keyType = Key_Z; }break;
                         
-                        case VK_NUMPAD0: { KeyType = Key_Num0; }break;
-                        case VK_NUMPAD1: { KeyType = Key_Num1; }break;
-                        case VK_NUMPAD2: { KeyType = Key_Num2; }break;
-                        case VK_NUMPAD3: { KeyType = Key_Num3; }break;
-                        case VK_NUMPAD4: { KeyType = Key_Num4; }break;
-                        case VK_NUMPAD5: { KeyType = Key_Num5; }break;
-                        case VK_NUMPAD6: { KeyType = Key_Num6; }break;
-                        case VK_NUMPAD7: { KeyType = Key_Num7; }break;
-                        case VK_NUMPAD8: { KeyType = Key_Num8; }break;
-                        case VK_NUMPAD9: { KeyType = Key_Num9; }break;
-                        case VK_MULTIPLY: { KeyType = Key_Multiply; }break;
-                        case VK_ADD: { KeyType = Key_Add; }break;
-                        case VK_DIVIDE: { KeyType = Key_Divide; }break;
-                        case VK_SUBTRACT: { KeyType = Key_Subtract; }break;
-                        case VK_SEPARATOR: { KeyType = Key_Separator; }break;
-                        case VK_DECIMAL: { KeyType = Key_Decimal; }break;
-                        case VK_F1: {  KeyType = Key_F1; }break;
-                        case VK_F2: {  KeyType = Key_F2; }break;
-                        case VK_F3: {  KeyType = Key_F3; }break;
-                        case VK_F4: {  KeyType = Key_F4; }break;
-                        case VK_F5: {  KeyType = Key_F5; }break;
-                        case VK_F6: {  KeyType = Key_F6; }break;
-                        case VK_F7: {  KeyType = Key_F7; }break;
-                        case VK_F8: {  KeyType = Key_F8; }break;
-                        case VK_F9: {  KeyType = Key_F9; }break;
-                        case VK_F10: {  KeyType = Key_F10; }break;
-                        case VK_F11: {  KeyType = Key_F11; }break;
-                        case VK_F12: {  KeyType = Key_F12; }break;
-                        case VK_VOLUME_MUTE: { KeyType = Key_VolumeMute; }break;
-                        case VK_VOLUME_UP: { KeyType = Key_VolumeUp; }break;
-                        case VK_VOLUME_DOWN: { KeyType = Key_VolumeDown; }break;
+                        case VK_NUMPAD0: { keyType = Key_Num0; }break;
+                        case VK_NUMPAD1: { keyType = Key_Num1; }break;
+                        case VK_NUMPAD2: { keyType = Key_Num2; }break;
+                        case VK_NUMPAD3: { keyType = Key_Num3; }break;
+                        case VK_NUMPAD4: { keyType = Key_Num4; }break;
+                        case VK_NUMPAD5: { keyType = Key_Num5; }break;
+                        case VK_NUMPAD6: { keyType = Key_Num6; }break;
+                        case VK_NUMPAD7: { keyType = Key_Num7; }break;
+                        case VK_NUMPAD8: { keyType = Key_Num8; }break;
+                        case VK_NUMPAD9: { keyType = Key_Num9; }break;
+                        case VK_MULTIPLY: { keyType = Key_Multiply; }break;
+                        case VK_ADD: { keyType = Key_Add; }break;
+                        case VK_DIVIDE: { keyType = Key_Divide; }break;
+                        case VK_SUBTRACT: { keyType = Key_Subtract; }break;
+                        case VK_SEPARATOR: { keyType = Key_Separator; }break;
+                        case VK_DECIMAL: { keyType = Key_Decimal; }break;
+                        case VK_F1: {  keyType = Key_F1; }break;
+                        case VK_F2: {  keyType = Key_F2; }break;
+                        case VK_F3: {  keyType = Key_F3; }break;
+                        case VK_F4: {  keyType = Key_F4; }break;
+                        case VK_F5: {  keyType = Key_F5; }break;
+                        case VK_F6: {  keyType = Key_F6; }break;
+                        case VK_F7: {  keyType = Key_F7; }break;
+                        case VK_F8: {  keyType = Key_F8; }break;
+                        case VK_F9: {  keyType = Key_F9; }break;
+                        case VK_F10: {  keyType = Key_F10; }break;
+                        case VK_F11: {  keyType = Key_F11; }break;
+                        case VK_F12: {  keyType = Key_F12; }break;
+                        case VK_VOLUME_MUTE: { keyType = Key_VolumeMute; }break;
+                        case VK_VOLUME_UP: { keyType = Key_VolumeUp; }break;
+                        case VK_VOLUME_DOWN: { keyType = Key_VolumeDown; }break;
                         
-                        Win32ProcessKey(&Input->KeyStates[KeyType], IsDown);
+                        Win32ProcessKey(&input->keyStates[keyType], isDown);
                     }
                     
-                    if(IsDown){
+                    if(isDown){
                         
-                        if(AltKeyWasDown && VKey == VK_F4){
-                            GlobalRunning = 0;
+                        if(altKeyWasDown && vKey == VK_F4){
+                            gRunning = 0;
                         }
                         
-                        if(AltKeyWasDown && VKey == VK_RETURN){
-                            Win32ToggleFullscreen(&Win32);
+                        if(altKeyWasDown && vKey == VK_RETURN){
+                            Win32ToggleFullscreen(&win32);
                         }
                     }
                 }
@@ -1118,40 +1184,40 @@ Win32ProcessMessages(input* Input){
             }break;
             
             case WM_QUIT:{
-                GlobalRunning = 0;
+                gRunning = 0;
             }break;
             
             case WM_CLOSE:{
                 PostQuitMessage(0);
-                GlobalRunning = 0;
+                gRunning = 0;
             }break;
             
             case WM_DESTROY:{
                 PostQuitMessage(0);
-                GlobalRunning = 0;
+                gRunning = 0;
             }break;
             
             default:{
-                TranslateMessage(&Msg);
-                DispatchMessage(&Msg);
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
             }break;
         } //END SWITCH
     } //END_WHILE
 }
 
 INTERNAL_FUNCTION void
-Win32ProcessInput(input* Input)
+Win32ProcessInput(Input* input)
 {
-    POINT Point;
-    BOOL GetCursorPosRes = GetCursorPos(&Point);
-    BOOL ScreenToClientRes = ScreenToClient(Win32.Window, &Point);
+    POINT point;
+    BOOL getCursorPosRes = GetCursorPos(&point);
+    BOOL screenToClientRec = ScreenToClient(win32.window, &point);
     
-    v2 MouseP = V2(Point.x, Point.y);
-    Input->LastMouseP = Input->MouseP;
-    Input->MouseP = MouseP;
+    v2 mouseP = V2(point.x, point.y);
+    input->lastMouseP = input->mouseP;
+    input->mouseP = mouseP;
     
     //NOTE(Dima): Processing mouse buttons
-    DWORD Win32MouseKeyID[] = {
+    DWORD win32MouseKeyID[] = {
         VK_LBUTTON,
         VK_MBUTTON,
         VK_RBUTTON,
@@ -1159,14 +1225,14 @@ Win32ProcessInput(input* Input)
         VK_XBUTTON2,
     };
     
-    for(u32 MouseKeyIndex = 0;
-        MouseKeyIndex < ARRAY_COUNT(Win32MouseKeyID);
-        MouseKeyIndex++)
+    for(u32 mouseKeyIndex = 0;
+        mouseKeyIndex < ARRAY_COUNT(win32MouseKeyID);
+        mouseKeyIndex++)
     {
-        Input->KeyStates[MouseKey_Left + MouseKeyIndex].TransitionHappened = 0;
-        SHORT WinMouseKeyState = GetKeyState(Win32MouseKeyID[MouseKeyIndex]);
+        input->keyStates[MouseKey_Left + mouseKeyIndex].transitionHappened = 0;
+        SHORT winMouseKeyState = GetKeyState(win32MouseKeyID[mouseKeyIndex]);
         
-        Win32ProcessKey(&Input->KeyStates[MouseKey_Left + MouseKeyIndex], WinMouseKeyState & (1 << 15));
+        Win32ProcessKey(&input->keyStates[MouseKey_Left + mouseKeyIndex], winMouseKeyState & (1 << 15));
     }
 }
 
@@ -1184,15 +1250,15 @@ LPARAM LParam)
         }break;
         
         case WM_DESTROY:{
-            GlobalRunning = 0;
+            gRunning = 0;
         }break;
         
         case WM_QUIT:{
-            GlobalRunning = 0;
+            gRunning = 0;
         }break;
         
         case WM_CLOSE:{
-            GlobalRunning = 0;
+            gRunning = 0;
         }break;
         
         default:{
@@ -1208,253 +1274,289 @@ int APIENTRY WinMain(HINSTANCE hInstance,
                      LPSTR     lpCmdLine,
                      int       nCmdShow)
 {
-    QueryPerformanceFrequency(&Win32.PerformanceFreqLI);
-    Win32.OneOverPerformanceFreq = 1.0f / (float)Win32.PerformanceFreqLI.QuadPart;
+    // NOTE(Dima): Initializing platform API
+    InitDefaultPlatformAPI(&platform);
     
-    u32 MemoryBlockSize = Gibibytes(1);
-    void* MemoryBlock = VirtualAlloc(
-        0, 
-        MemoryBlockSize,
-        MEM_COMMIT | MEM_RESERVE, 
-        PAGE_READWRITE);
-    memory_region GlobalMem = InitMemoryRegion(MemoryBlock, MemoryBlockSize);
+    platform.ReadFile = Win32ReadFile;
+    platform.WriteFile = Win32WriteFile;
+    platform.FreeFileMemory = Win32FreeFileMemory;
+    platform.ShowError = Win32ShowError;
+    platform.OutputString = Win32DebugOutputString;
+    platform.MemAlloc = Win32MemAlloc;
+    platform.MemFree = Win32MemFree;
     
-    WNDCLASSEXA WindowClass = {};
-    WindowClass.cbSize = sizeof(WindowClass);
-    WindowClass.lpszClassName = "MainWindowClassName";
-    WindowClass.hInstance = hInstance;
-    WindowClass.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
-    WindowClass.lpfnWndProc = Win32WindowProcessing;
+    QueryPerformanceFrequency(&win32.performanceFreqLI);
+    win32.oneOverPerformanceFreq = 1.0f / (float)win32.performanceFreqLI.QuadPart;
     
-    RegisterClassExA(&WindowClass);
+    // NOTE(Dima): Initializing memory sentinel
+    win32.memorySentinel = {};
+    win32.memorySentinel.prev = &win32.memorySentinel;
+    win32.memorySentinel.next = &win32.memorySentinel;
     
-    int WindowWidth = 1366;
-    WindowWidth = (WindowWidth + 3) & (~3);
-    int WindowHeight = 768;
+    Memory_Region gMem = {};
     
-    int WindowCreateW;
-    int WindowCreateH;
+    WNDCLASSEXA wndClass = {};
+    wndClass.cbSize = sizeof(wndClass);
+    wndClass.lpszClassName = "MainWindowClassName";
+    wndClass.hInstance = hInstance;
+    wndClass.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
+    wndClass.lpfnWndProc = Win32WindowProcessing;
+    
+    RegisterClassExA(&wndClass);
+    
+    int windowWidth = 1366;
+    windowWidth = (windowWidth + 3) & (~3);
+    int windowHeight = 768;
+    
+    int windowCreateW;
+    int windowCreateH;
     
     RECT ClientRect;
     ClientRect.left = 0;
     ClientRect.top = 0;
-    ClientRect.right = WindowWidth;
-    ClientRect.bottom = WindowHeight;
+    ClientRect.right = windowWidth;
+    ClientRect.bottom = windowHeight;
     BOOL WindowRectAdjusted = AdjustWindowRect(
         &ClientRect, (WS_OVERLAPPEDWINDOW | WS_VISIBLE) & (~WS_OVERLAPPED), 0);
     
     if(WindowRectAdjusted){
-        WindowCreateW = ClientRect.right - ClientRect.left;
-        WindowCreateH = ClientRect.bottom - ClientRect.top;
+        windowCreateW = ClientRect.right - ClientRect.left;
+        windowCreateH = ClientRect.bottom - ClientRect.top;
     }
     else{
-        WindowCreateW = WindowWidth;
-        WindowCreateH = WindowHeight;
+        windowCreateW = windowWidth;
+        windowCreateH = windowHeight;
     }
     
-    Win32.Window = CreateWindowA(
-        WindowClass.lpszClassName,
+    win32.window = CreateWindowA(
+        wndClass.lpszClassName,
         "Joy",
         WS_OVERLAPPEDWINDOW | WS_VISIBLE,
         CW_USEDEFAULT, CW_USEDEFAULT,
-        WindowCreateW,
-        WindowCreateH,
+        windowCreateW,
+        windowCreateH,
         0, 0, 
         hInstance, 
         0);
     
-    Win32.WindowWidth = WindowWidth;
-    Win32.WindowHeight = WindowHeight;
+    win32.windowWidth = windowWidth;
+    win32.windowHeight = windowHeight;
     
-    void* Win32BitmapMemory = PushSomeMem(&GlobalMem, WindowWidth * WindowHeight * 4, 64);
-    Win32.Bitmap = AssetAllocateBitmapInternal(WindowWidth, WindowHeight, Win32BitmapMemory);
-    Win32.BMI = {};
-    BITMAPINFO* BMI = &Win32.BMI;
-    BITMAPINFOHEADER* BMIHeader = &BMI->bmiHeader;
-    BMIHeader->biSize=  sizeof(BITMAPINFOHEADER);
-    BMIHeader->biWidth = WindowWidth;
-    BMIHeader->biHeight = -WindowHeight;
-    BMIHeader->biPlanes = 1;
-    BMIHeader->biBitCount = 32;
-    BMIHeader->biCompression = BI_RGB;
-    BMIHeader->biSizeImage = 0;
+    void* winBmpMemory = PushSomeMem(&gMem, windowWidth * windowHeight * 4, 64);
+    win32.bitmap = AssetAllocateBitmapInternal(windowWidth, windowHeight, winBmpMemory);
+    win32.bmi = {};
+    BITMAPINFO* bmi = &win32.bmi;
+    BITMAPINFOHEADER* bmiHeader = &bmi->bmiHeader;
+    bmiHeader->biSize=  sizeof(BITMAPINFOHEADER);
+    bmiHeader->biWidth = windowWidth;
+    bmiHeader->biHeight = -windowHeight;
+    bmiHeader->biPlanes = 1;
+    bmiHeader->biBitCount = 32;
+    bmiHeader->biCompression = BI_RGB;
+    bmiHeader->biSizeImage = 0;
     
-    HDC GlDC = GetDC(Win32.Window);
-    Win32.RenderContext = Win32InitOpenGL(GlDC);
-    
-    // NOTE(Dima): Initializing platform API
-    InitDefaultPlatformAPI(&PlatformAPI);
-    
-    PlatformAPI.ReadFile = Win32ReadFile;
-    PlatformAPI.WriteFile = Win32WriteFile;
-    PlatformAPI.FreeFileMemory = Win32FreeFileMemory;
-    PlatformAPI.ShowError = Win32ShowError;
-    PlatformAPI.OutputString = Win32DebugOutputString;
+    HDC glDC = GetDC(win32.window);
+    win32.renderCtx = Win32InitOpenGL(glDC);
     
     // NOTE(Dima): Initializing engine systems
-    GL_Init(&GlobalGL);
-    InitAssets(&GlobalAssets);
-    render_stack RenderStack_ = InitRenderStack(&GlobalMem, Megabytes(1));
-    render_stack* RenderStack = &RenderStack_;
+    GlInit(&gGL);
+    InitAssets(&gAssets);
+    
+    mi renderMemSize = Megabytes(2);
+    void* renderMem = PushSomeMem(&gMem, renderMemSize);
+    Render_Stack renderStack_ = InitRenderStack(renderMem, renderMemSize);
+    Render_Stack* renderStack = &renderStack_;
     InitGui(
-        &GlobalGui, 
-        &GlobalInput, 
-        &GlobalAssets, 
-        &GlobalMem, 
-        RenderStack, 
-        WindowWidth, 
-        WindowHeight);
+        &gGui, 
+        &gInput, 
+        &gAssets, 
+        &gMem, 
+        renderStack, 
+        windowWidth, 
+        windowHeight);
     
-    float Time = 0.0f;
-    float DeltaTime = 0.016f;
+    float time = 0.0f;
+    float deltaTime = 0.016f;
     
-    gui_layout* Lay = GetFirstLayout(&GlobalGui);
+    Gui_Layout* lay = GetFirstLayout(&gGui);
     
     //ShellExecuteA(NULL, "open", "http://www.microsoft.com", NULL, NULL, SW_SHOWNORMAL);
     
-    GlobalRunning = 1;
-    while(GlobalRunning){
-        LARGE_INTEGER BeginClockLI;
-        QueryPerformanceCounter(&BeginClockLI);
+    gRunning = 1;
+    while(gRunning){
+        LARGE_INTEGER beginClockLI;
+        QueryPerformanceCounter(&beginClockLI);
         
-        Win32ProcessMessages(&GlobalInput);
-        Win32ProcessInput(&GlobalInput);
+        Win32ProcessMessages(&gInput);
+        Win32ProcessInput(&gInput);
         
-        rc2 ClipRect = RcMinMax(V2(0.0f, 0.0f), V2(WindowWidth, WindowHeight));
+        rc2 ClipRect = RcMinMax(V2(0.0f, 0.0f), V2(windowWidth, windowHeight));
         
-        RenderStackBeginFrame(RenderStack);
+        RenderStackBeginFrame(renderStack);
         
-        PushClearColor(RenderStack, V3(1.0f, 0.5f, 0.0f));
+        PushClearColor(renderStack, V3(1.0f, 0.5f, 0.0f));
         
-        PushGradient(RenderStack, RcMinDim(V2(10, 10), V2(900, 300)), 
+#if 0        
+        PushGradient(renderStack, RcMinDim(V2(10, 10), V2(900, 300)), 
                      ColorFromHex("#FF00FF"), ColorFromHex("#4b0082"),
                      RenderEntryGradient_Horizontal);
-        PushGradient(RenderStack, RcMinDim(V2(100, 400), V2(900, 300)), 
+        PushGradient(renderStack, RcMinDim(V2(100, 400), V2(900, 300)), 
                      ColorFromHex("#FF00FF"), ColorFromHex("#4b0082"), 
                      RenderEntryGradient_Vertical);
+#endif
         
-        PushBitmap(RenderStack, &GlobalAssets.Sunset, V2(100.0f, Sin(Time * 1.0f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-        PushBitmap(RenderStack, &GlobalAssets.SunsetOrange, V2(200.0f, Sin(Time * 1.1f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-        PushBitmap(RenderStack, &GlobalAssets.SunsetField, V2(300.0f, Sin(Time * 1.2f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-        PushBitmap(RenderStack, &GlobalAssets.SunsetMountains, V2(400.0f, Sin(Time * 1.3f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-        PushBitmap(RenderStack, &GlobalAssets.MountainsFuji, V2(500.0f, Sin(Time * 1.4f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-        PushBitmap(RenderStack, &GlobalAssets.RoadClouds, V2(600.0f, Sin(Time * 1.5f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-        PushBitmap(RenderStack, &GlobalAssets.Sunrise, V2(700.0f, Sin(Time * 1.6f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
+        PushBitmap(renderStack, &gAssets.sunset, V2(100.0f, Sin(time * 1.0f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
+        PushBitmap(renderStack, &gAssets.sunsetOrange, V2(200.0f, Sin(time * 1.1f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
+        PushBitmap(renderStack, &gAssets.sunsetField, V2(300.0f, Sin(time * 1.2f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
+        PushBitmap(renderStack, &gAssets.sunsetMountains, V2(400.0f, Sin(time * 1.3f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
+        PushBitmap(renderStack, &gAssets.mountainsFuji, V2(500.0f, Sin(time * 1.4f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
+        PushBitmap(renderStack, &gAssets.roadClouds, V2(600.0f, Sin(time * 1.5f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
+        PushBitmap(renderStack, &gAssets.sunrise, V2(700.0f, Sin(time * 1.6f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
         
         char FPSBuf[64];
-        stbsp_sprintf(FPSBuf, "FPS %.2f, ms %.3f", 1.0f / DeltaTime, DeltaTime);
+        stbsp_sprintf(FPSBuf, "FPS %.2f, ms %.3f", 1.0f / deltaTime, deltaTime);
         
-        static int LastFrameEntryCount = 0;
-        static int LastFrameBytesUsed = 0;
+        static int lastFrameEntryCount = 0;
+        static int lastFrameBytesUsed = 0;
         char StackInfo[256];
         stbsp_sprintf(StackInfo, "EntryCount: %d; BytesUsed: %d;", 
-                      LastFrameEntryCount, 
-                      LastFrameBytesUsed);
+                      lastFrameEntryCount, 
+                      lastFrameBytesUsed);
         
 #if 1
-        gui_state* Gui = &GlobalGui;
+        Gui_State* gui = &gGui;
         
-        GuiBeginPage(Gui, "Page1");
-        GuiEndPage(Gui);
+        GuiBeginPage(gui, "Page1");
+        GuiEndPage(gui);
         
-        GuiBeginPage(Gui, "Page2");
-        GuiEndPage(Gui);
+        GuiBeginPage(gui, "Page2");
+        GuiEndPage(gui);
         
-        GuiBeginPage(Gui, "Animation");
-        GuiEndPage(Gui);
+        GuiBeginPage(gui, "Animation");
+        GuiEndPage(gui);
         
-        GuiBeginPage(Gui, "Platform");
-        GuiEndPage(Gui);
+        GuiBeginPage(gui, "Platform");
+        GuiEndPage(gui);
         
-        GuiBeginPage(Gui, "GUI");
-        GuiEndPage(Gui);
+        GuiBeginPage(gui, "GUI");
+        GuiEndPage(gui);
         
-        //GuiUpdateWindows(Gui);
+        //GuiUpdateWindows(gui);
         
-        GuiBeginLayout(Gui, Lay);
-        GuiText(Gui, "Hello world");
-        GuiText(Gui, FPSBuf);
-        GuiText(Gui, StackInfo);
-        GuiText(Gui, "I love Kate");
-        GuiText(Gui, "I wish joy and happiness for everyone");
+        GuiBeginLayout(gui, lay);
+        GuiText(gui, "Hello world");
+        GuiText(gui, FPSBuf);
+        GuiText(gui, StackInfo);
+        GuiText(gui, "I love Kate");
+        GuiText(gui, "I wish joy and happiness for everyone");
         
         LOCAL_AS_GLOBAL int RectCount = 0;
-        GuiBeginRow(Gui);
-        if(GuiButton(Gui, "Add")){
+        GuiBeginRow(gui);
+        if(GuiButton(gui, "Add")){
             RectCount++;
         }
-        if(GuiButton(Gui, "Clear")){
+        if(GuiButton(gui, "Clear")){
             RectCount--;
             if(RectCount < 0){
                 RectCount = 0;
             }
         }
-        GuiEndRow(Gui);
+        GuiEndRow(gui);
         for(int i = 0; i < RectCount; i++){
-            PushRect(RenderStack, RcMinDim(V2(100 + i * 50, 100), V2(40, 40)));
+            PushRect(renderStack, RcMinDim(V2(100 + i * 50, 100), V2(40, 40)));
         }
         
-        static b32 BoolButtonValue;
-        GuiBeginRow(Gui);
-        GuiBoolButton(Gui, "BoolButton", &BoolButtonValue);
-        GuiBoolButton(Gui, "BoolButton123", &BoolButtonValue);
-        GuiBoolButton(Gui, "BoolButton1234", &BoolButtonValue);
-        GuiBoolButton(Gui, "BoolButtonasdfga", &BoolButtonValue);
-        GuiBoolButton(Gui, "BoolButtonzxcvzxcb", &BoolButtonValue);
-        GuiEndRow(Gui);
+        static b32 boolButtonValue;
+        GuiBeginRow(gui);
+        GuiBoolButton(gui, "boolButton", &boolButtonValue);
+        GuiBoolButton(gui, "boolButton123", &boolButtonValue);
+        GuiBoolButton(gui, "boolButton1234", &boolButtonValue);
+        GuiBoolButton(gui, "boolButtonasdfga", &boolButtonValue);
+        GuiBoolButton(gui, "boolButtonzxcvzxcb", &boolButtonValue);
+        GuiEndRow(gui);
         
-        static b32 BoolButtonOnOffValue;
-        GuiBeginRow(Gui);
-        GuiBeginColumn(Gui);
-        GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &BoolButtonValue);
-        GuiBoolButtonOnOff(Gui, "BoolButtonOnOff1", &BoolButtonValue);
-        GuiBoolButtonOnOff(Gui, "BoolButtonOnOff2", &BoolButtonValue);
-        GuiBoolButtonOnOff(Gui, "BoolButtonOnOff3", &BoolButtonValue);
-        GuiEndColumn(Gui);
+        static b32 boolButtonOnOffValue;
+        GuiBeginRow(gui);
+        GuiBeginColumn(gui);
+        GuiBoolButtonOnOff(gui, "boolButtonOnOff", &boolButtonValue);
+        GuiBoolButtonOnOff(gui, "boolButtonOnOff1", &boolButtonValue);
+        GuiBoolButtonOnOff(gui, "boolButtonOnOff2", &boolButtonValue);
+        GuiBoolButtonOnOff(gui, "boolButtonOnOff3", &boolButtonValue);
+        GuiEndColumn(gui);
         
-        GuiBeginColumn(Gui);
-        static b32 CheckboxValue1;
-        static b32 CheckboxValue2;
-        static b32 CheckboxValue3;
-        static b32 CheckboxValue4;
-        GuiCheckbox(Gui, "Checkbox", &CheckboxValue1);
-        GuiCheckbox(Gui, "Checkbox1", &CheckboxValue2);
-        GuiCheckbox(Gui, "Checkbox2", &CheckboxValue3);
-        GuiCheckbox(Gui, "Checkbox3", &CheckboxValue4);
-        GuiEndColumn(Gui);
-        GuiEndRow(Gui);
+        GuiBeginColumn(gui);
+        static b32 checkboxValue1;
+        static b32 checkboxValue2;
+        static b32 checkboxValue3;
+        static b32 checkboxValue4;
+        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+        GuiCheckbox(gui, "Checkbox1", &checkboxValue2);
+        GuiCheckbox(gui, "Checkbox2", &checkboxValue3);
+        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+        GuiEndColumn(gui);
         
-        GuiTooltip(Gui, "Hello world!", GlobalInput.MouseP);
+        GuiBeginColumn(gui);
+        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+        GuiCheckbox(gui, "Checkbox1", &checkboxValue2);
+        GuiCheckbox(gui, "Checkbox2", &checkboxValue3);
+        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+        GuiEndColumn(gui);
+        GuiEndRow(gui);
         
-        GuiPreRender(Gui);
+        GuiBoolButtonOnOff(gui, "BoolButtonOnOff4", &boolButtonValue);
+        GuiCheckbox(gui, "Checkbox4", &checkboxValue4);
         
-        GuiEndLayout(&GlobalGui, Lay);
+        GuiBeginRow(gui);
+        GuiBeginColumn(gui);
+        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+        GuiBoolButtonOnOff(gui, "BoolButtonOnOff1", &boolButtonValue);
+        GuiBoolButtonOnOff(gui, "BoolButtonOnOff2", &boolButtonValue);
+        GuiBoolButtonOnOff(gui, "BoolButtonOnOff3", &boolButtonValue);
+        GuiEndColumn(gui);
+        
+        GuiBeginColumn(gui);
+        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+        GuiCheckbox(gui, "Checkbox1", &checkboxValue2);
+        GuiCheckbox(gui, "Checkbox2", &checkboxValue3);
+        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+        GuiEndColumn(gui);
+        
+        
+        GuiEndRow(gui);
+        
+        
+        GuiTooltip(gui, "Hello world!", gInput.mouseP);
+        
+        GuiPreRender(gui);
+        
+        GuiEndLayout(gui, lay);
 #endif
         
-        LastFrameBytesUsed = RenderStack->Data.Used;
-        LastFrameEntryCount = RenderStack->EntryCount;
+        lastFrameBytesUsed = renderStack->memUsed;
+        lastFrameEntryCount = renderStack->entryCount;
         
-        RenderMultithreaded(&PlatformAPI.HighPriorityQueue, RenderStack, &Win32.Bitmap);
+        RenderMultithreaded(&platform.highPriorityQueue, renderStack, &win32.bitmap);
         
-        GL_OutputRender(&GlobalGL, &Win32.Bitmap);
+        GlOutputRender(&gGL, &win32.bitmap);
         
-        LARGE_INTEGER EndClockLI;
-        QueryPerformanceCounter(&EndClockLI);
-        u64 ClocksElapsed = EndClockLI.QuadPart - BeginClockLI.QuadPart;
-        DeltaTime = (float)ClocksElapsed * Win32.OneOverPerformanceFreq;
-        Time += DeltaTime;
+        LARGE_INTEGER endClockLI;
+        QueryPerformanceCounter(&endClockLI);
+        u64 clocksElapsed = endClockLI.QuadPart - beginClockLI.QuadPart;
+        deltaTime = (float)clocksElapsed * win32.oneOverPerformanceFreq;
+        time += deltaTime;
         
-        SwapBuffers(GlDC);
+        SwapBuffers(glDC);
     }
     
-    //NOTE(dima): Cleanup
-    GL_Free(&GlobalGL);
     
-    FreePlatformAPI(&PlatformAPI);
-    Win32FreeOpenGL(Win32.RenderContext);
-    ReleaseDC(Win32.Window, GlDC);
-    DestroyWindow(Win32.Window);
-    VirtualFree(MemoryBlock, 0, MEM_RELEASE);
+    
+    //NOTE(dima): Cleanup
+    GlFree(&gGL);
+    
+    FreePlatformAPI(&platform);
+    Win32FreeOpenGL(win32.renderCtx);
+    ReleaseDC(win32.window, glDC);
+    DestroyWindow(win32.window);
     
     return (0);
 }

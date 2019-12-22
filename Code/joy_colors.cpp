@@ -1,14 +1,14 @@
 #include "joy_colors.h"
 #include "joy_strings.h"
 
-inline color_slot CreateColorSlot(color_state* ColorState, v4 Color, char* Name) {
-	color_slot Res = {};
+inline Color_Slot CreateColorSlot(Color_State* colorState, v4 color, char* name) {
+	Color_Slot res = {};
     
-	Res.Color = Color;
-	Res.Name = PushString(ColorState->ColorsMem, Name);
-	CopyStrings(Res.Name, Name);
+	res.color = color;
+	res.name = PushString(colorState->colorsMem, name);
+	CopyStrings(res.name, name);
     
-	char* At = Res.Name;
+	char* At = res.name;
 	while (*At) {
         
 		if (*At >= 'a' && *At <= 'z') {
@@ -18,13 +18,13 @@ inline color_slot CreateColorSlot(color_state* ColorState, v4 Color, char* Name)
 		At++;
 	}
     
-	Res.ColorU32 = PackRGBA(Res.Color);
+	res.colorU32 = PackRGBA(res.color);
     
-	return(Res);
+	return(res);
 }
 
-#define JOY_SET_COLOR(colorname, v4color) ColorState->ColorTable[Color_##colorname] = CreateColorSlot(ColorState, v4color, #colorname)
-static void InitDefaultColors(color_state* ColorState){
+#define JOY_SET_COLOR(colorname, v4color) colorState->colorTable[Color_##colorname] = CreateColorSlot(colorState, v4color, #colorname)
+static void InitDefaultColors(Color_State* colorState){
 	//NOTE(Dima): Initialization of the color table
 	JOY_SET_COLOR(Black,  V4(0.0f, 0.0f, 0.0f, 1.0f));
     JOY_SET_COLOR(White,  V4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -59,8 +59,8 @@ static void InitDefaultColors(color_state* ColorState){
     JOY_SET_COLOR(DarkSlateBlue,  ColorFromHex("#483d8b"));
 }
 
-#define JOY_SET_EXTCOLOR(colorname, v4color) ColorState->ColorTable[ColorExt_##colorname] = CreateColorSlot(ColorState, v4color, #colorname)
-static void InitExtColors(color_state* ColorState) {
+#define JOY_SET_EXTCOLOR(colorname, v4color) colorState->colorTable[ColorExt_##colorname] = CreateColorSlot(colorState, v4color, #colorname)
+static void InitExtColors(Color_State* colorState) {
     JOY_SET_EXTCOLOR(AliceBlue, ColorFromHex("#f0f8ff"));
 	JOY_SET_EXTCOLOR(AntiqueWhite, ColorFromHex("#faebd7"));
 	JOY_SET_EXTCOLOR(AntiqueWhite1, ColorFromHex("#ffefdb"));
@@ -570,11 +570,10 @@ static void InitExtColors(color_state* ColorState) {
 
 
 
-void InitColorsState(color_state* State, memory_region* ColorsMemory) {
+void InitColorsState(Color_State* state, Memory_Region* colorsMemory) {
     
-    State->ColorsMem = ColorsMemory;
+    state->colorsMem = colorsMemory;
     
-    InitDefaultColors(State);
-    
-    InitExtColors(State);
+    InitDefaultColors(state);
+    InitExtColors(state);
 }

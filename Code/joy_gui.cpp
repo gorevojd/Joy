@@ -2,424 +2,426 @@
 #include "joy_defines.h"
 
 // NOTE(Dima): Returns newly pushed window array
-INTERNAL_FUNCTION gui_window* GuiGrowWindowFreePool(gui_state* Gui, memory_region* Mem,  int Count){
-    gui_window* WindowFreePoolArray = PushArray(Mem, gui_window, Count);
+INTERNAL_FUNCTION Gui_Window* GuiGrowWindowFreePool(Gui_State* gui, Memory_Region* mem,  int count){
+    Gui_Window* windowFreePoolArray = PushArray(mem, Gui_Window, count);
     
-    for(int Index = 0; 
-        Index < Count;
-        Index++)
+    for(int index = 0; 
+        index < count;
+        index++)
     {
-        gui_window* Window = WindowFreePoolArray + Index;
+        Gui_Window* window = windowFreePoolArray + index;
         
-        *Window = {};
+        *window = {};
         
-        Window->PrevAlloc = Gui->WindowFreeSentinel.PrevAlloc;
-        Window->NextAlloc = &Gui->WindowFreeSentinel;
+        window->prevAlloc = gui->windowFreeSentinel.prevAlloc;
+        window->nextAlloc = &gui->windowFreeSentinel;
         
-        Window->PrevAlloc->NextAlloc = Window;
-        Window->NextAlloc->PrevAlloc = Window;
+        window->prevAlloc->nextAlloc = window;
+        window->nextAlloc->prevAlloc = window;
     }
     
-    return(WindowFreePoolArray);
+    return(windowFreePoolArray);
 }
 
-inline gui_window* GuiPopFromReturnList(gui_state* Gui){
-    gui_window* Result = Gui->WindowSentinel4Returning.Next;
+inline Gui_Window* GuiPopFromReturnList(Gui_State* gui){
+    Gui_Window* result = gui->windowSentinel4Returning.next;
     
     // NOTE(Dima): deleting from return list
-    Result->Next->Prev = Result->Prev;
-    Result->Prev->Next = Result->Next;
+    result->next->prev = result->prev;
+    result->prev->next = result->next;
     
-    Result->Next = 0;
-    Result->Prev = 0;
+    result->next = 0;
+    result->prev = 0;
     
-    return(Result);
+    return(result);
 }
 
-inline void GuiDeallocateWindow(gui_state* Gui, gui_window* Todo){
-    Todo->NextAlloc->PrevAlloc = Todo->PrevAlloc;
-    Todo->PrevAlloc->NextAlloc = Todo->NextAlloc;
+inline void GuiDeallocateWindow(Gui_State* gui, Gui_Window* todo){
+    todo->nextAlloc->prevAlloc = todo->prevAlloc;
+    todo->prevAlloc->nextAlloc = todo->nextAlloc;
     
-    Todo->NextAlloc = Gui->WindowFreeSentinel.NextAlloc;
-    Todo->PrevAlloc = &Gui->WindowFreeSentinel;
+    todo->nextAlloc = gui->windowFreeSentinel.nextAlloc;
+    todo->prevAlloc = &gui->windowFreeSentinel;
     
-    Todo->NextAlloc->PrevAlloc = Todo;
-    Todo->PrevAlloc->NextAlloc = Todo;
+    todo->nextAlloc->prevAlloc = todo;
+    todo->prevAlloc->nextAlloc = todo;
 }
 
 // NOTE(Dima): This function allocates as much windows as we need and 
 // NOTE(Dima): then adds them to return list. It returns first element
 // NOTE(Dima): of that list
-INTERNAL_FUNCTION gui_window* GuiAllocateWindows(gui_state* Gui, int Count)
+INTERNAL_FUNCTION Gui_Window* GuiAllocateWindows(Gui_State* gui, int count)
 {
     // NOTE(Dima): If free list is emty then allocate some more to it
-    b32 CanAllocateArray = 1;
-    int CanAllocateCount = Count;
-    gui_window* CheckAt = Gui->WindowFreeSentinel.NextAlloc;
-    for(int CheckIndex = 0; CheckIndex < Count; CheckIndex++){
-        if(CheckAt == &Gui->WindowFreeSentinel){
-            CanAllocateArray = 0;
-            CanAllocateCount = CheckIndex;
+    b32 canAllocateArray = 1;
+    int canAllocateCount = count;
+    Gui_Window* checkAt = gui->windowFreeSentinel.nextAlloc;
+    for(int checkIndex = 0; checkIndex < count; checkIndex++){
+        if(checkAt == &gui->windowFreeSentinel){
+            canAllocateArray = 0;
+            canAllocateCount = checkIndex;
             break;
         }
         
-        CheckAt = CheckAt->NextAlloc;
+        checkAt = checkAt->nextAlloc;
     }
     
-    int ToAllocateCount = Max(128, Count - CanAllocateCount);
-    if(!CanAllocateArray){
-        GuiGrowWindowFreePool(Gui, Gui->Mem, ToAllocateCount);
+    int toAllocateCount = Max(128, count - canAllocateCount);
+    if(!canAllocateArray){
+        GuiGrowWindowFreePool(gui, gui->mem, toAllocateCount);
     }
     
     // NOTE(Dima): Return list shoud be empty before return
-    Assert(Gui->WindowSentinel4Returning.Next == &Gui->WindowSentinel4Returning);
+    Assert(gui->windowSentinel4Returning.next == &gui->windowSentinel4Returning);
     
-    for(int AddIndex = 0;
-        AddIndex < Count;
-        AddIndex++)
+    for(int addIndex = 0;
+        addIndex < count;
+        addIndex++)
     {
         // NOTE(Dima): Before in this algo we ensured that we would
         // NOTE(Dima): have as mush elements as we need. But for sure
         // NOTE(Dima): I'll double check if we can grab one more element.
-        Assert(Gui->WindowFreeSentinel.NextAlloc != &Gui->WindowFreeSentinel);
+        Assert(gui->windowFreeSentinel.nextAlloc != &gui->windowFreeSentinel);
         
         // NOTE(Dima): Allocating from free list
-        gui_window* AddWindow = Gui->WindowFreeSentinel.NextAlloc;
+        Gui_Window* addWindow = gui->windowFreeSentinel.nextAlloc;
         
-        AddWindow->PrevAlloc->NextAlloc = AddWindow->NextAlloc;
-        AddWindow->NextAlloc->PrevAlloc = AddWindow->PrevAlloc;
+        addWindow->prevAlloc->nextAlloc = addWindow->nextAlloc;
+        addWindow->nextAlloc->prevAlloc = addWindow->prevAlloc;
         
         // NOTE(Dima): Inserting to use list
-        AddWindow->NextAlloc = &Gui->WindowUseSentinel;
-        AddWindow->PrevAlloc = Gui->WindowUseSentinel.PrevAlloc;
+        addWindow->nextAlloc = &gui->windowUseSentinel;
+        addWindow->prevAlloc = gui->windowUseSentinel.prevAlloc;
         
-        AddWindow->NextAlloc->PrevAlloc = AddWindow;
-        AddWindow->PrevAlloc->NextAlloc = AddWindow;
+        addWindow->nextAlloc->prevAlloc = addWindow;
+        addWindow->prevAlloc->nextAlloc = addWindow;
         
         // NOTE(Dima): Inserting to return list
-        AddWindow->Next = &Gui->WindowSentinel4Returning;
-        AddWindow->Prev = Gui->WindowSentinel4Returning.Prev;
+        addWindow->next = &gui->windowSentinel4Returning;
+        addWindow->prev = gui->windowSentinel4Returning.prev;
         
-        AddWindow->Next->Prev = AddWindow;
-        AddWindow->Prev->Next = AddWindow;
+        addWindow->next->prev = addWindow;
+        addWindow->prev->next = addWindow;
     }
     
-    gui_window* Result = Gui->WindowSentinel4Returning.Next;
+    Gui_Window* result = gui->windowSentinel4Returning.next;
     
-    return(Result);
+    return(result);
 }
 
-INTERNAL_FUNCTION gui_window* GuiAllocateWindow(gui_state* Gui){
-    GuiAllocateWindows(Gui, 1);
+INTERNAL_FUNCTION Gui_Window* GuiAllocateWindow(Gui_State* gui){
+    GuiAllocateWindows(gui, 1);
     
-    gui_window* Result = GuiPopFromReturnList(Gui);
+    Gui_Window* result = GuiPopFromReturnList(gui);
     
     // NOTE(Dima): Return list shoud be empty before return
-    Assert(Gui->WindowSentinel4Returning.Next == &Gui->WindowSentinel4Returning);
+    Assert(gui->windowSentinel4Returning.next == &gui->windowSentinel4Returning);
     
-    return(Result);
+    return(result);
 }
 
-inline void GuiAddWindowToList(gui_window* Window, 
-                               gui_window* Sentinel)
+inline void GuiAddWindowToList(Gui_Window* window, 
+                               Gui_Window* Sentinel)
 {
-    Window->Next = Sentinel;
-    Window->Prev = Sentinel->Prev;
+    window->next = Sentinel;
+    window->prev = Sentinel->prev;
     
-    Window->Next->Prev = Window;
-    Window->Prev->Next = Window;
+    window->next->prev = window;
+    window->prev->next = window;
 }
 
 
 void InitGui(
-gui_state* Gui, 
-input* Input, 
-assets* Assets, 
-memory_region* Mem, 
-render_stack* Stack,
-int Width,
-int Height)
+Gui_State* gui, 
+Input* input, 
+Assets* assets, 
+Memory_Region* mem, 
+Render_Stack* stack,
+int width,
+int height)
 {
-    Gui->MainFont = &Assets->InconsolataBold;
-    Gui->CheckboxMark = &Assets->CheckboxMark;
-    Gui->FontScale = 1.0f;
+    gui->mainFont = &assets->inconsolataBold;
+    gui->checkboxMark = &assets->checkboxMark;
+    gui->fontScale = 1.0f;
     
-    Gui->Stack = Stack;
-    Gui->Input = Input;
-    Gui->Mem = Mem;
+    gui->stack = stack;
+    gui->input = input;
+    gui->mem = mem;
     
-    Gui->Layout = {};
-    Gui->CurrentLayout = 0;
+    gui->layout = {};
+    gui->currentLayout = 0;
     
-    Gui->Width = Width;
-    Gui->Height = Height;
+    gui->width = width;
+    gui->height = height;
     
     // NOTE(Dima): Initializing root page 
-    CopyStrings(Gui->RootPage.Name, "Root");
-    Gui->RootPage.Next = &Gui->RootPage;
-    Gui->RootPage.Prev = &Gui->RootPage;
+    CopyStrings(gui->rootPage.name, "Root");
+    gui->rootPage.next = &gui->rootPage;
+    gui->rootPage.prev = &gui->rootPage;
     
     // NOTE(Dima): Initializing of window free pool and sentinels
-    Gui->WindowUseSentinel.NextAlloc = &Gui->WindowUseSentinel;
-    Gui->WindowUseSentinel.PrevAlloc = &Gui->WindowUseSentinel;
-    Gui->WindowFreeSentinel.NextAlloc = &Gui->WindowFreeSentinel;
-    Gui->WindowFreeSentinel.PrevAlloc = &Gui->WindowFreeSentinel;
+    gui->windowUseSentinel.nextAlloc = &gui->windowUseSentinel;
+    gui->windowUseSentinel.prevAlloc = &gui->windowUseSentinel;
+    gui->windowFreeSentinel.nextAlloc = &gui->windowFreeSentinel;
+    gui->windowFreeSentinel.prevAlloc = &gui->windowFreeSentinel;
     
-    GuiGrowWindowFreePool(Gui, Mem, 128);
+    GuiGrowWindowFreePool(gui, mem, 128);
     
     // NOTE(Dima): Init window sentinel for returning windows
     // NOTE(Dima): as list when we allocate multiple of them.
-    Gui->WindowSentinel4Returning.Next = &Gui->WindowSentinel4Returning;
-    Gui->WindowSentinel4Returning.Prev = &Gui->WindowSentinel4Returning;
+    gui->windowSentinel4Returning.next = &gui->windowSentinel4Returning;
+    gui->windowSentinel4Returning.prev = &gui->windowSentinel4Returning;
     
     // NOTE(Dima): Init window leaf sentinel
-    Gui->WindowLeafSentinel.Next = &Gui->WindowLeafSentinel;
-    Gui->WindowLeafSentinel.Prev = &Gui->WindowLeafSentinel;
+    gui->windowLeafSentinel.next = &gui->windowLeafSentinel;
+    gui->windowLeafSentinel.prev = &gui->windowLeafSentinel;
     
-    Gui->TempWindow1 = GuiAllocateWindow(Gui);
-    Gui->TempWindow1->Rect = RcMinDim(V2(10, 10), V2(1000, 600));
-    GuiAddWindowToList(Gui->TempWindow1, &Gui->WindowLeafSentinel);
+    gui->tempWindow1 = GuiAllocateWindow(gui);
+    gui->tempWindow1->rect = RcMinDim(V2(10, 10), V2(1000, 600));
+    GuiAddWindowToList(gui->tempWindow1, &gui->windowLeafSentinel);
     
     // NOTE(Dima): Initializing colors
-    InitColorsState(&Gui->ColorState, Mem);
-    Gui->Colors[GuiColor_Text] = GUI_GETCOLOR_COLSYS(Color_White);
-    Gui->Colors[GuiColor_HotText] = GUI_GETCOLOR_COLSYS(Color_Yellow);
-    Gui->Colors[GuiColor_Borders] = GUI_GETCOLOR_COLSYS(Color_Black);
+    InitColorsState(&gui->colorState, mem);
+    gui->colors[GuiColor_Text] = GUI_GETCOLOR_COLSYS(Color_White);
+    gui->colors[GuiColor_HotText] = GUI_GETCOLOR_COLSYS(Color_Yellow);
+    gui->colors[GuiColor_Borders] = GUI_GETCOLOR_COLSYS(Color_Black);
     
-    Gui->Colors[GuiColor_ButtonBackground] = GUI_COLORHEX("#337733");
-    Gui->Colors[GuiColor_ButtonBackgroundHot] = GUI_GETCOLOR_COLSYS(Color_Cyan);
-    Gui->Colors[GuiColor_ButtonForeground] = GUI_GETCOLOR_COLSYS(Color_White);
-    Gui->Colors[GuiColor_ButtonForegroundHot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
-    Gui->Colors[GuiColor_ButtonForegroundDisabled] = Gui->Colors[GuiColor_ButtonForeground] * 0.75f;
+    gui->colors[GuiColor_ButtonBackground] = GUI_COLORHEX("#337733");
+    gui->colors[GuiColor_ButtonBackgroundHot] = GUI_GETCOLOR_COLSYS(Color_Cyan);
+    gui->colors[GuiColor_ButtonForeground] = GUI_GETCOLOR_COLSYS(Color_White);
+    gui->colors[GuiColor_ButtonForegroundHot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
+    gui->colors[GuiColor_ButtonForegroundDisabled] = gui->colors[GuiColor_ButtonForeground] * 0.75f;
+    gui->colors[GuiColor_ButtonGrad1] = ColorFromHex("#2277DD");
+    gui->colors[GuiColor_ButtonGrad2] = ColorFromHex("#4b0082");
     
-    Gui->WindowAlpha = 0.85f;
-    Gui->Colors[GuiColor_WindowBackground] = V4(0.0f, 0.0f, 0.0f, Gui->WindowAlpha);
-    Gui->Colors[GuiColor_WindowBorder] = GUI_GETCOLOR_COLSYS(Color_Black);
-    Gui->Colors[GuiColor_WindowBorderHot] = GUI_GETCOLOR_COLSYS(Color_Magenta);
-    Gui->Colors[GuiColor_WindowBorderActive] = GUI_GETCOLOR_COLSYS(Color_Blue);
+    gui->windowAlpha = 0.85f;
+    gui->colors[GuiColor_WindowBackground] = V4(0.0f, 0.0f, 0.0f, gui->windowAlpha);
+    gui->colors[GuiColor_WindowBorder] = GUI_GETCOLOR_COLSYS(Color_Black);
+    gui->colors[GuiColor_WindowBorderHot] = GUI_GETCOLOR_COLSYS(Color_Magenta);
+    gui->colors[GuiColor_WindowBorderActive] = GUI_GETCOLOR_COLSYS(Color_Blue);
 }
 
-rc2 PrintTextInternal(font_info* FontInfo, render_stack* Stack, char* Text, v2 P, u32 TextOp, float Scale, v4 Color){
-    rc2 TextRect;
+rc2 PrintTextInternal(Font_Info* font, Render_Stack* stack, char* text, v2 p, u32 textOp, float scale, v4 color){
+    rc2 txtRc;
     
-    char* At = Text;
+    char* at = text;
     
-    v2 CurrentP = P;
+    v2 curP = p;
     
-    while(*At){
+    while(*at){
         
-        int GlyphIndex = FontInfo->Codepoint2Glyph[*At];
-        glyph_info* Glyph = &FontInfo->Glyphs[GlyphIndex];
+        int glyphIndex = font->codepoint2Glyph[*at];
+        Glyph_Info* glyph = &font->glyphs[glyphIndex];
         
-        float BitmapScale = Glyph->Height * Scale;
+        float bmpScale = glyph->height * scale;
         
-        v2 BitmapDim = { Glyph->Bitmap.WidthOverHeight * BitmapScale, BitmapScale };
+        v2 bitmapDim = { glyph->bitmap.widthOverHeight * bmpScale, bmpScale };
         
-        if(TextOp == PrintTextOp_Print){
-            float BitmapMinY = CurrentP.y + Glyph->YOffset * Scale;
-            float BitmapMinX = CurrentP.x + Glyph->XOffset * Scale;
+        if(textOp == PrintTextOp_Print){
+            float bitmapMinY = curP.y + glyph->yOffset * scale;
+            float bitmapMinX = curP.x + glyph->xOffset * scale;
             
-            PushBitmap(Stack, &Glyph->Bitmap, V2(BitmapMinX, BitmapMinY), BitmapDim.y, Color);
+            PushBitmap(stack, &glyph->bitmap, V2(bitmapMinX, bitmapMinY), bitmapDim.y, color);
         }
         
-        CurrentP.x += Glyph->Advance;
+        curP.x += ((float)glyph->advance * scale);
         
-        *At++;
+        *at++;
     }
     
-    TextRect.Min.x = P.x;
-	TextRect.Min.y = P.y - FontInfo->AscenderHeight * Scale;
-	TextRect.Max.x = CurrentP.x;
-	TextRect.Max.y = CurrentP.y - FontInfo->DescenderHeight * Scale;
+    txtRc.min.x = p.x;
+	txtRc.min.y = p.y - font->ascenderHeight * scale;
+	txtRc.max.x = curP.x;
+	txtRc.max.y = curP.y - font->descenderHeight * scale;
     
-	return(TextRect);
+	return(txtRc);
 }
 
-v2 GetTextSizeInternal(font_info* FontInfo, char* Text, float Scale){
+v2 GetTextSizeInternal(Font_Info* font, char* Text, float scale){
     rc2 TextRc = PrintTextInternal(
-        FontInfo, 
+        font, 
         0, 
         Text, V2(0.0f, 0.0f), 
         PrintTextOp_GetSize, 
-        Scale);
+        scale);
     
-    v2 Result = GetRectDim(TextRc);
+    v2 result = GetRectDim(TextRc);
     
-    return(Result);
+    return(result);
 }
 
-inline v2 GetCenteredTextOffset(font_info* FontInfo, float TextDimX, rc2 Rect, float Scale = 1.0f){
-    float LineDimY = GetLineAdvance(FontInfo, Scale);
-    float LineDelta = FontInfo->AscenderHeight * Scale - LineDimY * 0.5f;
+inline v2 GetCenteredTextOffset(Font_Info* font, float TextDimX, rc2 Rect, float scale = 1.0f){
+    float LineDimY = GetLineAdvance(font, scale);
+    float LineDelta = (font->ascenderHeight + font->lineGap) * scale - LineDimY * 0.5f;
     
-    v2 CenterRc = Rect.Min + GetRectDim(Rect) * 0.5f;
+    v2 CenterRc = Rect.min + GetRectDim(Rect) * 0.5f;
     
     v2 TargetP = V2(CenterRc.x - TextDimX * 0.5f, CenterRc.y + LineDelta);
     return(TargetP);
 }
 
-inline float GetCenteredTextOffsetY(font_info* FontInfo, rc2 Rect, float Scale = 1.0f){
-    float Result = GetCenteredTextOffset(FontInfo, 0.0f, Rect, Scale).y;
+inline float GetCenteredTextOffsetY(Font_Info* font, rc2 rect, float scale = 1.0f){
+    float result = GetCenteredTextOffset(font, 0.0f, rect, scale).y;
     
-    return(Result);
+    return(result);
 }
 
-inline v2 GetCenteredTextOffset(font_info* FontInfo, char* Text, rc2 Rect, float Scale = 1.0f){
-    v2 TextDim = GetTextSizeInternal(FontInfo, Text, Scale);
+inline v2 GetCenteredTextOffset(Font_Info* font, char* Text, rc2 rect, float scale = 1.0f){
+    v2 TextDim = GetTextSizeInternal(font, Text, scale);
     
-    v2 Result = GetCenteredTextOffset(FontInfo, TextDim.x, Rect, Scale);
+    v2 result = GetCenteredTextOffset(font, TextDim.x, rect, scale);
     
-    return(Result);
+    return(result);
 }
 
 rc2 PrintTextCenteredInRectInternal(
-font_info* FontInfo, 
-render_stack* Stack, 
-char* Text, 
-rc2 Rect, 
-float Scale, 
-v4 Color)
+Font_Info* font, 
+Render_Stack* stack, 
+char* text, 
+rc2 rect, 
+float scale, 
+v4 color)
 {
-    v2 TargetP = GetCenteredTextOffset(FontInfo, Text, Rect, Scale);
-    rc2 Result = PrintTextInternal(FontInfo, Stack, Text, TargetP, PrintTextOp_Print, Scale, Color);
+    v2 targetP = GetCenteredTextOffset(font, text, rect, scale);
+    rc2 result = PrintTextInternal(font, stack, text, targetP, PrintTextOp_Print, scale, color);
     
-    return(Result);
+    return(result);
 }
 
-v2 GetTextSize(gui_state* Gui, char* Text, float Scale){
-    v2 Result = GetTextSizeInternal(Gui->MainFont, 
-                                    Text, 
-                                    Gui->FontScale * Scale);
+v2 GetTextSize(Gui_State* gui, char* text, float scale){
+    v2 result = GetTextSizeInternal(gui->mainFont, 
+                                    text, 
+                                    gui->fontScale * scale);
     
-    return(Result);
+    return(result);
 }
 
-rc2 GetTextRect(gui_state* Gui, char* Text, v2 P, float Scale){
+rc2 GetTextRect(Gui_State* gui, char* text, v2 p, float scale){
     rc2 TextRc = PrintTextInternal(
-        Gui->MainFont, 
-        Gui->Stack, 
-        Text, P, 
+        gui->mainFont, 
+        gui->stack, 
+        text, p, 
         PrintTextOp_GetSize, 
-        Gui->FontScale * Scale);
+        gui->fontScale * scale);
     
     return(TextRc);
 }
 
-rc2 PrintText(gui_state* Gui, char* Text, v2 P, v4 Color, float Scale){
+rc2 PrintText(Gui_State* gui, char* text, v2 p, v4 color, float scale){
     rc2 TextRc = PrintTextInternal(
-        Gui->MainFont, 
-        Gui->Stack, 
-        Text, P, 
+        gui->mainFont, 
+        gui->stack, 
+        text, p, 
         PrintTextOp_Print, 
-        Gui->FontScale * Scale,
-        Color);
+        gui->fontScale * scale,
+        color);
     
     return(TextRc);
 }
 
-rc2 PrintTextCenteredInRect(gui_state* Gui, char* Text, rc2 Rect, float Scale, v4 Color){
-    rc2 Result = PrintTextCenteredInRectInternal(Gui->MainFont,
-                                                 Gui->Stack,
-                                                 Text, 
-                                                 Rect,
-                                                 Gui->FontScale * Scale,
-                                                 Color);
+rc2 PrintTextCenteredInRect(Gui_State* gui, char* text, rc2 rect, float scale, v4 color){
+    rc2 result = PrintTextCenteredInRectInternal(gui->mainFont,
+                                                 gui->stack,
+                                                 text, 
+                                                 rect,
+                                                 gui->fontScale * scale,
+                                                 color);
     
-    return(Result);
+    return(result);
 }
 
-void GuiBeginLayout(gui_state* Gui, gui_layout* Layout){
-    Layout->At = V2(0.0f, 0.0f);
+void GuiBeginLayout(Gui_State* gui, Gui_Layout* layout){
+    layout->at = V2(0.0f, 0.0f);
     
-    Gui->CurrentLayout = Layout;
+    gui->currentLayout = layout;
 }
 
-void GuiEndLayout(gui_state* Gui, gui_layout* Layout){
-    Layout->At = V2(0.0f, 0.0f);
+void GuiEndLayout(Gui_State* gui, Gui_Layout* layout){
+    layout->at = V2(0.0f, 0.0f);
     
-    Gui->CurrentLayout = 0;
+    gui->currentLayout = 0;
 }
 
-void GuiBeginPage(gui_state* Gui, char* Name){
-    u32 NameID = StringHashFNV(Name);
+void GuiBeginPage(Gui_State* gui, char* name){
+    u32 nameID = StringHashFNV(name);
     
-    gui_page* FoundPage = 0;
-    gui_page* PageAt = Gui->RootPage.Next;
-    for(PageAt; PageAt != &Gui->RootPage; PageAt = PageAt->Next){
-        if(NameID == PageAt->ID){
-            FoundPage = PageAt;
+    Gui_Page* foundPage = 0;
+    Gui_Page* pageAt = gui->rootPage.next;
+    for(pageAt; pageAt != &gui->rootPage; pageAt = pageAt->next){
+        if(nameID == pageAt->id){
+            foundPage = pageAt;
             break;
         }
     }
     
-    if(!FoundPage){
-        FoundPage = PushStruct(Gui->Mem, gui_page);
+    if(!foundPage){
+        foundPage = PushStruct(gui->mem, Gui_Page);
         
-        CopyStrings(FoundPage->Name, sizeof(FoundPage->Name), Name);
-        FoundPage->ID = NameID;
+        CopyStrings(foundPage->name, sizeof(foundPage->name), name);
+        foundPage->id = nameID;
         
-        FoundPage->Next = Gui->RootPage.Next;
-        FoundPage->Prev = &Gui->RootPage;
-        FoundPage->Next->Prev = FoundPage;
-        FoundPage->Prev->Next = FoundPage;
+        foundPage->next = gui->rootPage.next;
+        foundPage->prev = &gui->rootPage;
+        foundPage->next->prev = foundPage;
+        foundPage->prev->next = foundPage;
     }
     
     // NOTE(Dima): Can't start new page inside other page
-    Assert(!Gui->CurrentPage);
-    Gui->CurrentPage = FoundPage;
+    Assert(!gui->currentPage);
+    gui->currentPage = foundPage;
 }
 
-void GuiEndPage(gui_state* Gui){
-    Gui->CurrentPage = 0;
+void GuiEndPage(Gui_State* gui){
+    gui->currentPage = 0;
 }
 
-struct gui_snap_in_window_result{
+struct GuiSnapInWindowResult{
     union{
         struct{
-            rc2 Result;
-            rc2 RestRect;
+            rc2 result;
+            rc2 restRect;
         };
-        rc2 Rects[2];
+        rc2 rects[2];
     };
 };
 
-gui_snap_in_window_result GuiSnapInWindowRect(rc2 WindowRect, u32 SnapType){
-    gui_snap_in_window_result Result;
+GuiSnapInWindowResult GuiSnapInWindowRect(rc2 WindowRect, u32 SnapType){
+    GuiSnapInWindowResult result;
     
-    v2 Min = WindowRect.Min;
-    v2 Max = WindowRect.Max;
+    v2 Min = WindowRect.min;
+    v2 Max = WindowRect.max;
     
     v2 WindowDim = GetRectDim(WindowRect);
     v2 WindowHalfDim = WindowDim * 0.5f;
     
     switch(SnapType){
         case GuiWindowSnap_Left:{
-            Result.Result = RcMinDim(Min, 
+            result.result = RcMinDim(Min, 
                                      V2(WindowHalfDim.x, WindowDim.y));
-            Result.RestRect = RcMinDim(V2(Min.x + WindowHalfDim.x, Min.y),
+            result.restRect = RcMinDim(V2(Min.x + WindowHalfDim.x, Min.y),
                                        V2(WindowHalfDim.x, WindowDim.y));
         }break;
         
         case GuiWindowSnap_Right:{
-            Result.Result = RcMinDim(V2(Min.x + WindowHalfDim.x, Min.y),
+            result.result = RcMinDim(V2(Min.x + WindowHalfDim.x, Min.y),
                                      V2(WindowHalfDim.x, WindowDim.y));
-            Result.RestRect =  RcMinDim(Min, 
+            result.restRect =  RcMinDim(Min, 
                                         V2(WindowHalfDim.x, WindowDim.y));
         }break;
         
         case GuiWindowSnap_Top:{
-            Result.Result = RcMinDim(Min, V2(WindowDim.x, WindowHalfDim.y));
-            Result.RestRect = RcMinDim(V2(Min.x, Min.y + WindowHalfDim.y), V2(WindowDim.x, WindowHalfDim.y));
+            result.result = RcMinDim(Min, V2(WindowDim.x, WindowHalfDim.y));
+            result.restRect = RcMinDim(V2(Min.x, Min.y + WindowHalfDim.y), V2(WindowDim.x, WindowHalfDim.y));
         }break;
         
         case GuiWindowSnap_Bottom:{
-            Result.Result = RcMinDim(V2(Min.x, Min.y + WindowHalfDim.y), V2(WindowDim.x, WindowHalfDim.y));
-            Result.RestRect = RcMinDim(Min, V2(WindowDim.x, WindowHalfDim.y));;
+            result.result = RcMinDim(V2(Min.x, Min.y + WindowHalfDim.y), V2(WindowDim.x, WindowHalfDim.y));
+            result.restRect = RcMinDim(Min, V2(WindowDim.x, WindowHalfDim.y));;
         }break;
         
         case GuiWindowSnap_Whole:{
-            Result.Result = WindowRect;
-            Result.RestRect = {};
+            result.result = WindowRect;
+            result.restRect = {};
         }break;
         
         default:{
@@ -427,402 +429,441 @@ gui_snap_in_window_result GuiSnapInWindowRect(rc2 WindowRect, u32 SnapType){
         }break;
     }
     
-    return(Result);
+    return(result);
 }
 
-INTERNAL_FUNCTION void GuiSplitWindow(gui_state* Gui, 
-                                      gui_window* Window, 
-                                      int PartsCount, 
-                                      rc2* PartsRects)
+INTERNAL_FUNCTION void GuiSplitWindow(Gui_State* gui, 
+                                      Gui_Window* window, 
+                                      int partsCount, 
+                                      rc2* partsRects)
 {
-    GuiAllocateWindows(Gui, PartsCount);
+    GuiAllocateWindows(gui, partsCount);
     
-    for(int NewWindowIndex = 0;
-        NewWindowIndex < PartsCount;
-        NewWindowIndex++)
+    for(int newWindowIndex = 0;
+        newWindowIndex < partsCount;
+        newWindowIndex++)
     {
-        gui_window* NewWindow = GuiPopFromReturnList(Gui);
+        Gui_Window* newWindow = GuiPopFromReturnList(gui);
         
         // NOTE(Dima): Adding children to leafs
-        NewWindow->Next = Gui->WindowLeafSentinel.Next;
-        NewWindow->Prev = &Gui->WindowLeafSentinel;
+        newWindow->next = gui->windowLeafSentinel.next;
+        newWindow->prev = &gui->windowLeafSentinel;
         
-        NewWindow->Next->Prev = NewWindow;
-        NewWindow->Prev->Next = NewWindow;
+        newWindow->next->prev = newWindow;
+        newWindow->prev->next = newWindow;
         
-        NewWindow->Rect = PartsRects[NewWindowIndex];
+        newWindow->rect = partsRects[newWindowIndex];
     }
     
     // NOTE(Dima): Deallocating parent because it is not visible
-    Window->Next->Prev = Window->Prev;
-    Window->Prev->Next = Window->Next;
+    window->next->prev = window->prev;
+    window->prev->next = window->next;
     
-    Window->Next = 0;
-    Window->Prev = 0;
+    window->next = 0;
+    window->prev = 0;
     
-    GuiDeallocateWindow(Gui, Window);
+    GuiDeallocateWindow(gui, window);
     
     // NOTE(Dima): Return list shoud be empty after usage in this function
-    Assert(Gui->WindowSentinel4Returning.Next == &Gui->WindowSentinel4Returning);
+    Assert(gui->windowSentinel4Returning.next == &gui->windowSentinel4Returning);
 }
 
-INTERNAL_FUNCTION void GuiUpdateWindow(gui_state* Gui, gui_window* Window){
-    rc2 WindowRc = Window->Rect;
-    PushRect(Gui->Stack, WindowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
+INTERNAL_FUNCTION void GuiUpdateWindow(Gui_State* gui, Gui_Window* window){
+    rc2 windowRc = window->rect;
+    PushRect(gui->stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
     
-    v4 OutlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
-    if(MouseInRect(Gui->Input, WindowRc)){
-        OutlineColor = GUI_GETCOLOR(GuiColor_WindowBorderHot);
+    v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
+    if(MouseInRect(gui->input, windowRc)){
+        outlineColor = GUI_GETCOLOR(GuiColor_WindowBorderHot);
         
         // NOTE(Dima): Processing snapping
-        v2 WindowDim = GetRectDim(WindowRc);
-        v2 WindowHalfDim = WindowDim * 0.5f;
-        v2 WindowCenter = WindowRc.Min + WindowHalfDim;
+        v2 windowDim = GetRectDim(windowRc);
+        v2 windowHalfDim = windowDim * 0.5f;
+        v2 windowCenter = windowRc.min + windowHalfDim;
         
-        v2 MouseP = Gui->Input->MouseP;
-        MouseP = ClampInRect(MouseP, WindowRc);
-        v2 DiffFromCenter = MouseP - WindowCenter;
-        v2 DiffRelative;
-        DiffRelative.x = DiffFromCenter.x / WindowHalfDim.x;
-        DiffRelative.y = DiffFromCenter.y / WindowHalfDim.y;
-        v2 AbsDiff = DiffRelative;
-        AbsDiff.x = Abs(AbsDiff.x);
-        AbsDiff.y = Abs(AbsDiff.y);
+        v2 mouseP = gui->input->mouseP;
+        mouseP = ClampInRect(mouseP, windowRc);
+        v2 diffFromCenter = mouseP - windowCenter;
+        v2 diffRelative;
+        diffRelative.x = diffFromCenter.x / windowHalfDim.x;
+        diffRelative.y = diffFromCenter.y / windowHalfDim.y;
+        v2 absDiff = diffRelative;
+        absDiff.x = Abs(absDiff.x);
+        absDiff.y = Abs(absDiff.y);
         
-        float MaxAbsDiff = 0.35f;
-        u32 SnapType = GuiWindowSnap_Whole;
-        if(DiffRelative.x < 0){
-            if(AbsDiff.x > MaxAbsDiff){
-                MaxAbsDiff = AbsDiff.x;
-                SnapType = GuiWindowSnap_Left;
+        float maxAbsDiff = 0.35f;
+        u32 snapType = GuiWindowSnap_Whole;
+        if(diffRelative.x < 0){
+            if(absDiff.x > maxAbsDiff){
+                maxAbsDiff = absDiff.x;
+                snapType = GuiWindowSnap_Left;
             }
         }
         else{
-            if(AbsDiff.x > MaxAbsDiff){
-                MaxAbsDiff = AbsDiff.x;
-                SnapType = GuiWindowSnap_Right;
+            if(absDiff.x > maxAbsDiff){
+                maxAbsDiff = absDiff.x;
+                snapType = GuiWindowSnap_Right;
             }
         }
         
-        if(DiffRelative.y < 0){
-            if(AbsDiff.y > MaxAbsDiff){
-                MaxAbsDiff = AbsDiff.y;
-                SnapType = GuiWindowSnap_Top;
+        if(diffRelative.y < 0){
+            if(absDiff.y > maxAbsDiff){
+                maxAbsDiff = absDiff.y;
+                snapType = GuiWindowSnap_Top;
             }
         }
         else{
-            if(AbsDiff.y > MaxAbsDiff){
-                MaxAbsDiff = AbsDiff.y;
-                SnapType = GuiWindowSnap_Bottom;
+            if(absDiff.y > maxAbsDiff){
+                maxAbsDiff = absDiff.y;
+                snapType = GuiWindowSnap_Bottom;
             }
         }
         
         // NOTE(Dima): Pushing snap rectangle
-        if(SnapType != GuiWindowSnap_Whole){
-            gui_snap_in_window_result SnapRes = GuiSnapInWindowRect(WindowRc, SnapType);
-            v4 SnapColor = V4(1.0f, 0.0f, 1.0f, 0.4f);
-            PushRect(Gui->Stack, SnapRes.Result, SnapColor);
+        if(snapType != GuiWindowSnap_Whole){
+            GuiSnapInWindowResult snapRes = GuiSnapInWindowRect(windowRc, snapType);
+            v4 snapColor = V4(1.0f, 0.0f, 1.0f, 0.4f);
+            PushRect(gui->stack, snapRes.result, snapColor);
             
-            if(KeyWentDown(Gui->Input, MouseKey_Left)){
-                GuiSplitWindow(Gui, Window, 2, SnapRes.Rects);
+            if(KeyWentDown(gui->input, MouseKey_Left)){
+                GuiSplitWindow(gui, window, 2, snapRes.rects);
             }
         }
     }
     
     // NOTE(Dima): Pushing inner outline
-    PushRectInnerOutline(Gui->Stack, WindowRc, 1, OutlineColor);
+    PushRectInnerOutline(gui->stack, windowRc, 1, outlineColor);
     
 }
 
-void GuiUpdateWindows(gui_state* Gui){
-    gui_window* UpdateAt = Gui->WindowLeafSentinel.Next;
-    while(UpdateAt != &Gui->WindowLeafSentinel){
-        gui_window* TempNext = UpdateAt->Next;
+void GuiUpdateWindows(Gui_State* gui){
+    Gui_Window* updateAt = gui->windowLeafSentinel.next;
+    while(updateAt != &gui->windowLeafSentinel){
+        Gui_Window* tempNext = updateAt->next;
         
-        GuiUpdateWindow(Gui, UpdateAt);
+        GuiUpdateWindow(gui, updateAt);
         
-        UpdateAt = TempNext;
+        updateAt = tempNext;
     }
 }
 
 // NOTE(Dima): Default advance type is Column advance
-inline void GuiPreAdvance(gui_state* Gui, gui_layout* Layout){
-    gui_advance_ctx* Ctx = &Layout->AdvanceRememberStack[Layout->StackCurrentIndex];
-    b32 RowStarted = Ctx->Type == GuiAdvanceType_Row;
+inline void GuiPreAdvance(Gui_State* gui, Gui_Layout* layout){
+    GuiAdvanceCtx* ctx = &layout->advanceRememberStack[layout->stackCurrentIndex];
+    b32 rowStarted = ctx->type == GuiAdvanceType_Row;
     
-    float RememberValue = Ctx->RememberValue;
+    float rememberValue = ctx->rememberValue;
     
-    if(RowStarted){
-        Layout->At.y = Ctx->Baseline;
+    if(rowStarted){
+        layout->at.y = ctx->baseline;
     }
     else{
-        Layout->At.x = Ctx->Baseline;
-        Layout->At.y += GuiGetBaseline(Gui);
+        layout->at.x = ctx->baseline;
+        layout->at.y += GuiGetBaseline(gui);
     }
 }
 
-inline void GuiPostAdvance(gui_state* Gui, gui_layout* Layout, rc2 ElementRect){
-    gui_advance_ctx* Ctx = &Layout->AdvanceRememberStack[Layout->StackCurrentIndex];
-    b32 RowStarted = (Ctx->Type == GuiAdvanceType_Row);
+inline void GuiPostAdvance(Gui_State* gui, Gui_Layout* layout, rc2 ElementRect){
+    GuiAdvanceCtx* ctx = &layout->advanceRememberStack[layout->stackCurrentIndex];
+    b32 rowStarted = (ctx->type == GuiAdvanceType_Row);
     
-    float RememberValue = Ctx->RememberValue;
+    float RememberValue = ctx->rememberValue;
     
-    float ToX = ElementRect.Max.x + GetScaledAscender(Gui->MainFont, Gui->FontScale) * 0.5f;
-    float ToY = ElementRect.Max.y + GetLineAdvance(Gui->MainFont, Gui->FontScale) * 0.2f;
+    float toX = ElementRect.max.x + GetScaledAscender(gui->mainFont, gui->fontScale) * 0.5f;
+    float toY = ElementRect.max.y + GetLineAdvance(gui->mainFont, gui->fontScale) * 0.15f;
     
-    if(RowStarted){
-        Layout->At.x = ToX;
-        Ctx->Maximum = Max(Ctx->Maximum, ToY);
+    if(rowStarted){
+        layout->at.x = toX;
+        ctx->maximum = Max(ctx->maximum, toY);
     }
     else{
-        Layout->At.y = ToY;
-        Ctx->Maximum = Max(Ctx->Maximum, ToX);
+        layout->at.y = toY;
+        ctx->maximum = Max(ctx->maximum, toX);
     }
+    ctx->maxHorz = Max(ctx->maxHorz, toX);
+    ctx->maxVert = Max(ctx->maxVert, toY);
 }
 
 
-inline gui_advance_ctx GuiRowAdvanceCtx(float RememberX, float Baseline){
-    gui_advance_ctx Ctx = {};
+inline GuiAdvanceCtx GuiRowAdvanceCtx(float rememberX, float baseline){
+    GuiAdvanceCtx ctx = {};
     
-    Ctx.Type = GuiAdvanceType_Row;
-    Ctx.RememberValue = RememberX;
-    Ctx.Baseline = Baseline;
+    ctx.type = GuiAdvanceType_Row;
+    ctx.rememberValue = rememberX;
+    ctx.baseline = baseline;
     
-    return(Ctx);
+    return(ctx);
 }
 
-inline gui_advance_ctx GuiColumnAdvanceCtx(float RememberY, float Baseline){
-    gui_advance_ctx Ctx = {};
+inline GuiAdvanceCtx GuiColumnAdvanceCtx(float rememberY, float baseline){
+    GuiAdvanceCtx ctx = {};
     
-    Ctx.Type = GuiAdvanceType_Column;
-    Ctx.RememberValue = RememberY;
-    Ctx.Baseline = Baseline;
+    ctx.type = GuiAdvanceType_Column;
+    ctx.rememberValue = rememberY;
+    ctx.baseline = baseline;
     
-    return(Ctx);
+    return(ctx);
 }
 
-void GuiBeginRow(gui_state* Gui){
-    gui_layout* Layout = GetFirstLayout(Gui);
+void GuiBeginRow(Gui_State* gui){
+    Gui_Layout* layout = GetFirstLayout(gui);
     
-    Assert(Layout->StackCurrentIndex < ArrayCount(Layout->AdvanceRememberStack));
+    Assert(layout->stackCurrentIndex < ArrayCount(layout->advanceRememberStack));
     
-    Layout->AdvanceRememberStack[++Layout->StackCurrentIndex] = GuiRowAdvanceCtx(
-        Layout->At.x, Layout->At.y + GuiGetBaseline(Gui));
+    layout->advanceRememberStack[++layout->stackCurrentIndex] = 
+        GuiRowAdvanceCtx(layout->at.x, layout->at.y + GuiGetBaseline(gui));
 }
 
 
-void GuiBeginColumn(gui_state* Gui){
-    gui_layout* Layout = GetFirstLayout(Gui);
+void GuiBeginColumn(Gui_State* gui){
+    Gui_Layout* layout = GetFirstLayout(gui);
     
-    Assert(Layout->StackCurrentIndex < ArrayCount(Layout->AdvanceRememberStack));
+    Assert(layout->stackCurrentIndex < ArrayCount(layout->advanceRememberStack));
     
-    Layout->AdvanceRememberStack[++Layout->StackCurrentIndex] = GuiColumnAdvanceCtx(
-        Layout->At.y,
-        Layout->At.x);
+    layout->advanceRememberStack[++layout->stackCurrentIndex] = 
+        GuiColumnAdvanceCtx(layout->at.y, layout->at.x);
 }
 
-void GuiEndRow(gui_state* Gui){
-    gui_layout* Layout = GetFirstLayout(Gui);
+void GuiEndRow(Gui_State* gui){
+    Gui_Layout* layout = GetFirstLayout(gui);
     
-    Assert(Layout->StackCurrentIndex >= 1);
+    Assert(layout->stackCurrentIndex >= 1);
     
-    gui_advance_ctx* Ctx = &Layout->AdvanceRememberStack[Layout->StackCurrentIndex--];
-    Assert(Ctx->Type == GuiAdvanceType_Row);
+    GuiAdvanceCtx* ctx = &layout->advanceRememberStack[layout->stackCurrentIndex--];
+    Assert(ctx->type == GuiAdvanceType_Row);
     
-    Layout->At.x = Ctx->RememberValue;
-    Layout->At.y = Ctx->Maximum;
+    // NOTE(Dima): Set X value to the remembered value
+    layout->at.x = ctx->rememberValue;
+    // NOTE(Dima): Set Y value to the largest vertical value
+    layout->at.y = ctx->maxVert;
+    
+    GuiAdvanceCtx* newCtx = &layout->advanceRememberStack[layout->stackCurrentIndex];
+    newCtx->maximum = Max(ctx->maximum, newCtx->maximum);
+    
+    newCtx->maxHorz = Max(ctx->maxHorz, newCtx->maxHorz);
+    newCtx->maxVert = Max(ctx->maxVert, newCtx->maxVert);
+    
+    ctx->maximum = 0.0f;
 }
 
-void GuiEndColumn(gui_state* Gui){
-    gui_layout* Layout = GetFirstLayout(Gui);
+void GuiEndColumn(Gui_State* gui){
+    Gui_Layout* layout = GetFirstLayout(gui);
     
-    Assert(Layout->StackCurrentIndex >= 1);
+    Assert(layout->stackCurrentIndex >= 1);
     
-    gui_advance_ctx* Ctx = &Layout->AdvanceRememberStack[Layout->StackCurrentIndex--];
-    Assert(Ctx->Type == GuiAdvanceType_Column);
+    GuiAdvanceCtx* ctx = &layout->advanceRememberStack[layout->stackCurrentIndex--];
+    Assert(ctx->type == GuiAdvanceType_Column);
     
-    Layout->At.y = Ctx->RememberValue;
-    Layout->At.x = Ctx->Maximum;
+    // NOTE(Dima): Set Y Value to the remembered value
+    layout->at.y = ctx->rememberValue;
+    // NOTE(Dima): Set X value to the maximum horizontal value
+    layout->at.x = ctx->maxHorz;
+    
+    GuiAdvanceCtx* newCtx = &layout->advanceRememberStack[layout->stackCurrentIndex];
+    newCtx->maximum = Max(ctx->maximum, newCtx->maximum);
+    
+    newCtx->maxHorz = Max(ctx->maxHorz, newCtx->maxHorz);
+    newCtx->maxVert = Max(ctx->maxVert, newCtx->maxVert);
+    
+    ctx->maximum = 0.0f;
 }
 
-void GuiPreRender(gui_state* Gui){
-    for(int TooltipIndex = 0; TooltipIndex < GUI_MAX_TOOLTIPS; TooltipIndex++){
-        gui_tooltip* Tooltip = &Gui->Tooltips[TooltipIndex];
+INTERNAL_FUNCTION void GuiPushBut(Gui_State* gui, rc2 rect){
+    
+#if 0
+    PushRect(gui->stack, rect, GUI_GETCOLOR(GuiColor_ButtonBackground));
+#else
+    PushGradient(
+        gui->stack, rect, 
+        GUI_GETCOLOR(GuiColor_ButtonGrad1),
+        GUI_GETCOLOR(GuiColor_ButtonGrad2),
+        RenderEntryGradient_Vertical);
+#endif
+}
+
+void GuiPreRender(Gui_State* gui){
+    for(int tooltipIndex = 0; tooltipIndex < GUI_MAX_TOOLTIPS; tooltipIndex++){
+        Gui_Tooltip* ttip= &gui->tooltips[tooltipIndex];
         
-        PrintText(Gui, Tooltip->Text, Tooltip->At, GUI_GETCOLOR(GuiColor_Text), 1.0f);
+        PrintText(gui, ttip->text, ttip->at, GUI_GETCOLOR(GuiColor_Text), 1.0f);
     }
-    Gui->TooltipIndex = 0;
+    gui->tooltipIndex = 0;
 }
 
-void GuiTooltip(gui_state* Gui, char* TooltipText, v2 At){
-    Assert(Gui->TooltipIndex < GUI_MAX_TOOLTIPS);
-    gui_tooltip* Tooltip = &Gui->Tooltips[Gui->TooltipIndex++];
+void GuiTooltip(Gui_State* gui, char* tooltipText, v2 at){
+    Assert(gui->tooltipIndex < GUI_MAX_TOOLTIPS);
+    Gui_Tooltip* ttip = &gui->tooltips[gui->tooltipIndex++];
     
-    CopyStrings(Tooltip->Text, GUI_TOOLTIP_MAX_SIZE, TooltipText);
-    Tooltip->At = At;
+    CopyStrings(ttip->text, GUI_TOOLTIP_MAX_SIZE, tooltipText);
+    ttip->at = at;
 }
 
-void GuiText(gui_state* Gui, char* Text){
-    gui_layout* Layout = GetFirstLayout(Gui);
+void GuiText(Gui_State* gui, char* text){
+    Gui_Layout* layout = GetFirstLayout(gui);
     
-    GuiPreAdvance(Gui, Layout);
+    GuiPreAdvance(gui, layout);
     
-    rc2 TextRc = PrintText(Gui, Text, Layout->At, GUI_GETCOLOR(GuiColor_Text));
+    rc2 textRc = PrintText(gui, text, layout->at, GUI_GETCOLOR(GuiColor_Text));
     
-    GuiPostAdvance(Gui, Layout, TextRc);
+    GuiPostAdvance(gui, layout, textRc);
 }
 
-b32 GuiButton(gui_state* Gui, char* ButtonName){
-    b32 Result = 0;
+b32 GuiButton(Gui_State* gui, char* buttonName){
+    b32 result = 0;
     
-    gui_layout* Layout = GetFirstLayout(Gui);
+    Gui_Layout* layout = GetFirstLayout(gui);
     
-    GuiPreAdvance(Gui, Layout);
+    GuiPreAdvance(gui, layout);
     
     // NOTE(Dima): Printing button and text
-    rc2 TextRc = GetTextRect(Gui, ButtonName, Layout->At);
-    rc2 TempTextRc = GrowRectByScaledValue(TextRc, V2(4.0f, 2.0f), Gui->FontScale);
-    TextRc.Max = TextRc.Min + GetRectDim(TempTextRc);
-    PushRect(Gui->Stack, TextRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
-    //PushRectOutline(Gui->Stack, TextRc, 1, GUI_GETCOLOR(GuiColor_Borders));
+    rc2 textRc = GetTextRect(gui, buttonName, layout->at);
+    rc2 TempTextRc = GrowRectByScaledValue(textRc, V2(4.0f, 2.0f), gui->fontScale);
+    textRc.max = textRc.min + GetRectDim(TempTextRc);
+    
+    GuiPushBut(gui, textRc);
+    //PushRect(gui->stack, textRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
+    //PushRectOutline(gui->stack, textRc, 1, GUI_GETCOLOR(GuiColor_Borders));
     
     // NOTE(Dima): Event processing
-    v4 TextColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
-    if(MouseInRect(Gui->Input, TextRc)){
-        TextColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
+    v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
+    if(MouseInRect(gui->input, textRc)){
+        textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
         
-        if(KeyWentDown(Gui->Input, MouseKey_Left)){
-            Result = 1;
+        if(KeyWentDown(gui->input, MouseKey_Left)){
+            result = 1;
         }
     }
     
-    PrintTextCenteredInRect(Gui, ButtonName, TextRc, Gui->FontScale, TextColor);
+    PrintTextCenteredInRect(gui, buttonName, textRc, 1.0f, textColor);
     
-    GuiPostAdvance(Gui, Layout, TextRc);
+    GuiPostAdvance(gui, layout, textRc);
     
-    return(Result);
+    return(result);
 }
 
-void GuiBoolButton(gui_state* Gui, char* ButtonName, b32* Value){
-    gui_layout* Layout = GetFirstLayout(Gui);
+void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value){
+    Gui_Layout* layout = GetFirstLayout(gui);
     
-    GuiPreAdvance(Gui, Layout);
+    GuiPreAdvance(gui, layout);
     
     // NOTE(Dima): Printing button and text
-    rc2 TextRc = GetTextRect(Gui, ButtonName, Layout->At);
-    rc2 TempTextRc = GrowRectByScaledValue(TextRc, V2(4.0f, 2.0f), Gui->FontScale);
-    TextRc.Max = TextRc.Min + GetRectDim(TempTextRc);
-    PushRect(Gui->Stack, TextRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
-    //PushRectOutline(Gui->Stack, TextRc, 1, GUI_GETCOLOR(GuiColor_Borders));
+    rc2 textRc = GetTextRect(gui, buttonName, layout->at);
+    rc2 TempTextRc = GrowRectByScaledValue(textRc, V2(4.0f, 2.0f), gui->fontScale);
+    textRc.max = textRc.min + GetRectDim(TempTextRc);
+    GuiPushBut(gui, textRc);
+    //PushRect(gui->stack, textRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
+    //PushRectOutline(gui->stack, textRc, 1, GUI_GETCOLOR(GuiColor_Borders));
     
-    v4 TextColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
+    v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
     
     // NOTE(Dima): Event processing
-    if(Value){
-        if(*Value == 0){
-            TextColor = GUI_GETCOLOR(GuiColor_ButtonForegroundDisabled);
+    if(value){
+        if(*value == 0){
+            textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundDisabled);
         }
         
-        if(MouseInRect(Gui->Input, TextRc)){
-            TextColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
+        if(MouseInRect(gui->input, textRc)){
+            textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
-            if(KeyWentDown(Gui->Input, MouseKey_Left)){
-                *Value = !*Value;
+            if(KeyWentDown(gui->input, MouseKey_Left)){
+                *value = !*value;
             }
         }
     }
     
-    PrintTextCenteredInRect(Gui, ButtonName, TextRc, Gui->FontScale, TextColor);
+    PrintTextCenteredInRect(gui, buttonName, textRc, 1.0f, textColor);
     
-    GuiPostAdvance(Gui, Layout, TextRc);
+    GuiPostAdvance(gui, layout, textRc);
 }
 
-void GuiBoolButtonOnOff(gui_state* Gui, char* ButtonName, b32* Value){
-    gui_layout* Layout = GetFirstLayout(Gui);
+void GuiBoolButtonOnOff(Gui_State* gui, char* buttonName, b32* value){
+    Gui_Layout* layout = GetFirstLayout(gui);
     
-    GuiPreAdvance(Gui, Layout);
+    GuiPreAdvance(gui, layout);
     
     // NOTE(Dima): Button printing
-    rc2 ButRc = GetTextRect(Gui, "OFF", Layout->At);
-    v2 ButTextDim = GetRectDim(ButRc);
-    rc2 TempButRc = GrowRectByScaledValue(ButRc, V2(4.0f, 2.0f), Gui->FontScale);
-    v2 TempButRcDim = GetRectDim(TempButRc);
-    ButRc.Max = ButRc.Min + TempButRcDim;
-    PushRect(Gui->Stack, ButRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
-    //PushRectOutline(Gui->Stack, ButRc, 1, GUI_GETCOLOR(GuiColor_Borders));
+    rc2 butRc = GetTextRect(gui, "OFF", layout->at);
+    v2 butTextDim = GetRectDim(butRc);
+    rc2 tempButRc = GrowRectByScaledValue(butRc, V2(4.0f, 2.0f), gui->fontScale);
+    v2 tempButRcDim = GetRectDim(tempButRc);
+    butRc.max = butRc.min + tempButRcDim;
+    GuiPushBut(gui, butRc);
+    //PushRect(gui->stack, butRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
+    //PushRectOutline(gui->stack, butRc, 1, GUI_GETCOLOR(GuiColor_Borders));
     
     // NOTE(Dima): Button name text printing
-    float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, ButRc, Gui->FontScale);
-    v2 NameStart = V2(ButRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->FontScale) * 0.5f, NameStartY);
-    rc2 NameRc = PrintText(Gui, ButtonName, NameStart, GUI_GETCOLOR(GuiColor_Text));
+    float nameStartY = GetCenteredTextOffsetY(gui->mainFont, butRc, gui->fontScale);
+    v2 nameStart = V2(butRc.max.x + GetScaledAscender(gui->mainFont, gui->fontScale) * 0.5f, nameStartY);
+    rc2 NameRc = PrintText(gui, buttonName, nameStart, GUI_GETCOLOR(GuiColor_Text));
     
     // NOTE(Dima): Event processing
-    char ButtonText[4];
-    CopyStrings(ButtonText, "ERR");
-    v4 ButtonTextC = GUI_GETCOLOR(GuiColor_ButtonForeground);
-    if(Value){
-        if(*Value){
-            CopyStrings(ButtonText, "ON");
+    char buttonText[4];
+    CopyStrings(buttonText, "ERR");
+    v4 buttonTextC = GUI_GETCOLOR(GuiColor_ButtonForeground);
+    if(value){
+        if(*value){
+            CopyStrings(buttonText, "ON");
         }
         else{
-            ButtonTextC = GUI_GETCOLOR(GuiColor_ButtonForegroundDisabled);
+            buttonTextC = GUI_GETCOLOR(GuiColor_ButtonForegroundDisabled);
             
-            CopyStrings(ButtonText, "OFF");
+            CopyStrings(buttonText, "OFF");
         }
         
-        if(MouseInRect(Gui->Input, ButRc)){
-            ButtonTextC = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
+        if(MouseInRect(gui->input, butRc)){
+            buttonTextC = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
-            if(KeyWentDown(Gui->Input, MouseKey_Left)){
-                *Value = !*Value;
+            if(KeyWentDown(gui->input, MouseKey_Left)){
+                *value = !*value;
             }
         }
     }
     
-    PrintTextCenteredInRect(Gui, ButtonText, ButRc, Gui->FontScale, ButtonTextC);
+    PrintTextCenteredInRect(gui, buttonText, butRc, 1.0f, buttonTextC);
     
-    rc2 AdvanceRect = GetBoundingRect(ButRc, NameRc);
-    GuiPostAdvance(Gui, Layout, AdvanceRect);
+    rc2 AdvanceRect = GetBoundingRect(butRc, NameRc);
+    GuiPostAdvance(gui, layout, AdvanceRect);
 }
 
-void GuiCheckbox(gui_state* Gui, char* Name, b32* Value){
-    gui_layout* Layout = GetFirstLayout(Gui);
+void GuiCheckbox(Gui_State* gui, char* name, b32* value){
+    Gui_Layout* layout = GetFirstLayout(gui);
     
-    GuiPreAdvance(Gui, Layout);
+    GuiPreAdvance(gui, layout);
     
     // NOTE(Dima): Checkbox rendering
-    float CheckboxSize = GetLineAdvance(Gui->MainFont, Gui->FontScale);
-    rc2 CheckRect;
-    CheckRect.Min = V2(Layout->At.x, Layout->At.y - GetScaledAscender(Gui->MainFont, Gui->FontScale));
-    CheckRect.Max = CheckRect.Min + V2(CheckboxSize, CheckboxSize);
-    rc2 TempButRc = GrowRectByScaledValue(CheckRect, V2(2.0f, 2.0f), Gui->FontScale);
-    CheckRect.Max = CheckRect.Min + GetRectDim(TempButRc);
+    float chkSize = GetLineAdvance(gui->mainFont, gui->fontScale);
+    rc2 chkRect;
+    chkRect.min = V2(layout->at.x, layout->at.y - GetScaledAscender(gui->mainFont, gui->fontScale));
+    chkRect.max = chkRect.min + V2(chkSize, chkSize);
+    rc2 tempButRc = GrowRectByScaledValue(chkRect, V2(2.0f, 2.0f), gui->fontScale);
+    chkRect.max = chkRect.min + GetRectDim(tempButRc);
     
     // NOTE(Dima): Event processing
-    v4 BackColor = GUI_GETCOLOR(GuiColor_ButtonBackground);
-    if(Value){
-        if(MouseInRect(Gui->Input, CheckRect)){
-            BackColor = GUI_GETCOLOR(GuiColor_ButtonBackgroundHot);
+    v4 backC = GUI_GETCOLOR(GuiColor_ButtonBackground);
+    if(value){
+        if(MouseInRect(gui->input, chkRect)){
+            backC = GUI_GETCOLOR(GuiColor_ButtonBackgroundHot);
             
-            if(KeyWentDown(Gui->Input, MouseKey_Left)){
-                *Value = !*Value;
+            if(KeyWentDown(gui->input, MouseKey_Left)){
+                *value = !*value;
             }
         }
     }
     
-    PushRect(Gui->Stack, CheckRect, BackColor);
+    //PushRect(gui->stack, chkRect, backC);
+    GuiPushBut(gui, chkRect);
     
-    if(*Value){
-        PushBitmap(Gui->Stack, Gui->CheckboxMark, CheckRect.Min, GetRectHeight(CheckRect), V4(1.0f, 1.0f, 1.0f, 1.0f));
+    if(*value){
+        PushBitmap(gui->stack, gui->checkboxMark, chkRect.min, GetRectHeight(chkRect), V4(1.0f, 1.0f, 1.0f, 1.0f));
     }
     
-    //PushRectOutline(Gui->Stack, CheckRect, 1, GUI_GETCOLOR(GuiColor_Borders));
+    //PushRectOutline(gui->stack, chkRect, 1, GUI_GETCOLOR(GuiColor_Borders));
     
     // NOTE(Dima): Button name text printing
-    float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, CheckRect, Gui->FontScale);
-    v2 NameStart = V2(CheckRect.Max.x + GetScaledAscender(Gui->MainFont, Gui->FontScale) * 0.5f, NameStartY);
-    rc2 NameRc = PrintText(Gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
+    float nameStartY = GetCenteredTextOffsetY(gui->mainFont, chkRect, gui->fontScale);
+    v2 nameStart = V2(chkRect.max.x + GetScaledAscender(gui->mainFont, gui->fontScale) * 0.5f, nameStartY);
+    rc2 nameRc = PrintText(gui, name, nameStart, GUI_GETCOLOR(GuiColor_Text));
     
-    rc2 AdvanceRect = GetBoundingRect(CheckRect, NameRc);
-    GuiPostAdvance(Gui, Layout, AdvanceRect);
+    rc2 advanceRect = GetBoundingRect(chkRect, nameRc);
+    GuiPostAdvance(gui, layout, advanceRect);
 }

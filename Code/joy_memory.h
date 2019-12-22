@@ -2,52 +2,115 @@
 #define JOY_MEMORY_H
 
 #include "joy_defines.h"
+#include "joy_platform.h"
 #include <stdint.h>
 #include <string.h>
 
-struct memory_region{
-    void* Base;
-    size_t Used;
-    size_t Total;
+enum MemoryRegionType{
+    MemoryRegion_Dynamic,
+    MemoryRegion_Static,
 };
 
-inline memory_region InitMemoryRegion(void* Base, size_t Size){
-    memory_region Result = {};
+struct Memory_Region{
+    Memory_Block block;
     
-    Result.Base = Base;
-    Result.Total = Size;
-    Result.Used = 0;
+    int regionCount;
     
-    return(Result);
+    u32 type;
+};
+
+inline void* PushSomeMem(Memory_Region* region, size_t size, size_t align = 8){
+    size_t beforeAlign = (size_t)region->block.base + region->block.used;
+    size_t alignedPos = (beforeAlign + align - 1) & (~(align - 1));
+    size_t advancedByAlign = alignedPos - beforeAlign;
+    
+    size_t toAllocateSize = advancedByAlign + size;
+    size_t newUsedCount = region->block.used + toAllocateSize;
+    
+    void* result = 0;
+    
+#define MINIMUM_MEMORY_REGION_SIZE Kibibytes(512)
+    if(((newUsedCount > region->block.total) || (region->block.base == 0)) && 
+       region->type == MemoryRegion_Dynamic)
+    {
+        // NOTE(Dima): Platform is guaranteed to allocate aligned mem
+        // NOTE(Dima): so here i allocate only Size but not ToAllocateSize
+        
+        size_t sizeWithPrevBlock = size + sizeof(Memory_Region);
+        size_t toAllocateWithPrevBlock;
+        if(sizeWithPrevBlock > MINIMUM_MEMORY_REGION_SIZE){
+            toAllocateWithPrevBlock = sizeWithPrevBlock;
+        }
+        else{
+            toAllocateWithPrevBlock = MINIMUM_MEMORY_REGION_SIZE;
+        }
+        
+        void* newBase = platform.MemAlloc(toAllocateWithPrevBlock);
+        size_t newUsed = size;
+        size_t newTotal = toAllocateWithPrevBlock - sizeof(Memory_Region);
+        
+        if(region->regionCount == 0){
+            // NOTE(Dima): This is the first block so it means it
+            // NOTE(Dima): has not old region
+        }
+        else{
+            Memory_Region* OldRegion = (Memory_Region*)((u8*)newBase + newTotal);
+            OldRegion->block.base = region->block.base;
+            OldRegion->block.used = region->block.used;
+            OldRegion->block.total = region->block.total;
+            OldRegion->type = region->type;
+        }
+        
+        region->regionCount++;
+        region->block.base = newBase;
+        region->block.used = newUsed;
+        region->block.total = newTotal;
+        region->type = MemoryRegion_Dynamic;
+        
+        result = region->block.base;
+    }
+    else{
+        Assert(newUsedCount <= region->block.total);
+        
+        result = (void*)alignedPos;
+        region->block.used = newUsedCount;
+    }
+    
+    return(result);
 }
 
-inline void* PushSomeMem(memory_region* Region, size_t Size, size_t Align = 8){
-    
-    size_t BeforeAlign = (size_t)Region->Base + Region->Used;
-    size_t AlignedPos = (BeforeAlign + Align - 1) & (~(Align - 1));
-    size_t AdvancedByAlign = AlignedPos - BeforeAlign;
-    
-    size_t NewUsedCount = Region->Used + AdvancedByAlign + Size;
-    Assert(NewUsedCount <= Region->Total);
-    
-    void* Result = (void*)AlignedPos;
-    
-    Region->Used = NewUsedCount;
-    
-    int Temp = (size_t)Result & (Align - 1);
-    Assert(Temp == 0);
-    
-    return(Result);
+inline void FreeMemoryRegion(Memory_Region* region){
+    if(region->type == MemoryRegion_Dynamic){
+        while(region->regionCount > 1){
+            Memory_Region* old = (Memory_Region*)((u8*)region->block.base + region->block.total);
+        }
+    }
+    else{
+        
+    }
 }
 
-inline memory_region SplitMemoryRegion(memory_region* Region, size_t NewStackSize){
-    memory_region Result = {};
+// NOTE(Dima): Pushed region will can grow
+inline Memory_Region PushMemoryRegionStatic(Memory_Region* existing, mi size){
+    Memory_Region result = {};
     
-    Result.Base = PushSomeMem(Region, NewStackSize);
-    Result.Total = NewStackSize;
-    Result.Used = 0;
+    result.block.base = PushSomeMem(existing, size);
+    result.block.total = size;
+    result.block.used = 0;
+    result.type = MemoryRegion_Static;
     
-    return(Result);
+    return(result);
+}
+
+inline Memory_Region PushMemoryRegionDynamic(Memory_Region* existing, mi size){
+    Memory_Region result = {};
+    
+    result.block.base = PushSomeMem(existing, size);
+    result.block.total = size;
+    result.block.used = 0;
+    result.type = MemoryRegion_Dynamic;
+    
+    return(result);
 }
 
 #define PushSize(region, size) PushSomeMem(region, size)

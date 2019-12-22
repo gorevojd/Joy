@@ -6,65 +6,65 @@
 #include "joy_memory.h"
 
 inline v4 ColorFrom255(int R, int G, int B) {
-	float OneOver255 = 1.0f / 255.0f;
-	v4 Result = V4(R, G, B, 1.0f);
-	Result.r *= OneOver255;
-	Result.g *= OneOver255;
-	Result.b *= OneOver255;
+	float oneOver255 = 1.0f / 255.0f;
+	v4 res = V4(R, G, B, 1.0f);
+	res.r *= oneOver255;
+	res.g *= oneOver255;
+	res.b *= oneOver255;
     
-    Result.r = Clamp01(Result.r);
-    Result.g = Clamp01(Result.g);
-    Result.b = Clamp01(Result.b);
+    res.r = Clamp01(res.r);
+    res.g = Clamp01(res.g);
+    res.b = Clamp01(res.b);
     
-	return(Result);
+	return(res);
 }
 
 inline int IntFromHexCharForColors(char C) {
-	int Result = 0;
+	int res = 0;
     
 	if (C >= 'a' && C <= 'f') {
 		C += 'A' - 'a';
 	}
     
 	if (C >= '0' && C <= '9') {
-		Result = C - '0';
+		res = C - '0';
 	}
     
 	if (C >= 'A' && C <= 'F') {
-		Result = C + 10 - 'A';
+		res = C + 10 - 'A';
 	}
     
-	return(Result);
+	return(res);
 }
 
-inline v4 ColorFromHex(char* Str) {
-	float OneOver255 = 1.0f / 255.0f;
+inline v4 ColorFromHex(char* str) {
+	float oneOver255 = 1.0f / 255.0f;
     
-	v4 Result;
+	v4 res;
     
-	Assert(Str[0] == '#');
+	Assert(str[0] == '#');
     
 	int R, G, B;
-	R = IntFromHexCharForColors(Str[1]) * 16 + IntFromHexCharForColors(Str[2]);
-	G = IntFromHexCharForColors(Str[3]) * 16 + IntFromHexCharForColors(Str[4]);
-	B = IntFromHexCharForColors(Str[5]) * 16 + IntFromHexCharForColors(Str[6]);
+	R = IntFromHexCharForColors(str[1]) * 16 + IntFromHexCharForColors(str[2]);
+	G = IntFromHexCharForColors(str[3]) * 16 + IntFromHexCharForColors(str[4]);
+	B = IntFromHexCharForColors(str[5]) * 16 + IntFromHexCharForColors(str[6]);
     
-	Result = V4(R, G, B, 1.0f);
+	res = V4(R, G, B, 1.0f);
     
-	Result.r *= OneOver255;
-	Result.g *= OneOver255;
-	Result.b *= OneOver255;
+	res.r *= oneOver255;
+	res.g *= oneOver255;
+	res.b *= oneOver255;
     
-	return(Result);
+	return(res);
 }
 
-struct color_slot {
-	v4 Color;
-	u32 ColorU32;
-	char* Name;
+struct Color_Slot {
+	v4 color;
+	u32 colorU32;
+	char* name;
 };
 
-enum color_table_type {
+enum ColorTableType {
 	Color_Black,
 	Color_White,
 	Color_Red,
@@ -608,18 +608,18 @@ enum color_table_type {
 
 // TODO(Dima): ZII memory region here
 // TODO(Dima): Organize like hash table nearby
-struct color_state{
-	memory_region* ColorsMem;
-	color_slot ColorTable[Color_Count];
+struct Color_State{
+	Memory_Region* colorsMem;
+    Color_Slot colorTable[Color_Count];
 };
 
-inline v4 GetColor(color_state* ColorState, u32 ColorIndex) {
-	v4 Result = ColorState->ColorTable[ColorIndex].Color;
+inline v4 GetColor(Color_State* colorState, u32 colorIndex) {
+	v4 result = colorState->colorTable[colorIndex].color;
     
-	return(Result);
+	return(result);
 }
 
 //NOTE(dima): Function prototypes
-void InitColorsState(color_state* State, memory_region* ColorsMemory);
+void InitColorsState(Color_State* state, Memory_Region* colorsMemory);
 
 #endif

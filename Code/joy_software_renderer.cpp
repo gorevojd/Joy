@@ -18,38 +18,38 @@
 #define MM_LERP(a, b, t) _mm_add_ps(a, _mm_mul_ps(_mm_sub_ps(b, a), t))
 
 void RenderOneBitmapIntoAnother(
-bmp_info* RenderTo, 
-bmp_info* RenderWhat,
-int StartX,
-int StartY,
-v4 ModulationColor) 
+Bmp_Info* to, 
+Bmp_Info* what,
+int startX,
+int startY,
+v4 modulationColor) 
 {
 	float OneOver255 = 1.0f / 255.0f;
     
-	int MaxToX = StartX + RenderWhat->Width;
-	int MaxToY = StartY + RenderWhat->Height;
+	int MaxToX = startX + what->width;
+	int MaxToY = startY + what->height;
     
-	Assert(MaxToX <= RenderTo->Width);
-	Assert(MaxToY <= RenderTo->Height);
+	Assert(MaxToX <= to->width);
+	Assert(MaxToY <= to->height);
     
 	u32 SrcX = 0;
 	u32 SrcY = 0;
     
-	for (int Y = StartY; Y < MaxToY; Y++) {
-		SrcY = Y - StartY;
+	for (int Y = startY; Y < MaxToY; Y++) {
+		SrcY = Y - startY;
         
-		for (int X = StartX; X < MaxToX; X++) {
-			SrcX = X - StartX;
+		for (int X = startX; X < MaxToX; X++) {
+			SrcX = X - startX;
             
-			u32* Out = (u32*)RenderTo->Pixels + Y * RenderTo->Width + X;
+			u32* Out = (u32*)to->pixels + Y * to->width + X;
 			v4 DstInitColor = UnpackRGBA(*Out);
             
             
-			u32* From = (u32*)RenderWhat->Pixels + SrcY * RenderWhat->Width + SrcX;
+			u32* From = (u32*)what->pixels + SrcY * what->width + SrcX;
             
 			v4 FromColor = UnpackRGBA(*From);
             
-			v4 ResultColor = FromColor * ModulationColor;
+			v4 ResultColor = FromColor * modulationColor;
             
 			//NOTE(dima): Calculating blend alpha value
 			float BlendAlpha = ResultColor.a;
@@ -70,20 +70,20 @@ v4 ModulationColor)
 }
 
 
-void RenderRGBA2BGRA(bmp_info* Buffer, rc2 ClipRect){
+void RenderRGBA2BGRA(Bmp_Info* buf, rc2 clipRect){
 	int MinX = 0;
-	int MaxX = Buffer->Width;
+	int MaxX = buf->width;
 	int MinY = 0;
-	int MaxY = Buffer->Height;
+	int MaxY = buf->height;
     
-    MinX = Clamp(MinX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MinY = Clamp(MinY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
+    MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
     
 	for (u32 DestY = MinY; DestY < MaxY; DestY++) {
 		for (u32 DestX = MinX; DestX < MaxX; DestX++) {
-			u32* OutDest = (u32*)Buffer->Pixels + DestY * Buffer->Width + DestX;
+			u32* OutDest = (u32*)buf->pixels + DestY * buf->width + DestX;
             
             v4 LoadColor = UnpackRGBA(*OutDest);
             v4 StoreColor = V4(
@@ -100,22 +100,22 @@ void RenderRGBA2BGRA(bmp_info* Buffer, rc2 ClipRect){
 }
 
 
-void RenderRGBA2BGRASSE(bmp_info* Buffer, rc2 ClipRect) {
+void RenderRGBA2BGRASSE(Bmp_Info* buf, rc2 clipRect) {
 	
 	int MinX = 0;
-	int MaxX = Buffer->Width;
+	int MaxX = buf->width;
 	int MinY = 0;
-	int MaxY = Buffer->Height;
+	int MaxY = buf->height;
     
 	__m128 mm255 = _mm_set1_ps(255.0f);
 	__m128i mmFF = _mm_set1_epi32(0xFF);
 	__m128 mmOneOver255 = _mm_set1_ps(1.0f / 255.0f);
     
     
-	MinX = Clamp(MinX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MinY = Clamp(MinY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
+	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
     
 	__m128i mmMaxX = _mm_set1_epi32(MaxX);
 	__m128 mmMaxXF = _mm_cvtepi32_ps(mmMaxX);
@@ -124,7 +124,7 @@ void RenderRGBA2BGRASSE(bmp_info* Buffer, rc2 ClipRect) {
 		for (u32 DestX = MinX; DestX < MaxX; DestX += 4) {
 			__m128i mmHorzIndex = _mm_setr_epi32(DestX, DestX + 1, DestX + 2, DestX + 3);
             
-            void* OutDest = (u8*)Buffer->Pixels + DestY * Buffer->Pitch + DestX * 4;
+            void* OutDest = (u8*)buf->pixels + DestY * buf->pitch + DestX * 4;
             
 			__m128i mmPreDestColor = _mm_loadu_si128((__m128i*)OutDest);
             
@@ -163,23 +163,23 @@ void RenderRGBA2BGRASSE(bmp_info* Buffer, rc2 ClipRect) {
 }
 
 
-void RenderClear(bmp_info* Buffer, v3 Color, rc2 ClipRect) {
+void RenderClear(Bmp_Info* buf, v3 Color, rc2 clipRect) {
 	v4 ResColor = V4(Color.x, Color.y, Color.z, 1.0f);
 	u32 OutColor = PackRGBA(ResColor);
     
 	int MinX = 0;
-	int MaxX = Buffer->Width;
+	int MaxX = buf->width;
 	int MinY = 0;
-	int MaxY = Buffer->Height;
+	int MaxY = buf->height;
     
-	MinX = Clamp(MinX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MinY = Clamp(MinY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
+	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
     
 	for (u32 DestY = MinY; DestY < MaxY; DestY++) {
 		for (u32 DestX = MinX; DestX < MaxX; DestX++) {
-			u32* OutDest = (u32*)Buffer->Pixels + DestY * Buffer->Width + DestX;
+			u32* OutDest = (u32*)buf->pixels + DestY * buf->width + DestX;
             
 			*OutDest = OutColor;
 		}
@@ -187,19 +187,19 @@ void RenderClear(bmp_info* Buffer, v3 Color, rc2 ClipRect) {
 }
 
 
-void RenderClearSSE(bmp_info* Buffer, v3 Color, rc2 ClipRect) {
+void RenderClearSSE(Bmp_Info* buf, v3 Color, rc2 clipRect) {
 	v4 ResColor = V4(Color.x, Color.y, Color.z, 1.0f);
 	u32 OutColor = PackRGBA(ResColor);
     
 	int MinX = 0;
-	int MaxX = Buffer->Width;
+	int MaxX = buf->width;
 	int MinY = 0;
-	int MaxY = Buffer->Height;
+	int MaxY = buf->height;
     
-	MinX = Clamp(MinX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MinY = Clamp(MinY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
+	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
     
 	__m128i mmMaxX = _mm_set1_epi32(MaxX);
 	__m128 mmMaxXF = _mm_cvtepi32_ps(mmMaxX);
@@ -226,12 +226,12 @@ void RenderClearSSE(bmp_info* Buffer, v3 Color, rc2 ClipRect) {
     
 	for (u32 DestY = MinY; DestY < MaxY; DestY++) {
 		for (u32 DestX = MinX; DestX < MaxX; DestX += 4) {
-			//u32* OutDest = (u32*)Buffer->Pixels + DestY * Buffer->Width + DestX;
+			//u32* OutDest = (u32*)buf->pixels + DestY * buf->width + DestX;
             
 #if 1
 			__m128i mmHorzIndex = _mm_setr_epi32(DestX, DestX + 1, DestX + 2, DestX + 3);
             
-			u32* OutDest = (u32*)((u8*)Buffer->Pixels + DestY * Buffer->Pitch + DestX * 4);
+			u32* OutDest = (u32*)((u8*)buf->pixels + DestY * buf->pitch + DestX * 4);
             
             __m128i mmPreDestColor = _mm_loadu_si128((__m128i*)OutDest);
             
@@ -250,10 +250,10 @@ void RenderClearSSE(bmp_info* Buffer, v3 Color, rc2 ClipRect) {
 	}
 }
 
-void RenderGradientHorz(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2 ClipRect){
+void RenderGradientHorz(Bmp_Info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect){
 	
-    v2 P = Rect.Min;
-    v2 Dim = GetRectDim(Rect);
+    v2 P = rect.min;
+    v2 Dim = GetRectDim(rect);
     
     int InitX = floorf(P.x);
 	int InitY = floorf(P.y);
@@ -270,15 +270,15 @@ void RenderGradientHorz(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2 Cl
     int SaveDimX = MaxX - MinX;
     int SaveDimY = MaxY - MinY;
     
-	MinX = Clamp(MinX, 0, Buffer->Width);
-	MaxX = Clamp(MaxX, 0, Buffer->Width);
-	MinY = Clamp(MinY, 0, Buffer->Height);
-	MaxY = Clamp(MaxY, 0, Buffer->Height);
+	MinX = Clamp(MinX, 0, buf->width);
+	MaxX = Clamp(MaxX, 0, buf->width);
+	MinY = Clamp(MinY, 0, buf->height);
+	MaxY = Clamp(MaxY, 0, buf->height);
     
-	MinX = Clamp(MinX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MinY = Clamp(MinY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
+	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
     
 	float OneOverWidth = 1.0f / (float)SaveDimX;
 	float OneOverHeight = 1.0f / (float)SaveDimY;
@@ -287,14 +287,14 @@ void RenderGradientHorz(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2 Cl
         
 		float DeltaV = (float)(VertIndex - SaveMinY) * OneOverHeight;
         
-		u32* Pixel = (u32*)((u8*)Buffer->Pixels + VertIndex * Buffer->Pitch + MinX * 4);
+		u32* Pixel = (u32*)((u8*)buf->pixels + VertIndex * buf->pitch + MinX * 4);
 		for (int HorzIndex = MinX; HorzIndex < MaxX; HorzIndex++) {
 			float DeltaU = (float)(HorzIndex - SaveMinX) * OneOverWidth;
             
 			v4 OutColor;
-			OutColor.x = Color1.x + (Color2.x - Color1.x) * DeltaU;
-			OutColor.y = Color1.y + (Color2.y - Color1.y) * DeltaU;
-			OutColor.z = Color1.z + (Color2.z - Color1.z) * DeltaU;
+			OutColor.x = color1.x + (Color2.x - color1.x) * DeltaU;
+			OutColor.y = color1.y + (Color2.y - color1.y) * DeltaU;
+			OutColor.z = color1.z + (Color2.z - color1.z) * DeltaU;
 			OutColor.w = 1.0f;
             
 			u32 ColorByteRep = PackRGBA(OutColor);
@@ -304,9 +304,9 @@ void RenderGradientHorz(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2 Cl
 	}
 }
 
-void RenderGradientHorzSSE(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2 ClipRect) {
-    v2 P = Rect.Min;
-    v2 Dim = GetRectDim(Rect);
+void RenderGradientHorzSSE(Bmp_Info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect) {
+    v2 P = rect.min;
+    v2 Dim = GetRectDim(rect);
     
     int InitX = floorf(P.x);
 	int InitY = floorf(P.y);
@@ -323,15 +323,15 @@ void RenderGradientHorzSSE(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2
     int SaveDimX = MaxX - MinX;
     int SaveDimY = MaxY - MinY;
 	
-	MinX = Clamp(MinX, 0, Buffer->Width);
-	MaxX = Clamp(MaxX, 0, Buffer->Width);
-	MinY = Clamp(MinY, 0, Buffer->Height);
-	MaxY = Clamp(MaxY, 0, Buffer->Height);
+	MinX = Clamp(MinX, 0, buf->width);
+	MaxX = Clamp(MaxX, 0, buf->width);
+	MinY = Clamp(MinY, 0, buf->height);
+	MaxY = Clamp(MaxY, 0, buf->height);
     
-	MinX = Clamp(MinX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MinY = Clamp(MinY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
+	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
     
     __m128i mmMinX = _mm_set1_epi32(MinX);
     __m128i mmMinY = _mm_set1_epi32(MinY);
@@ -345,13 +345,13 @@ void RenderGradientHorzSSE(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2
 	__m128 mm255 = _mm_set1_ps(255.0f);
 	__m128 mmOneOver255 = _mm_set1_ps(1.0f / 255.0f);
     
-	__m128 mmColor1_r = _mm_set1_ps(Color1.r);
-	__m128 mmColor1_g = _mm_set1_ps(Color1.g);
-	__m128 mmColor1_b = _mm_set1_ps(Color1.b);
+	__m128 mmColor1_r = _mm_set1_ps(color1.r);
+	__m128 mmColor1_g = _mm_set1_ps(color1.g);
+	__m128 mmColor1_b = _mm_set1_ps(color1.b);
     
-    __m128 mmColorDiff_r = _mm_set1_ps(Color2.r - Color1.r);
-    __m128 mmColorDiff_g = _mm_set1_ps(Color2.g - Color1.g);
-    __m128 mmColorDiff_b = _mm_set1_ps(Color2.b - Color1.b);
+    __m128 mmColorDiff_r = _mm_set1_ps(Color2.r - color1.r);
+    __m128 mmColorDiff_g = _mm_set1_ps(Color2.g - color1.g);
+    __m128 mmColorDiff_b = _mm_set1_ps(Color2.b - color1.b);
     
 	float OneOverWidth = 1.0f / (float)SaveDimX;
 	float OneOverHeight = 1.0f / (float)SaveDimY;
@@ -367,7 +367,7 @@ void RenderGradientHorzSSE(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2
         
 		for (int HorzIndex = MinX; HorzIndex < MaxX; HorzIndex += 4) {
 			
-			u32* Pixel = (u32*)((u8*)Buffer->Pixels + VertIndex * Buffer->Width * 4 + HorzIndex * 4);
+			u32* Pixel = (u32*)((u8*)buf->pixels + VertIndex * buf->width * 4 + HorzIndex * 4);
 			
             int TmpIndex = HorzIndex - SaveMinX;
 			__m128i mmHorzIndex = _mm_setr_epi32(TmpIndex, TmpIndex + 1, TmpIndex + 2, TmpIndex + 3);
@@ -397,10 +397,10 @@ void RenderGradientHorzSSE(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2
 }
 
 
-void RenderGradientVert(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2 ClipRect){
+void RenderGradientVert(Bmp_Info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect){
 	
-    v2 P = Rect.Min;
-    v2 Dim = GetRectDim(Rect);
+    v2 P = rect.min;
+    v2 Dim = GetRectDim(rect);
     
     int InitX = floorf(P.x);
 	int InitY = floorf(P.y);
@@ -417,29 +417,29 @@ void RenderGradientVert(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2 Cl
     int SaveDimX = MaxX - MinX;
     int SaveDimY = MaxY - MinY;
     
-	MinX = Clamp(MinX, 0, Buffer->Width);
-	MaxX = Clamp(MaxX, 0, Buffer->Width);
-	MinY = Clamp(MinY, 0, Buffer->Height);
-	MaxY = Clamp(MaxY, 0, Buffer->Height);
+	MinX = Clamp(MinX, 0, buf->width);
+	MaxX = Clamp(MaxX, 0, buf->width);
+	MinY = Clamp(MinY, 0, buf->height);
+	MaxY = Clamp(MaxY, 0, buf->height);
     
-	MinX = Clamp(MinX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MinY = Clamp(MinY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
+	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
     
     
 	float OneOverWidth = 1.0f / (float)SaveDimX;
 	float OneOverHeight = 1.0f / (float)SaveDimY;
     
 	for (int VertIndex = MinY; VertIndex < MaxY; VertIndex++) {
-        u32* Pixel = (u32*)((u8*)Buffer->Pixels + VertIndex * Buffer->Pitch + MinX * 4);
+        u32* Pixel = (u32*)((u8*)buf->pixels + VertIndex * buf->pitch + MinX * 4);
 		
 		float DeltaV = (float)(VertIndex - SaveMinY) * OneOverHeight;
         
         v4 OutColor;
-        OutColor.x = Color1.x + (Color2.x - Color1.x) * DeltaV;
-        OutColor.y = Color1.y + (Color2.y - Color1.y) * DeltaV;
-        OutColor.z = Color1.z + (Color2.z - Color1.z) * DeltaV;
+        OutColor.x = color1.x + (Color2.x - color1.x) * DeltaV;
+        OutColor.y = color1.y + (Color2.y - color1.y) * DeltaV;
+        OutColor.z = color1.z + (Color2.z - color1.z) * DeltaV;
         OutColor.w = 1.0f;
         
         u32 ColorByteRep = PackRGBA(OutColor);
@@ -450,9 +450,9 @@ void RenderGradientVert(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2 Cl
 	}
 }
 
-void RenderGradientVertSSE(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2 ClipRect) {
-    v2 P = Rect.Min;
-    v2 Dim = GetRectDim(Rect);
+void RenderGradientVertSSE(Bmp_Info* buf, rc2 rect, v3 color1, v3 color2, rc2 clipRect) {
+    v2 P = rect.min;
+    v2 Dim = GetRectDim(rect);
     
     int InitX = floorf(P.x);
 	int InitY = floorf(P.y);
@@ -469,15 +469,15 @@ void RenderGradientVertSSE(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2
     int SaveDimX = MaxX - MinX;
     int SaveDimY = MaxY - MinY;
 	
-	MinX = Clamp(MinX, 0, Buffer->Width);
-	MaxX = Clamp(MaxX, 0, Buffer->Width);
-	MinY = Clamp(MinY, 0, Buffer->Height);
-	MaxY = Clamp(MaxY, 0, Buffer->Height);
+	MinX = Clamp(MinX, 0, buf->width);
+	MaxX = Clamp(MaxX, 0, buf->width);
+	MinY = Clamp(MinY, 0, buf->height);
+	MaxY = Clamp(MaxY, 0, buf->height);
     
-	MinX = Clamp(MinX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MinY = Clamp(MinY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
+	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
     
     __m128i mmMinX = _mm_set1_epi32(MinX);
     __m128i mmMinY = _mm_set1_epi32(MinY);
@@ -491,13 +491,13 @@ void RenderGradientVertSSE(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2
 	__m128 mm255 = _mm_set1_ps(255.0f);
 	__m128 mmOneOver255 = _mm_set1_ps(1.0f / 255.0f);
     
-	__m128 mmColor1_r = _mm_set1_ps(Color1.r);
-	__m128 mmColor1_g = _mm_set1_ps(Color1.g);
-	__m128 mmColor1_b = _mm_set1_ps(Color1.b);
+	__m128 mmColor1_r = _mm_set1_ps(color1.r);
+	__m128 mmColor1_g = _mm_set1_ps(color1.g);
+	__m128 mmColor1_b = _mm_set1_ps(color1.b);
     
-    __m128 mmColorDiff_r = _mm_set1_ps(Color2.r - Color1.r);
-    __m128 mmColorDiff_g = _mm_set1_ps(Color2.g - Color1.g);
-    __m128 mmColorDiff_b = _mm_set1_ps(Color2.b - Color1.b);
+    __m128 mmColorDiff_r = _mm_set1_ps(color2.r - color1.r);
+    __m128 mmColorDiff_g = _mm_set1_ps(color2.g - color1.g);
+    __m128 mmColorDiff_b = _mm_set1_ps(color2.b - color1.b);
     
 	float OneOverWidth = 1.0f / (float)SaveDimX;
 	float OneOverHeight = 1.0f / (float)SaveDimY;
@@ -534,7 +534,7 @@ void RenderGradientVertSSE(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2
         
 		for (int HorzIndex = MinX; HorzIndex < MaxX; HorzIndex += 4) {
 			
-			u32* Pixel = (u32*)((u8*)Buffer->Pixels + VertIndex * Buffer->Width * 4 + HorzIndex * 4);
+			u32* Pixel = (u32*)((u8*)buf->pixels + VertIndex * buf->width * 4 + HorzIndex * 4);
 			
 			
 			_mm_storeu_si128((__m128i*)Pixel, mmOutColor);
@@ -544,15 +544,15 @@ void RenderGradientVertSSE(bmp_info* Buffer, rc2 Rect, v3 Color1, v3 Color2, rc2
 
 
 void RenderBitmapSSE(
-bmp_info* Buffer,
-bmp_info* Bitmap,
+Bmp_Info* buf,
+Bmp_Info* bitmap,
 v2 P,
 float TargetBitmapPixelHeight,
-v4 ModulationColor01,
-rc2 ClipRect)
+v4 modulationColor01,
+rc2 clipRect)
 {
-	float TargetScaling = (float)TargetBitmapPixelHeight / (float)Bitmap->Height;
-	u32 TargetWidth = (float)Bitmap->Width * TargetScaling;
+	float TargetScaling = (float)TargetBitmapPixelHeight / (float)bitmap->height;
+	u32 TargetWidth = (float)bitmap->width * TargetScaling;
 	u32 TargetHeight = TargetBitmapPixelHeight;
     
 	__m128 mmTargetScaling = _mm_set1_ps(TargetScaling);
@@ -566,21 +566,21 @@ rc2 ClipRect)
 	__m128 mmOneOver255 = _mm_set1_ps(1.0f / 255.0f);
 	__m128i mmFF = _mm_set1_epi32(0xFF);
     
-	__m128 mmSourceWidth = _mm_set1_ps((float)Bitmap->Width);
-	__m128 mmSourceHeight = _mm_set1_ps((float)Bitmap->Height);
-	__m128i mmSourcePitch = _mm_set1_epi32(Bitmap->Pitch);
+	__m128 mmSourceWidth = _mm_set1_ps((float)bitmap->width);
+	__m128 mmSourceHeight = _mm_set1_ps((float)bitmap->height);
+	__m128i mmSourcePitch = _mm_set1_epi32(bitmap->pitch);
     
-	__m128 mmDestWidth = _mm_set1_ps((float)Buffer->Width);
-	__m128i mmDestWidthI = _mm_set1_epi32(Buffer->Width);
+	__m128 mmDestWidth = _mm_set1_ps((float)buf->width);
+	__m128i mmDestWidthI = _mm_set1_epi32(buf->width);
     
-	__m128i mmSourceWidthI = _mm_set1_epi32(Bitmap->Width);
-	__m128i mmSourceHeightI = _mm_set1_epi32(Bitmap->Height);
+	__m128i mmSourceWidthI = _mm_set1_epi32(bitmap->width);
+	__m128i mmSourceHeightI = _mm_set1_epi32(bitmap->height);
     
 	__m128i mmSourceWidthMinusOneI = _mm_sub_epi32(mmSourceWidthI, mmOneI);
 	__m128i mmSourceHeightMinusOneI = _mm_sub_epi32(mmSourceHeightI, mmOneI);
     
-	__m128 mmOneOverSourceWidth = _mm_set1_ps(1.0f / (float)Bitmap->Width);
-	__m128 mmOneOverSourceHeight = _mm_set1_ps(1.0f / (float)Bitmap->Height);
+	__m128 mmOneOverSourceWidth = _mm_set1_ps(1.0f / (float)bitmap->width);
+	__m128 mmOneOverSourceHeight = _mm_set1_ps(1.0f / (float)bitmap->height);
     
 	__m128 mmOneOverWidth = _mm_div_ps(mmOne, mmTargetWidth);
 	__m128 mmOneOverHeight = _mm_div_ps(mmOne, mmTargetHeight);
@@ -598,32 +598,32 @@ rc2 ClipRect)
 	int MaxY = MinY + TargetHeight;
     
     
-	MinX = Clamp(MinX, 0, Buffer->Width);
-	MaxX = Clamp(MaxX, 0, Buffer->Width);
-	MinY = Clamp(MinY, 0, Buffer->Height);
-	MaxY = Clamp(MaxY, 0, Buffer->Height);
+	MinX = Clamp(MinX, 0, buf->width);
+	MaxX = Clamp(MaxX, 0, buf->width);
+	MinY = Clamp(MinY, 0, buf->height);
+	MaxY = Clamp(MaxY, 0, buf->height);
     
-	MinX = Clamp(MinX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MinY = Clamp(MinY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
+	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
     
 	__m128i mmMaxX = _mm_set1_epi32(MaxX);
 	__m128 mmMaxXF = _mm_cvtepi32_ps(mmMaxX);
     
-	__m128 mmModulationColor_r = _mm_set1_ps(ModulationColor01.r);
-	__m128 mmModulationColor_g = _mm_set1_ps(ModulationColor01.g);
-	__m128 mmModulationColor_b = _mm_set1_ps(ModulationColor01.b);
-	__m128 mmModulationColor_a = _mm_set1_ps(ModulationColor01.a);
+	__m128 mmmodulationColor_r = _mm_set1_ps(modulationColor01.r);
+	__m128 mmmodulationColor_g = _mm_set1_ps(modulationColor01.g);
+	__m128 mmmodulationColor_b = _mm_set1_ps(modulationColor01.b);
+	__m128 mmmodulationColor_a = _mm_set1_ps(modulationColor01.a);
     
-	mmModulationColor_r = _mm_mul_ps(mmModulationColor_r, mmModulationColor_a);
-	mmModulationColor_g = _mm_mul_ps(mmModulationColor_g, mmModulationColor_a);
-	mmModulationColor_b = _mm_mul_ps(mmModulationColor_b, mmModulationColor_a);
+	mmmodulationColor_r = _mm_mul_ps(mmmodulationColor_r, mmmodulationColor_a);
+	mmmodulationColor_g = _mm_mul_ps(mmmodulationColor_g, mmmodulationColor_a);
+	mmmodulationColor_b = _mm_mul_ps(mmmodulationColor_b, mmmodulationColor_a);
     
-	mmModulationColor_r = _mm_min_ps(mmOne, _mm_max_ps(mmZero, mmModulationColor_r));
-	mmModulationColor_g = _mm_min_ps(mmOne, _mm_max_ps(mmZero, mmModulationColor_g));
-	mmModulationColor_b = _mm_min_ps(mmOne, _mm_max_ps(mmZero, mmModulationColor_b));
-	mmModulationColor_a = _mm_min_ps(mmOne, _mm_max_ps(mmZero, mmModulationColor_a));
+	mmmodulationColor_r = _mm_min_ps(mmOne, _mm_max_ps(mmZero, mmmodulationColor_r));
+	mmmodulationColor_g = _mm_min_ps(mmOne, _mm_max_ps(mmZero, mmmodulationColor_g));
+	mmmodulationColor_b = _mm_min_ps(mmOne, _mm_max_ps(mmZero, mmmodulationColor_b));
+	mmmodulationColor_a = _mm_min_ps(mmOne, _mm_max_ps(mmZero, mmmodulationColor_a));
     
 	for (int DestY = MinY; DestY < MaxY; DestY++) {
         
@@ -665,28 +665,28 @@ rc2 ClipRect)
 			__m128i mmBotRTexelSrcOffset = _mm_add_epi32(mmPitchByMaxSrcY, mmMaxSrcXx4);
             
 			__m128i mmTopLTexel = _mm_setr_epi32(
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 0)),
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 1)),
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 2)),
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 3)));
+				*(u32*)((u8*)bitmap->pixels + MMI(mmTopLTexelSrcOffset, 0)),
+				*(u32*)((u8*)bitmap->pixels + MMI(mmTopLTexelSrcOffset, 1)),
+				*(u32*)((u8*)bitmap->pixels + MMI(mmTopLTexelSrcOffset, 2)),
+				*(u32*)((u8*)bitmap->pixels + MMI(mmTopLTexelSrcOffset, 3)));
             
 			__m128i mmTopRTexel = _mm_setr_epi32(
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 0)),
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 1)),
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 2)),
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 3)));
+				*(u32*)((u8*)bitmap->pixels + MMI(mmTopRTexelSrcOffset, 0)),
+				*(u32*)((u8*)bitmap->pixels + MMI(mmTopRTexelSrcOffset, 1)),
+				*(u32*)((u8*)bitmap->pixels + MMI(mmTopRTexelSrcOffset, 2)),
+				*(u32*)((u8*)bitmap->pixels + MMI(mmTopRTexelSrcOffset, 3)));
             
 			__m128i mmBotLTexel = _mm_setr_epi32(
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 0)),
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 1)),
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 2)),
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 3)));
+				*(u32*)((u8*)bitmap->pixels + MMI(mmBotLTexelSrcOffset, 0)),
+				*(u32*)((u8*)bitmap->pixels + MMI(mmBotLTexelSrcOffset, 1)),
+				*(u32*)((u8*)bitmap->pixels + MMI(mmBotLTexelSrcOffset, 2)),
+				*(u32*)((u8*)bitmap->pixels + MMI(mmBotLTexelSrcOffset, 3)));
             
 			__m128i mmBotRTexel = _mm_setr_epi32(
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 0)),
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 1)),
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 2)),
-				*(u32*)((u8*)Bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 3)));
+				*(u32*)((u8*)bitmap->pixels + MMI(mmBotRTexelSrcOffset, 0)),
+				*(u32*)((u8*)bitmap->pixels + MMI(mmBotRTexelSrcOffset, 1)),
+				*(u32*)((u8*)bitmap->pixels + MMI(mmBotRTexelSrcOffset, 2)),
+				*(u32*)((u8*)bitmap->pixels + MMI(mmBotRTexelSrcOffset, 3)));
             
 			__m128 mmTopLeft_r = MM_UNPACK_COLOR_CHANNEL0(mmTopLTexel);
 			__m128 mmTopLeft_g = MM_UNPACK_COLOR_CHANNEL(mmTopLTexel, 8);
@@ -727,12 +727,12 @@ rc2 ClipRect)
 			__m128 mmBlended_a = MM_LERP(mmUpperBlend_a, mmLowerBlend_a, mmDeltaY);
             
 			/*Multiplication by input color*/
-			mmBlended_r = _mm_mul_ps(mmBlended_r, mmModulationColor_r);
-			mmBlended_g = _mm_mul_ps(mmBlended_g, mmModulationColor_g);
-			mmBlended_b = _mm_mul_ps(mmBlended_b, mmModulationColor_b);
-			mmBlended_a = _mm_mul_ps(mmBlended_a, mmModulationColor_a);
+			mmBlended_r = _mm_mul_ps(mmBlended_r, mmmodulationColor_r);
+			mmBlended_g = _mm_mul_ps(mmBlended_g, mmmodulationColor_g);
+			mmBlended_b = _mm_mul_ps(mmBlended_b, mmmodulationColor_b);
+			mmBlended_a = _mm_mul_ps(mmBlended_a, mmmodulationColor_a);
             
-			u32* OutDest = (u32*)((u8*)Buffer->Pixels + DestY * Buffer->Pitch + DestX * 4);
+			u32* OutDest = (u32*)((u8*)buf->pixels + DestY * buf->pitch + DestX * 4);
             
 			__m128i mmPreDestColor = _mm_loadu_si128((__m128i*)OutDest);
             
@@ -777,26 +777,26 @@ rc2 ClipRect)
 }
 
 void RenderBitmap(
-bmp_info* Buffer,
-bmp_info* Bitmap,
+Bmp_Info* buf,
+Bmp_Info* bitmap,
 v2 P,
 float TargetBitmapPixelHeight,
-v4 ModulationColor01, 
-rc2 ClipRect)
+v4 modulationColor01, 
+rc2 clipRect)
 {
-	float TargetScaling = (float)TargetBitmapPixelHeight / (float)Bitmap->Height;
+	float TargetScaling = (float)TargetBitmapPixelHeight / (float)bitmap->height;
     
-	ModulationColor01.r *= ModulationColor01.a;
-	ModulationColor01.g *= ModulationColor01.a;
-	ModulationColor01.b *= ModulationColor01.a;
+	modulationColor01.r *= modulationColor01.a;
+	modulationColor01.g *= modulationColor01.a;
+	modulationColor01.b *= modulationColor01.a;
     
 	/*Clamping incoming color*/
-	ModulationColor01.r = Clamp01(ModulationColor01.r);
-	ModulationColor01.g = Clamp01(ModulationColor01.g);
-	ModulationColor01.b = Clamp01(ModulationColor01.b);
-	ModulationColor01.a = Clamp01(ModulationColor01.a);
+	modulationColor01.r = Clamp01(modulationColor01.r);
+	modulationColor01.g = Clamp01(modulationColor01.g);
+	modulationColor01.b = Clamp01(modulationColor01.b);
+	modulationColor01.a = Clamp01(modulationColor01.a);
     
-	u32 TargetWidth = (float)Bitmap->Width * TargetScaling;
+	u32 TargetWidth = (float)bitmap->width * TargetScaling;
 	u32 TargetHeight = TargetBitmapPixelHeight;
     
 	int InitX = P.x;
@@ -808,18 +808,18 @@ rc2 ClipRect)
 	int MinY = InitY;
 	int MaxY = MinY + TargetHeight;
     
-	MinX = Clamp(MinX, 0, Buffer->Width);
-	MaxX = Clamp(MaxX, 0, Buffer->Width);
-	MinY = Clamp(MinY, 0, Buffer->Height);
-	MaxY = Clamp(MaxY, 0, Buffer->Height);
+	MinX = Clamp(MinX, 0, buf->width);
+	MaxX = Clamp(MaxX, 0, buf->width);
+	MinY = Clamp(MinY, 0, buf->height);
+	MaxY = Clamp(MaxY, 0, buf->height);
     
-	MinX = Clamp(MinX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MinY = Clamp(MinY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
+	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
     
-	float SourceWidth = Bitmap->Width;
-	float SourceHeight = Bitmap->Height;
+	float SourceWidth = bitmap->width;
+	float SourceHeight = bitmap->height;
     
 	float OneOverSrcWidth = 1.0f / SourceWidth;
 	float OneOverSrcHeight = 1.0f / SourceHeight;
@@ -846,13 +846,13 @@ rc2 ClipRect)
 			float DeltaX = SourceX - (float)MinSourceX_;
 			float DeltaY = SourceY - (float)MinSourceY_;
             
-			u32 MaxSourceX_ = Min(MinSourceX_ + 1, Bitmap->Width - 1);
-			u32 MaxSourceY_ = Min(MinSourceY_ + 1, Bitmap->Height - 1);
+			u32 MaxSourceX_ = Min(MinSourceX_ + 1, bitmap->width - 1);
+			u32 MaxSourceY_ = Min(MinSourceY_ + 1, bitmap->height - 1);
             
-			u32* TopLeft = (u32*)((u8*)Bitmap->Pixels + Bitmap->Pitch * MinSourceY_ + MinSourceX_ * 4);
-			u32* TopRight = (u32*)((u8*)Bitmap->Pixels + Bitmap->Pitch * MinSourceY_ + MaxSourceX_ * 4);
-			u32* BotLeft = (u32*)((u8*)Bitmap->Pixels + Bitmap->Pitch * MaxSourceY_ + MinSourceX_ * 4);
-			u32* BotRight = (u32*)((u8*)Bitmap->Pixels + Bitmap->Pitch * MaxSourceY_ + MaxSourceX_ * 4);
+			u32* TopLeft = (u32*)((u8*)bitmap->pixels + bitmap->pitch * MinSourceY_ + MinSourceX_ * 4);
+			u32* TopRight = (u32*)((u8*)bitmap->pixels + bitmap->pitch * MinSourceY_ + MaxSourceX_ * 4);
+			u32* BotLeft = (u32*)((u8*)bitmap->pixels + bitmap->pitch * MaxSourceY_ + MinSourceX_ * 4);
+			u32* BotRight = (u32*)((u8*)bitmap->pixels + bitmap->pitch * MaxSourceY_ + MaxSourceX_ * 4);
             
 			v4 TopLeftColor = UnpackRGBA(*TopLeft);
 			v4 TopRightColor = UnpackRGBA(*TopRight);
@@ -880,12 +880,12 @@ rc2 ClipRect)
 			BlendedColor.b = UpperBlend.b + (LowerBlend.b - UpperBlend.b) * DeltaY;
 			BlendedColor.a = UpperBlend.a + (LowerBlend.a - UpperBlend.a) * DeltaY;
 			
-			BlendedColor.r = BlendedColor.r * ModulationColor01.r;
-			BlendedColor.g = BlendedColor.g * ModulationColor01.g;
-			BlendedColor.b = BlendedColor.b * ModulationColor01.b;
-			BlendedColor.a = BlendedColor.a * ModulationColor01.a;
+			BlendedColor.r = BlendedColor.r * modulationColor01.r;
+			BlendedColor.g = BlendedColor.g * modulationColor01.g;
+			BlendedColor.b = BlendedColor.b * modulationColor01.b;
+			BlendedColor.a = BlendedColor.a * modulationColor01.a;
             
-			u32* OutDest = (u32*)((u8*)Buffer->Pixels + DestY * Buffer->Pitch + DestX * 4);
+			u32* OutDest = (u32*)((u8*)buf->pixels + DestY * buf->pitch + DestX * 4);
 			v4 PreDestColor = UnpackRGBA(*OutDest);
             
 			//float BlendAlpha = PreDestColor.a + BlendedColor.a - PreDestColor.a * BlendedColor.a;
@@ -908,11 +908,11 @@ rc2 ClipRect)
 }
 
 void RenderRect(
-bmp_info* Buffer,
+Bmp_Info* buf,
 v2 P,
 v2 Dim,
-v4 ModulationColor01, 
-rc2 ClipRect)
+v4 modulationColor01, 
+rc2 clipRect)
 {
 	int InitX = floorf(P.x);
 	int InitY = floorf(P.y);
@@ -923,35 +923,35 @@ rc2 ClipRect)
 	int MinY = InitY;
 	int MaxY = MinY + ceilf(Dim.y);
     
-	MinX = Clamp(MinX, 0, Buffer->Width);
-	MaxX = Clamp(MaxX, 0, Buffer->Width);
-	MinY = Clamp(MinY, 0, Buffer->Height);
-	MaxY = Clamp(MaxY, 0, Buffer->Height);
+	MinX = Clamp(MinX, 0, buf->width);
+	MaxX = Clamp(MaxX, 0, buf->width);
+	MinY = Clamp(MinY, 0, buf->height);
+	MaxY = Clamp(MaxY, 0, buf->height);
     
-	MinX = Clamp(MinX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MinY = Clamp(MinY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
+	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
     
 	/*Clamping incoming color*/
-	ModulationColor01.r = Clamp01(ModulationColor01.r);
-	ModulationColor01.g = Clamp01(ModulationColor01.g);
-	ModulationColor01.b = Clamp01(ModulationColor01.b);
-	ModulationColor01.a = Clamp01(ModulationColor01.a);
+	modulationColor01.r = Clamp01(modulationColor01.r);
+	modulationColor01.g = Clamp01(modulationColor01.g);
+	modulationColor01.b = Clamp01(modulationColor01.b);
+	modulationColor01.a = Clamp01(modulationColor01.a);
     
 	/*Premultiplying incoming color with it alpha*/
-	ModulationColor01.r *= ModulationColor01.a;
-	ModulationColor01.g *= ModulationColor01.a;
-	ModulationColor01.b *= ModulationColor01.a;
+	modulationColor01.r *= modulationColor01.a;
+	modulationColor01.g *= modulationColor01.a;
+	modulationColor01.b *= modulationColor01.a;
     
 	for (int DestY = MinY; DestY < MaxY; DestY++) {
 		for (int DestX = MinX; DestX < MaxX; DestX++) {
-			u32* OutDest = (u32*)((u8*)Buffer->Pixels + DestY * Buffer->Pitch + DestX * 4);
+			u32* OutDest = (u32*)((u8*)buf->pixels + DestY * buf->pitch + DestX * 4);
             
-			v4 ResultColor = ModulationColor01;
+			v4 ResultColor = modulationColor01;
 			v4 PreDestColor = UnpackRGBA(*OutDest);
             
-			float BlendAlpha = ModulationColor01.a;
+			float BlendAlpha = modulationColor01.a;
             
 			v4 AlphaBlendColor;
 			AlphaBlendColor.r = (1.0f - BlendAlpha) * PreDestColor.r + ResultColor.r;
@@ -967,11 +967,11 @@ rc2 ClipRect)
 }
 
 void RenderRectSSE(
-bmp_info* Buffer,
+Bmp_Info* buf,
 v2 P,
 v2 Dim,
-v4 ModulationColor01,
-rc2 ClipRect)
+v4 modulationColor01,
+rc2 clipRect)
 {
 	int InitX = floorf(P.x);
 	int InitY = floorf(P.y);
@@ -983,15 +983,15 @@ rc2 ClipRect)
 	int MaxY = MinY + ceilf(Dim.y);
     
 	/*Clamping incoming color*/
-	MinX = Clamp(MinX, 0, Buffer->Width);
-	MaxX = Clamp(MaxX, 0, Buffer->Width);
-	MinY = Clamp(MinY, 0, Buffer->Height);
-	MaxY = Clamp(MaxY, 0, Buffer->Height);
+	MinX = Clamp(MinX, 0, buf->width);
+	MaxX = Clamp(MaxX, 0, buf->width);
+	MinY = Clamp(MinY, 0, buf->height);
+	MaxY = Clamp(MaxY, 0, buf->height);
     
-	MinX = Clamp(MinX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MinY = Clamp(MinY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)ClipRect.Min.x, (int)ClipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)ClipRect.Min.y, (int)ClipRect.Max.y);
+	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
     
 	__m128 mmOne = _mm_set1_ps(1.0f);
 	__m128 mmZero = _mm_set1_ps(0.0f);
@@ -1001,10 +1001,10 @@ rc2 ClipRect)
 	__m128i mmMaxX = _mm_set1_epi32(MaxX);
 	__m128 mmMaxXF = _mm_cvtepi32_ps(mmMaxX);
     
-	__m128 mmModColor_r = _mm_set1_ps(ModulationColor01.r);
-	__m128 mmModColor_g = _mm_set1_ps(ModulationColor01.g);
-	__m128 mmModColor_b = _mm_set1_ps(ModulationColor01.b);
-	__m128 mmModColor_a = _mm_set1_ps(ModulationColor01.a);
+	__m128 mmModColor_r = _mm_set1_ps(modulationColor01.r);
+	__m128 mmModColor_g = _mm_set1_ps(modulationColor01.g);
+	__m128 mmModColor_b = _mm_set1_ps(modulationColor01.b);
+	__m128 mmModColor_a = _mm_set1_ps(modulationColor01.a);
     
 	mmModColor_r = _mm_min_ps(_mm_max_ps(mmModColor_r, mmZero), mmOne);
 	mmModColor_g = _mm_min_ps(_mm_max_ps(mmModColor_g, mmZero), mmOne);
@@ -1016,7 +1016,7 @@ rc2 ClipRect)
 	mmModColor_g = _mm_mul_ps(_mm_mul_ps(mmModColor_g, mmModColor_a), mm255);
 	mmModColor_b = _mm_mul_ps(_mm_mul_ps(mmModColor_b, mmModColor_a), mm255);
     
-	__m128i mmDestWidth = _mm_set1_epi32(Buffer->Width);
+	__m128i mmDestWidth = _mm_set1_epi32(buf->width);
 	__m128 mmDestWidthF = _mm_cvtepi32_ps(mmDestWidth);
     
     
@@ -1025,7 +1025,7 @@ rc2 ClipRect)
 			__m128i mmDestX = _mm_setr_epi32(DestX, DestX + 1, DestX + 2, DestX + 3);
 			__m128 mmDestXF = _mm_cvtepi32_ps(mmDestX);
             
-			u32* OutDest = (u32*)((u8*)Buffer->Pixels + DestY * Buffer->Pitch + (DestX << 2));
+			u32* OutDest = (u32*)((u8*)buf->pixels + DestY * buf->pitch + (DestX << 2));
 			__m128i mmDstPixels = _mm_loadu_si128((__m128i*)OutDest);
             
 #if 0
@@ -1088,30 +1088,38 @@ rc2 ClipRect)
 	u32 PixelFillCount = (MaxY - MinY) * (MaxX - MinX);
 }
 
-void SoftwareRenderStackToOutput(render_stack* Stack, bmp_info* Buffer, rc2 ClipRect){
-    u8* At = (u8*)Stack->Data.Base;
-	u8* StackEnd = (u8*)Stack->Data.Base + Stack->Data.Used;
+void SoftwareRenderStackToOutput(Render_Stack* stack, Bmp_Info* buf, rc2 clipRect){
+    u8* at = (u8*)stack->mem;
+	u8* stackEnd = (u8*)stack->mem + stack->memUsed;
     
-	while (At < StackEnd) {
-        render_entry_header* Header = (render_entry_header*)At;
+	while (at < stackEnd) {
+        Render_Entry_Header* header = (Render_Entry_Header*)at;
         
-        At += sizeof(render_entry_header);
+        at += sizeof(Render_Entry_Header);
         
-        switch(Header->Type){
+        switch(header->type){
             case RenderEntry_ClearColor:{
-                RENDER_GET_ENTRY(render_entry_clear_color);
+                RENDER_GET_ENTRY(RenderEntryClearColor);
                 
-                RenderClearSSE(Buffer, Entry->ClearColor01, ClipRect);
+                RenderClearSSE(buf, entry->clearColor01, clipRect);
             }break;
             
             case RenderEntry_Gradient:{
-                RENDER_GET_ENTRY(render_entry_gradient);
+                RENDER_GET_ENTRY(RenderEntryGradient);
                 
-                if(Entry->GradientType == RenderEntryGradient_Horizontal){
-                    RenderGradientHorzSSE(Buffer, Entry->Rc, Entry->Color1, Entry->Color2, ClipRect);
+                if(entry->gradType == RenderEntryGradient_Horizontal){
+                    RenderGradientHorzSSE(buf, 
+                                          entry->rc, 
+                                          entry->color1, 
+                                          entry->color2, 
+                                          clipRect);
                 }
-                else if(Entry->GradientType == RenderEntryGradient_Vertical){
-                    RenderGradientVertSSE(Buffer, Entry->Rc, Entry->Color1, Entry->Color2, ClipRect);
+                else if(entry->gradType == RenderEntryGradient_Vertical){
+                    RenderGradientVertSSE(buf, 
+                                          entry->rc, 
+                                          entry->color1, 
+                                          entry->color2, 
+                                          clipRect);
                 }
                 else{
                     INVALID_CODE_PATH;
@@ -1119,40 +1127,40 @@ void SoftwareRenderStackToOutput(render_stack* Stack, bmp_info* Buffer, rc2 Clip
             }break;
             
             case RenderEntry_Rect:{
-                RENDER_GET_ENTRY(render_entry_rect);
+                RENDER_GET_ENTRY(RenderEntryRect);
                 
 #if 1
-                RenderRectSSE(Buffer,
-                              Entry->P,
-                              Entry->Dim,
-                              Entry->ModulationColor01,
-                              ClipRect);
+                RenderRectSSE(buf,
+                              entry->p,
+                              entry->dim,
+                              entry->modulationColor01,
+                              clipRect);
 #else
-                RenderRect(Buffer,
-                           Entry->P,
-                           Entry->Dim,
-                           Entry->ModulationColor01,
-                           ClipRect);
+                RenderRect(buf,
+                           entry->p,
+                           entry->dim,
+                           entry->modulationColor01,
+                           clipRect);
 #endif
             }break;
             
             case RenderEntry_Bitmap:{
-                RENDER_GET_ENTRY(render_entry_bitmap);
+                RENDER_GET_ENTRY(RenderEntryBitmap);
                 
 #if 1
-                RenderBitmapSSE(Buffer, 
-                                Entry->Bitmap,
-                                Entry->TopLeftP,
-                                Entry->PixelHeight,
-                                Entry->ModulationColor01,
-                                ClipRect);
+                RenderBitmapSSE(buf, 
+                                entry->bitmap,
+                                entry->topLeftP,
+                                entry->pixelHeight,
+                                entry->modulationColor01,
+                                clipRect);
 #else
-                RenderBitmap(Buffer, 
-                             Entry->Bitmap,
-                             Entry->TopLeftP,
-                             Entry->PixelHeight,
-                             Entry->ModulationColor01,
-                             ClipRect);
+                RenderBitmap(buf, 
+                             entry->bitmap,
+                             entry->topLeftP,
+                             entry->pixelHeight,
+                             entry->modulationColor01,
+                             clipRect);
 #endif
             }break;
             
@@ -1161,168 +1169,162 @@ void SoftwareRenderStackToOutput(render_stack* Stack, bmp_info* Buffer, rc2 Clip
             }break;
         }
         
-        At += Header->DataSize;
+        at += header->dataSize;
     }
 }
 
-struct render_queue_work{
-    bmp_info* Buffer;
-    rc2 ClipRect;
-    render_stack* Stack;
+struct Render_Queue_Work_Data{
+    Bmp_Info* buf;
+    rc2 clipRect;
+    Render_Stack* stack;
 };
 
 PLATFORM_CALLBACK(RenderQueueWork){
-    render_queue_work* Work = (render_queue_work*)Data;
+    Render_Queue_Work_Data* work = (Render_Queue_Work_Data*)data;
     
     SoftwareRenderStackToOutput(
-        Work->Stack,
-        Work->Buffer,
-        Work->ClipRect);
+        work->stack,
+        work->buf,
+        work->clipRect);
 }
 
-struct render_queue_rgba2bgra_work{
-    bmp_info* Buffer;
-    rc2 ClipRect;
+struct Render_Queue_rgba2bgra_Work{
+    Bmp_Info* buf;
+    rc2 clipRect;
 };
 
 PLATFORM_CALLBACK(RenderQueueRGBA2BGRAWork){
-    render_queue_rgba2bgra_work* Work = (render_queue_rgba2bgra_work*)Data;
+    Render_Queue_rgba2bgra_Work* work = (Render_Queue_rgba2bgra_Work*)data;
     
-#if 0    
-    char Text[256];
-    stbsp_sprintf(Text, "Hello world from: %d\n", GetThreadID());
-    PlatformAPI.OutputString(Text);
-#endif
-    
-    RenderRGBA2BGRASSE(Work->Buffer, Work->ClipRect);
+    RenderRGBA2BGRASSE(work->buf, work->clipRect);
 }
 
 #define TILES_COUNT 32
-void RenderMultithreaded(platform_job_queue* Queue, render_stack* Stack, bmp_info* Buffer) {
+void RenderMultithreaded(Platform_Job_Queue* queue, Render_Stack* stack, Bmp_Info* buf) {
     
 #if 0
-	rc2 ClipRect;
-	ClipRect.Min = V2(0, 0);
-	ClipRect.Max = V2(Buffer->Width, Buffer->Height);
+	rc2 clipRect;
+	clipRect.min = V2(0, 0);
+	clipRect.max = V2(buf->width, buf->height);
     
-	SoftwareRenderStackToOutput(Stack, Buffer, ClipRect);
+	SoftwareRenderStackToOutput(stack, buf, clipRect);
 #else
     
 #if 0
 #define SIDE_TILES_COUNT 8
     
-	render_queue_work Works[SIDE_TILES_COUNT * SIDE_TILES_COUNT];
+	RenderQueueWork works[SIDE_TILES_COUNT * SIDE_TILES_COUNT];
     
-	int SideTileWidth = Buffer->Width / SIDE_TILES_COUNT;
-    SideTileWidth = (SideTileWidth + 15) & (~15);
-	int SideTileHeight = Buffer->Height / SIDE_TILES_COUNT;
+	int sideTileW = buf->width / SIDE_TILES_COUNT;
+    sideTileW = (sideTileW + 15) & (~15);
+	int sideTileH = buf->height / SIDE_TILES_COUNT;
     
     for (int j = 0; j < SIDE_TILES_COUNT; j++) {
 		for (int i = 0; i < SIDE_TILES_COUNT; i++) {
-            rc2 Rect;
+            rc2 rect;
             
-            Rect.Min = V2(SideTileWidth * i, SideTileHeight * j);
-            Rect.Max = V2(SideTileWidth * (i + 1), SideTileHeight * (j + 1));
+            rect.min = V2(sideTileW * i, sideTileH * j);
+            rect.max = V2(sideTileW * (i + 1), sideTileH * (j + 1));
             
             if (j == SIDE_TILES_COUNT - 1) {
-                Rect.Max.y = Buffer->Height;
+                rect.max.y = buf->height;
             }
             
             if (i == SIDE_TILES_COUNT - 1) {
-                Rect.Max.x = Buffer->Width;
+                rect.max.x = buf->width;
             }
             
-            render_queue_work* WorkData = &Works[j * SIDE_TILES_COUNT + i];
-            WorkData->Buffer = Buffer;
-            WorkData->Stack = Stack;
-            WorkData->ClipRect = Rect;
+            RenderQueueWork* workData = &works[j * SIDE_TILES_COUNT + i];
+            workData->buf = buf;
+            workData->stack = stack;
+            workData->clipRect = rect;
             
             //if ((j & 1) == (i & 1)) {
-            PlatformAddEntry(Queue, RenderQueueWork, WorkData);
+            PlatformAddEntry(Queue, RenderQueueWork, workData);
             //}
 		}
     }
 #else
-    render_queue_work Works[TILES_COUNT];
+    Render_Queue_Work_Data works[TILES_COUNT];
     
-    int PreferableTileHeight = Buffer->Height / TILES_COUNT;
-    if(PreferableTileHeight < 16){
-        PreferableTileHeight = 16;
+    int preferTileH = buf->height / TILES_COUNT;
+    if(preferTileH < 16){
+        preferTileH = 16;
     }
     
-    int CurrentH = 0; 
+    int curH = 0; 
     for(int i = 0; i < TILES_COUNT; i++){
-        rc2 Rect;
+        rc2 rect;
         
-        b32 ShouldExit = 0;
-        int MaxHeight = CurrentH + PreferableTileHeight;
-        if(MaxHeight > Buffer->Height){
-            MaxHeight = Buffer->Height;
-            ShouldExit = 1;
+        b32 shouldExit = 0;
+        int maxH = curH + preferTileH;
+        if(maxH > buf->height){
+            maxH = buf->height;
+            shouldExit = 1;
         }
         
-        Rect.Min = V2(0.0f, CurrentH);
-        Rect.Max = V2(Buffer->Width, MaxHeight);
+        rect.min = V2(0.0f, curH);
+        rect.max = V2(buf->width, maxH);
         
-        render_queue_work* WorkData = &Works[i];
-        WorkData->Buffer = Buffer;
-        WorkData->Stack = Stack;
-        WorkData->ClipRect = Rect;
+        Render_Queue_Work_Data* workData = &works[i];
+        workData->buf = buf;
+        workData->stack = stack;
+        workData->clipRect = rect;
         
         //if (i & 1) {
-        PlatformAddEntry(Queue, RenderQueueWork, WorkData);
+        PlatformAddEntry(queue, RenderQueueWork, workData);
         //}
         
-        CurrentH += PreferableTileHeight;
-        if(ShouldExit){
+        curH += preferTileH;
+        if(shouldExit){
             break;
         }
     }
 #endif
     
-    PlatformWaitForCompletion(Queue);
+    PlatformWaitForCompletion(queue);
 #endif
 }
 
-void RenderMultithreadedRGBA2BGRA(platform_job_queue* Queue, bmp_info* Buffer) {
+void RenderMultithreadedRGBA2BGRA(Platform_Job_Queue* queue, Bmp_Info* buf) {
     
-    render_queue_rgba2bgra_work Works[TILES_COUNT];
+    Render_Queue_rgba2bgra_Work works[TILES_COUNT];
     
 #if 1
-    int PreferableTileHeight = Buffer->Height / TILES_COUNT;
-    if(PreferableTileHeight < 16){
-        PreferableTileHeight = 16;
+    int preferTileH = buf->height / TILES_COUNT;
+    if(preferTileH < 16){
+        preferTileH = 16;
     }
     
-    int CurrentH = 0; 
+    int currentH = 0; 
     for(int i = 0; i < TILES_COUNT; i++){
-        rc2 Rect;
+        rc2 rect;
         
-        b32 ShouldExit = 0;
-        int MaxHeight = CurrentH + PreferableTileHeight;
-        if(MaxHeight > Buffer->Height){
-            MaxHeight = Buffer->Height;
-            ShouldExit = 1;
+        b32 shouldExit = 0;
+        int maxH = currentH + preferTileH;
+        if(maxH > buf->height){
+            maxH = buf->height;
+            shouldExit = 1;
         }
         
-        Rect.Min = V2(0.0f, CurrentH);
-        Rect.Max = V2(Buffer->Width, MaxHeight);
+        rect.min = V2(0.0f, currentH);
+        rect.max = V2(buf->width, maxH);
         
-        render_queue_rgba2bgra_work* WorkData = &Works[i];
-        WorkData->Buffer = Buffer;
-        WorkData->ClipRect = Rect;
+        Render_Queue_rgba2bgra_Work* workData = &works[i];
+        workData->buf = buf;
+        workData->clipRect = rect;
         
         //if (i & 1) {
-        PlatformAddEntry(Queue, RenderQueueRGBA2BGRAWork, WorkData);
+        PlatformAddEntry(queue, RenderQueueRGBA2BGRAWork, workData);
         //}
         
-        CurrentH += PreferableTileHeight;
-        if(ShouldExit){
+        currentH += preferTileH;
+        if(shouldExit){
             break;
         }
     }
     
-    PlatformWaitForCompletion(Queue);
+    PlatformWaitForCompletion(queue);
 #endif
     
 }

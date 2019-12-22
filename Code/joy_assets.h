@@ -7,24 +7,24 @@
 #include "joy_asset_util.h"
 
 // NOTE(dima): Bitmaps are stored in gamma-corrected premultiplied alpha format
-struct assets{
-    bmp_info Sunset;
-    bmp_info SunsetOrange;
-    bmp_info SunsetField;
-    bmp_info SunsetMountains;
-    bmp_info SunsetPurple;
-    bmp_info Sunrise;
-    bmp_info MountainsFuji;
-    bmp_info RoadClouds;
+struct Assets{
+    Bmp_Info sunset;
+    Bmp_Info sunsetOrange;
+    Bmp_Info sunsetField;
+    Bmp_Info sunsetMountains;
+    Bmp_Info sunsetPurple;
+    Bmp_Info sunrise;
+    Bmp_Info mountainsFuji;
+    Bmp_Info roadClouds;
     
-    bmp_info CheckboxMark;
+    Bmp_Info checkboxMark;
     
-    font_info LiberationMono;
-    font_info LilitaOne;
-    font_info InconsolataBold;
-    
+    Font_Info liberationMono;
+    Font_Info lilitaOne;
+    Font_Info inconsolataBold;
+    Font_Info pfdin;
 };
 
-void InitAssets(assets* Assets);
+void InitAssets(Assets* assets);
 
 #endif

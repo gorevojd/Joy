@@ -8,25 +8,25 @@
 #include "joy_strings.h"
 #include "joy_colors.h"
 
-inline float GetBaseline(font_info* FontInfo, float Scale = 1.0f){
-    float Result = (FontInfo->AscenderHeight + FontInfo->LineGap) * Scale;
+inline float GetBaseline(Font_Info* fontInfo, float scale = 1.0f){
+    float res = (fontInfo->ascenderHeight + fontInfo->lineGap) * scale;
     
-    return(Result);
+    return(res);
 }
 
-inline float GetLineAdvance(font_info* FontInfo, float Scale = 1.0f){
-    float Result = (FontInfo->AscenderHeight + FontInfo->LineGap - FontInfo->DescenderHeight) * Scale;
+inline float GetLineAdvance(Font_Info* fontInfo, float scale = 1.0f){
+    float res = (fontInfo->ascenderHeight + fontInfo->lineGap - fontInfo->descenderHeight) * scale;
     
-    return(Result);
+    return(res);
 }
 
-inline float GetScaledAscender(font_info* FontInfo, float Scale = 1.0f){
-    float Result = FontInfo->AscenderHeight * Scale;
+inline float GetScaledAscender(Font_Info* fontInfo, float scale = 1.0f){
+    float res = fontInfo->ascenderHeight * scale;
     
-    return(Result);
+    return(res);
 }
 
-enum gui_color_type{
+enum GuiColorType{
     GuiColor_Text,
     GuiColor_HotText,
     GuiColor_Borders,
@@ -36,6 +36,8 @@ enum gui_color_type{
     GuiColor_ButtonForeground,
     GuiColor_ButtonForegroundDisabled,
     GuiColor_ButtonForegroundHot,
+    GuiColor_ButtonGrad1,
+    GuiColor_ButtonGrad2,
     
     GuiColor_WindowBackground,
     GuiColor_WindowBorder,
@@ -45,29 +47,29 @@ enum gui_color_type{
     GuiColor_Count,
 };
 
-#define GUI_GETCOLOR(color) Gui->Colors[color]
-#define GUI_GETCOLOR_COLSYS(index) Gui->ColorState.ColorTable[index].Color
+#define GUI_GETCOLOR(color) gui->colors[color]
+#define GUI_GETCOLOR_COLSYS(index) gui->colorState.colorTable[index].color
 #define GUI_COLORHEX(str) ColorFromHex(str)
 
-struct gui_page{
-    char Name[128];
-    u32 ID;
+struct Gui_Page{
+    char name[128];
+    u32 id;
     
-    gui_page* Next;
-    gui_page* Prev;
+    Gui_Page* next;
+    Gui_Page* prev;
 };
 
-struct gui_window{
-    gui_window* NextAlloc;
-    gui_window* PrevAlloc;
+struct Gui_Window{
+    Gui_Window* nextAlloc;
+    Gui_Window* prevAlloc;
     
-    gui_window* Next;
-    gui_window* Prev;
+    Gui_Window* next;
+    Gui_Window* prev;
     
-    rc2 Rect;
+    rc2 rect;
 };
 
-enum gui_window_snap_type{
+enum GuiWindowSnapType{
     GuiWindowSnap_Left,
     GuiWindowSnap_Right,
     GuiWindowSnap_Top,
@@ -75,95 +77,98 @@ enum gui_window_snap_type{
     GuiWindowSnap_Whole,
 };
 
-struct gui_element{
-    char Name[128];
-    u32 ID;
-    u32 Type;
+struct GuiElement{
+    char name[128];
+    u32 id;
+    u32 type;
     
-    gui_element* Next;
-    gui_element* Prev;
+    GuiElement* next;
+    GuiElement* prev;
 };
 
 
-enum gui_advance_type{
+enum GuiAdvanceType{
     GuiAdvanceType_Column,
     GuiAdvanceType_Row,
 };
 
-struct gui_advance_ctx{
-    u32 Type;
-    float RememberValue;
-    float Baseline;
-    float Maximum;
+struct GuiAdvanceCtx{
+    u32 type;
+    float rememberValue;
+    float baseline;
+    float maximum;
+    
+    float maxHorz;
+    float maxVert;
 };
 
-struct gui_layout{
-    v2 Start;
-    v2 At;
+struct Gui_Layout{
+    v2 start;
+    v2 at;
     
-    gui_advance_ctx AdvanceRememberStack[16];
-    int StackCurrentIndex;
+    GuiAdvanceCtx advanceRememberStack[16];
+    int stackCurrentIndex;
 };
 
 #define GUI_TOOLTIP_MAX_SIZE 256
-struct gui_tooltip{
-    char Text[GUI_TOOLTIP_MAX_SIZE];
-    v2 At;
+struct Gui_Tooltip{
+    char text[GUI_TOOLTIP_MAX_SIZE];
+    v2 at;
 };
 
-struct gui_state{
-    font_info* MainFont;
-    float FontScale;
+struct Gui_State{
+    Font_Info* mainFont;
+    float fontScale;
     
-    render_stack* Stack;
-    input* Input;
-    memory_region* Mem;
+    Render_Stack* stack;
+    Input* input;
+    Memory_Region* mem;
     
     
-    gui_layout Layout;
-    gui_layout* CurrentLayout;
-    gui_page RootPage;
-    gui_page* CurrentPage;
+    Gui_Layout layout;
+    Gui_Layout* currentLayout;
+    Gui_Page rootPage;
+    Gui_Page* currentPage;
     
-    gui_window WindowUseSentinel;
-    gui_window WindowFreeSentinel;
-    gui_window WindowSentinel4Returning;
-    gui_window WindowLeafSentinel;
+    Gui_Window windowUseSentinel;
+    Gui_Window windowFreeSentinel;
+    Gui_Window windowSentinel4Returning;
+    Gui_Window windowLeafSentinel;
     
-    gui_window* TempWindow1;
-    gui_window* TempWindow2;
+    Gui_Window* tempWindow1;
+    Gui_Window* tempWindow2;
     
-    int Width;
-    int Height;
+    int width;
+    int height;
     
 #define GUI_MAX_TOOLTIPS 256
-    gui_tooltip Tooltips[GUI_MAX_TOOLTIPS];
-    int TooltipIndex;
+    Gui_Tooltip tooltips[GUI_MAX_TOOLTIPS];
+    int tooltipIndex;
     
-    bmp_info* CheckboxMark;
+    Bmp_Info* checkboxMark;
     
-    color_state ColorState;
-    v4 Colors[GuiColor_Count];
-    float WindowAlpha;
+    Color_State colorState;
+    v4 colors[GuiColor_Count];
+    float windowAlpha;
 };
 
-inline float GuiGetBaseline(gui_state* Gui, float Scale = 1.0f){
-    float Result = GetBaseline(Gui->MainFont, Gui->FontScale * Scale);
+inline float GuiGetBaseline(Gui_State* gui, float scale = 1.0f){
+    float res = GetBaseline(gui->mainFont, gui->fontScale * scale);
     
-    return(Result);
+    return(res);
 }
 
-inline float GuiGetLineAdvance(gui_state* Gui, float Scale = 1.0f){
-    float Result = GetLineAdvance(Gui->MainFont, Gui->FontScale * Scale);
+inline float GuiGetLineAdvance(Gui_State* gui, float scale = 1.0f){
+    float res = GetLineAdvance(gui->mainFont, gui->fontScale * scale);
     
-    return(Result);
+    return(res);
 }
 
 //TODO(Dima): Delete this
-inline gui_layout* GetFirstLayout(gui_state* Gui){
-    gui_layout* Result = &Gui->Layout;
+inline Gui_Layout* GetFirstLayout(Gui_State* gui){
+    Gui_Layout* res = &gui->layout;
     
-    return(Result);
+    return(res);
 }
 
 enum print_text_operation{
@@ -171,43 +176,43 @@ enum print_text_operation{
     PrintTextOp_GetSize,
 };
 
-rc2 PrintTextInternal(font_info* FontInfo, render_stack* Stack, char* Text, v2 P, u32 TextOp, float Scale = 1.0f, v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f));
-v2 GetTextSizeInternal(font_info* FontInfo, char* Text, float Scale);
-rc2 PrintTextCenteredInRectInternal(font_info* FontInfo, render_stack* Stack, char* Text, rc2 Rect, float Scale = 1.0f, v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f));
+rc2 PrintTextInternal(Font_Info* fontInfo, Render_Stack* stack, char* text, v2 P, u32 textOp, float scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
+v2 GetTextSizeInternal(Font_Info* fontInfo, char* text, float scale);
+rc2 PrintTextCenteredInRectInternal(Font_Info* fontInfo, Render_Stack* stack, char* text, rc2 rect, float scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
 
-v2 GetTextSize(gui_state* Gui, char* Text, float Scale = 1.0f);
-rc2 GetTextRect(gui_state* Gui, char* Text, v2 P, float Scale = 1.0f);
-rc2 PrintText(gui_state* Gui, char* Text, v2 P, v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f), float Scale = 1.0f);
-rc2 PrintTextCenteredInRect(gui_state* Gui, char* Text, rc2 Rect, float Scale = 1.0f, v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f));
+v2 GetTextSize(Gui_State* gui, char* Text, float scale = 1.0f);
+rc2 GetTextRect(Gui_State* gui, char* Text, v2 p, float scale = 1.0f);
+rc2 PrintText(Gui_State* gui, char* text, v2 P, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f), float scale = 1.0f);
+rc2 PrintTextCenteredInRect(Gui_State* gui, char* text, rc2 tect, float scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
 
-void GuiUpdateWindows(gui_state* Gui);
+void GuiUpdateWindows(Gui_State* gui);
 
 void InitGui(
-gui_state* Gui, 
-input* Input, 
-assets* Assets, 
-memory_region* Mem, 
-render_stack* Stack,
-int Width,
-int Height);
-void GuiBeginLayout(gui_state* Gui, gui_layout* Layout);
-void GuiEndLayout(gui_state* Gui, gui_layout* Layout);
+Gui_State* gui, 
+Input* input, 
+Assets* assets, 
+Memory_Region* mem, 
+Render_Stack* stack,
+int width,
+int height);
+void GuiBeginLayout(Gui_State* gui, Gui_Layout* layout);
+void GuiEndLayout(Gui_State* gui, Gui_Layout* layout);
 
-void GuiBeginPage(gui_state* Gui, char* Name);
-void GuiEndPage(gui_state* Gui);
+void GuiBeginPage(Gui_State* gui, char* name);
+void GuiEndPage(Gui_State* gui);
 
-void GuiBeginRow(gui_state* Gui);
-void GuiEndRow(gui_state* Gui);
-void GuiBeginColumn(gui_state* Gui);
-void GuiEndColumn(gui_state* Gui);
+void GuiBeginRow(Gui_State* gui);
+void GuiEndRow(Gui_State* gui);
+void GuiBeginColumn(Gui_State* gui);
+void GuiEndColumn(Gui_State* gui);
 
-void GuiPreRender(gui_state* Gui);
+void GuiPreRender(Gui_State* gui);
 
-void GuiTooltip(gui_state* Gui, char* TooltipText, v2 At);
-void GuiText(gui_state* Gui, char* Text);
-b32 GuiButton(gui_state* Gui, char* ButtonName);
-void GuiBoolButton(gui_state* Gui, char* ButtonName, b32* Value);
-void GuiBoolButtonOnOff(gui_state* Gui, char* ButtonName, b32* Value);
-void GuiCheckbox(gui_state* Gui, char* Name, b32* Value);
+void GuiTooltip(Gui_State* gui, char* tooltipText, v2 at);
+void GuiText(Gui_State* gui, char* text);
+b32 GuiButton(Gui_State* gui, char* buttonName);
+void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value);
+void GuiBoolButtonOnOff(Gui_State* gui, char* buttonName, b32* value);
+void GuiCheckbox(Gui_State* gui, char* name, b32* value);
 
 #endif

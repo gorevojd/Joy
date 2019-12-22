@@ -22,10 +22,18 @@ typedef signed long long i64;
 typedef float f32;
 typedef double f64;
 
+typedef size_t mi;
+typedef intptr_t imi;
+typedef uintptr_t umi;
+
 inline int SafeTruncateToInt(float Value){
     int Result = (int)(Value + 0.5f);
     
     return(Result);
+}
+
+inline void ToggleBool(b32* Value){
+    *Value = !*Value;
 }
 
 #endif

@@ -4,7 +4,7 @@
 #include "joy_types.h"
 #include "joy_math.h"
 
-enum key_type{
+enum KeyType{
     KeyMouse_Left,
     KeyMouse_Right,
     KeyMouse_Middle,
@@ -114,87 +114,87 @@ enum key_type{
 
 #define MOUSE_KEY_COUNT (Key_Count - MouseKey_Left)
 
-struct key_state{
-    b32 EndedDown;
-    b32 TransitionHappened;
+struct KeyState{
+    b32 endedDown;
+    b32 transitionHappened;
 };
 
-struct input{
-    key_state KeyStates[Key_Count];
+struct Input{
+    KeyState keyStates[Key_Count];
     
     //NOTE(Dima): In window coords top-left
-    v2 LastMouseP;
-    v2 MouseP;
+    v2 lastMouseP;
+    v2 mouseP;
 };
 
-inline b32 KeyIsDown(input* Input, u32 KeyType){
-    b32 Result = Input->KeyStates[KeyType].EndedDown;
+inline b32 KeyIsDown(Input* input, u32 keyType){
+    b32 res = input->keyStates[keyType].endedDown;
     
-    return(Result);
+    return(res);
 }
 
-inline b32 KeyWentDown(input* Input, u32 KeyType){
-    key_state* Key = &Input->KeyStates[KeyType];
+inline b32 KeyWentDown(Input* input, u32 keyType){
+    KeyState* Key = &input->keyStates[keyType];
     
-    b32 Result = Key->EndedDown && Key->TransitionHappened;
+    b32 res = Key->endedDown && Key->transitionHappened;
     
-    return(Result);
+    return(res);
 }
 
-inline b32 KeyWentUp(input* Input, u32 KeyType){
-    key_state* Key = &Input->KeyStates[KeyType];
+inline b32 KeyWentUp(Input* input, u32 keyType){
+    KeyState* Key = &input->keyStates[keyType];
     
-    b32 Result = !Key->EndedDown && Key->TransitionHappened;
+    b32 res = !Key->endedDown && Key->transitionHappened;
     
-    return(Result);
+    return(res);
 }
 
-inline b32 MouseInRect(input* Input, rc2 Rect) {
-	b32 Result = 0;
+inline b32 MouseInRect(Input* input, rc2 rect) {
+	b32 res = 0;
     
-	Result =
-		(Input->MouseP.x >= Rect.Min.x) &&
-		(Input->MouseP.y >= Rect.Min.y) &&
-		(Input->MouseP.x <= Rect.Max.x) &&
-		(Input->MouseP.y <= Rect.Max.y);
+	res =
+		(input->mouseP.x >= rect.min.x) &&
+		(input->mouseP.y >= rect.min.y) &&
+		(input->mouseP.x <= rect.max.x) &&
+		(input->mouseP.y <= rect.max.y);
     
-	return(Result);
+	return(res);
 }
 
-inline b32 MouseInRect(input* Input, v2 P, v2 Dim) {
-	b32 Result = 0;
+inline b32 MouseInRect(Input* input, v2 P, v2 Dim) {
+	b32 res = 0;
     
-	rc2 Rect;
-	Rect.Min = P;
-	Rect.Max = P + Dim;
+	rc2 rect;
+	rect.min = P;
+	rect.max = P + Dim;
     
-    Result = MouseInRect(Input, Rect);
+    res = MouseInRect(input, rect);
     
-    return(Result);
+    return(res);
 }
 
-inline b32 MouseLeftWentDownInRect(input* Input, rc2 Rect) {
-	b32 Result = 0;
+inline b32 MouseLeftWentDownInRect(Input* input, rc2 rect) {
+	b32 res = 0;
     
-	if (MouseInRect(Input, Rect)) {
-		if (KeyWentDown(Input, MouseKey_Left)) {
-			Result = 1;
+	if (MouseInRect(input, rect)) {
+		if (KeyWentDown(input, MouseKey_Left)) {
+			res = 1;
 		}
 	}
     
-	return(Result);
+	return(res);
 }
 
-inline b32 MouseRightWentDownInRect(input* Input, rc2 Rect) {
-	b32 Result = 0;
+inline b32 MouseRightWentDownInRect(Input* input, rc2 rect) {
+	b32 res = 0;
     
-	if (MouseInRect(Input, Rect)) {
-		if (KeyWentDown(Input, MouseKey_Right)) {
-			Result = 1;
+	if (MouseInRect(input, rect)) {
+		if (KeyWentDown(input, MouseKey_Right)) {
+			res = 1;
 		}
 	}
     
-	return(Result);
+	return(res);
 }
 
 

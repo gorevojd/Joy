@@ -6,7 +6,7 @@
 #include "joy_math.h"
 #include "joy_asset_types.h"
 
-enum render_entry_type{
+enum RenderEntryType{
     RenderEntry_ClearColor,
     RenderEntry_Bitmap,
     RenderEntry_Rect,
@@ -15,182 +15,206 @@ enum render_entry_type{
     RenderEntry_Gradient,
 };
 
-struct render_entry_header{
-    u32 Type;
-    u32 DataSize;
+struct Render_Entry_Header{
+    u32 type;
+    u32 dataSize;
 };
 
-#define RENDER_GET_ENTRY(type) type* Entry = (type*)At
-struct render_stack{
-    memory_region Data;
+#define RENDER_GET_ENTRY(type) type* entry = (type*)at
+struct Render_Stack{
+    void* mem;
+    mi memUsed;
+    mi memSize;
     
-    int EntryCount;
+    int entryCount;
 };
 
-inline render_stack InitRenderStack(memory_region* Stack, size_t StackByteSize){
-    render_stack Result = {};
+inline Render_Stack InitRenderStack(void* mem4stack, mi size){
+    Render_Stack result = {};
     
-    Result.Data = SplitMemoryRegion(Stack, StackByteSize);
-    Result.EntryCount = 0;
+    result.mem = mem4stack;
+    result.memUsed = 0;
+    result.memSize = size;
+    result.entryCount = 0;
     
-    return(Result);
+    return(result);
 }
 
-inline void RenderStackBeginFrame(render_stack* Stack){
-    Stack->Data.Used = 0;
-    Stack->EntryCount = 0;
+inline void RenderStackBeginFrame(Render_Stack* stack){
+    stack->memUsed = 0;
+    stack->entryCount = 0;
 }
 
 #define RENDER_ENTRY_MEMORY_ALIGN 4
 #pragma pack(push, RENDER_ENTRY_MEMORY_ALIGN)
-struct render_entry_clear_color{
-    v3 ClearColor01;
+struct RenderEntryClearColor{
+    v3 clearColor01;
 };
 
-struct render_entry_bitmap{
-    bmp_info* Bitmap;
-    v2 TopLeftP;
-    float PixelHeight;
-    v4 ModulationColor01;
+struct RenderEntryBitmap{
+    Bmp_Info* bitmap;
+    v2 topLeftP;
+    float pixelHeight;
+    v4 modulationColor01;
 };
 
-enum render_entry_gradient_type{
+enum RenderEntryGradientType{
     RenderEntryGradient_Horizontal,
     RenderEntryGradient_Vertical,
 };
 
-struct render_entry_gradient{
-    rc2 Rc;
-    v3 Color1;
-    v3 Color2;
-    u32 GradientType;
+struct RenderEntryGradient{
+    rc2 rc;
+    v3 color1;
+    v3 color2;
+    u32 gradType;
 };
 
-struct render_entry_rect{
-    v4 ModulationColor01;
-    v2 P;
-    v2 Dim;
+struct RenderEntryRect{
+    v4 modulationColor01;
+    v2 p;
+    v2 dim;
 };
 
-struct render_entry_glyph{
+struct RenderEntryGlyph{
     
 };
 
-struct render_entry_mesh{
+struct RenderEntryMesh{
     
 };
 #pragma pack(pop)
 
-inline void* RenderPushEntryToStack(render_stack* Stack, u32 SizeOfType, u32 TypeEnum) {
-	render_entry_header* Header =
-		(render_entry_header*)PushSomeMem(&Stack->Data, sizeof(render_entry_header) + SizeOfType, RENDER_ENTRY_MEMORY_ALIGN);
+inline void* RenderPushMem(Render_Stack* stack, mi size, mi align = 8){
+    mi beforeAlign = (mi)stack->mem + stack->memUsed;
+    mi alignedPos = (beforeAlign + align - 1) & (~(align - 1));
+    mi advancedByAlign = alignedPos - beforeAlign;
     
-	Stack->EntryCount++;
+    mi toAllocateSize = advancedByAlign + size;
+    mi newUsedCount = stack->memUsed + toAllocateSize;
     
-	Header->Type = TypeEnum;
-	Header->DataSize = SizeOfType;
+    void* result = 0;
     
-    void* EntryData = (void*)(Header + 1);
+    Assert(newUsedCount <= stack->memSize);
     
-	return(EntryData);
+    result = (void*)alignedPos;
+    stack->memUsed= newUsedCount;
+    
+    return(result);
+    
+}
+
+
+inline void* RenderPushEntryToStack(Render_Stack* stack, u32 sizeOfType, u32 typeEnum) {
+	Render_Entry_Header* header =
+		(Render_Entry_Header*)RenderPushMem(stack, sizeof(Render_Entry_Header) + sizeOfType, RENDER_ENTRY_MEMORY_ALIGN);
+    
+	stack->entryCount++;
+    
+	header->type = typeEnum;
+	header->dataSize = sizeOfType;
+    
+    void* entryData = (void*)(header + 1);
+    
+	return(entryData);
 }
 
 #define PUSH_RENDER_ENTRY(stack, type_enum, type) (type*)RenderPushEntryToStack(stack, sizeof(type), type_enum)
 
-inline void PushClearColor(render_stack* Stack, v3 Color){
-    render_entry_clear_color* Entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_ClearColor, render_entry_clear_color);;
+inline void PushClearColor(Render_Stack* stack, v3 color){
+    RenderEntryClearColor* entry = PUSH_RENDER_ENTRY(stack, RenderEntry_ClearColor, RenderEntryClearColor);;
     
-    Entry->ClearColor01 = Color;
+    entry->clearColor01 = color;
 }
 
-inline void PushBitmap(render_stack* Stack, bmp_info* Bitmap, v2 P, float Height, v4 MultColor){
-    render_entry_bitmap* Entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Bitmap, render_entry_bitmap);
+inline void PushBitmap(Render_Stack* stack, Bmp_Info* bitmap, v2 p, float height, v4 multColor){
+    RenderEntryBitmap* entry = PUSH_RENDER_ENTRY(stack, RenderEntry_Bitmap, RenderEntryBitmap);
     
-    Entry->Bitmap = Bitmap;
-    Entry->TopLeftP = P;
-    Entry->PixelHeight = Height;
-    Entry->ModulationColor01 = MultColor;
+    entry->bitmap = bitmap;
+    entry->topLeftP = p;
+    entry->pixelHeight = height;
+    entry->modulationColor01 = multColor;
 }
 
-inline void PushGradient(render_stack* Stack, 
-                         rc2 Rc, 
-                         v3 Color1, 
-                         v3 Color2, 
-                         u32 GradientType)
+inline void PushGradient(Render_Stack* stack, 
+                         rc2 rc, 
+                         v3 color1, 
+                         v3 color2, 
+                         u32 gradType)
 {
-    render_entry_gradient* Entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Gradient, render_entry_gradient);
+    RenderEntryGradient* entry = PUSH_RENDER_ENTRY(stack, RenderEntry_Gradient, RenderEntryGradient);
     
-    Entry->Rc = Rc;
-    Entry->Color1 = Color1;
-    Entry->Color2 = Color2;
-    Entry->GradientType = GradientType;
+    entry->rc = rc;
+    entry->color1 = color1;
+    entry->color2 = color2;
+    entry->gradType = gradType;
 }
 
-inline void PushGradient(render_stack* Stack, 
-                         rc2 Rc, 
-                         v4 Color1, 
-                         v4 Color2, 
-                         u32 GradientType)
+inline void PushGradient(Render_Stack* stack, 
+                         rc2 rc, 
+                         v4 color1, 
+                         v4 color2, 
+                         u32 gradType)
 {
-    render_entry_gradient* Entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Gradient, render_entry_gradient);
+    RenderEntryGradient* entry = PUSH_RENDER_ENTRY(stack, RenderEntry_Gradient, RenderEntryGradient);
     
-    Entry->Rc = Rc;
-    Entry->Color1 = Color1.rgb;
-    Entry->Color2 = Color2.rgb;
-    Entry->GradientType = GradientType;
+    entry->rc = rc;
+    entry->color1 = color1.rgb;
+    entry->color2 = color2.rgb;
+    entry->gradType = gradType;
 }
 
 inline void PushRect(
-render_stack* Stack, 
-rc2 Rect, 
-v4 MultColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
+Render_Stack* stack, 
+rc2 rect, 
+v4 multColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
-    render_entry_rect* Entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Rect, render_entry_rect);
+    RenderEntryRect* entry = PUSH_RENDER_ENTRY(stack, RenderEntry_Rect, RenderEntryRect);
     
-    Rect = RectNormalizeSubpixel(Rect);
+    rect = RectNormalizeSubpixel(rect);
     
-	Entry->P = Rect.Min;
-	Entry->Dim = GetRectDim(Rect);
-	Entry->ModulationColor01 = MultColor;
+	entry->p = rect.min;
+	entry->dim = GetRectDim(rect);
+	entry->modulationColor01 = multColor;
 }
 
-inline void PushRect(render_stack* Stack, 
-                     v2 P, v2 Dim,
-                     v4 MultColor = V4(1.0f, 1.0f, 1.0f, 1.0f)) 
+inline void PushRect(Render_Stack* stack, 
+                     v2 p, v2 dim,
+                     v4 multColor = V4(1.0f, 1.0f, 1.0f, 1.0f)) 
 {
-    rc2 Rect = RcMinDim(P, Dim);
+    rc2 rect = RcMinDim(p, dim);
     
-    PushRect(Stack, Rect, MultColor);
+    PushRect(stack, rect, multColor);
 }
 
-inline void PushRectOutline(render_stack* Stack, v2 P, v2 Dim, int PixelWidth, v4 MultColor = V4(0.0f, 0.0f, 0.0f, 1.0f)) {
-	v2 WidthQuad = V2(PixelWidth, PixelWidth);
-	PushRect(Stack, V2(P.x - PixelWidth, P.y - PixelWidth), V2(Dim.x + 2.0f * PixelWidth, PixelWidth), MultColor);
-	PushRect(Stack, V2(P.x - PixelWidth, P.y), V2(PixelWidth, Dim.y + PixelWidth), MultColor);
-	PushRect(Stack, V2(P.x, P.y + Dim.y), V2(Dim.x + PixelWidth, PixelWidth), MultColor);
-	PushRect(Stack, V2(P.x + Dim.x, P.y), V2(PixelWidth, Dim.y), MultColor);
+inline void PushRectOutline(Render_Stack* stack, v2 p, v2 dim, int pixelWidth, v4 multColor = V4(0.0f, 0.0f, 0.0f, 1.0f)) {
+	v2 widthQuad = V2(pixelWidth, pixelWidth);
+	PushRect(stack, V2(p.x - pixelWidth, p.y - pixelWidth), V2(dim.x + 2.0f * pixelWidth, pixelWidth), multColor);
+	PushRect(stack, V2(p.x - pixelWidth, p.y), V2(pixelWidth, dim.y + pixelWidth), multColor);
+	PushRect(stack, V2(p.x, p.y + dim.y), V2(dim.x + pixelWidth, pixelWidth), multColor);
+	PushRect(stack, V2(p.x + dim.x, p.y), V2(pixelWidth, dim.y), multColor);
 }
 
 
-inline void PushRectOutline(render_stack* Stack, rc2 Rect, int PixelWidth, v4 MultColor = V4(0.0f, 0.0f, 0.0f, 1.0f)) {
-    v2 P = Rect.Min;
-    v2 Dim = GetRectDim(Rect);
+inline void PushRectOutline(Render_Stack* stack, rc2 rect, int pixelWidth, v4 multColor = V4(0.0f, 0.0f, 0.0f, 1.0f)) {
+    v2 p = rect.min;
+    v2 dim = GetRectDim(rect);
     
-	v2 WidthQuad = V2(PixelWidth, PixelWidth);
-	PushRect(Stack, V2(P.x - PixelWidth, P.y - PixelWidth), V2(Dim.x + 2.0f * PixelWidth, PixelWidth), MultColor);
-	PushRect(Stack, V2(P.x - PixelWidth, P.y), V2(PixelWidth, Dim.y + PixelWidth), MultColor);
-	PushRect(Stack, V2(P.x, P.y + Dim.y), V2(Dim.x + PixelWidth, PixelWidth), MultColor);
-	PushRect(Stack, V2(P.x + Dim.x, P.y), V2(PixelWidth, Dim.y), MultColor);
+	v2 widthQuad = V2(pixelWidth, pixelWidth);
+	PushRect(stack, V2(p.x - pixelWidth, p.y - pixelWidth), V2(dim.x + 2.0f * pixelWidth, pixelWidth), multColor);
+	PushRect(stack, V2(p.x - pixelWidth, p.y), V2(pixelWidth, dim.y + pixelWidth), multColor);
+	PushRect(stack, V2(p.x, p.y + dim.y), V2(dim.x + pixelWidth, pixelWidth), multColor);
+	PushRect(stack, V2(p.x + dim.x, p.y), V2(pixelWidth, dim.y), multColor);
 }
 
-inline void PushRectInnerOutline(render_stack* Stack, rc2 Rect, int PixelWidth, v4 Color = V4(0.0f, 0.0f, 0.0f, 1.0f)) {
-	v2 Dim = GetRectDim(Rect);
-	v2 P = Rect.Min;
+inline void PushRectInnerOutline(Render_Stack* stack, rc2 rect, int pixelWidth, v4 color = V4(0.0f, 0.0f, 0.0f, 1.0f)) {
+	v2 dim = GetRectDim(rect);
+	v2 p = rect.min;
     
-	PushRect(Stack, V2(P.x, P.y), V2(Dim.x, PixelWidth), Color);
-	PushRect(Stack, V2(P.x, P.y + PixelWidth), V2(PixelWidth, Dim.y - PixelWidth), Color);
-	PushRect(Stack, V2(P.x + PixelWidth, P.y + Dim.y - PixelWidth), V2(Dim.x - PixelWidth, PixelWidth), Color);
-	PushRect(Stack, V2(P.x + Dim.x - PixelWidth, P.y + PixelWidth), V2(PixelWidth, Dim.y - 2 * PixelWidth), Color);
+	PushRect(stack, V2(p.x, p.y), V2(dim.x, pixelWidth), color);
+	PushRect(stack, V2(p.x, p.y + pixelWidth), V2(pixelWidth, dim.y - pixelWidth), color);
+	PushRect(stack, V2(p.x + pixelWidth, p.y + dim.y - pixelWidth), V2(dim.x - pixelWidth, pixelWidth), color);
+	PushRect(stack, V2(p.x + dim.x - pixelWidth, p.y + pixelWidth), V2(pixelWidth, dim.y - 2 * pixelWidth), color);
 }
 
 
