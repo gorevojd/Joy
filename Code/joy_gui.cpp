@@ -47,6 +47,62 @@ inline void GuiDeallocateWindow(Gui_State* gui, Gui_Window* todo){
     todo->prevAlloc->nextAlloc = todo;
 }
 
+INTERNAL_FUNCTION Gui_Element* GuiAllocateElement(
+Gui_State* gui, 
+Memory_Region* mem)
+{
+    Gui_Element* result = 0;
+    
+    if(gui->freeSentinel.nextAlloc != &gui->freeSentinel){
+        
+    }
+    else{
+        const int count = 128;
+        Gui_Element* elemPoolArray = PushArray(mem, Gui_Element, count);
+        
+        for(int index = 0; 
+            index < count;
+            index++)
+        {
+            Gui_Element* elem = elemPoolArray + index;
+            
+            elem->prevAlloc = gui->freeSentinel.prevAlloc;
+            elem->nextAlloc = &gui->freeSentinel;
+            
+            elem->prevAlloc->nextAlloc = elem;
+            elem->nextAlloc->prevAlloc = elem;
+        }
+    }
+    
+    result = gui->freeSentinel.nextAlloc;
+    
+    // NOTE(Dima): Deallocating from free list
+    result->nextAlloc->prevAlloc = result->prevAlloc;
+    result->prevAlloc->nextAlloc = result->nextAlloc;
+    
+    // NOTE(Dima): Allocating in use list
+    result->nextAlloc = &gui->useSentinel;
+    result->prevAlloc = gui->useSentinel.prevAlloc;
+    
+    result->nextAlloc->prevAlloc = result;
+    result->prevAlloc->nextAlloc = result;
+    
+    return(result);
+}
+
+INTERNAL_FUNCTION void GuiFreeElement(Gui_State* gui,
+                                      Gui_Element* elem)
+{
+    elem->nextAlloc->prevAlloc = elem->prevAlloc;
+    elem->prevAlloc->nextAlloc = elem->nextAlloc;
+    
+    elem->nextAlloc = gui->freeSentinel.nextAlloc;
+    elem->prevAlloc = &gui->freeSentinel;
+    
+    elem->nextAlloc->prevAlloc = elem;
+    elem->prevAlloc->nextAlloc = elem;
+}
+
 // NOTE(Dima): This function allocates as much windows as we need and 
 // NOTE(Dima): then adds them to return list. It returns first element
 // NOTE(Dima): of that list
@@ -179,6 +235,13 @@ int height)
     gui->tempWindow1 = GuiAllocateWindow(gui);
     gui->tempWindow1->rect = RcMinDim(V2(10, 10), V2(1000, 600));
     GuiAddWindowToList(gui->tempWindow1, &gui->windowLeafSentinel);
+    
+    // NOTE(Dima): Initializing elements sentinel
+    gui->freeSentinel.nextAlloc = &gui->freeSentinel;
+    gui->freeSentinel.prevAlloc = &gui->freeSentinel;
+    
+    gui->useSentinel.nextAlloc = &gui->useSentinel;
+    gui->useSentinel.prevAlloc = &gui->useSentinel;
     
     // NOTE(Dima): Initializing colors
     InitColorsState(&gui->colorState, mem);

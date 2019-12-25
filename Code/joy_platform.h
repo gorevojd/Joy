@@ -85,7 +85,7 @@ PLATFORM_WRITE_FILE(PlatformWriteFile);
 typedef PLATFORM_FREE_FILE_MEMORY(Platform_Free_File_Memory);
 PLATFORM_FREE_FILE_MEMORY(PlatformFreeFileMemory);
 
-enum Platform_error_type{
+enum Platform_Error_Type{
     PlatformError_Error,
     PlatformError_Warning,
     PlatformError_Information,

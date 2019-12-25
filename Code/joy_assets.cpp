@@ -16,6 +16,12 @@ void InitAssets(Assets* assets){
     
     assets->liberationMono = LoadFont("../Data/Fonts/LiberationMono-Regular.ttf", 16.0f, LoadFont_BakeShadow);
     assets->lilitaOne = LoadFont("../Data/Fonts/LilitaOne.ttf", 20.0f, LoadFont_BakeShadow);
-    assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 16.0f, LoadFont_BakeBlur);
+    
+#if 1
+    assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, LoadFont_BakeBlur);
+#else
+    assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 16.0f, 0);
+#endif
+    
     assets->pfdin = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 16.0f, 0);
 }

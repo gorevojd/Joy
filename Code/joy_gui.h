@@ -77,15 +77,6 @@ enum GuiWindowSnapType{
     GuiWindowSnap_Whole,
 };
 
-struct GuiElement{
-    char name[128];
-    u32 id;
-    u32 type;
-    
-    GuiElement* next;
-    GuiElement* prev;
-};
-
 
 enum GuiAdvanceType{
     GuiAdvanceType_Column,
@@ -116,6 +107,18 @@ struct Gui_Tooltip{
     v2 at;
 };
 
+struct Gui_Element{
+    char name[64];
+    
+    u32 id;
+    
+    Gui_Element* mext;
+    Gui_Element* prev;
+    
+    Gui_Element* nextAlloc;
+    Gui_Element* prevAlloc;
+};
+
 struct Gui_State{
     Font_Info* mainFont;
     float fontScale;
@@ -123,7 +126,6 @@ struct Gui_State{
     Render_Stack* stack;
     Input* input;
     Memory_Region* mem;
-    
     
     Gui_Layout layout;
     Gui_Layout* currentLayout;
@@ -137,6 +139,9 @@ struct Gui_State{
     
     Gui_Window* tempWindow1;
     Gui_Window* tempWindow2;
+    
+    Gui_Element freeSentinel;
+    Gui_Element useSentinel;
     
     int width;
     int height;

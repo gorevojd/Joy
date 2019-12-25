@@ -1,8 +1,11 @@
 #include "win32_joy.h"
+#include "joy_dirx.h"
+#include <dsound.h>
 
 #define STB_SPRINTF_STATIC
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
+
 
 /*
 TODO(Dima):
@@ -21,6 +24,8 @@ GLOBAL_VARIABLE Input gInput;
 GLOBAL_VARIABLE Assets gAssets;
 GLOBAL_VARIABLE Gui_State gGui;
 GLOBAL_VARIABLE Gl_State gGL;
+GLOBAL_VARIABLE DirX_State gDirX;
+GLOBAL_VARIABLE DSound_State gDSound;
 
 Platform platform;
 
@@ -1361,6 +1366,11 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     // NOTE(Dima): Initializing engine systems
     GlInit(&gGL);
     InitAssets(&gAssets);
+    DirXInit(&gDirX, 
+             win32.window, 
+             win32.windowWidth,
+             win32.windowHeight);
+    DSoundInit(&gDSound, win32.window);
     
     mi renderMemSize = Megabytes(2);
     void* renderMem = PushSomeMem(&gMem, renderMemSize);
@@ -1545,14 +1555,18 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         deltaTime = (float)clocksElapsed * win32.oneOverPerformanceFreq;
         time += deltaTime;
         
+        //gDirX.devCtx->ClearRenderTargetView(gDirX.backBuffer, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
+        
+        //gDirX.swapChain->Present(0, 0);
+        
         SwapBuffers(glDC);
     }
-    
-    
     
     //NOTE(dima): Cleanup
     GlFree(&gGL);
     
+    DSoundFree(&gDSound);
+    DirXFree(&gDirX);
     FreePlatformAPI(&platform);
     Win32FreeOpenGL(win32.renderCtx);
     ReleaseDC(win32.window, glDC);

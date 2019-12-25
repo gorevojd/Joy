@@ -131,6 +131,9 @@ WGLFUN(wglGetExtensionStringEXT);
 WGLFUN(wglGetSwapIntervalEXT);
 WGLFUN(wglSwapIntervalEXT);
 
+// NOTE(Dima): This is defined here for joy_dirx files.
+PLATFORM_SHOW_ERROR(Win32ShowError);
+
 struct Win_Memory_Region{
     // NOTE(Dima): Size of memory that we can actually use
     mi size;
