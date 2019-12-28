@@ -2,6 +2,8 @@
 #define JOY_DEFINES_H
 
 #define Assert(cond) if(!(cond)){ *((int*)0) = 0;}
+#define ASSERT(cond) if(!(cond)){ *((int*)0) = 0;}
+
 #define ArrayCount(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define InvalidCodePath Assert(!"Invalid code path!");
 

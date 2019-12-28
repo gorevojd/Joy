@@ -107,16 +107,39 @@ struct Gui_Tooltip{
     v2 at;
 };
 
+enum Gui_Element_Type{
+    GuiElement_None,
+    GuiElement_Root,
+    GuiElement_ChildrenSentinel,
+    GuiElement_TreeNode,
+    GuiElement_TreeLink,
+    GuiElement_Item,
+    GuiElement_RowColumn,
+};
+
 struct Gui_Element{
     char name[64];
     
-    u32 id;
+    union{
+        struct {
+            b32 opened;
+        } treeNode;
+    }data;
     
-    Gui_Element* mext;
+    Gui_Element* parentInTree;
+    
+    u32 id;
+    u32 type;
+    
+    Gui_Element* next;
     Gui_Element* prev;
     
     Gui_Element* nextAlloc;
     Gui_Element* prevAlloc;
+    
+    Gui_Element* parent;
+    Gui_Element* childSentinel;
+    int childCount;
 };
 
 struct Gui_State{
@@ -142,6 +165,12 @@ struct Gui_State{
     
     Gui_Element freeSentinel;
     Gui_Element useSentinel;
+    
+    Gui_Element* rootElement;
+    Gui_Element* curElement;
+    
+    Gui_Element* rootTree;
+    Gui_Element* curTree;
     
     int width;
     int height;
@@ -219,5 +248,8 @@ b32 GuiButton(Gui_State* gui, char* buttonName);
 void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value);
 void GuiBoolButtonOnOff(Gui_State* gui, char* buttonName, b32* value);
 void GuiCheckbox(Gui_State* gui, char* name, b32* value);
+
+void GuiBeginTree(Gui_State* gui, char* name);
+void GuiEndTree(Gui_State* gui);
 
 #endif

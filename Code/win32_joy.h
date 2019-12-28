@@ -6,6 +6,7 @@
 #include <io.h>
 #include <fcntl.h>
 #include <Windows.h>
+#include <dsound.h>
 
 #include "joy_types.h"
 #include "joy_math.h"
@@ -18,10 +19,15 @@
 #include "joy_platform.h"
 #include "joy_gui.h"
 
+#define JOY_USE_OPENGL 1
+#define JOY_USE_DIRECTX 0
+
+#if JOY_USE_OPENGL
 #define JOY_OPENGL_DEFS_DECLARATION
 #include "joy_opengl_defs.h"
 
 #include "joy_opengl.h"
+#endif
 
 #ifndef WGL_ARB_multisample
 #define WGL_ARB_multisample 1
@@ -133,6 +139,25 @@ WGLFUN(wglSwapIntervalEXT);
 
 // NOTE(Dima): This is defined here for joy_dirx files.
 PLATFORM_SHOW_ERROR(Win32ShowError);
+PLATFORM_DEBUG_OUTPUT_STRING(Win32DebugOutputString);
+
+struct DSound_State{
+    b32 secondaryBufferCreated;
+    b32 captureBufferCreated;
+    
+    WAVEFORMATEX waveFormat;
+    
+    // NOTE(Dima): DirectSound stuff
+    LPDIRECTSOUND8 dSound;
+    LPDIRECTSOUNDBUFFER primBuf;
+    LPDIRECTSOUNDBUFFER secBuf;
+    DSBUFFERDESC secBufDesc;
+    
+    // NOTE(Dima): DirectSoundCapture stuff
+    LPDIRECTSOUNDCAPTURE8 dCapture;
+    LPDIRECTSOUNDCAPTUREBUFFER dCaptureBuf;
+    DSCBUFFERDESC dCaptureDesc;
+};
 
 struct Win_Memory_Region{
     // NOTE(Dima): Size of memory that we can actually use

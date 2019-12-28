@@ -81,6 +81,7 @@ enum ColorTableType {
 	Color_Burlywood,
 	Color_DarkGoldenrod,
 	Color_OliveDrab,
+    Color_ToxicGreen,
     
     Color_Thistle,
     Color_Plum,

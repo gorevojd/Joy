@@ -1,11 +1,14 @@
 #include "win32_joy.h"
+
+#if JOY_USE_DIRECTX
 #include "joy_dirx.h"
+#endif
+
 #include <dsound.h>
 
 #define STB_SPRINTF_STATIC
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
-
 
 /*
 TODO(Dima):
@@ -23,11 +26,167 @@ GLOBAL_VARIABLE b32 gRunning;
 GLOBAL_VARIABLE Input gInput;
 GLOBAL_VARIABLE Assets gAssets;
 GLOBAL_VARIABLE Gui_State gGui;
-GLOBAL_VARIABLE Gl_State gGL;
-GLOBAL_VARIABLE DirX_State gDirX;
 GLOBAL_VARIABLE DSound_State gDSound;
+#if JOY_USE_OPENGL
+GLOBAL_VARIABLE Gl_State gGL;
+#endif
+#if JOY_USE_DIRECTX
+GLOBAL_VARIABLE DirX_State gDirX;
+#endif
 
 Platform platform;
+
+
+BOOL CALLBACK DirectSoundEnumerateCallback( 
+LPGUID lpGuid, 
+LPCSTR lpcstrDescription, 
+LPCSTR lpcstrModule, 
+LPVOID lpContext )
+{
+    Win32DebugOutputString((char*)lpcstrDescription);
+    
+    return(TRUE);
+}
+
+
+/*
+Note that Direct Sound does use two different kinds of buffers which are primary and secondary
+ buffers. The primary buffer is the main sound memory buffer on your default sound card, USB
+ headset, and so forth. Secondary buffers are buffers you create in memory and load your sounds
+ into. When you play a secondary buffer the Direct Sound API takes care of mixing that sound
+ into the primary buffer which then plays the sound. If you play multiple secondary buffers at
+ the same time it will mix them together and play them in the primary buffer. Also note that all
+ buffers are circular so you can set them to repeat indefinitely.
+*/
+void DSoundInit(DSound_State* dsState, HWND hwnd){
+    dsState->secondaryBufferCreated = 0;
+    dsState->captureBufferCreated = 0;
+    
+    //DirectSoundCaptureEnumerate((LPDSENUMCALLBACK)DirectSoundEnumerateCallback, 0);
+    //DirectSoundEnumerate((LPDSENUMCALLBACK)DirectSoundEnumerateCallback, 0);
+    
+    WAVEFORMATEX* pwf = &dsState->waveFormat;
+    pwf->wFormatTag = WAVE_FORMAT_PCM;
+    pwf->nSamplesPerSec = 44100;
+    pwf->wBitsPerSample = 16;
+    pwf->nChannels = 2;
+    pwf->nBlockAlign = (pwf->wBitsPerSample / 8) * pwf->nChannels;
+    pwf->nAvgBytesPerSec = pwf->nSamplesPerSec * pwf->nBlockAlign;
+    pwf->cbSize = 0;
+    
+    if(SUCCEEDED(DirectSoundCreate8(0, &dsState->dSound, 0))){
+        // NOTE(Dima): Setting cooperative level
+        if(SUCCEEDED(dsState->dSound->SetCooperativeLevel(hwnd, DSSCL_PRIORITY))){
+            DSBUFFERDESC primBufDesc;
+            primBufDesc.dwSize = sizeof(DSBUFFERDESC);
+            primBufDesc.dwFlags = DSBCAPS_PRIMARYBUFFER | DSBCAPS_CTRLVOLUME;
+            primBufDesc.dwBufferBytes = 0;
+            primBufDesc.lpwfxFormat = 0;
+            primBufDesc.guid3DAlgorithm = GUID_NULL;
+            primBufDesc.dwReserved = 0;
+            
+            // NOTE(Dima): Creating primary buffer
+            HRESULT primBufRes = dsState->dSound->CreateSoundBuffer(
+                &primBufDesc, 
+                &dsState->primBuf, 
+                0);
+            
+            
+            if(SUCCEEDED(primBufRes)){
+                // NOTE(Dima): setting wave format
+                if(SUCCEEDED(dsState->primBuf->SetFormat(pwf))){
+                    DSBUFFERDESC secBufDesc = {};
+                    secBufDesc.dwSize = sizeof(DSBUFFERDESC);
+                    secBufDesc.dwFlags = DSBCAPS_GETCURRENTPOSITION2;
+                    secBufDesc.dwBufferBytes = pwf->nAvgBytesPerSec * 2; // 2 sesond lenght buffer
+                    secBufDesc.lpwfxFormat = pwf;
+                    secBufDesc.dwReserved = 0;
+                    secBufDesc.guid3DAlgorithm = GUID_NULL;
+                    
+                    // NOTE(Dima): Creating secondary buffer
+                    if(SUCCEEDED(dsState->dSound->CreateSoundBuffer(&secBufDesc, &dsState->secBuf, 0)))
+                    {
+                        // NOTE(Dima): EVERYTHING SUCCEEDED
+                        dsState->secBufDesc = secBufDesc;
+                        dsState->secondaryBufferCreated = 1;
+                    }
+                    else{
+                        Win32ShowError(
+                            PlatformError_Error, "DirectSound can not create secondary buffer");
+                    }
+                }
+                else{
+                    Win32ShowError(
+                        PlatformError_Error, 
+                        "Can not set DirectSound format");
+                }
+            }
+            else{
+                Win32ShowError(
+                    PlatformError_Error, 
+                    "Can not create DirectSound primary buffer");
+            }
+        }
+        else{
+            Win32ShowError(
+                PlatformError_Error, 
+                "DirectSound can not set cooperative level");
+        }
+    }
+    else{
+        Win32ShowError(
+            PlatformError_Error, 
+            "Can not create DirectSound object");
+    }
+    
+    if(SUCCEEDED(DirectSoundCaptureCreate8(0, &dsState->dCapture, 0))){
+        DSCBUFFERDESC dCaptureDesc = {};
+		dCaptureDesc.dwSize = sizeof(DSCBUFFERDESC);
+		dCaptureDesc.dwFlags = 0;
+		dCaptureDesc.dwBufferBytes = pwf->nAvgBytesPerSec * 4;
+		dCaptureDesc.dwReserved = 0;
+		dCaptureDesc.lpwfxFormat = pwf;
+		dCaptureDesc.dwFXCount = 0;
+		dCaptureDesc.lpDSCFXDesc = NULL;
+        
+        if (SUCCEEDED(dsState->dCapture->CreateCaptureBuffer(
+			&dCaptureDesc,
+			&dsState->dCaptureBuf, 0)))
+		{
+            dsState->dCaptureDesc = dCaptureDesc;
+            dsState->captureBufferCreated = 1;
+        }
+        else{
+            Win32ShowError(
+                PlatformError_Error, 
+                "Can not create DirectSoundCapture buffer");
+        }
+    }
+    else{
+        Win32ShowError(
+            PlatformError_Error, 
+            "Can not create DirectSoundCapture object");
+    }
+}
+
+
+void DSoundFree(DSound_State* ds){
+    if(ds->secBuf){
+        ds->secBuf->Release();
+        ds->secBuf = 0;
+    }
+    
+    if(ds->primBuf){
+        ds->primBuf->Release();
+        ds->primBuf = 0;
+    }
+    
+    if(ds->dSound){
+        ds->dSound->Release();
+        ds->dSound = 0;
+    }
+}
+
 
 LRESULT CALLBACK
 TmpOpenGLWndProc(
@@ -953,6 +1112,10 @@ PLATFORM_SHOW_ERROR(Win32ShowError){
 
 PLATFORM_DEBUG_OUTPUT_STRING(Win32DebugOutputString){
     OutputDebugString(text);
+    char Buf[32];
+    Buf[0] = '\n';
+    Buf[1] = 0;
+    OutputDebugString(Buf);
 }
 
 PLATFORM_MEMALLOC(Win32MemAlloc){
@@ -1364,13 +1527,19 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     win32.renderCtx = Win32InitOpenGL(glDC);
     
     // NOTE(Dima): Initializing engine systems
-    GlInit(&gGL);
     InitAssets(&gAssets);
+    DSoundInit(&gDSound, win32.window);
+    
+#if JOY_USE_OPENGL
+    GlInit(&gGL);
+#endif
+    
+#if JOY_USE_DIRECTX
     DirXInit(&gDirX, 
              win32.window, 
              win32.windowWidth,
              win32.windowHeight);
-    DSoundInit(&gDSound, win32.window);
+#endif
     
     mi renderMemSize = Megabytes(2);
     void* renderMem = PushSomeMem(&gMem, renderMemSize);
@@ -1454,12 +1623,15 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         //GuiUpdateWindows(gui);
         
         GuiBeginLayout(gui, lay);
+        GuiBeginTree(gui, "Some text");
         GuiText(gui, "Hello world");
         GuiText(gui, FPSBuf);
         GuiText(gui, StackInfo);
         GuiText(gui, "I love Kate");
         GuiText(gui, "I wish joy and happiness for everyone");
+        GuiEndTree(gui);
         
+        GuiBeginTree(gui, "AddClearButtons");
         LOCAL_AS_GLOBAL int RectCount = 0;
         GuiBeginRow(gui);
         if(GuiButton(gui, "Add")){
@@ -1475,7 +1647,9 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         for(int i = 0; i < RectCount; i++){
             PushRect(renderStack, RcMinDim(V2(100 + i * 50, 100), V2(40, 40)));
         }
+        GuiEndTree(gui);
         
+        GuiBeginTree(gui, "Buttons and checkboxes");
         static b32 boolButtonValue;
         GuiBeginRow(gui);
         GuiBoolButton(gui, "boolButton", &boolButtonValue);
@@ -1515,7 +1689,9 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         
         GuiBoolButtonOnOff(gui, "BoolButtonOnOff4", &boolButtonValue);
         GuiCheckbox(gui, "Checkbox4", &checkboxValue4);
+        GuiEndTree(gui);
         
+        GuiBeginTree(gui, "Some more buts");
         GuiBeginRow(gui);
         GuiBeginColumn(gui);
         GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
@@ -1531,9 +1707,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
         GuiEndColumn(gui);
         
-        
         GuiEndRow(gui);
-        
+        GuiEndTree(gui);
         
         GuiTooltip(gui, "Hello world!", gInput.mouseP);
         
@@ -1566,9 +1741,15 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     GlFree(&gGL);
     
     DSoundFree(&gDSound);
-    DirXFree(&gDirX);
     FreePlatformAPI(&platform);
+    
+#if JOY_USE_DIRECTX
+    DirXFree(&gDirX);
+#endif
+#if JOY_USE_OPENGL
     Win32FreeOpenGL(win32.renderCtx);
+#endif
+    
     ReleaseDC(win32.window, glDC);
     DestroyWindow(win32.window);
     

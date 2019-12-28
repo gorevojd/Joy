@@ -5,7 +5,6 @@
 #include <d3dx11.h>
 #include <d3dx10.h>
 #include <Windows.h>
-#include <dsound.h>
 
 #include "joy_platform.h"
 #include "joy_types.h"
@@ -18,17 +17,6 @@
 #pragma comment (lib, "dsound.lib")
 #pragma comment (lib, "winmm.lib")
 
-struct DSound_State{
-    b32 secondaryBufferCreated;
-    
-    // NOTE(Dima): DirectSound stuff
-    LPDIRECTSOUND8 dSound;
-    LPDIRECTSOUNDBUFFER primBuf;
-    LPDIRECTSOUNDBUFFER secBuf;
-    DSBUFFERDESC secBufDesc;
-    WAVEFORMATEX waveFormat;
-};
-
 struct DirX_State{
     IDXGISwapChain* swapChain;
     ID3D11Device* dev;
@@ -37,6 +25,7 @@ struct DirX_State{
 };
 
 extern PLATFORM_SHOW_ERROR(Win32ShowError);
+extern PLATFORM_DEBUG_OUTPUT_STRING(Win32DebugOutputString);
 
 // NOTE(Dima): direct sound stuff
 void DSoundInit(DSound_State* dsState, HWND hwnd);
