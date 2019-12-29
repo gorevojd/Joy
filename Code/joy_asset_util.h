@@ -15,6 +15,11 @@ enum load_font_flags{
     LoadFont_BakeBlur = 2,
 };
 
+struct Loaded_Strings{
+    char** strings;
+    int count;
+};
+
 // NOTE(Dima): Data buffers utility functions
 Data_Buffer ReadFileToDataBuffer(char* fileName);
 void FreeDataBuffer(Data_Buffer* dataBuffer);
@@ -28,6 +33,7 @@ void AssetCopyBitmapData(Bmp_Info* dst, Bmp_Info* src);
 // NOTE(Dima): Functions for loading stuff
 Bmp_Info LoadBMP(char* filePath);
 Font_Info LoadFont(char* filePath, float height, u32 flags = 0);
-
+Loaded_Strings LoadStringListFromFile(char* filePath);
+void FreeStringList(Loaded_Strings* list);
 
 #endif

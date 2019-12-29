@@ -1561,6 +1561,25 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     
     //ShellExecuteA(NULL, "open", "http://www.microsoft.com", NULL, NULL, SW_SHOWNORMAL);
     
+    Loaded_Strings bmpStrs = LoadStringListFromFile("../Data/Images/ToLoadImages.txt");
+    
+    Bmp_Info toShowArray[] = {
+        gAssets.sunset,
+        gAssets.sunsetOrange,
+        gAssets.sunsetField,
+        gAssets.sunsetMountains,
+        gAssets.sunsetPurple,
+        gAssets.sunrise,
+        gAssets.mountainsFuji,
+        gAssets.roadClouds,
+    };
+    int toShowCount = ARRAY_COUNT(toShowArray);
+    float toShowFadeoutTime = 1.5f;
+    float toShowTime = 5.0f;
+    int toShowIndex = 0;
+    int toShowNextIndex = (toShowIndex + 1) % toShowCount;
+    float timeSinceShow = 0.0f;
+    
     gRunning = 1;
     while(gRunning){
         LARGE_INTEGER beginClockLI;
@@ -1575,6 +1594,40 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         
         PushClearColor(renderStack, V3(1.0f, 0.5f, 0.0f));
         
+        Bmp_Info* toShow = toShowArray + toShowIndex;
+        Bmp_Info* toShowNext = toShowArray + toShowNextIndex;
+        
+        float toShowH = CalcScreenFitHeight(
+            toShow->width, toShow->height,
+            win32.windowWidth, win32.windowHeight);
+        float toShowNextH = CalcScreenFitHeight(
+            toShowNext->width, toShowNext->height,
+            win32.windowWidth, win32.windowHeight);
+        
+        float fadeoutAlpha = Clamp01((timeSinceShow - toShowTime) / toShowFadeoutTime);
+        
+        PushBitmap(
+            renderStack, 
+            toShow, 
+            V2(0.0f, 0.0f), 
+            toShowH, 
+            V4(1.0f, 1.0f, 1.0f, 1.0f));
+        
+        PushBitmap(
+            renderStack, 
+            toShowNext, 
+            V2(0.0f, 0.0f), 
+            toShowNextH, 
+            V4(1.0f, 1.0f, 1.0f, fadeoutAlpha));
+        
+        timeSinceShow += deltaTime;
+        if(timeSinceShow > toShowTime + toShowFadeoutTime){
+            toShowIndex = toShowNextIndex;
+            toShowNextIndex = (toShowIndex + 1) % toShowCount;
+            timeSinceShow = 0.0f;
+        }
+        
+        
 #if 0        
         PushGradient(renderStack, RcMinDim(V2(10, 10), V2(900, 300)), 
                      ColorFromHex("#FF00FF"), ColorFromHex("#4b0082"),
@@ -1584,6 +1637,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
                      RenderEntryGradient_Vertical);
 #endif
         
+        
+#if 0        
         PushBitmap(renderStack, &gAssets.sunset, V2(100.0f, Sin(time * 1.0f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
         PushBitmap(renderStack, &gAssets.sunsetOrange, V2(200.0f, Sin(time * 1.1f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
         PushBitmap(renderStack, &gAssets.sunsetField, V2(300.0f, Sin(time * 1.2f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -1591,6 +1646,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         PushBitmap(renderStack, &gAssets.mountainsFuji, V2(500.0f, Sin(time * 1.4f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
         PushBitmap(renderStack, &gAssets.roadClouds, V2(600.0f, Sin(time * 1.5f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
         PushBitmap(renderStack, &gAssets.sunrise, V2(700.0f, Sin(time * 1.6f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
+#endif
+        
         
         char FPSBuf[64];
         stbsp_sprintf(FPSBuf, "FPS %.2f, ms %.3f", 1.0f / deltaTime, deltaTime);

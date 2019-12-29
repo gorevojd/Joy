@@ -51,6 +51,18 @@ inline void GuiDeallocateWindow(Gui_State* gui, Gui_Window* todo){
     todo->prevAlloc->nextAlloc = todo;
 }
 
+INTERNAL_FUNCTION void GuiDeallocateElement(Gui_State* gui, Gui_Element* elem)
+{
+    elem->next->prev = elem->prev;
+    elem->prev->next = elem->next;
+    
+    elem->next = gui->freeSentinel.next;
+    elem->prev = &gui->freeSentinel;
+    
+    elem->next->prev = elem;
+    elem->prev->next = elem;
+}
+
 INTERNAL_FUNCTION Gui_Element* GuiAllocateElement(
 Gui_State* gui)
 {
@@ -191,7 +203,7 @@ INTERNAL_FUNCTION Gui_Element* GuiBeginElement(Gui_State* gui,
 {
     Gui_Element* Result = GuiInitElement(gui, 
                                          name, 
-                                         &gui->curElement, 
+                                         &gui->currentPage->curElement, 
                                          type,
                                          gui->curTree);
     
@@ -216,9 +228,9 @@ INTERNAL_FUNCTION b32 GuiElementOpenedInTree(Gui_Element* elem){
 
 INTERNAL_FUNCTION void GuiEndElement(Gui_State* gui, u32 type)
 {
-    ASSERT(gui->curElement->type == type);
+    ASSERT(gui->currentPage->curElement->type == type);
     
-    gui->curElement = gui->curElement->parent;
+    gui->currentPage->curElement = gui->currentPage->curElement->parent;
 }
 
 INTERNAL_FUNCTION void GuiFreeElement(Gui_State* gui,
@@ -317,8 +329,7 @@ inline void GuiAddWindowToList(Gui_Window* window,
     window->prev->next = window;
 }
 
-
-inline void GuiInitRoot(Gui_State* gui, Gui_Element** root){
+INTERNAL_FUNCTION void GuiInitRoot(Gui_State* gui, Gui_Element** root){
     
     (*root) = GuiAllocateElement(gui);
     (*root)->next = (*root);
@@ -339,6 +350,59 @@ inline void GuiInitRoot(Gui_State* gui, Gui_Element** root){
     rcs->id = StringHashFNV(rcs->name);
     rcs->type = GuiElement_ChildrenSentinel;
     
+}
+
+INTERNAL_FUNCTION void GuiInitPage(Gui_State* gui, 
+                                   Gui_Page* page,
+                                   char* name)
+{
+    u32 nameID = StringHashFNV(name);
+    
+    CopyStrings(page->name, sizeof(page->name), name);
+    page->id = nameID;
+    
+    page->next = gui->sentinelPage.next;
+    page->prev = &gui->sentinelPage;
+    page->next->prev = page;
+    page->prev->next = page;
+    
+    // NOTE(Dima): Initializing root element
+    GuiInitRoot(gui, &page->rootElement);
+    
+    // NOTE(Dima): Setting current element
+    page->curElement = page->rootElement;
+}
+
+void GuiBeginPage(Gui_State* gui, char* name){
+    // NOTE(Dima): Can't start new page inside other page
+    ASSERT(gui->pageBeginned == 0);
+    gui->pageBeginned = 1;
+    
+    u32 nameID = StringHashFNV(name);
+    
+    Gui_Page* foundPage = 0;
+    Gui_Page* pageAt = gui->sentinelPage.next;
+    for(pageAt; pageAt != &gui->sentinelPage; pageAt = pageAt->next){
+        if(nameID == pageAt->id){
+            foundPage = pageAt;
+            break;
+        }
+    }
+    
+    if(!foundPage){
+        foundPage = PushStruct(gui->mem, Gui_Page);
+        
+        GuiInitPage(gui, foundPage, name);
+    }
+    
+    gui->currentPage = foundPage;
+}
+
+void GuiEndPage(Gui_State* gui){
+    ASSERT(gui->pageBeginned == 1);
+    gui->pageBeginned = 0;
+    
+    gui->currentPage = &gui->rootPage;
 }
 
 void InitGui(
@@ -363,11 +427,6 @@ int height)
     
     gui->width = width;
     gui->height = height;
-    
-    // NOTE(Dima): Initializing root page 
-    CopyStrings(gui->rootPage.name, "Root");
-    gui->rootPage.next = &gui->rootPage;
-    gui->rootPage.prev = &gui->rootPage;
     
     // NOTE(Dima): Initializing of window free pool and sentinels
     gui->windowUseSentinel.nextAlloc = &gui->windowUseSentinel;
@@ -398,12 +457,19 @@ int height)
     gui->useSentinel.prevAlloc = &gui->useSentinel;
     
     // NOTE(Dima): Initializing root element
-    GuiInitRoot(gui, &gui->rootElement);
     GuiInitRoot(gui, &gui->rootTree);
     
     // NOTE(Dima): Setting current element
-    gui->curElement = gui->rootElement;
     gui->curTree = gui->rootTree;
+    
+    // NOTE(Dima): Initializing root & sentinel pages page 
+    CopyStrings(gui->sentinelPage.name, "SentinelPage");
+    gui->sentinelPage.next = &gui->sentinelPage;
+    gui->sentinelPage.prev = &gui->sentinelPage;
+    
+    gui->pageBeginned = 0;
+    gui->currentPage = &gui->rootPage;
+    GuiInitPage(gui, &gui->rootPage, "RootPage");
     
     // NOTE(Dima): Initializing colors
     InitColorsState(&gui->colorState, mem);
@@ -565,39 +631,6 @@ void GuiEndLayout(Gui_State* gui, Gui_Layout* layout){
     layout->at = V2(0.0f, 0.0f);
     
     gui->currentLayout = 0;
-}
-
-void GuiBeginPage(Gui_State* gui, char* name){
-    u32 nameID = StringHashFNV(name);
-    
-    Gui_Page* foundPage = 0;
-    Gui_Page* pageAt = gui->rootPage.next;
-    for(pageAt; pageAt != &gui->rootPage; pageAt = pageAt->next){
-        if(nameID == pageAt->id){
-            foundPage = pageAt;
-            break;
-        }
-    }
-    
-    if(!foundPage){
-        foundPage = PushStruct(gui->mem, Gui_Page);
-        
-        CopyStrings(foundPage->name, sizeof(foundPage->name), name);
-        foundPage->id = nameID;
-        
-        foundPage->next = gui->rootPage.next;
-        foundPage->prev = &gui->rootPage;
-        foundPage->next->prev = foundPage;
-        foundPage->prev->next = foundPage;
-    }
-    
-    // NOTE(Dima): Can't start new page inside other page
-    Assert(!gui->currentPage);
-    gui->currentPage = foundPage;
-}
-
-void GuiEndPage(Gui_State* gui){
-    gui->currentPage = 0;
 }
 
 struct GuiSnapInWindowResult{
@@ -832,7 +865,7 @@ inline GuiAdvanceCtx GuiColumnAdvanceCtx(float rememberY, float baseline){
 
 void GuiBeginRow(Gui_State* gui){
     char name[64];
-    stbsp_sprintf(name, "Row or Column: %d", gui->curElement->childCount);
+    stbsp_sprintf(name, "Row or Column: %d", gui->currentPage->curElement->childCount);
     
     Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_RowColumn);
     if(GuiElementOpenedInTree(elem)){
@@ -848,7 +881,7 @@ void GuiBeginRow(Gui_State* gui){
 
 void GuiBeginColumn(Gui_State* gui){
     char name[64];
-    stbsp_sprintf(name, "Row or Column: %d", gui->curElement->childCount);
+    stbsp_sprintf(name, "Row or Column: %d", gui->currentPage->curElement->childCount);
     
     Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_RowColumn);
     if(GuiElementOpenedInTree(elem)){
@@ -863,7 +896,7 @@ void GuiBeginColumn(Gui_State* gui){
 }
 
 void GuiEndRow(Gui_State* gui){
-    if(GuiElementOpenedInTree(gui->curElement)){
+    if(GuiElementOpenedInTree(gui->currentPage->curElement)){
         
         Gui_Layout* layout = GetFirstLayout(gui);
         
@@ -890,7 +923,7 @@ void GuiEndRow(Gui_State* gui){
 }
 
 void GuiEndColumn(Gui_State* gui){
-    if(GuiElementOpenedInTree(gui->curElement)){
+    if(GuiElementOpenedInTree(gui->currentPage->curElement)){
         
         Gui_Layout* layout = GetFirstLayout(gui);
         
@@ -982,6 +1015,7 @@ void GuiBeginTree(Gui_State* gui, char* name){
         v4 textColor = GUI_GETCOLOR_COLSYS(Color_ToxicGreen);
         v4 oulineColor = GUI_GETCOLOR_COLSYS(Color_Red);
         
+        GuiPushBut(gui, textRc, PushBut_Grad, oulineColor);
         if(tree->data.treeNode.opened){
             GuiPushBut(gui, textRc, PushBut_Outline, oulineColor);
         }
@@ -999,8 +1033,8 @@ void GuiBeginTree(Gui_State* gui, char* name){
     }
 }
 void GuiEndTree(Gui_State* gui){
-    GuiEndElement(gui, GuiElement_Item);
     GuiEndTreeNode(gui);
+    GuiEndElement(gui, GuiElement_Item);
 }
 
 void GuiText(Gui_State* gui, char* text){

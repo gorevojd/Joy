@@ -2,6 +2,9 @@
 #include "joy_math.h"
 #include "joy_asset_util.h"
 
+#include <vector>
+#include <string>
+
 void InitAssets(Assets* assets){
     assets->sunset = LoadBMP("../Data/Images/sunset.jpg");
     assets->sunsetOrange = LoadBMP("../Data/Images/sunset_orange.jpg");

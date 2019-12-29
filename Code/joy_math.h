@@ -1034,4 +1034,30 @@ inline rc2 RectNormalizeSubpixel(rc2 A){
     return(A);
 }
 
+// NOTE(Dima): Other math
+inline float CalcScreenFitHeight(
+float bmpW, float bmpH,
+float scrW, float scrH)
+{
+    float Result = scrH;
+    
+    float ar1 = bmpW / bmpH;
+    float ar2 = scrW / scrH;
+    
+    float bmpWoverH = bmpW / bmpH;
+    
+    
+    if(ar1 > ar2){
+        Result = scrH;
+    }
+    else{
+        float c1 = scrH / bmpH;
+        float scaledH = bmpH * c1;
+        float scaledW = scaledH * bmpWoverH;
+        Result = scaledH * scrW / scaledW;
+    }
+    
+    return(Result);
+}
+
 #endif

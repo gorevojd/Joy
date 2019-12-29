@@ -24,8 +24,8 @@ Data_Buffer ReadFileToDataBuffer(char* fileName){
 		u64 fileSize = ftell(fp);
 		fseek(fp, 0, 0);
         
-		res.size = fileSize;
-		res.data = (u8*)calloc(fileSize, 1);
+		res.size = fileSize + 1;
+		res.data = (u8*)calloc(fileSize + 1, 1);
         
 		fread(res.data, 1, fileSize, fp);
         
@@ -41,6 +41,81 @@ void FreeDataBuffer(Data_Buffer* dataBuffer){
 	}
 }
 
+inline b32 IsWhitespaceNewlineOrEndline(char c){
+    b32 res = (c == '\n' || 
+               c == '\r' ||
+               c == ' ' ||
+               c == 0);
+    
+    return(res);
+}
+
+Loaded_Strings LoadStringListFromFile(char* filePath){
+    Loaded_Strings result = {};
+    
+    Data_Buffer buf = ReadFileToDataBuffer(filePath);
+    
+    std::vector<std::string> strings;
+    
+    char* at = (char*)buf.data;
+    
+    char bufStr[256];
+    int inLinePos = 0;
+    
+    if(buf.size){
+        
+        while(at && *at != 0){
+            if(IsWhitespaceNewlineOrEndline(*at))
+            {
+                bufStr[inLinePos] = 0;
+                strings.push_back(std::string(bufStr));
+                
+                inLinePos = 0;
+                
+                // NOTE(Dima): Skip to next valid symbol
+                while(at && IsWhitespaceNewlineOrEndline(*at))
+                {
+                    if(*at == 0){
+                        break;
+                    }
+                    
+                    at++;
+                }
+            }
+            else{
+                bufStr[inLinePos++] = *at;
+                at++;
+            }
+        }
+        
+        result.count = strings.size();
+        
+        size_t totalDataNeeded = 0;
+        for(int i = 0; i < strings.size(); i++){
+            totalDataNeeded += strings[i].length() + 1 + sizeof(char*);
+        }
+        
+        result.strings = (char**)malloc(totalDataNeeded);
+        
+        int curSumOfSizes = 0;
+        for(int i = 0; i < result.count; i++){
+            result.strings[i] = (char*)result.strings + result.count * sizeof(char*) + curSumOfSizes;
+            curSumOfSizes += strings[i].length() + 1;
+            strcpy(result.strings[i], strings[i].c_str());
+        }
+        
+        FreeDataBuffer(&buf);
+    }
+    
+    return(result);
+}
+
+void FreeStringList(Loaded_Strings* list){
+    if(list->strings){
+        free(list->strings);
+        list->strings = 0;
+    }
+}
 
 Bmp_Info AssetAllocateBitmapInternal(u32 width, u32 height, void* pixelsData) {
 	Bmp_Info res = {};

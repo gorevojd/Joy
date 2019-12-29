@@ -8,6 +8,14 @@
 #include "joy_strings.h"
 #include "joy_colors.h"
 
+/*
+NOTE(dima):
+
+1) Gui layouts structured next way. Each element is Gui_Element structure.
+It can have some children and parents elements. The tree of elements is a
+Gui_Page. It's done this way because of comfortability to group the elements
+*/
+
 inline float GetBaseline(Font_Info* fontInfo, float scale = 1.0f){
     float res = (fontInfo->ascenderHeight + fontInfo->lineGap) * scale;
     
@@ -50,14 +58,6 @@ enum GuiColorType{
 #define GUI_GETCOLOR(color) gui->colors[color]
 #define GUI_GETCOLOR_COLSYS(index) gui->colorState.colorTable[index].color
 #define GUI_COLORHEX(str) ColorFromHex(str)
-
-struct Gui_Page{
-    char name[128];
-    u32 id;
-    
-    Gui_Page* next;
-    Gui_Page* prev;
-};
 
 struct Gui_Window{
     Gui_Window* nextAlloc;
@@ -142,6 +142,18 @@ struct Gui_Element{
     int childCount;
 };
 
+
+struct Gui_Page{
+    char name[128];
+    u32 id;
+    
+    Gui_Page* next;
+    Gui_Page* prev;
+    
+    Gui_Element* rootElement;
+    Gui_Element* curElement;
+};
+
 struct Gui_State{
     Font_Info* mainFont;
     float fontScale;
@@ -152,6 +164,9 @@ struct Gui_State{
     
     Gui_Layout layout;
     Gui_Layout* currentLayout;
+    
+    b32 pageBeginned;
+    Gui_Page sentinelPage;
     Gui_Page rootPage;
     Gui_Page* currentPage;
     
@@ -165,9 +180,6 @@ struct Gui_State{
     
     Gui_Element freeSentinel;
     Gui_Element useSentinel;
-    
-    Gui_Element* rootElement;
-    Gui_Element* curElement;
     
     Gui_Element* rootTree;
     Gui_Element* curTree;
