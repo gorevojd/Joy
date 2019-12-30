@@ -5,6 +5,14 @@
 #include "joy_defines.h"
 #include "joy_asset_types.h"
 #include "joy_asset_util.h"
+#include "joy_platform.h"
+
+
+struct asset{
+    union{
+        
+    };
+};
 
 // NOTE(dima): Bitmaps are stored in gamma-corrected premultiplied alpha format
 struct Assets{
@@ -16,6 +24,9 @@ struct Assets{
     Bmp_Info sunrise;
     Bmp_Info mountainsFuji;
     Bmp_Info roadClouds;
+    
+    Bmp_Info* fadeoutBmps;
+    int fadeoutBmpsCount;
     
     Bmp_Info checkboxMark;
     

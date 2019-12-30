@@ -1561,19 +1561,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     
     //ShellExecuteA(NULL, "open", "http://www.microsoft.com", NULL, NULL, SW_SHOWNORMAL);
     
-    Loaded_Strings bmpStrs = LoadStringListFromFile("../Data/Images/ToLoadImages.txt");
-    
-    Bmp_Info toShowArray[] = {
-        gAssets.sunset,
-        gAssets.sunsetOrange,
-        gAssets.sunsetField,
-        gAssets.sunsetMountains,
-        gAssets.sunsetPurple,
-        gAssets.sunrise,
-        gAssets.mountainsFuji,
-        gAssets.roadClouds,
-    };
-    int toShowCount = ARRAY_COUNT(toShowArray);
+    Bmp_Info* toShowArray = gAssets.fadeoutBmps;
+    int toShowCount = gAssets.fadeoutBmpsCount;
     float toShowFadeoutTime = 1.5f;
     float toShowTime = 5.0f;
     int toShowIndex = 0;

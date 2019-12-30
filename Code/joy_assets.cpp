@@ -5,7 +5,23 @@
 #include <vector>
 #include <string>
 
+#define STB_SPRINTF_STATIC
+#define STB_SPRINTF_IMPLEMENTATION
+#include "stb_sprintf.h"
+
 void InitAssets(Assets* assets){
+    
+    Loaded_Strings bmpStrs = LoadStringListFromFile("../Data/Images/ToLoadImages.txt");
+    assets->fadeoutBmps = (Bmp_Info*)platform.MemAlloc(sizeof(Bmp_Info) * bmpStrs.count);
+    assets->fadeoutBmpsCount = bmpStrs.count;
+    for(int i = 0; i < bmpStrs.count; i++){
+        char tmpBuf[256];
+        stbsp_sprintf(tmpBuf, "../Data/Images/%s", bmpStrs.strings[i]);
+        
+        assets->fadeoutBmps[i] = LoadBMP(tmpBuf);
+    }
+    FreeStringList(&bmpStrs);
+    
     assets->sunset = LoadBMP("../Data/Images/sunset.jpg");
     assets->sunsetOrange = LoadBMP("../Data/Images/sunset_orange.jpg");
     assets->sunsetField = LoadBMP("../Data/Images/sunset_field.jpg");

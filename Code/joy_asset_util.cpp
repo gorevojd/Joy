@@ -2,6 +2,7 @@
 #include "joy_software_renderer.h"
 #include "joy_defines.h"
 #include "joy_render_blur.h"
+#include "joy_simd.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -14,6 +15,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
 #include "stb_image.h"
+
+#include <intrin.h>
 
 Data_Buffer ReadFileToDataBuffer(char* fileName){
 	Data_Buffer res = {};
@@ -182,7 +185,43 @@ Bmp_Info LoadBMP(char* FilePath){
     void* OurImageMem = malloc(ImageSize);
     res = AssetAllocateBitmapInternal(width, height, OurImageMem);
     
-    for(int PixelIndex = 0;
+    int pixelsCountForSIMD = pixelsCount & (~3);
+    
+    __m128 mm255 = _mm_set1_ps(255.0f);
+    __m128 mmOneOver255 = _mm_set1_ps(1.0f / 255.0f);
+    __m128i mmFF = _mm_set1_epi32(0xFF);
+    
+    int PixelIndex = 0;
+    for(PixelIndex;
+        PixelIndex < pixelsCountForSIMD;
+        PixelIndex += 4)
+    {
+        u32* Pix = ((u32*)Image + PixelIndex);
+        
+        __m128i mmTexel = _mm_setr_epi32(*Pix, *(Pix + 1), *(Pix + 2), *(Pix + 3));
+        __m128 mmTexel_r = MM_UNPACK_COLOR_CHANNEL0(mmTexel);
+        __m128 mmTexel_g = MM_UNPACK_COLOR_CHANNEL(mmTexel, 8);
+        __m128 mmTexel_b = MM_UNPACK_COLOR_CHANNEL(mmTexel, 16);
+        __m128 mmTexel_a = MM_UNPACK_COLOR_CHANNEL(mmTexel, 24);
+        
+        mmTexel_r = _mm_mul_ps(mmTexel_r, mmTexel_a);
+        mmTexel_g = _mm_mul_ps(mmTexel_g, mmTexel_a);
+        mmTexel_b = _mm_mul_ps(mmTexel_b, mmTexel_a);
+        
+        
+        __m128i mmColorShifted_a = _mm_slli_epi32(_mm_cvtps_epi32(_mm_mul_ps(mmTexel_a, mm255)), 24);
+        __m128i mmColorShifted_b = _mm_slli_epi32(_mm_cvtps_epi32(_mm_mul_ps(mmTexel_b, mm255)), 16);
+        __m128i mmColorShifted_g = _mm_slli_epi32(_mm_cvtps_epi32(_mm_mul_ps(mmTexel_g, mm255)), 8);
+        __m128i mmColorShifted_r = _mm_cvtps_epi32(_mm_mul_ps(mmTexel_r, mm255));
+        
+        __m128i mmResult = _mm_or_si128(
+            _mm_or_si128(mmColorShifted_r, mmColorShifted_g),
+            _mm_or_si128(mmColorShifted_b, mmColorShifted_a));
+        
+        _mm_storeu_si128((__m128i*)((u32*)res.pixels + PixelIndex), mmResult);
+    }
+    
+    for(PixelIndex;
         PixelIndex < pixelsCount;
         PixelIndex++)
     {
