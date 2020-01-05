@@ -8,6 +8,9 @@
 #include "joy_strings.h"
 #include "joy_colors.h"
 
+#define JOY_GUI_TRUE 1
+#define JOY_GUI_FALSE 0
+
 /*
 NOTE(dima):
 
@@ -59,25 +62,6 @@ enum GuiColorType{
 #define GUI_GETCOLOR_COLSYS(index) gui->colorState.colorTable[index].color
 #define GUI_COLORHEX(str) ColorFromHex(str)
 
-struct Gui_Window{
-    Gui_Window* nextAlloc;
-    Gui_Window* prevAlloc;
-    
-    Gui_Window* next;
-    Gui_Window* prev;
-    
-    rc2 rect;
-};
-
-enum GuiWindowSnapType{
-    GuiWindowSnap_Left,
-    GuiWindowSnap_Right,
-    GuiWindowSnap_Top,
-    GuiWindowSnap_Bottom,
-    GuiWindowSnap_Whole,
-};
-
-
 enum GuiAdvanceType{
     GuiAdvanceType_Column,
     GuiAdvanceType_Row,
@@ -99,6 +83,32 @@ struct Gui_Layout{
     
     GuiAdvanceCtx advanceRememberStack[16];
     int stackCurrentIndex;
+    
+    v2 dimStack[16];
+    int dimStackIndex;
+    b32 inPushBlock;
+};
+
+struct Gui_Window{
+    Gui_Window* nextAlloc;
+    Gui_Window* prevAlloc;
+    
+    Gui_Window* next;
+    Gui_Window* prev;
+    
+    rc2 rect;
+    
+    Gui_Layout layout;
+    
+    b32 visible;
+};
+
+enum GuiWindowSnapType{
+    GuiWindowSnap_Left,
+    GuiWindowSnap_Right,
+    GuiWindowSnap_Top,
+    GuiWindowSnap_Bottom,
+    GuiWindowSnap_Whole,
 };
 
 #define GUI_TOOLTIP_MAX_SIZE 256
@@ -110,21 +120,30 @@ struct Gui_Tooltip{
 enum Gui_Element_Type{
     GuiElement_None,
     GuiElement_Root,
+    GuiElement_Page,
     GuiElement_ChildrenSentinel,
-    GuiElement_TreeNode,
     GuiElement_TreeLink,
     GuiElement_Item,
     GuiElement_RowColumn,
+    GuiElement_RadioGroup,
 };
 
 struct Gui_Element{
     char name[64];
     
-    union{
-        struct {
-            b32 opened;
-        } treeNode;
+    struct {
+        union{
+            struct{
+                u32* ref;
+                u32 activeId;
+            } radioGroup;
+        };
+        
+        // NOTE(Dima): is initialized (b32)
+        b32 isInit;
     }data;
+    
+    b32 opened;
     
     Gui_Element* parentInTree;
     
@@ -142,18 +161,6 @@ struct Gui_Element{
     int childCount;
 };
 
-
-struct Gui_Page{
-    char name[128];
-    u32 id;
-    
-    Gui_Page* next;
-    Gui_Page* prev;
-    
-    Gui_Element* rootElement;
-    Gui_Element* curElement;
-};
-
 struct Gui_State{
     Font_Info* mainFont;
     float fontScale;
@@ -165,10 +172,8 @@ struct Gui_State{
     Gui_Layout layout;
     Gui_Layout* currentLayout;
     
-    b32 pageBeginned;
-    Gui_Page sentinelPage;
-    Gui_Page rootPage;
-    Gui_Page* currentPage;
+    Gui_Element* rootElement;
+    Gui_Element* curElement;
     
     Gui_Window windowUseSentinel;
     Gui_Window windowFreeSentinel;
@@ -180,9 +185,6 @@ struct Gui_State{
     
     Gui_Element freeSentinel;
     Gui_Element useSentinel;
-    
-    Gui_Element* rootTree;
-    Gui_Element* curTree;
     
     int width;
     int height;
@@ -198,6 +200,78 @@ struct Gui_State{
     float windowAlpha;
 };
 
+
+//TODO(Dima): Delete this
+inline Gui_Layout* GetFirstLayout(Gui_State* gui){
+    Gui_Layout* res = &gui->layout;
+    
+    return(res);
+}
+
+inline void GuiPushDim(Gui_State* gui, v2 dim){
+    Gui_Layout* lay = GetFirstLayout(gui);
+    
+    ASSERT(lay->dimStackIndex < ARRAY_COUNT(lay->dimStack));
+    
+    // NOTE(Dima): can't push if inside push block
+    if(lay->inPushBlock){
+        
+    }
+    else{
+        lay->dimStack[lay->dimStackIndex++] = dim;
+    }
+}
+
+inline b32 GuiPopDim(Gui_State* gui, v2* outDim){
+    Gui_Layout* lay = GetFirstLayout(gui);
+    
+    b32 result = 0;
+    
+    int decrementValue = lay->inPushBlock ? 0 : 1;
+    
+    if(lay->dimStackIndex > 0){
+        result = 1;
+        
+        if(outDim){
+            int viewIndex = lay->dimStackIndex - 1;
+            *outDim = lay->dimStack[viewIndex];
+            lay->dimStackIndex -= decrementValue;
+        }
+    }
+    
+    return(result);
+}
+
+
+inline void GuiPushDimBegin(Gui_State* gui, v2 dim){
+    Gui_Layout* lay = GetFirstLayout(gui);
+    
+    lay->dimStack[lay->dimStackIndex++] = dim;
+    
+    lay->inPushBlock = 1;
+}
+
+inline void GuiPushDimEnd(Gui_State* gui){
+    Gui_Layout* lay = GetFirstLayout(gui);
+    
+    lay->inPushBlock = 0;
+    
+    GuiPopDim(gui, 0);
+}
+
+inline rc2 GetTxtElemRect(Gui_State* gui, Gui_Layout* lay, rc2 txtRc, v2 growScale){
+    v2 popDim;
+    if(GuiPopDim(gui, &popDim)){
+        txtRc.max = txtRc.min + popDim;
+    }
+    else{
+        rc2 tempTextRc = GrowRectByScaledValue(txtRc, growScale, gui->fontScale);
+        txtRc.max = txtRc.min + GetRectDim(tempTextRc);
+    }
+    
+    return(txtRc);
+}
+
 inline float GuiGetBaseline(Gui_State* gui, float scale = 1.0f){
     float res = GetBaseline(gui->mainFont, gui->fontScale * scale);
     
@@ -206,13 +280,6 @@ inline float GuiGetBaseline(Gui_State* gui, float scale = 1.0f){
 
 inline float GuiGetLineAdvance(Gui_State* gui, float scale = 1.0f){
     float res = GetLineAdvance(gui->mainFont, gui->fontScale * scale);
-    
-    return(res);
-}
-
-//TODO(Dima): Delete this
-inline Gui_Layout* GetFirstLayout(Gui_State* gui){
-    Gui_Layout* res = &gui->layout;
     
     return(res);
 }
@@ -263,5 +330,13 @@ void GuiCheckbox(Gui_State* gui, char* name, b32* value);
 
 void GuiBeginTree(Gui_State* gui, char* name);
 void GuiEndTree(Gui_State* gui);
+
+void GuiBeginRadioGroup(
+Gui_State* gui, 
+char* name, 
+u32* ref, 
+u32 defaultId);
+void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId);
+void GuiEndRadioGroup(Gui_State* gui);
 
 #endif

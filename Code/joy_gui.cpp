@@ -108,8 +108,8 @@ Gui_State* gui)
 INTERNAL_FUNCTION Gui_Element* GuiInitElement(Gui_State* gui,
                                               char* name,
                                               Gui_Element** cur,
-                                              u32 type,
-                                              Gui_Element* curTree)
+                                              u32 type, 
+                                              b32 initOpened)
 {
     Gui_Element* result = 0;
     
@@ -153,7 +153,8 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(Gui_State* gui,
             found->parent = *cur;
             found->type = type;
             
-            found->parentInTree = curTree;
+            // NOTE(Dima): freeing data
+            found->data = {};
             
             // NOTE(Dima): Initializing children sentinel
             found->childCount = 0;
@@ -166,6 +167,9 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(Gui_State* gui,
             CopyStrings(fcs->name, "ChildrenSentinel");
             fcs->id = StringHashFNV(fcs->name);
             fcs->type = GuiElement_ChildrenSentinel;
+            
+            // NOTE(Dima): Initializing opened
+            found->opened = initOpened;
         }
         
         ASSERT(found->type == type);
@@ -178,44 +182,27 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(Gui_State* gui,
     return(result);
 }
 
-INTERNAL_FUNCTION Gui_Element* GuiBeginTreeNode(Gui_State* gui,
-                                                char* name)
-{
-    Gui_Element* Result = GuiInitElement(gui, 
-                                         name, 
-                                         &gui->curTree, 
-                                         GuiElement_TreeNode, 
-                                         gui->curTree);
-    
-    return(Result);
-}
-
-INTERNAL_FUNCTION void GuiEndTreeNode(Gui_State* gui){
-    ASSERT(gui->curTree->type == GuiElement_TreeNode);
-    
-    gui->curTree = gui->curTree->parent;
-}
-
 
 INTERNAL_FUNCTION Gui_Element* GuiBeginElement(Gui_State* gui,
                                                char* name,
-                                               u32 type)
+                                               u32 type,
+                                               b32 opened)
 {
     Gui_Element* Result = GuiInitElement(gui, 
                                          name, 
-                                         &gui->currentPage->curElement, 
+                                         &gui->curElement, 
                                          type,
-                                         gui->curTree);
+                                         opened);
     
     return(Result);
 }
 
 INTERNAL_FUNCTION b32 GuiElementOpenedInTree(Gui_Element* elem){
     b32 Result = 1;
-    Gui_Element* at = elem->parentInTree;
+    Gui_Element* at = elem->parent;
     
     while(at->parent != 0){
-        if(at->data.treeNode.opened != 1){
+        if(at->opened != 1){
             Result = 0;
             break;
         }
@@ -228,9 +215,9 @@ INTERNAL_FUNCTION b32 GuiElementOpenedInTree(Gui_Element* elem){
 
 INTERNAL_FUNCTION void GuiEndElement(Gui_State* gui, u32 type)
 {
-    ASSERT(gui->currentPage->curElement->type == type);
+    ASSERT(gui->curElement->type == type);
     
-    gui->currentPage->curElement = gui->currentPage->curElement->parent;
+    gui->curElement = gui->curElement->parent;
 }
 
 INTERNAL_FUNCTION void GuiFreeElement(Gui_State* gui,
@@ -352,57 +339,15 @@ INTERNAL_FUNCTION void GuiInitRoot(Gui_State* gui, Gui_Element** root){
     
 }
 
-INTERNAL_FUNCTION void GuiInitPage(Gui_State* gui, 
-                                   Gui_Page* page,
-                                   char* name)
-{
-    u32 nameID = StringHashFNV(name);
-    
-    CopyStrings(page->name, sizeof(page->name), name);
-    page->id = nameID;
-    
-    page->next = gui->sentinelPage.next;
-    page->prev = &gui->sentinelPage;
-    page->next->prev = page;
-    page->prev->next = page;
-    
-    // NOTE(Dima): Initializing root element
-    GuiInitRoot(gui, &page->rootElement);
-    
-    // NOTE(Dima): Setting current element
-    page->curElement = page->rootElement;
-}
-
 void GuiBeginPage(Gui_State* gui, char* name){
-    // NOTE(Dima): Can't start new page inside other page
-    ASSERT(gui->pageBeginned == 0);
-    gui->pageBeginned = 1;
-    
-    u32 nameID = StringHashFNV(name);
-    
-    Gui_Page* foundPage = 0;
-    Gui_Page* pageAt = gui->sentinelPage.next;
-    for(pageAt; pageAt != &gui->sentinelPage; pageAt = pageAt->next){
-        if(nameID == pageAt->id){
-            foundPage = pageAt;
-            break;
-        }
-    }
-    
-    if(!foundPage){
-        foundPage = PushStruct(gui->mem, Gui_Page);
-        
-        GuiInitPage(gui, foundPage, name);
-    }
-    
-    gui->currentPage = foundPage;
+    GuiBeginElement(gui, 
+                    name,
+                    GuiElement_Page,
+                    JOY_TRUE);
 }
 
 void GuiEndPage(Gui_State* gui){
-    ASSERT(gui->pageBeginned == 1);
-    gui->pageBeginned = 0;
-    
-    gui->currentPage = &gui->rootPage;
+    GuiEndElement(gui, GuiElement_Page);
 }
 
 void InitGui(
@@ -447,6 +392,7 @@ int height)
     
     gui->tempWindow1 = GuiAllocateWindow(gui);
     gui->tempWindow1->rect = RcMinDim(V2(10, 10), V2(1000, 600));
+    gui->tempWindow1->visible = 1;
     GuiAddWindowToList(gui->tempWindow1, &gui->windowLeafSentinel);
     
     // NOTE(Dima): Initializing elements sentinel
@@ -457,19 +403,10 @@ int height)
     gui->useSentinel.prevAlloc = &gui->useSentinel;
     
     // NOTE(Dima): Initializing root element
-    GuiInitRoot(gui, &gui->rootTree);
+    GuiInitRoot(gui, &gui->rootElement);
     
     // NOTE(Dima): Setting current element
-    gui->curTree = gui->rootTree;
-    
-    // NOTE(Dima): Initializing root & sentinel pages page 
-    CopyStrings(gui->sentinelPage.name, "SentinelPage");
-    gui->sentinelPage.next = &gui->sentinelPage;
-    gui->sentinelPage.prev = &gui->sentinelPage;
-    
-    gui->pageBeginned = 0;
-    gui->currentPage = &gui->rootPage;
-    GuiInitPage(gui, &gui->rootPage, "RootPage");
+    gui->curElement = gui->rootElement;
     
     // NOTE(Dima): Initializing colors
     InitColorsState(&gui->colorState, mem);
@@ -521,11 +458,11 @@ rc2 PrintTextInternal(Font_Info* font, Render_Stack* stack, char* text, v2 p, u3
     }
     
     txtRc.min.x = p.x;
-	txtRc.min.y = p.y - font->ascenderHeight * scale;
-	txtRc.max.x = curP.x;
-	txtRc.max.y = curP.y - font->descenderHeight * scale;
+    txtRc.min.y = p.y - font->ascenderHeight * scale;
+    txtRc.max.x = curP.x;
+    txtRc.max.y = curP.y - font->descenderHeight * scale;
     
-	return(txtRc);
+    return(txtRc);
 }
 
 v2 GetTextSizeInternal(Font_Info* font, char* Text, float scale){
@@ -625,6 +562,13 @@ void GuiBeginLayout(Gui_State* gui, Gui_Layout* layout){
     layout->at = V2(0.0f, 0.0f);
     
     gui->currentLayout = layout;
+    
+    // NOTE(Dima): Init dim stack
+    for(int dimIndex = 0; dimIndex < ARRAY_COUNT(layout->dimStack); dimIndex++){
+        layout->dimStack[dimIndex] = {};
+    }
+    layout->dimStackIndex = 0;
+    layout->inPushBlock = 0;
 }
 
 void GuiEndLayout(Gui_State* gui, Gui_Layout* layout){
@@ -727,71 +671,80 @@ INTERNAL_FUNCTION void GuiSplitWindow(Gui_State* gui,
 }
 
 INTERNAL_FUNCTION void GuiUpdateWindow(Gui_State* gui, Gui_Window* window){
-    rc2 windowRc = window->rect;
-    PushRect(gui->stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
     
-    v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
-    if(MouseInRect(gui->input, windowRc)){
-        outlineColor = GUI_GETCOLOR(GuiColor_WindowBorderHot);
+    window->layout.start = window->rect.min;
+    
+    if(window->visible){
         
-        // NOTE(Dima): Processing snapping
-        v2 windowDim = GetRectDim(windowRc);
-        v2 windowHalfDim = windowDim * 0.5f;
-        v2 windowCenter = windowRc.min + windowHalfDim;
+        rc2 windowRc = window->rect;
+        PushRect(gui->stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
         
-        v2 mouseP = gui->input->mouseP;
-        mouseP = ClampInRect(mouseP, windowRc);
-        v2 diffFromCenter = mouseP - windowCenter;
-        v2 diffRelative;
-        diffRelative.x = diffFromCenter.x / windowHalfDim.x;
-        diffRelative.y = diffFromCenter.y / windowHalfDim.y;
-        v2 absDiff = diffRelative;
-        absDiff.x = Abs(absDiff.x);
-        absDiff.y = Abs(absDiff.y);
-        
-        float maxAbsDiff = 0.35f;
-        u32 snapType = GuiWindowSnap_Whole;
-        if(diffRelative.x < 0){
-            if(absDiff.x > maxAbsDiff){
-                maxAbsDiff = absDiff.x;
-                snapType = GuiWindowSnap_Left;
-            }
-        }
-        else{
-            if(absDiff.x > maxAbsDiff){
-                maxAbsDiff = absDiff.x;
-                snapType = GuiWindowSnap_Right;
-            }
-        }
-        
-        if(diffRelative.y < 0){
-            if(absDiff.y > maxAbsDiff){
-                maxAbsDiff = absDiff.y;
-                snapType = GuiWindowSnap_Top;
-            }
-        }
-        else{
-            if(absDiff.y > maxAbsDiff){
-                maxAbsDiff = absDiff.y;
-                snapType = GuiWindowSnap_Bottom;
-            }
-        }
-        
-        // NOTE(Dima): Pushing snap rectangle
-        if(snapType != GuiWindowSnap_Whole){
-            GuiSnapInWindowResult snapRes = GuiSnapInWindowRect(windowRc, snapType);
-            v4 snapColor = V4(1.0f, 0.0f, 1.0f, 0.4f);
-            PushRect(gui->stack, snapRes.result, snapColor);
+        v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
+        if(MouseInRect(gui->input, windowRc)){
+            outlineColor = GUI_GETCOLOR(GuiColor_WindowBorderHot);
             
-            if(KeyWentDown(gui->input, MouseKey_Left)){
-                GuiSplitWindow(gui, window, 2, snapRes.rects);
+            b32 conditionForSnapping = 0;
+            if(conditionForSnapping){
+                
+                // NOTE(Dima): Processing snapping
+                v2 windowDim = GetRectDim(windowRc);
+                v2 windowHalfDim = windowDim * 0.5f;
+                v2 windowCenter = windowRc.min + windowHalfDim;
+                
+                v2 mouseP = gui->input->mouseP;
+                mouseP = ClampInRect(mouseP, windowRc);
+                v2 diffFromCenter = mouseP - windowCenter;
+                v2 diffRelative;
+                diffRelative.x = diffFromCenter.x / windowHalfDim.x;
+                diffRelative.y = diffFromCenter.y / windowHalfDim.y;
+                v2 absDiff = diffRelative;
+                absDiff.x = Abs(absDiff.x);
+                absDiff.y = Abs(absDiff.y);
+                
+                float maxAbsDiff = 0.35f;
+                u32 snapType = GuiWindowSnap_Whole;
+                if(diffRelative.x < 0){
+                    if(absDiff.x > maxAbsDiff){
+                        maxAbsDiff = absDiff.x;
+                        snapType = GuiWindowSnap_Left;
+                    }
+                }
+                else{
+                    if(absDiff.x > maxAbsDiff){
+                        maxAbsDiff = absDiff.x;
+                        snapType = GuiWindowSnap_Right;
+                    }
+                }
+                
+                if(diffRelative.y < 0){
+                    if(absDiff.y > maxAbsDiff){
+                        maxAbsDiff = absDiff.y;
+                        snapType = GuiWindowSnap_Top;
+                    }
+                }
+                else{
+                    if(absDiff.y > maxAbsDiff){
+                        maxAbsDiff = absDiff.y;
+                        snapType = GuiWindowSnap_Bottom;
+                    }
+                }
+                
+                // NOTE(Dima): Pushing snap rectangle
+                if(snapType != GuiWindowSnap_Whole){
+                    GuiSnapInWindowResult snapRes = GuiSnapInWindowRect(windowRc, snapType);
+                    v4 snapColor = V4(1.0f, 0.0f, 1.0f, 0.4f);
+                    PushRect(gui->stack, snapRes.result, snapColor);
+                    
+                    if(KeyWentDown(gui->input, MouseKey_Left)){
+                        GuiSplitWindow(gui, window, 2, snapRes.rects);
+                    }
+                }
             }
         }
+        
+        // NOTE(Dima): Pushing inner outline
+        PushRectInnerOutline(gui->stack, windowRc, 1, outlineColor);
     }
-    
-    // NOTE(Dima): Pushing inner outline
-    PushRectInnerOutline(gui->stack, windowRc, 1, outlineColor);
-    
 }
 
 void GuiUpdateWindows(Gui_State* gui){
@@ -803,6 +756,14 @@ void GuiUpdateWindows(Gui_State* gui){
         
         updateAt = tempNext;
     }
+}
+
+void GuiBeginUpdateWindows(Gui_State* gui){
+    
+}
+
+void GuiEndUpdateWindows(Gui_State* gui){
+    GuiUpdateWindows(gui);
 }
 
 // NOTE(Dima): Default advance type is Column advance
@@ -865,9 +826,9 @@ inline GuiAdvanceCtx GuiColumnAdvanceCtx(float rememberY, float baseline){
 
 void GuiBeginRow(Gui_State* gui){
     char name[64];
-    stbsp_sprintf(name, "Row or Column: %d", gui->currentPage->curElement->childCount);
+    stbsp_sprintf(name, "Row or Column: %d", gui->curElement->childCount);
     
-    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_RowColumn);
+    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_RowColumn, JOY_TRUE);
     if(GuiElementOpenedInTree(elem)){
         
         Gui_Layout* layout = GetFirstLayout(gui);
@@ -881,9 +842,9 @@ void GuiBeginRow(Gui_State* gui){
 
 void GuiBeginColumn(Gui_State* gui){
     char name[64];
-    stbsp_sprintf(name, "Row or Column: %d", gui->currentPage->curElement->childCount);
+    stbsp_sprintf(name, "Row or Column: %d", gui->curElement->childCount);
     
-    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_RowColumn);
+    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_RowColumn, JOY_TRUE);
     if(GuiElementOpenedInTree(elem)){
         
         Gui_Layout* layout = GetFirstLayout(gui);
@@ -896,7 +857,7 @@ void GuiBeginColumn(Gui_State* gui){
 }
 
 void GuiEndRow(Gui_State* gui){
-    if(GuiElementOpenedInTree(gui->currentPage->curElement)){
+    if(GuiElementOpenedInTree(gui->curElement)){
         
         Gui_Layout* layout = GetFirstLayout(gui);
         
@@ -923,7 +884,7 @@ void GuiEndRow(Gui_State* gui){
 }
 
 void GuiEndColumn(Gui_State* gui){
-    if(GuiElementOpenedInTree(gui->currentPage->curElement)){
+    if(GuiElementOpenedInTree(gui->curElement)){
         
         Gui_Layout* layout = GetFirstLayout(gui);
         
@@ -1002,8 +963,7 @@ void GuiTooltip(Gui_State* gui, char* tooltipText, v2 at){
 
 
 void GuiBeginTree(Gui_State* gui, char* name){
-    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_Item);
-    Gui_Element* tree = GuiBeginTreeNode(gui, name);
+    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_Item, JOY_FALSE);
     
     if(GuiElementOpenedInTree(elem)){
         Gui_Layout* layout = GetFirstLayout(gui);
@@ -1016,7 +976,7 @@ void GuiBeginTree(Gui_State* gui, char* name){
         v4 oulineColor = GUI_GETCOLOR_COLSYS(Color_Red);
         
         GuiPushBut(gui, textRc, PushBut_Grad, oulineColor);
-        if(tree->data.treeNode.opened){
+        if(elem->opened){
             GuiPushBut(gui, textRc, PushBut_Outline, oulineColor);
         }
         
@@ -1024,7 +984,7 @@ void GuiBeginTree(Gui_State* gui, char* name){
             textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
             if(KeyWentDown(gui->input, MouseKey_Left)){
-                tree->data.treeNode.opened = !tree->data.treeNode.opened;
+                elem->opened = !elem->opened;
             }
         }
         PrintText(gui, name, layout->at, textColor);
@@ -1033,12 +993,11 @@ void GuiBeginTree(Gui_State* gui, char* name){
     }
 }
 void GuiEndTree(Gui_State* gui){
-    GuiEndTreeNode(gui);
     GuiEndElement(gui, GuiElement_Item);
 }
 
 void GuiText(Gui_State* gui, char* text){
-    Gui_Element* elem = GuiBeginElement(gui, text, GuiElement_Item);
+    Gui_Element* elem = GuiBeginElement(gui, text, GuiElement_Item, JOY_TRUE);
     if(GuiElementOpenedInTree(elem)){
         Gui_Layout* layout = GetFirstLayout(gui);
         
@@ -1054,7 +1013,7 @@ void GuiText(Gui_State* gui, char* text){
 b32 GuiButton(Gui_State* gui, char* buttonName){
     b32 result = 0;
     
-    Gui_Element* elem = GuiBeginElement(gui, buttonName, GuiElement_Item);
+    Gui_Element* elem = GuiBeginElement(gui, buttonName, GuiElement_Item, JOY_TRUE);
     if(GuiElementOpenedInTree(elem)){
         Gui_Layout* layout = GetFirstLayout(gui);
         
@@ -1062,12 +1021,8 @@ b32 GuiButton(Gui_State* gui, char* buttonName){
         
         // NOTE(Dima): Printing button and text
         rc2 textRc = GetTextRect(gui, buttonName, layout->at);
-        rc2 TempTextRc = GrowRectByScaledValue(textRc, V2(4.0f, 3.0f), gui->fontScale);
-        textRc.max = textRc.min + GetRectDim(TempTextRc);
-        
+        textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 3.0f));
         GuiPushBut(gui, textRc);
-        //PushRect(gui->stack, textRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
-        //PushRectOutline(gui->stack, textRc, 1, GUI_GETCOLOR(GuiColor_Borders));
         
         // NOTE(Dima): Event processing
         v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
@@ -1089,7 +1044,7 @@ b32 GuiButton(Gui_State* gui, char* buttonName){
 }
 
 void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value){
-    Gui_Element* elem = GuiBeginElement(gui, buttonName, GuiElement_Item);
+    Gui_Element* elem = GuiBeginElement(gui, buttonName, GuiElement_Item, JOY_TRUE);
     if(GuiElementOpenedInTree(elem)){
         Gui_Layout* layout = GetFirstLayout(gui);
         
@@ -1097,11 +1052,8 @@ void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value){
         
         // NOTE(Dima): Printing button and text
         rc2 textRc = GetTextRect(gui, buttonName, layout->at);
-        rc2 TempTextRc = GrowRectByScaledValue(textRc, V2(4.0f, 3.0f), gui->fontScale);
-        textRc.max = textRc.min + GetRectDim(TempTextRc);
+        textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 3.0f));
         GuiPushBut(gui, textRc);
-        //PushRect(gui->stack, textRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
-        //PushRectOutline(gui->stack, textRc, 1, GUI_GETCOLOR(GuiColor_Borders));
         
         v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
         
@@ -1128,7 +1080,7 @@ void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value){
 }
 
 void GuiBoolButtonOnOff(Gui_State* gui, char* buttonName, b32* value){
-    Gui_Element* elem = GuiBeginElement(gui, buttonName, GuiElement_Item);
+    Gui_Element* elem = GuiBeginElement(gui, buttonName, GuiElement_Item, JOY_TRUE);
     if(GuiElementOpenedInTree(elem)){
         Gui_Layout* layout = GetFirstLayout(gui);
         
@@ -1136,13 +1088,8 @@ void GuiBoolButtonOnOff(Gui_State* gui, char* buttonName, b32* value){
         
         // NOTE(Dima): Button printing
         rc2 butRc = GetTextRect(gui, "OFF", layout->at);
-        v2 butTextDim = GetRectDim(butRc);
-        rc2 tempButRc = GrowRectByScaledValue(butRc, V2(4.0f, 3.0f), gui->fontScale);
-        v2 tempButRcDim = GetRectDim(tempButRc);
-        butRc.max = butRc.min + tempButRcDim;
+        butRc = GetTxtElemRect(gui, layout, butRc, V2(4.0f, 3.0f));
         GuiPushBut(gui, butRc);
-        //PushRect(gui->stack, butRc, GUI_GETCOLOR(GuiColor_ButtonBackground));
-        //PushRectOutline(gui->stack, butRc, 1, GUI_GETCOLOR(GuiColor_Borders));
         
         // NOTE(Dima): Button name text printing
         float nameStartY = GetCenteredTextOffsetY(gui->mainFont, butRc, gui->fontScale);
@@ -1181,7 +1128,7 @@ void GuiBoolButtonOnOff(Gui_State* gui, char* buttonName, b32* value){
 }
 
 void GuiCheckbox(Gui_State* gui, char* name, b32* value){
-    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_Item);
+    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_Item, JOY_TRUE);
     if(GuiElementOpenedInTree(elem)){
         Gui_Layout* layout = GetFirstLayout(gui);
         
@@ -1192,8 +1139,7 @@ void GuiCheckbox(Gui_State* gui, char* name, b32* value){
         rc2 chkRect;
         chkRect.min = V2(layout->at.x, layout->at.y - GetScaledAscender(gui->mainFont, gui->fontScale));
         chkRect.max = chkRect.min + V2(chkSize, chkSize);
-        rc2 tempButRc = GrowRectByScaledValue(chkRect, V2(2.0f, 2.0f), gui->fontScale);
-        chkRect.max = chkRect.min + GetRectDim(tempButRc);
+        chkRect = GetTxtElemRect(gui, layout, chkRect, V2(2.0f, 2.0f));
         
         // NOTE(Dima): Event processing
         v4 backC = GUI_GETCOLOR(GuiColor_ButtonBackground);
@@ -1207,14 +1153,11 @@ void GuiCheckbox(Gui_State* gui, char* name, b32* value){
             }
         }
         
-        //PushRect(gui->stack, chkRect, backC);
         GuiPushBut(gui, chkRect);
         
         if(*value){
             PushBitmap(gui->stack, gui->checkboxMark, chkRect.min, GetRectHeight(chkRect), V4(1.0f, 1.0f, 1.0f, 1.0f));
         }
-        
-        //PushRectOutline(gui->stack, chkRect, 1, GUI_GETCOLOR(GuiColor_Borders));
         
         // NOTE(Dima): Button name text printing
         float nameStartY = GetCenteredTextOffsetY(gui->mainFont, chkRect, gui->fontScale);
@@ -1225,4 +1168,94 @@ void GuiCheckbox(Gui_State* gui, char* name, b32* value){
         GuiPostAdvance(gui, layout, advanceRect);
     }
     GuiEndElement(gui, GuiElement_Item);
+}
+
+void GuiBeginRadioGroup(
+Gui_State* gui, 
+char* name, 
+u32* ref, 
+u32 defaultId) 
+{
+    Gui_Element* element = GuiBeginElement(gui, 
+                                           name, 
+                                           GuiElement_RadioGroup, 
+                                           JOY_TRUE);
+    
+    if (!element->data.isInit) {
+        element->data.radioGroup.activeId = defaultId;
+        element->data.radioGroup.ref = ref;
+        
+        element->data.isInit = 1;
+    }
+}
+
+INTERNAL_FUNCTION inline Gui_Element* 
+GuiFindRadioGroupParent(Gui_Element* curElement) {
+    Gui_Element* result = 0;
+    
+    Gui_Element* at = curElement;
+    while (at != 0) {
+        if (at->type == GuiElement_RadioGroup) {
+            result = at;
+            break;
+        }
+        
+        at = at->parent;
+    }
+    
+    return(result);
+}
+
+void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId) {
+    
+    Gui_Element* radioBut = GuiBeginElement(gui, name, GuiElement_Item, JOY_TRUE);
+    
+    Gui_Element* radioGroup = GuiFindRadioGroupParent(gui->curElement);
+    if (radioGroup && GuiElementOpenedInTree(radioBut)) {
+        b32 isActive = 0;
+        if (radioGroup->data.radioGroup.activeId == uniqueId) {
+            isActive = 1;
+        }
+        
+        Gui_Layout* layout = GetFirstLayout(gui);
+        
+        GuiPreAdvance(gui, layout);
+        
+        // NOTE(Dima): Printing button and text
+        rc2 textRc = GetTextRect(gui, name, layout->at);
+        textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 3.0f));
+        GuiPushBut(gui, textRc);
+        
+        v4 textC;
+        if(isActive){
+            textC = GUI_GETCOLOR(GuiColor_ButtonForeground);
+            v4 oulineColor = GUI_GETCOLOR_COLSYS(Color_Red);
+            GuiPushBut(gui, textRc, PushBut_Outline, oulineColor);
+        }
+        else{
+            textC = GUI_GETCOLOR(GuiColor_ButtonForegroundDisabled);
+        }
+        
+        if (MouseInRect(gui->input, textRc)) {
+            textC = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
+            
+            if (KeyWentDown(gui->input, MouseKey_Left)) {
+                
+                if(radioGroup->data.radioGroup.ref){
+                    *radioGroup->data.radioGroup.ref = uniqueId;
+                }
+                radioGroup->data.radioGroup.activeId = uniqueId;
+            }
+        }
+        
+        PrintTextCenteredInRect(gui, name, textRc, 1.0f, textC);
+        
+        GuiPostAdvance(gui, layout, textRc);
+    }
+    
+    GuiEndElement(gui, GuiElement_Item);
+}
+
+void GuiEndRadioGroup(Gui_State* gui) {
+    GuiEndElement(gui, GuiElement_RadioGroup);
 }

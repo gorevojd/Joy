@@ -167,6 +167,9 @@ void DSoundInit(DSound_State* dsState, HWND hwnd){
             PlatformError_Error, 
             "Can not create DirectSoundCapture object");
     }
+    
+    ASSERT(dsState->secondaryBufferCreated);
+    ASSERT(dsState->captureBufferCreated);
 }
 
 
@@ -187,6 +190,49 @@ void DSoundFree(DSound_State* ds){
     }
 }
 
+INTERNAL_FUNCTION void
+Win32ClearSoundBuffer(DSound_State* ds)
+{
+    void* region1;
+    DWORD region1Size;
+    void* region2;
+    DWORD region2Size;
+    
+    HRESULT lockResult = ds->secBuf->Lock(
+        0, 
+        ds->secBufDesc.dwBufferBytes,
+        &region1,
+        &region1Size,
+        &region2,
+        &region2Size,
+        DSBLOCK_ENTIREBUFFER);
+    
+    if(SUCCEEDED(lockResult)){
+        int r1NBlocks = region1Size / (ds->waveFormat.nBlockAlign);
+        int r2NBlocks = region2Size / (ds->waveFormat.nBlockAlign);
+        
+        
+        i16* sampleAt = (i16*)region1;
+        for(int bIndex = 0; bIndex < r1NBlocks;
+            bIndex++)
+        {
+            *sampleAt++ = 0;
+            *sampleAt++ = 0;
+        }
+        
+        sampleAt = (i16*)region2;
+        for(int bIndex = 0;
+            bIndex < r2NBlocks;
+            bIndex++)
+        {
+            *sampleAt++ = 0;
+            *sampleAt++ = 0;
+        }
+        
+        HRESULT unlockResult = ds->secBuf->Unlock(region1, region1Size,
+                                                  region2, region2Size);
+    }
+}
 
 LRESULT CALLBACK
 TmpOpenGLWndProc(
@@ -1529,6 +1575,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     // NOTE(Dima): Initializing engine systems
     InitAssets(&gAssets);
     DSoundInit(&gDSound, win32.window);
+    Win32ClearSoundBuffer(&gDSound);
     
 #if JOY_USE_OPENGL
     GlInit(&gGL);
@@ -1666,7 +1713,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         GuiBeginPage(gui, "GUI");
         GuiEndPage(gui);
         
-        //GuiUpdateWindows(gui);
+        GuiUpdateWindows(gui);
         
         GuiBeginLayout(gui, lay);
         GuiBeginTree(gui, "Some text");
@@ -1737,6 +1784,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         GuiCheckbox(gui, "Checkbox4", &checkboxValue4);
         GuiEndTree(gui);
         
+        GuiBeginPage(gui, "Page1");
         GuiBeginTree(gui, "Some more buts");
         GuiBeginRow(gui);
         GuiBeginColumn(gui);
@@ -1748,6 +1796,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         
         GuiBeginColumn(gui);
         GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+        GuiPushDim(gui, V2(100, 40));
         GuiCheckbox(gui, "Checkbox1", &checkboxValue2);
         GuiCheckbox(gui, "Checkbox2", &checkboxValue3);
         GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
@@ -1755,6 +1804,23 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         
         GuiEndRow(gui);
         GuiEndTree(gui);
+        GuiEndPage(gui);
+        
+        GuiBeginRow(gui);
+        static u32 activeRadio = 0;
+        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+        GuiPushDimBegin(gui, V2(100, 40));
+        GuiRadioButton(gui, "radio0", 0);
+        GuiRadioButton(gui, "radio1", 1);
+        GuiRadioButton(gui, "radio2", 2);
+        GuiRadioButton(gui, "radio3", 3);
+        GuiPushDimEnd(gui);
+        GuiEndRadioGroup(gui);
+        
+        char radioTxt[32];
+        stbsp_sprintf(radioTxt, "radio but value: %u", activeRadio);
+        GuiEndRow(gui);
+        GuiText(gui, radioTxt);
         
         GuiTooltip(gui, "Hello world!", gInput.mouseP);
         

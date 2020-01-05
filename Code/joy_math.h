@@ -22,6 +22,11 @@
 #define JOY_MATH_MIN(a, b) ((a) > (b) ? (b) : (a))
 #define JOY_MATH_MAX(a, b) ((a) > (b) ? (a) : (b))
 
+struct Complex_Num {
+	float re;
+	float im;
+};
+
 //NOTE(dima): Structures
 typedef union v2 {
 	struct {
@@ -932,6 +937,45 @@ inline v4 UnpackRGBA(uint32_t Color){
     
     return(res);
 }
+
+/* Complex number math */
+
+inline Complex_Num operator+(Complex_Num a, Complex_Num b) {
+	Complex_Num res;
+    
+	res.re = a.re + b.re;
+	res.im = a.im + b.im;
+    
+	return(res);
+}
+
+inline Complex_Num operator-(Complex_Num a, Complex_Num b) {
+	Complex_Num res;
+    
+	res.re = a.re - b.re;
+	res.im = a.im - b.im;
+    
+	return(res);
+}
+
+inline Complex_Num operator*(Complex_Num a, Complex_Num b) {
+	Complex_Num res;
+    
+	res.re = a.re * b.re - a.im * b.im;
+	res.im = a.im * b.re + a.re * b.im;
+    
+	return(res);
+}
+
+inline Complex_Num operator*(Complex_Num a, float s) {
+	Complex_Num res;
+    
+	res.re = a.re * s;
+	res.im = a.im * s;
+    
+	return(res);
+}
+
 
 /* Rectangle math */
 inline rc2 RcMinMax(v2 Min, v2 Max){
