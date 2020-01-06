@@ -1078,6 +1078,20 @@ inline rc2 RectNormalizeSubpixel(rc2 A){
     return(A);
 }
 
+inline int BoxIntersectsWithBox(rc2 Box1, rc2 Box2) {
+	v2 Box1Dim = GetRectDim(Box1);
+	v2 Box2Dim = GetRectDim(Box2);
+    
+	float DistBetweenCentersX = abs((Box1.min.x - Box2.min.x) * 2.0f + (Box1Dim.x - Box2Dim.x));
+	float DistBetweenCentersY = abs((Box1.min.y - Box2.min.y) * 2.0f + (Box1Dim.y - Box2Dim.y));
+    
+    int IntersectionHappens =
+		((DistBetweenCentersX < Box1Dim.x + Box2Dim.x) &&
+         (DistBetweenCentersY < Box1Dim.y + Box2Dim.y));
+    
+	return(IntersectionHappens);
+}
+
 // NOTE(Dima): Other math
 inline float CalcScreenFitHeight(
 float bmpW, float bmpH,

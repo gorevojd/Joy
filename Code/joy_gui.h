@@ -77,16 +77,27 @@ struct GuiAdvanceCtx{
     float maxVert;
 };
 
+enum Gui_Layout_Type{
+    GuiLayout_Layout,
+    GuiLayout_Window,
+};
+
 struct Gui_Layout{
     v2 start;
     v2 at;
+    v2 dim;
+    
+    char name[128];
+    u32 id;
+    u32 type;
+    
+    struct Gui_Element* elem;
+    
+    Gui_Layout* next;
+    Gui_Layout* prev;
     
     GuiAdvanceCtx advanceRememberStack[16];
     int stackCurrentIndex;
-    
-    v2 dimStack[16];
-    int dimStackIndex;
-    b32 inPushBlock;
 };
 
 struct Gui_Window{
@@ -117,6 +128,16 @@ struct Gui_Tooltip{
     v2 at;
 };
 
+struct Gui_Page{
+    char name[128];
+    u32 id;
+    
+    Gui_Element* elem;
+    
+    Gui_Page* next;
+    Gui_Page* prev;
+};
+
 enum Gui_Element_Type{
     GuiElement_None,
     GuiElement_Root,
@@ -126,6 +147,7 @@ enum Gui_Element_Type{
     GuiElement_Item,
     GuiElement_RowColumn,
     GuiElement_RadioGroup,
+    GuiElement_Layout,
 };
 
 struct Gui_Element{
@@ -137,6 +159,14 @@ struct Gui_Element{
                 u32* ref;
                 u32 activeId;
             } radioGroup;
+            
+            struct {
+                Gui_Layout* ref;
+            } layout;
+            
+            struct {
+                Gui_Page* ref;
+            } page;
         };
         
         // NOTE(Dima): is initialized (b32)
@@ -169,8 +199,12 @@ struct Gui_State{
     Input* input;
     Memory_Region* mem;
     
-    Gui_Layout layout;
-    Gui_Layout* currentLayout;
+    Gui_Page rootPage;
+    Gui_Page* currentPage;
+    int pageCount;
+    
+    Gui_Layout rootLayout;
+    int layoutCount;
     
     Gui_Element* rootElement;
     Gui_Element* curElement;
@@ -198,45 +232,74 @@ struct Gui_State{
     Color_State colorState;
     v4 colors[GuiColor_Count];
     float windowAlpha;
+    
+    v2 dimStack[128];
+    int dimStackIndex;
+    b32 inPushBlock;
 };
+
+inline Gui_Element* 
+GuiFindElementOfTypeUpInTree(Gui_Element* curElement, u32 elementType) {
+    Gui_Element* result = 0;
+    
+    Gui_Element* at = curElement;
+    while (at != 0) {
+        if (at->type == elementType) {
+            result = at;
+            break;
+        }
+        
+        at = at->parent;
+    }
+    
+    return(result);
+}
 
 
 //TODO(Dima): Delete this
-inline Gui_Layout* GetFirstLayout(Gui_State* gui){
-    Gui_Layout* res = &gui->layout;
+inline Gui_Layout* GetParentLayout(Gui_State* gui){
+    Gui_Layout* res = 0;
+    
+    Gui_Element* layoutElem = GuiFindElementOfTypeUpInTree(
+        gui->curElement, 
+        GuiElement_Layout);
+    
+    if(!layoutElem){
+        res = &gui->rootLayout;
+    }
+    else{
+        res = layoutElem->data.layout.ref;
+    }
     
     return(res);
 }
 
 inline void GuiPushDim(Gui_State* gui, v2 dim){
-    Gui_Layout* lay = GetFirstLayout(gui);
-    
-    ASSERT(lay->dimStackIndex < ARRAY_COUNT(lay->dimStack));
+    ASSERT(gui->dimStackIndex < ARRAY_COUNT(gui->dimStack));
+    ASSERT(!gui->inPushBlock);
     
     // NOTE(Dima): can't push if inside push block
-    if(lay->inPushBlock){
+    if(gui->inPushBlock){
         
     }
     else{
-        lay->dimStack[lay->dimStackIndex++] = dim;
+        gui->dimStack[gui->dimStackIndex++] = dim;
     }
 }
 
 inline b32 GuiPopDim(Gui_State* gui, v2* outDim){
-    Gui_Layout* lay = GetFirstLayout(gui);
-    
     b32 result = 0;
     
-    int decrementValue = lay->inPushBlock ? 0 : 1;
+    int decrementValue = gui->inPushBlock ? 0 : 1;
     
-    if(lay->dimStackIndex > 0){
+    if(gui->dimStackIndex > 0){
         result = 1;
         
         if(outDim){
-            int viewIndex = lay->dimStackIndex - 1;
-            *outDim = lay->dimStack[viewIndex];
-            lay->dimStackIndex -= decrementValue;
+            int viewIndex = gui->dimStackIndex - 1;
+            *outDim = gui->dimStack[viewIndex];
         }
+        gui->dimStackIndex -= decrementValue;
     }
     
     return(result);
@@ -244,17 +307,13 @@ inline b32 GuiPopDim(Gui_State* gui, v2* outDim){
 
 
 inline void GuiPushDimBegin(Gui_State* gui, v2 dim){
-    Gui_Layout* lay = GetFirstLayout(gui);
+    gui->dimStack[gui->dimStackIndex++] = dim;
     
-    lay->dimStack[lay->dimStackIndex++] = dim;
-    
-    lay->inPushBlock = 1;
+    gui->inPushBlock = 1;
 }
 
 inline void GuiPushDimEnd(Gui_State* gui){
-    Gui_Layout* lay = GetFirstLayout(gui);
-    
-    lay->inPushBlock = 0;
+    gui->inPushBlock = 0;
     
     GuiPopDim(gui, 0);
 }
@@ -308,8 +367,12 @@ Memory_Region* mem,
 Render_Stack* stack,
 int width,
 int height);
-void GuiBeginLayout(Gui_State* gui, Gui_Layout* layout);
-void GuiEndLayout(Gui_State* gui, Gui_Layout* layout);
+
+void GuiFrameBegin(Gui_State* gui);
+void GuiFrameEnd(Gui_State* gui);
+
+void GuiBeginLayout(Gui_State* gui, char* name, u32 layoutType);
+void GuiEndLayout(Gui_State* gui);
 
 void GuiBeginPage(Gui_State* gui, char* name);
 void GuiEndPage(Gui_State* gui);
@@ -319,7 +382,7 @@ void GuiEndRow(Gui_State* gui);
 void GuiBeginColumn(Gui_State* gui);
 void GuiEndColumn(Gui_State* gui);
 
-void GuiPreRender(Gui_State* gui);
+void GuiFramePrepare4Render(Gui_State* gui);
 
 void GuiTooltip(Gui_State* gui, char* tooltipText, v2 at);
 void GuiText(Gui_State* gui, char* text);

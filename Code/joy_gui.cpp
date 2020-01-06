@@ -340,10 +340,39 @@ INTERNAL_FUNCTION void GuiInitRoot(Gui_State* gui, Gui_Element** root){
 }
 
 void GuiBeginPage(Gui_State* gui, char* name){
-    GuiBeginElement(gui, 
-                    name,
-                    GuiElement_Page,
-                    JOY_TRUE);
+    u32 nameID = StringHashFNV(name);
+    
+    Gui_Page* foundPage = 0;
+    Gui_Page* pageAt = gui->rootPage.next;
+    for(pageAt; pageAt != &gui->rootPage; pageAt = pageAt->next){
+        if(nameID == pageAt->id){
+            foundPage = pageAt;
+            break;
+        }
+    }
+    
+    if(!foundPage){
+        foundPage = PushStruct(gui->mem, Gui_Page);
+        
+        CopyStrings(foundPage->name, sizeof(foundPage->name), name);
+        foundPage->id = nameID;
+        
+        foundPage->next = gui->rootPage.next;
+        foundPage->prev = &gui->rootPage;
+        foundPage->next->prev = foundPage;
+        foundPage->prev->next = foundPage;
+        
+        ++gui->pageCount;
+    }
+    
+    // NOTE(Dima): Init page element
+    Gui_Element* pageElem = GuiBeginElement(gui, 
+                                            name,
+                                            GuiElement_Page,
+                                            JOY_TRUE);
+    // NOTE(Dima): Init references
+    pageElem->data.page.ref = foundPage;
+    foundPage->elem = pageElem;
 }
 
 void GuiEndPage(Gui_State* gui){
@@ -367,11 +396,32 @@ int height)
     gui->input = input;
     gui->mem = mem;
     
-    gui->layout = {};
-    gui->currentLayout = 0;
-    
     gui->width = width;
     gui->height = height;
+    
+    // NOTE(Dima): Init layouts
+    gui->layoutCount = 1;
+    gui->rootLayout = {};
+    gui->rootLayout.next = &gui->rootLayout;
+    gui->rootLayout.prev = &gui->rootLayout;
+    CopyStrings(gui->rootLayout.name, "RootLayout");
+    gui->rootLayout.id = StringHashFNV(gui->rootLayout.name);
+    
+    // NOTE(Dima): Init dim stack
+    for(int dimIndex = 0; dimIndex < ARRAY_COUNT(gui->dimStack); dimIndex++){
+        gui->dimStack[dimIndex] = {};
+    }
+    gui->dimStackIndex = 0;
+    gui->inPushBlock = 0;
+    
+    
+    // NOTE(Dima): Init pages
+    gui->pageCount = 1;
+    gui->rootPage = {};
+    gui->rootPage.next = &gui->rootPage;
+    gui->rootPage.prev = &gui->rootPage;
+    CopyStrings(gui->rootPage.name, "RootPage");
+    gui->rootPage.id = StringHashFNV(gui->rootPage.name);
     
     // NOTE(Dima): Initializing of window free pool and sentinels
     gui->windowUseSentinel.nextAlloc = &gui->windowUseSentinel;
@@ -558,23 +608,93 @@ rc2 PrintTextCenteredInRect(Gui_State* gui, char* text, rc2 rect, float scale, v
     return(result);
 }
 
-void GuiBeginLayout(Gui_State* gui, Gui_Layout* layout){
-    layout->at = V2(0.0f, 0.0f);
+INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 layoutType, Gui_Element* layoutElem){
+    // NOTE(Dima): initializing references
+    layoutElem->data.layout.ref = layout;
+    layout->elem = layoutElem;
     
-    gui->currentLayout = layout;
-    
-    // NOTE(Dima): Init dim stack
-    for(int dimIndex = 0; dimIndex < ARRAY_COUNT(layout->dimStack); dimIndex++){
-        layout->dimStack[dimIndex] = {};
+    v2 popDim;
+    if(!GuiPopDim(gui, &popDim)){
+        popDim = V2(640, 480);
     }
-    layout->dimStackIndex = 0;
-    layout->inPushBlock = 0;
+    
+    // NOTE(Dima): Layout initializing
+    layout->type = layoutType;
+    if(!layoutElem->data.isInit){
+        layout->start = V2(100.0f, 100.0f) * (gui->layoutCount - 1);
+        layout->at = layout->start;
+        
+        switch(layoutType){
+            case GuiLayout_Layout:{
+                layout->dim = V2(gui->width, gui->height);
+            }break;
+            
+            case GuiLayout_Window:{
+                layout->dim = popDim;
+            }break;
+        }
+        
+        layoutElem->data.isInit = JOY_TRUE;
+    }
+    
+    // NOTE(Dima): Initializing initial advance ctx
+    layout->advanceRememberStack[0].type = GuiAdvanceType_Column;
+    layout->advanceRememberStack[0].rememberValue = layout->start.y;
+    layout->advanceRememberStack[0].baseline = layout->start.x;
+    
+    if(layoutType == GuiLayout_Window){
+        rc2 windowRc = RcMinDim(layout->start, layout->dim);
+        PushRect(gui->stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
+        
+        v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
+        if(MouseInRect(gui->input, windowRc)){
+            outlineColor = GUI_GETCOLOR(GuiColor_WindowBorderHot);
+        }
+        
+        // NOTE(Dima): Pushing inner outline
+        PushRectOutline(gui->stack, windowRc, 2, outlineColor);
+    }
 }
 
-void GuiEndLayout(Gui_State* gui, Gui_Layout* layout){
-    layout->at = V2(0.0f, 0.0f);
+void GuiBeginLayout(Gui_State* gui, char* name, u32 layoutType){
+    // NOTE(Dima): In list inserting
+    u32 nameID = StringHashFNV(name);
     
-    gui->currentLayout = 0;
+    Gui_Layout* foundLayout = 0;
+    Gui_Layout* layoutAt = gui->rootLayout.next;
+    for(layoutAt; layoutAt != &gui->rootLayout; layoutAt = layoutAt->next){
+        if(nameID == layoutAt->id){
+            foundLayout = layoutAt;
+            break;
+        }
+    }
+    
+    if(!foundLayout){
+        foundLayout = PushStruct(gui->mem, Gui_Layout);
+        
+        CopyStrings(foundLayout->name, sizeof(foundLayout->name), name);
+        foundLayout->id = nameID;
+        
+        foundLayout->next = gui->rootLayout.next;
+        foundLayout->prev = &gui->rootLayout;
+        foundLayout->next->prev = foundLayout;
+        foundLayout->prev->next = foundLayout;
+        
+        ++gui->layoutCount;
+    }
+    
+    // NOTE(Dima): Beginnning layout elem
+    Gui_Element* layoutElem = GuiBeginElement(gui, name, GuiElement_Layout, JOY_TRUE);
+    
+    GuiInitLayout(gui, foundLayout, layoutType, layoutElem);
+}
+
+void GuiEndLayout(Gui_State* gui){
+    Gui_Layout* lay = GetParentLayout(gui);
+    
+    lay->at = lay->start;
+    
+    GuiEndElement(gui, GuiElement_Layout);
 }
 
 struct GuiSnapInWindowResult{
@@ -766,6 +886,37 @@ void GuiEndUpdateWindows(Gui_State* gui){
     GuiUpdateWindows(gui);
 }
 
+void GuiFrameBegin(Gui_State* gui){
+    // NOTE(Dima): Init dim stack
+    // NOTE(Dima): Init dim stack
+    gui->dimStackIndex = 0;
+    gui->inPushBlock = 0;
+    
+    
+    // NOTE(Dima): Init root layout
+    Gui_Element* layoutElem = GuiBeginElement(gui, 
+                                              gui->rootLayout.name, 
+                                              GuiElement_Layout, 
+                                              JOY_TRUE);
+    GuiInitLayout(gui, &gui->rootLayout, GuiLayout_Layout, layoutElem);
+}
+
+void GuiFrameEnd(Gui_State* gui){
+    // NOTE(Dima): Deinit root layout
+    gui->rootLayout.at = gui->rootLayout.start;
+    GuiEndElement(gui, GuiElement_Layout);
+}
+
+void GuiFramePrepare4Render(Gui_State* gui){
+    for(int tooltipIndex = 0; tooltipIndex < GUI_MAX_TOOLTIPS; tooltipIndex++){
+        Gui_Tooltip* ttip= &gui->tooltips[tooltipIndex];
+        
+        PrintText(gui, ttip->text, ttip->at, GUI_GETCOLOR(GuiColor_Text), 1.0f);
+    }
+    gui->tooltipIndex = 0;
+}
+
+
 // NOTE(Dima): Default advance type is Column advance
 inline void GuiPreAdvance(Gui_State* gui, Gui_Layout* layout){
     GuiAdvanceCtx* ctx = &layout->advanceRememberStack[layout->stackCurrentIndex];
@@ -831,7 +982,7 @@ void GuiBeginRow(Gui_State* gui){
     Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_RowColumn, JOY_TRUE);
     if(GuiElementOpenedInTree(elem)){
         
-        Gui_Layout* layout = GetFirstLayout(gui);
+        Gui_Layout* layout = GetParentLayout(gui);
         
         Assert(layout->stackCurrentIndex < ArrayCount(layout->advanceRememberStack));
         
@@ -847,7 +998,7 @@ void GuiBeginColumn(Gui_State* gui){
     Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_RowColumn, JOY_TRUE);
     if(GuiElementOpenedInTree(elem)){
         
-        Gui_Layout* layout = GetFirstLayout(gui);
+        Gui_Layout* layout = GetParentLayout(gui);
         
         Assert(layout->stackCurrentIndex < ArrayCount(layout->advanceRememberStack));
         
@@ -859,7 +1010,7 @@ void GuiBeginColumn(Gui_State* gui){
 void GuiEndRow(Gui_State* gui){
     if(GuiElementOpenedInTree(gui->curElement)){
         
-        Gui_Layout* layout = GetFirstLayout(gui);
+        Gui_Layout* layout = GetParentLayout(gui);
         
         Assert(layout->stackCurrentIndex >= 1);
         
@@ -886,7 +1037,7 @@ void GuiEndRow(Gui_State* gui){
 void GuiEndColumn(Gui_State* gui){
     if(GuiElementOpenedInTree(gui->curElement)){
         
-        Gui_Layout* layout = GetFirstLayout(gui);
+        Gui_Layout* layout = GetParentLayout(gui);
         
         Assert(layout->stackCurrentIndex >= 1);
         
@@ -944,13 +1095,19 @@ INTERNAL_FUNCTION void GuiPushBut(Gui_State* gui, rc2 rect, u32 type = PushBut_G
     }
 }
 
-void GuiPreRender(Gui_State* gui){
-    for(int tooltipIndex = 0; tooltipIndex < GUI_MAX_TOOLTIPS; tooltipIndex++){
-        Gui_Tooltip* ttip= &gui->tooltips[tooltipIndex];
-        
-        PrintText(gui, ttip->text, ttip->at, GUI_GETCOLOR(GuiColor_Text), 1.0f);
-    }
-    gui->tooltipIndex = 0;
+inline b32 PotentiallyVisible(Gui_Layout* lay, v2 dim){
+    rc2 layRc = RcMinDim(lay->start, lay->dim);
+    rc2 targetRc = RcMinDim(lay->at, dim);
+    
+    b32 res = BoxIntersectsWithBox(layRc, targetRc);
+    
+    return(res);
+}
+
+inline b32 PotentiallyVisibleSmall(Gui_Layout* lay){
+    v2 dim = V2(200, 40);
+    
+    return(PotentiallyVisible(lay, dim));
 }
 
 void GuiTooltip(Gui_State* gui, char* tooltipText, v2 at){
@@ -966,7 +1123,7 @@ void GuiBeginTree(Gui_State* gui, char* name){
     Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_Item, JOY_FALSE);
     
     if(GuiElementOpenedInTree(elem)){
-        Gui_Layout* layout = GetFirstLayout(gui);
+        Gui_Layout* layout = GetParentLayout(gui);
         
         GuiPreAdvance(gui, layout);
         
@@ -998,9 +1155,11 @@ void GuiEndTree(Gui_State* gui){
 
 void GuiText(Gui_State* gui, char* text){
     Gui_Element* elem = GuiBeginElement(gui, text, GuiElement_Item, JOY_TRUE);
-    if(GuiElementOpenedInTree(elem)){
-        Gui_Layout* layout = GetFirstLayout(gui);
-        
+    Gui_Layout* layout = GetParentLayout(gui);
+    
+    if(GuiElementOpenedInTree(elem) && 
+       PotentiallyVisibleSmall(layout))
+    {
         GuiPreAdvance(gui, layout);
         
         rc2 textRc = PrintText(gui, text, layout->at, GUI_GETCOLOR(GuiColor_Text));
@@ -1014,9 +1173,11 @@ b32 GuiButton(Gui_State* gui, char* buttonName){
     b32 result = 0;
     
     Gui_Element* elem = GuiBeginElement(gui, buttonName, GuiElement_Item, JOY_TRUE);
-    if(GuiElementOpenedInTree(elem)){
-        Gui_Layout* layout = GetFirstLayout(gui);
-        
+    Gui_Layout* layout = GetParentLayout(gui);
+    
+    if(GuiElementOpenedInTree(elem) && 
+       PotentiallyVisibleSmall(layout))
+    {
         GuiPreAdvance(gui, layout);
         
         // NOTE(Dima): Printing button and text
@@ -1045,9 +1206,11 @@ b32 GuiButton(Gui_State* gui, char* buttonName){
 
 void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value){
     Gui_Element* elem = GuiBeginElement(gui, buttonName, GuiElement_Item, JOY_TRUE);
-    if(GuiElementOpenedInTree(elem)){
-        Gui_Layout* layout = GetFirstLayout(gui);
-        
+    Gui_Layout* layout = GetParentLayout(gui);
+    
+    if(GuiElementOpenedInTree(elem) && 
+       PotentiallyVisibleSmall(layout))
+    {
         GuiPreAdvance(gui, layout);
         
         // NOTE(Dima): Printing button and text
@@ -1081,9 +1244,11 @@ void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value){
 
 void GuiBoolButtonOnOff(Gui_State* gui, char* buttonName, b32* value){
     Gui_Element* elem = GuiBeginElement(gui, buttonName, GuiElement_Item, JOY_TRUE);
-    if(GuiElementOpenedInTree(elem)){
-        Gui_Layout* layout = GetFirstLayout(gui);
-        
+    Gui_Layout* layout = GetParentLayout(gui);
+    
+    if(GuiElementOpenedInTree(elem) && 
+       PotentiallyVisibleSmall(layout))
+    {
         GuiPreAdvance(gui, layout);
         
         // NOTE(Dima): Button printing
@@ -1129,8 +1294,11 @@ void GuiBoolButtonOnOff(Gui_State* gui, char* buttonName, b32* value){
 
 void GuiCheckbox(Gui_State* gui, char* name, b32* value){
     Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_Item, JOY_TRUE);
-    if(GuiElementOpenedInTree(elem)){
-        Gui_Layout* layout = GetFirstLayout(gui);
+    Gui_Layout* layout = GetParentLayout(gui);
+    
+    if(GuiElementOpenedInTree(elem) && 
+       PotentiallyVisibleSmall(layout))
+    {
         
         GuiPreAdvance(gui, layout);
         
@@ -1207,17 +1375,19 @@ GuiFindRadioGroupParent(Gui_Element* curElement) {
 }
 
 void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId) {
-    
     Gui_Element* radioBut = GuiBeginElement(gui, name, GuiElement_Item, JOY_TRUE);
-    
     Gui_Element* radioGroup = GuiFindRadioGroupParent(gui->curElement);
-    if (radioGroup && GuiElementOpenedInTree(radioBut)) {
+    Gui_Layout* layout = GetParentLayout(gui);
+    
+    if (radioGroup && 
+        GuiElementOpenedInTree(radioBut) && 
+        PotentiallyVisibleSmall(layout)) 
+    {
         b32 isActive = 0;
         if (radioGroup->data.radioGroup.activeId == uniqueId) {
             isActive = 1;
         }
         
-        Gui_Layout* layout = GetFirstLayout(gui);
         
         GuiPreAdvance(gui, layout);
         
