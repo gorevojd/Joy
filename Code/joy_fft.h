@@ -1,7 +1,7 @@
 #ifndef JOY_FFT_H
 #define JOY_FFT_H
 
-#include "joy_math.h"
+#include <std::complex>
 
 #endif
 
@@ -9,12 +9,12 @@
 #define JOY_FFT_IMPLEMENTATION_DONE
 
 
-void Dft(Complex_Num* in, Complex_Num* out, int count) {
+void Dft(std::complex<float>* in, std::complex<float>* out, int count) {
 	float invCount = 1.0f / (float)count;
 	
 	for (int n = 0; n < count; n++)
 	{
-		Complex_Num xn = {};
+		std::complex<float> xn = {};
         
 		for (int k = 0; k < count; k++) {
 			float angle = 2.0f * PI * (float)k * (float)n * invCount;
@@ -30,12 +30,12 @@ void Dft(Complex_Num* in, Complex_Num* out, int count) {
 	}
 }
 
-void DftInv(Complex_Num* in, int count, Complex_Num* out) {
+void DftInv(std::complex<float>* in, int count, std::complex<float>* out) {
 	float invCount = 1.0f / (float)count;
     
 	for (int k = 0; k < count; k++)
 	{
-		Complex_Num xk = {};
+		std::complex<float> xk = {};
         
 		for (int n = 0; n < count; n++)
 		{

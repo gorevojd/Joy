@@ -123,13 +123,13 @@ void FreeStringList(Loaded_Strings* list){
 Bmp_Info AssetAllocateBitmapInternal(u32 width, u32 height, void* pixelsData) {
 	Bmp_Info res = {};
     
-	res.width = width;
-	res.height = height;
-	res.pitch = 4 * width;
+	res.Width = width;
+	res.Height = height;
+	res.Pitch = 4 * width;
     
-	res.widthOverHeight = (float)width / (float)height;
+	res.WidthOverHeight = (float)width / (float)height;
     
-	res.pixels = (u8*)pixelsData;
+	res.Pixels = (u8*)pixelsData;
     
 	return(res);
 }
@@ -146,21 +146,21 @@ Bmp_Info AssetAllocateBitmap(u32 width, u32 height) {
 }
 
 void AssetCopyBitmapData(Bmp_Info* Dst, Bmp_Info* Src) {
-	Assert(Dst->width == Src->width);
-	Assert(Dst->height == Src->height);
+	Assert(Dst->Width == Src->Width);
+	Assert(Dst->Height == Src->Height);
     
-	u32* DestOut = (u32*)Dst->pixels;
-	u32* ScrPix = (u32*)Src->pixels;
-	for (int j = 0; j < Src->height; j++) {
-		for (int i = 0; i < Src->width; i++) {
+	u32* DestOut = (u32*)Dst->Pixels;
+	u32* ScrPix = (u32*)Src->Pixels;
+	for (int j = 0; j < Src->Height; j++) {
+		for (int i = 0; i < Src->Width; i++) {
 			*DestOut++ = *ScrPix++;
 		}
 	}
 }
 
 void AssetDeallocateBitmap(Bmp_Info* Buffer) {
-	if (Buffer->pixels) {
-		free(Buffer->pixels);
+	if (Buffer->Pixels) {
+		free(Buffer->Pixels);
 	}
 }
 
@@ -218,7 +218,7 @@ Bmp_Info LoadBMP(char* FilePath){
             _mm_or_si128(mmColorShifted_r, mmColorShifted_g),
             _mm_or_si128(mmColorShifted_b, mmColorShifted_a));
         
-        _mm_storeu_si128((__m128i*)((u32*)res.pixels + PixelIndex), mmResult);
+        _mm_storeu_si128((__m128i*)((u32*)res.Pixels + PixelIndex), mmResult);
     }
     
     for(PixelIndex;
@@ -234,7 +234,7 @@ Bmp_Info LoadBMP(char* FilePath){
         
         u32 PackedColor = PackRGBA(Color);
         
-        *((u32*)res.pixels + PixelIndex) = PackedColor;
+        *((u32*)res.Pixels + PixelIndex) = PackedColor;
     }
     
     stbi_image_free(Image);
@@ -254,10 +254,10 @@ u32 Flags,
 int BlurRadius,
 float* GaussianBox)
 {
-    int glyphIndex = FontInfo->glyphCount++;
-    Glyph_Info* glyph = &FontInfo->glyphs[glyphIndex];
+    int glyphIndex = FontInfo->GlyphCount++;
+    Glyph_Info* glyph = &FontInfo->Glyphs[glyphIndex];
     
-    FontInfo->codepoint2Glyph[Codepoint] = glyphIndex;
+    FontInfo->Codepoint2Glyph[Codepoint] = glyphIndex;
     
     int CharWidth;
 	int CharHeight;
@@ -292,22 +292,22 @@ float* GaussianBox)
     
     stbtt_GetCodepointHMetrics(STBFont, Codepoint, &Advance, &LeftBearingX);
     
-    glyph->width = CharBmpWidth + ShadowOffset;
-	glyph->height = CharBmpHeight + ShadowOffset;
-	glyph->bitmap = AssetAllocateBitmap(glyph->width, glyph->height);
-	glyph->advance = Advance * FontScale;
-	glyph->leftBearingX = LeftBearingX * FontScale;
-	glyph->xOffset = XOffset - CharBorder;
-	glyph->yOffset = YOffset - CharBorder;
-	glyph->codepoint = Codepoint;
+    glyph->Width = CharBmpWidth + ShadowOffset;
+	glyph->Height = CharBmpHeight + ShadowOffset;
+	glyph->Bitmap = AssetAllocateBitmap(glyph->Width, glyph->Height);
+	glyph->Advance = Advance * FontScale;
+	glyph->LeftBearingX = LeftBearingX * FontScale;
+	glyph->XOffset = XOffset - CharBorder;
+	glyph->YOffset = YOffset - CharBorder;
+	glyph->Codepoint = Codepoint;
     
-    *AtlasWidth += glyph->width;
-	*AtlasHeight = Max(*AtlasHeight, glyph->height);
+    *AtlasWidth += glyph->Width;
+	*AtlasHeight = Max(*AtlasHeight, glyph->Height);
     
     //NOTE(dima): Clearing the image bytes
-	u32* Pixel = (u32*)glyph->bitmap.pixels;
-	for (int Y = 0; Y < glyph->height; Y++) {
-		for (int X = 0; X < glyph->width; X++) {
+	u32* Pixel = (u32*)glyph->Bitmap.Pixels;
+	for (int Y = 0; Y < glyph->Height; Y++) {
+		for (int X = 0; X < glyph->Width; X++) {
 			*Pixel++ = 0;
 		}
 	}
@@ -330,7 +330,7 @@ float* GaussianBox)
 			resColor.b *= resColor.a;
             
 			u32 ColorValue = PackRGBA(resColor);
-			u32* TargetPixel = (u32*)((u8*)CharBitmap.pixels + j* CharBitmap.pitch + i * 4);
+			u32* TargetPixel = (u32*)((u8*)CharBitmap.Pixels + j* CharBitmap.Pitch + i * 4);
 			*TargetPixel = ColorValue;
 		}
 	}
@@ -359,17 +359,17 @@ float* GaussianBox)
 #if 1
 		BlurBitmapExactGaussian(
 			&ToBlur,
-			BlurredResult.pixels,
-			ToBlur.width,
-			ToBlur.height,
+			BlurredResult.Pixels,
+			ToBlur.Width,
+			ToBlur.Height,
 			BlurRadius,
 			GaussianBox);
         
         
-		for (int Y = 0; Y < ToBlur.height; Y++) {
-			for (int X = 0; X < ToBlur.width; X++) {
-				u32* FromPix = (u32*)BlurredResult.pixels + Y * BlurredResult.width + X;
-				u32* ToPix = (u32*)ToBlur.pixels + Y * ToBlur.width + X;
+		for (int Y = 0; Y < ToBlur.Height; Y++) {
+			for (int X = 0; X < ToBlur.Width; X++) {
+				u32* FromPix = (u32*)BlurredResult.Pixels + Y * BlurredResult.Width + X;
+				u32* ToPix = (u32*)ToBlur.Pixels + Y * ToBlur.Width + X;
                 
 				v4 FromColor = UnpackRGBA(*FromPix);
                 
@@ -384,24 +384,24 @@ float* GaussianBox)
         
 		BlurBitmapExactGaussian(
 			&ToBlur,
-			BlurredResult.pixels,
-			ToBlur.width,
-			ToBlur.height,
+			BlurredResult.Pixels,
+			ToBlur.Width,
+			ToBlur.Height,
 			BlurRadius,
 			GaussianBox);
         
 #else
 		BlurBitmapApproximateGaussian(
 			&ToBlur,
-			BlurredResult.pixels,
-			TempBitmap.pixels,
-			ToBlur.width,
-			ToBlur.height,
+			BlurredResult.Pixels,
+			TempBitmap.Pixels,
+			ToBlur.Width,
+			ToBlur.Height,
 			BlurRadius);
-		for (int Y = 0; Y < ToBlur.height; Y++) {
-			for (int X = 0; X < ToBlur.width; X++) {
-				u32* FromPix = (u32*)BlurredResult.pixels + Y * BlurredResult.width + X;
-				u32* ToPix = (u32*)ToBlur.pixels + Y * ToBlur.width + X;
+		for (int Y = 0; Y < ToBlur.Height; Y++) {
+			for (int X = 0; X < ToBlur.Width; X++) {
+				u32* FromPix = (u32*)BlurredResult.Pixels + Y * BlurredResult.Width + X;
+				u32* ToPix = (u32*)ToBlur.Pixels + Y * ToBlur.Width + X;
 				v4 FromColor = UnpackRGBA(*FromPix);
 				v4 resColor = FromColor;
 				if (resColor.a > 0.05f) {
@@ -412,15 +412,15 @@ float* GaussianBox)
 		}
 		BlurBitmapApproximateGaussian(
 			&ToBlur,
-			BlurredResult.pixels,
-			TempBitmap.pixels,
-			ToBlur.width,
-			ToBlur.height,
+			BlurredResult.Pixels,
+			TempBitmap.Pixels,
+			ToBlur.Width,
+			ToBlur.Height,
 			BlurRadius);
 #endif
         
 		RenderOneBitmapIntoAnother(
-			&glyph->bitmap,
+			&glyph->Bitmap,
 			&BlurredResult,
 			0, 0,
 			V4(0.0f, 0.0f, 0.0f, 1.0f));
@@ -433,7 +433,7 @@ float* GaussianBox)
     if(Flags & LoadFont_BakeShadow){
         
         RenderOneBitmapIntoAnother(
-            &glyph->bitmap,
+            &glyph->Bitmap,
             &CharBitmap,
             CharBorder + ShadowOffset,
             CharBorder + ShadowOffset,
@@ -442,7 +442,7 @@ float* GaussianBox)
     }
     
     RenderOneBitmapIntoAnother(
-        &glyph->bitmap,
+        &glyph->Bitmap,
         &CharBitmap,
         CharBorder,
         CharBorder,
@@ -473,9 +473,9 @@ Font_Info LoadFont(char* FilePath, float height, u32 Flags){
 		&DescenderHeight,
 		&LineGap);
     
-    res.ascenderHeight = (float)AscenderHeight * Scale;
-	res.descenderHeight = (float)DescenderHeight * Scale;
-	res.lineGap = (float)LineGap * Scale;
+    res.AscenderHeight = (float)AscenderHeight * Scale;
+	res.DescenderHeight = (float)DescenderHeight * Scale;
+	res.LineGap = (float)LineGap * Scale;
     
     int AtlasWidth = 0;
     int AtlasHeight = 0;
@@ -506,18 +506,18 @@ Font_Info LoadFont(char* FilePath, float height, u32 Flags){
     }
     
     //NOTE(dima): Processing kerning
-	res.kerningPairs = (float*)malloc(sizeof(float) * res.glyphCount * res.glyphCount);
+	res.KerningPairs = (float*)malloc(sizeof(float) * res.GlyphCount * res.GlyphCount);
     
-	for (int firstIndex = 0; firstIndex < res.glyphCount; firstIndex++) {
-		for (int secondIndex = 0; secondIndex < res.glyphCount; secondIndex++) {
-			u32 KerningIndex = secondIndex * res.glyphCount + firstIndex;
+	for (int firstIndex = 0; firstIndex < res.GlyphCount; firstIndex++) {
+		for (int secondIndex = 0; secondIndex < res.GlyphCount; secondIndex++) {
+			u32 KerningIndex = secondIndex * res.GlyphCount + firstIndex;
             
-			int FirstCodepoint = res.glyphs[firstIndex].codepoint;
-			int SecondCodepoint = res.glyphs[secondIndex].codepoint;
+			int FirstCodepoint = res.Glyphs[firstIndex].Codepoint;
+			int SecondCodepoint = res.Glyphs[secondIndex].Codepoint;
             
 			int Kern = stbtt_GetGlyphKernAdvance(&STBFont, FirstCodepoint, SecondCodepoint);
             
-			res.kerningPairs[KerningIndex] = (float)Kern * Scale;
+			res.KerningPairs[KerningIndex] = (float)Kern * Scale;
 		}
 	}
     
@@ -526,3 +526,499 @@ Font_Info LoadFont(char* FilePath, float height, u32 Flags){
     return(res);
 }
 
+Mesh_Info MakeMesh(
+std::vector<v3>& Positions,
+std::vector<v2>& TexCoords,
+std::vector<v3>& Normals,
+std::vector<v3>& Tangents,
+std::vector<v3>& Colors,
+std::vector<u32> Indices,
+b32 CalculateNormals,
+b32 CalculateTangents)
+{
+	Mesh_Info Result = {};
+    
+    u32 VerticesCount = Positions.size();
+    
+	Result.Handle = 0;
+	Result.IndicesCount = Indices.size();
+	Result.Indices = (u32*)malloc(Indices.size() * sizeof(u32));
+	for (int IndexIndex = 0;
+         IndexIndex < Indices.size();
+         IndexIndex++)
+	{
+		Result.Indices[IndexIndex] = Indices[IndexIndex];
+	}
+    
+    Result.MeshType = Mesh_Simple;
+	Result.VerticesCount = VerticesCount;
+    size_t VertsSize = sizeof(Vertex_Info) * VerticesCount;
+	Result.Vertices = malloc(VertsSize);
+    memset(Result.Vertices, 0, VertsSize);
+    
+    ASSERT(Positions.size());
+    ASSERT(TexCoords.size());
+    
+    Vertex_Info* DstVerts = (Vertex_Info*)Result.Vertices;
+    
+    for (int Index = 0;
+         Index < Result.IndicesCount;
+         Index += 3)
+    {
+        int Index0 = Result.Indices[Index];
+        int Index1 = Result.Indices[Index + 1];
+        int Index2 = Result.Indices[Index + 2];
+        
+        v3 P0 = Positions[Index0];
+        v3 P1 = Positions[Index1];
+        v3 P2 = Positions[Index2];
+        
+        v2 Tex0 = TexCoords[Index0];
+        v2 Tex1 = TexCoords[Index1];
+        v2 Tex2 = TexCoords[Index2];
+        
+        DstVerts[Index0].P = P0;
+        DstVerts[Index1].P = P1;
+        DstVerts[Index2].P = P2;
+        
+        DstVerts[Index0].UV = Tex0;
+        DstVerts[Index1].UV = Tex1;
+        DstVerts[Index2].UV = Tex2;
+        
+        v3 Edge1 = P1 - P0;
+        v3 Edge2 = P2 - P0;
+        
+        if (CalculateTangents || (Tangents.size() != VerticesCount)) {
+            v2 DeltaTex1 = Tex1 - Tex0;
+            v2 DeltaTex2 = Tex2 - Tex0;
+            
+            float InvDet = 1.0f / (DeltaTex1.x * DeltaTex2.y - DeltaTex2.x * DeltaTex1.y);
+            
+            v3 T = InvDet * (DeltaTex2.y * Edge1 - DeltaTex1.y * Edge2);
+            v3 B = InvDet * (DeltaTex1.x * Edge2 - DeltaTex2.x * Edge1);
+            
+            T = Normalize(T);
+            /*
+            NOTE(dima): bitangent calculation is implemented
+            but not used...
+            */
+            B = Normalize(B);
+            
+            //NOTE(dima): Setting the calculating tangent to the vertex;
+            DstVerts[Index0].T = T;
+            DstVerts[Index1].T = T;
+            DstVerts[Index2].T = T;
+        }
+        else{
+            //NOTE(dima): Just copy tangents if they exist
+            DstVerts[Index0].T = Tangents[Index0];
+            DstVerts[Index1].T = Tangents[Index1];
+            DstVerts[Index2].T = Tangents[Index2];
+        }
+        
+        //NOTE(dima): Normals calculation and setting
+        if (CalculateNormals || (Normals.size() != VerticesCount)) {
+            v3 TriNormal = Normalize(Cross(Edge2, Edge1));
+            
+            DstVerts[Index0].N = TriNormal;
+            DstVerts[Index1].N = TriNormal;
+            DstVerts[Index2].N = TriNormal;
+        }
+        else{
+            DstVerts[Index0].N = Normals[Index0];
+            DstVerts[Index1].N = Normals[Index1];
+            DstVerts[Index2].N = Normals[Index2];
+        }
+        
+        // NOTE(Dima): Colors copying
+        if(Colors.size() != VerticesCount){
+            DstVerts[Index0].C = V3(0.0f, 0.0f, 0.0f);
+            DstVerts[Index1].C = V3(0.0f, 0.0f, 0.0f);
+            DstVerts[Index2].C = V3(0.0f, 0.0f, 0.0f);
+        }
+        else{
+            DstVerts[Index0].C = Colors[Index0];
+            DstVerts[Index1].C = Colors[Index1];
+            DstVerts[Index2].C = Colors[Index2];
+        }
+    }
+    
+    // NOTE(Dima): Writing vertices
+    for(int VertexIndex = 0;
+        VertexIndex < VerticesCount;
+        VertexIndex++)
+    {
+        Vertex_Info* Vertex = (Vertex_Info*)Result.Vertices;
+        
+        *Vertex = {};
+        
+        Vertex->P = Positions[VertexIndex];
+        
+        if(TexCoords.size() == VerticesCount){
+            Vertex->UV = TexCoords[VertexIndex];
+        }
+        
+        if(Normals.size() == VerticesCount){
+            Vertex->N = Normals[VertexIndex];
+        }
+    }
+    
+    return(Result);
+}
+
+Mesh_Info MakeSphere(int Segments, int Rings) {
+    Mesh_Info Result = {};
+    
+    float Radius = 0.5f;
+    
+    Segments = Max(Segments, 3);
+    Rings = Max(Rings, 2);
+    
+    //NOTE(dima): 2 top and bottom triangle fans + 
+    int VerticesCount = (Segments * 3) * 2 + (Segments * (Rings - 2)) * 4;
+    int IndicesCount = (Segments * 3) * 2 + (Segments * (Rings - 2)) * 6;
+    
+    std::vector<v3> Positions;
+    std::vector<v2> TexCoords;
+    std::vector<v3> Normals;
+    std::vector<u32> Indices;
+    
+    float AngleVert = JOY_PI / (float)Rings;
+    float AngleHorz = JOY_TWO_PI / (float)Segments;
+    
+    int VertexAt = 0;
+    int IndexAt = 0;
+    
+    for (int VertAt = 1; VertAt <= Rings; VertAt++) {
+        float CurrAngleVert = (float)VertAt * AngleVert;
+        float PrevAngleVert = (float)(VertAt - 1) * AngleVert;
+        
+        float PrevY = Cos(PrevAngleVert) * Radius;
+        float CurrY = Cos(CurrAngleVert) * Radius;
+        
+        float SinVertPrev = Sin(PrevAngleVert);
+        float SinVertCurr = Sin(CurrAngleVert);
+        
+        for (int HorzAt = 1; HorzAt <= Segments; HorzAt++) {
+            float CurrAngleHorz = (float)HorzAt * AngleHorz;
+            float PrevAngleHorz = (float)(HorzAt - 1) * AngleHorz;
+            
+            v3 P0, P1, C0, C1;
+            v2 P0uv, P1uv, C0uv, C1uv;
+            
+            P0.y = PrevY;
+            P1.y = PrevY;
+            
+            C0.y = CurrY;
+            C1.y = CurrY;
+            
+            //TODO(dima): handle triangle fan case
+            P0.x = Cos(PrevAngleHorz) * SinVertPrev * Radius;
+            P1.x = Cos(CurrAngleHorz) * SinVertPrev * Radius;
+            
+            P0.z = Sin(PrevAngleHorz) * SinVertPrev * Radius;
+            P1.z = Sin(CurrAngleHorz) * SinVertPrev * Radius;
+            
+            C0.x = Cos(PrevAngleHorz) * SinVertCurr * Radius;
+            C1.x = Cos(CurrAngleHorz) * SinVertCurr * Radius;
+            
+            C0.z = Sin(PrevAngleHorz) * SinVertCurr * Radius;
+            C1.z = Sin(CurrAngleHorz) * SinVertCurr * Radius;
+            
+            v3 NP0 = Normalize(P0);
+            v3 NP1 = Normalize(P1);
+            v3 NC0 = Normalize(C0);
+            v3 NC1 = Normalize(C1);
+            
+            P0uv = V2(0.0f, 0.0f);
+            P1uv = V2(0.0f, 0.0f);
+            C0uv = V2(0.0f, 0.0f);
+            C1uv = V2(0.0f, 0.0f);
+            
+            if (VertAt == 1) {
+                // NOTE(Dima): Top fan
+                Positions.push_back(P0);
+                Positions.push_back(C0);
+                Positions.push_back(C1);
+                
+                TexCoords.push_back(P0uv);
+                TexCoords.push_back(C0uv);
+                TexCoords.push_back(C1uv);
+                
+                Normals.push_back(NP0);
+                Normals.push_back(NC0);
+                Normals.push_back(NC1);
+                
+                Indices.push_back(VertexAt);
+                Indices.push_back(VertexAt + 1);
+                Indices.push_back(VertexAt + 2);
+                
+                IndexAt += 3;
+                VertexAt += 3;
+            }
+            else if (VertAt == Rings) {
+                // NOTE(Dima): Bottom fan
+                Positions.push_back(P1);
+                Positions.push_back(P0);
+                Positions.push_back(C1);
+                
+                TexCoords.push_back(P1uv);
+                TexCoords.push_back(P0uv);
+                TexCoords.push_back(C1uv);
+                
+                Normals.push_back(NP1);
+                Normals.push_back(NP0);
+                Normals.push_back(NC1);
+                
+                Indices.push_back(VertexAt);
+                Indices.push_back(VertexAt + 1);
+                Indices.push_back(VertexAt + 2);
+                
+                IndexAt += 3;
+                VertexAt += 3;
+            }
+            else {
+                Positions.push_back(P1);
+                Positions.push_back(P0);
+                Positions.push_back(C0);
+                Positions.push_back(C1);
+                
+                TexCoords.push_back(P1uv);
+                TexCoords.push_back(P0uv);
+                TexCoords.push_back(C0uv);
+                TexCoords.push_back(C1uv);
+                
+                Normals.push_back(NP1);
+                Normals.push_back(NP0);
+                Normals.push_back(NC0);
+                Normals.push_back(NC1);
+                
+                Indices.push_back(VertexAt);
+                Indices.push_back(VertexAt + 1);
+                Indices.push_back(VertexAt + 2);
+                Indices.push_back(VertexAt);
+                Indices.push_back(VertexAt + 2);
+                Indices.push_back(VertexAt + 3);
+                
+                IndexAt += 6;
+                VertexAt += 4;
+            }
+        }
+    }
+    
+    ASSERT(Positions.size() == VerticesCount);
+    ASSERT(TexCoords.size() == VerticesCount);
+    ASSERT(Normals.size() == VerticesCount);
+    ASSERT(Indices.size() == IndicesCount);
+    
+    Result = MakeMesh(Positions, 
+                      TexCoords, 
+                      Normals, 
+                      std::vector<v3>(), 
+                      std::vector<v3>(),
+                      Indices,
+                      JOY_FALSE, 
+                      JOY_TRUE);
+    
+    return(Result);
+}
+
+Mesh_Info GenerateCylynder(float Height, float Radius, int SidesCount) {
+    Mesh_Info Result = {};
+    
+    SidesCount = Max(3, SidesCount);
+    
+    int VerticesCount = SidesCount * 4 + SidesCount * 2 * 3;
+    int IndicesCount = SidesCount * 6 + SidesCount * 2 * 3;
+    
+    float Angle = JOY_TWO_PI / (float)SidesCount;
+    
+    int IndexAt = 0;
+    int VertexAt = 0;
+    
+    std::vector<v3> Positions;
+    std::vector<v2> TexCoords;
+    std::vector<v3> Normals;
+    std::vector<u32> Indices;
+    
+    //NOTE(dima): Building top triangle fans
+    float TopY = Height * 0.5f;
+    for (int Index = 1;
+         Index <= SidesCount;
+         Index++)
+    {
+        float CurrAngle = (float)Index * Angle;
+        float PrevAngle = (float)(Index - 1) * Angle;
+        
+        float TopY = Height * 0.5f;
+        
+        v3 CurrP;
+        v3 PrevP;
+        v3 Center = V3(0.0f, 0.0f, 0.0f);
+        
+        CurrP.x = Cos(CurrAngle) * Radius;
+        CurrP.y = TopY;
+        CurrP.z = Sin(CurrAngle) * Radius;
+        
+        PrevP.x = Cos(PrevAngle) * Radius;
+        PrevP.y = TopY;
+        PrevP.z = Sin(PrevAngle) * Radius;
+        
+        v2 CurrUV = V2(0.0f, 0.0f);
+        v2 PrevUV = V2(0.0f, 0.0f);
+        v2 CentUV = V2(0.0f, 0.0f);
+        
+        Center.y = TopY;
+        
+        // NOTE(Dima): Pushing vertex data
+        Positions.push_back(PrevP);
+        Positions.push_back(CurrP);
+        Positions.push_back(Center);
+        
+        TexCoords.push_back(PrevUV);
+        TexCoords.push_back(CurrUV);
+        TexCoords.push_back(CentUV);
+        
+        v3 Normal = V3(0.0f, 1.0f, 0.0f);
+        Normals.push_back(Normal);
+        Normals.push_back(Normal);
+        Normals.push_back(Normal);
+        
+        // NOTE(Dima): Pushing indices
+        Indices.push_back(VertexAt);
+        Indices.push_back(VertexAt + 1);
+        Indices.push_back(VertexAt + 2);
+        
+        VertexAt += 3;
+        IndexAt += 3;
+    }
+    
+    //NOTE(dima): Building bottom triangle fans
+    for (int Index = 1;
+         Index <= SidesCount;
+         Index++)
+    {
+        float CurrAngle = (float)Index * Angle;
+        float PrevAngle = (float)(Index - 1) * Angle;
+        
+        float BotY = -Height * 0.5f;
+        
+        v3 CurrP;
+        v3 PrevP;
+        v3 Center = V3(0.0f, 0.0f, 0.0f);
+        
+        CurrP.x = Cos(CurrAngle) * Radius;
+        CurrP.y = BotY;
+        CurrP.z = Sin(CurrAngle) * Radius;
+        
+        PrevP.x = Cos(PrevAngle) * Radius;
+        PrevP.y = BotY;
+        PrevP.z = Sin(PrevAngle) * Radius;
+        
+        v2 CurrUV = V2(0.0f, 0.0f);
+        v2 PrevUV = V2(0.0f, 0.0f);
+        v2 CentUV = V2(0.0f, 0.0f);
+        
+        Center.y = BotY;
+        
+        // NOTE(Dima): Pushing vertex data
+        Positions.push_back(CurrP);
+        Positions.push_back(PrevP);
+        Positions.push_back(Center);
+        
+        TexCoords.push_back(CurrUV);
+        TexCoords.push_back(PrevUV);
+        TexCoords.push_back(CentUV);
+        
+        v3 Normal = V3(0.0f, -1.0f, 0.0f);
+        Normals.push_back(Normal);
+        Normals.push_back(Normal);
+        Normals.push_back(Normal);
+        
+        // NOTE(Dima): Pushing indices
+        Indices.push_back(VertexAt);
+        Indices.push_back(VertexAt + 1);
+        Indices.push_back(VertexAt + 2);
+        
+        VertexAt += 3;
+        IndexAt += 3;
+    }
+    
+    //NOTE(dima): Building sides
+    for (int Index = 1;
+         Index <= SidesCount;
+         Index++)
+    {
+        float CurrAngle = (float)Index * Angle;
+        float PrevAngle = (float)(Index - 1) * Angle;
+        
+        v3 CurrP;
+        v3 PrevP;
+        
+        CurrP.x = Cos(CurrAngle) * Radius;
+        CurrP.y = 0.0f;
+        CurrP.z = Sin(CurrAngle) * Radius;
+        
+        PrevP.x = Cos(PrevAngle) * Radius;
+        PrevP.y = 0.0f;
+        PrevP.z = Sin(PrevAngle) * Radius;
+        
+        v3 TopC, TopP;
+        v3 BotC, BotP;
+        
+        v2 TopCuv = V2(0.0f, 0.0f);
+        v2 TopPuv = V2(0.0f, 0.0f);
+        v2 BotCuv = V2(0.0f, 0.0f);
+        v2 BotPuv = V2(0.0f, 0.0f);
+        
+        TopC = CurrP;
+        BotC = CurrP;
+        TopP = PrevP;
+        BotP = PrevP;
+        
+        v3 Normal = Normalize(TopC);
+        
+        TopC.y = Height * 0.5f;
+        TopP.y = Height * 0.5f;
+        BotC.y = -Height * 0.5f;
+        BotP.y = -Height * 0.5f;
+        
+        // NOTE(Dima): Pushing vertex data
+        Positions.push_back(TopC);
+        Positions.push_back(TopP);
+        Positions.push_back(BotP);
+        Positions.push_back(BotC);
+        
+        TexCoords.push_back(TopCuv);
+        TexCoords.push_back(TopPuv);
+        TexCoords.push_back(BotPuv);
+        TexCoords.push_back(BotCuv);
+        
+        Normals.push_back(Normal);
+        Normals.push_back(Normal);
+        Normals.push_back(Normal);
+        
+        // NOTE(Dima): Pushing indices
+        Indices.push_back(VertexAt);
+        Indices.push_back(VertexAt + 1);
+        Indices.push_back(VertexAt + 2);
+        Indices.push_back(VertexAt);
+        Indices.push_back(VertexAt + 2);
+        Indices.push_back(VertexAt + 3);
+        
+        VertexAt += 4;
+        IndexAt += 6;
+    }
+    
+    Result = MakeMesh(Positions, 
+                      TexCoords, 
+                      Normals, 
+                      std::vector<v3>(), 
+                      std::vector<v3>(),
+                      Indices,
+                      JOY_FALSE, 
+                      JOY_TRUE);
+    
+    
+    return(Result);
+}

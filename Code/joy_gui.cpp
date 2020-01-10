@@ -488,29 +488,29 @@ rc2 PrintTextInternal(Font_Info* font, Render_Stack* stack, char* text, v2 p, u3
     
     while(*at){
         
-        int glyphIndex = font->codepoint2Glyph[*at];
-        Glyph_Info* glyph = &font->glyphs[glyphIndex];
+        int glyphIndex = font->Codepoint2Glyph[*at];
+        Glyph_Info* glyph = &font->Glyphs[glyphIndex];
         
-        float bmpScale = glyph->height * scale;
+        float bmpScale = glyph->Height * scale;
         
-        v2 bitmapDim = { glyph->bitmap.widthOverHeight * bmpScale, bmpScale };
+        v2 bitmapDim = { glyph->Bitmap.WidthOverHeight * bmpScale, bmpScale };
         
         if(textOp == PrintTextOp_Print){
-            float bitmapMinY = curP.y + glyph->yOffset * scale;
-            float bitmapMinX = curP.x + glyph->xOffset * scale;
+            float bitmapMinY = curP.y + glyph->YOffset * scale;
+            float bitmapMinX = curP.x + glyph->XOffset * scale;
             
-            PushBitmap(stack, &glyph->bitmap, V2(bitmapMinX, bitmapMinY), bitmapDim.y, color);
+            PushBitmap(stack, &glyph->Bitmap, V2(bitmapMinX, bitmapMinY), bitmapDim.y, color);
         }
         
-        curP.x += ((float)glyph->advance * scale);
+        curP.x += ((float)glyph->Advance * scale);
         
         *at++;
     }
     
     txtRc.min.x = p.x;
-    txtRc.min.y = p.y - font->ascenderHeight * scale;
+    txtRc.min.y = p.y - font->AscenderHeight * scale;
     txtRc.max.x = curP.x;
-    txtRc.max.y = curP.y - font->descenderHeight * scale;
+    txtRc.max.y = curP.y - font->DescenderHeight * scale;
     
     return(txtRc);
 }
@@ -530,7 +530,7 @@ v2 GetTextSizeInternal(Font_Info* font, char* Text, float scale){
 
 inline v2 GetCenteredTextOffset(Font_Info* font, float TextDimX, rc2 Rect, float scale = 1.0f){
     float LineDimY = GetLineAdvance(font, scale);
-    float LineDelta = (font->ascenderHeight + font->lineGap) * scale - LineDimY * 0.5f;
+    float LineDelta = (font->AscenderHeight + font->LineGap) * scale - LineDimY * 0.5f;
     
     v2 CenterRc = Rect.min + GetRectDim(Rect) * 0.5f;
     

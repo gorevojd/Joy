@@ -20,19 +20,19 @@ Gui_Page. It's done this way because of comfortability to group the elements
 */
 
 inline float GetBaseline(Font_Info* fontInfo, float scale = 1.0f){
-    float res = (fontInfo->ascenderHeight + fontInfo->lineGap) * scale;
+    float res = (fontInfo->AscenderHeight + fontInfo->LineGap) * scale;
     
     return(res);
 }
 
 inline float GetLineAdvance(Font_Info* fontInfo, float scale = 1.0f){
-    float res = (fontInfo->ascenderHeight + fontInfo->lineGap - fontInfo->descenderHeight) * scale;
+    float res = (fontInfo->AscenderHeight + fontInfo->LineGap - fontInfo->DescenderHeight) * scale;
     
     return(res);
 }
 
 inline float GetScaledAscender(Font_Info* fontInfo, float scale = 1.0f){
-    float res = fontInfo->ascenderHeight * scale;
+    float res = fontInfo->AscenderHeight * scale;
     
     return(res);
 }

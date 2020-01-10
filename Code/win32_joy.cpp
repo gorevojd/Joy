@@ -1633,10 +1633,10 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         Bmp_Info* toShowNext = toShowArray + toShowNextIndex;
         
         float toShowH = CalcScreenFitHeight(
-            toShow->width, toShow->height,
+            toShow->Width, toShow->Height,
             win32.windowWidth, win32.windowHeight);
         float toShowNextH = CalcScreenFitHeight(
-            toShowNext->width, toShowNext->height,
+            toShowNext->Width, toShowNext->Height,
             win32.windowWidth, win32.windowHeight);
         
         float fadeoutAlpha = Clamp01((timeSinceShow - toShowTime) / toShowFadeoutTime);
@@ -1713,8 +1713,6 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         GuiEndPage(gui);
         
         //GuiUpdateWindows(gui);
-        
-        GuiBeginLayout(gui, "layout1", GuiLayout_Window);
         GuiBeginTree(gui, "Some text");
         GuiText(gui, "Hello world");
         GuiText(gui, FPSBuf);
@@ -1723,6 +1721,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         GuiText(gui, "I wish joy and happiness for everyone");
         GuiEndTree(gui);
         
+        //GuiPushDim(gui, V2(100, 100));
+        GuiBeginLayout(gui, "layout1", GuiLayout_Window);
         GuiBeginTree(gui, "AddClearButtons");
         LOCAL_AS_GLOBAL int RectCount = 0;
         GuiBeginRow(gui);

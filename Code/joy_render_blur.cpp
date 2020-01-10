@@ -70,17 +70,17 @@ int BlurRadius)
 {
 	int BlurDiam = 1 + BlurRadius + BlurRadius;
     
-	for (int Y = 0; Y < From->height; Y++) {
-		for (int X = 0; X < From->width; X++) {
+	for (int Y = 0; Y < From->Height; Y++) {
+		for (int X = 0; X < From->Width; X++) {
             
-			u32* TargetPixel = (u32*)((u8*)To->pixels + Y * To->pitch + X * 4);
+			u32* TargetPixel = (u32*)((u8*)To->Pixels + Y * To->Pitch + X * 4);
             
 			v4 VertSum = {};
 			int VertSumCount = 0;
 			for (int kY = Y - BlurRadius; kY <= Y + BlurRadius; kY++) {
-				int targetY = Clamp(kY, 0, From->height - 1);
+				int targetY = Clamp(kY, 0, From->Height - 1);
                 
-				u32* ScanPixel = (u32*)((u8*)From->pixels + targetY * From->pitch + X * 4);
+				u32* ScanPixel = (u32*)((u8*)From->Pixels + targetY * From->Pitch + X * 4);
 				v4 UnpackedColor = UnpackRGBA(*ScanPixel);
                 
 				VertSum += UnpackedColor;
@@ -92,9 +92,9 @@ int BlurRadius)
 			v4 HorzSum = {};
 			int HorzSumCount = 0;
 			for (int kX = X - BlurRadius; kX <= X + BlurRadius; kX++) {
-				int targetX = Clamp(kX, 0, From->width - 1);
+				int targetX = Clamp(kX, 0, From->Width - 1);
                 
-				u32* ScanPixel = (u32*)((u8*)From->pixels + Y * From->pitch + targetX * 4);
+				u32* ScanPixel = (u32*)((u8*)From->Pixels + Y * From->Pitch + targetX * 4);
 				v4 UnpackedColor = UnpackRGBA(*ScanPixel);
                 
 				HorzSum += UnpackedColor;
@@ -120,17 +120,17 @@ void* TempBitmapMem,
 int width, int height,
 int BlurRadius)
 {
-	Assert(width == BitmapToBlur->width);
-	Assert(height == BitmapToBlur->height);
+	Assert(width == BitmapToBlur->Width);
+	Assert(height == BitmapToBlur->Height);
     
 	Bmp_Info Result = AssetAllocateBitmapInternal(
-		BitmapToBlur->width,
-		BitmapToBlur->height,
+		BitmapToBlur->Width,
+		BitmapToBlur->Height,
 		ResultBitmapMem);
     
 	Bmp_Info TempBitmap = AssetAllocateBitmapInternal(
-		BitmapToBlur->width,
-		BitmapToBlur->height,
+		BitmapToBlur->Width,
+		BitmapToBlur->Height,
 		TempBitmapMem);
     
     
@@ -184,12 +184,12 @@ int width, int height,
 int BlurRadius,
 float* GaussianBox)
 {
-	Assert(width == BitmapToBlur->width);
-	Assert(height == BitmapToBlur->height);
+	Assert(width == BitmapToBlur->Width);
+	Assert(height == BitmapToBlur->Height);
     
 	Bmp_Info Result = AssetAllocateBitmapInternal(
-		BitmapToBlur->width,
-		BitmapToBlur->height,
+		BitmapToBlur->Width,
+		BitmapToBlur->Height,
 		ResultBitmapMem);
     
 	int BlurDiam = 1 + BlurRadius + BlurRadius;
@@ -197,20 +197,20 @@ float* GaussianBox)
 	Bmp_Info* From = BitmapToBlur;
 	Bmp_Info* To = &Result;
     
-	for (int Y = 0; Y < From->height; Y++) {
-		for (int X = 0; X < From->width; X++) {
+	for (int Y = 0; Y < From->Height; Y++) {
+		for (int X = 0; X < From->Width; X++) {
             
-			u32* TargetPixel = (u32*)((u8*)To->pixels + Y * To->pitch + X * 4);
+			u32* TargetPixel = (u32*)((u8*)To->Pixels + Y * To->Pitch + X * 4);
             
 			v4 SumColor = {};
 			for (int kY = Y - BlurRadius; kY <= Y + BlurRadius; kY++) {
-				int targetY = Clamp(kY, 0, From->height - 1);
+				int targetY = Clamp(kY, 0, From->Height - 1);
 				int inboxY = kY - (Y - BlurRadius);
 				for (int kX = X - BlurRadius; kX <= X + BlurRadius; kX++) {
-					int targetX = Clamp(kX, 0, From->width - 1);
+					int targetX = Clamp(kX, 0, From->Width - 1);
 					int inboxX = kX - (X - BlurRadius);
                     
-					u32* ScanPixel = (u32*)((u8*)From->pixels + targetY * From->pitch + targetX * 4);
+					u32* ScanPixel = (u32*)((u8*)From->Pixels + targetY * From->Pitch + targetX * 4);
                     
 					v4 UnpackedColor = UnpackRGBA(*ScanPixel);
                     

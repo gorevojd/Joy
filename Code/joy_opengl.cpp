@@ -188,24 +188,24 @@ void GlFree(Gl_State* gl){
     }
 }
 
-void GlOutputRender(Gl_State* gl, Bmp_Info* blitBMP){
+void GlOutputRender(Gl_State* gl, Bmp_Info* BlitBmp, Mesh_Info* Mesh2Render){
     glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     
     // NOTE(Dima): Blit texture load
-    GLuint blitTex;
-    glGenTextures(1, &blitTex);
-	glBindTexture(GL_TEXTURE_2D, blitTex);
+    GLuint BlitTex;
+    glGenTextures(1, &BlitTex);
+	glBindTexture(GL_TEXTURE_2D, BlitTex);
 	glTexImage2D(
 		GL_TEXTURE_2D,
 		0,
 		GL_RGBA,
-		blitBMP->width,
-		blitBMP->height,
+		BlitBmp->Width,
+		BlitBmp->Height,
 		0,
 		GL_RGBA,
 		GL_UNSIGNED_BYTE,
-		blitBMP->pixels);
+		BlitBmp->Pixels);
 	
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -218,12 +218,14 @@ void GlOutputRender(Gl_State* gl, Bmp_Info* blitBMP){
     glUseProgram(GLGETPID(gl->screenShader));
     
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, blitTex);
+    glBindTexture(GL_TEXTURE_2D, BlitTex);
     glUniform1i(gl->screenShader.screenTextureLoc, 0);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     
     // NOTE(Dima): Freeing blit texture
-    glDeleteTextures(1, &blitTex);
+    glDeleteTextures(1, &BlitTex);
+    
+    
     
     glUseProgram(0);
     glBindVertexArray(0);

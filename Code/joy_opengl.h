@@ -40,6 +40,6 @@ struct Gl_State{
 
 void GlInit(Gl_State* gl);
 void GlFree(Gl_State* gl);
-void GlOutputRender(Gl_State* GL, Bmp_Info* blitBMP);
+void GlOutputRender(Gl_State* GL, Bmp_Info* BlitBmp, Mesh_Info* Mesh2Render);
 
 #endif
