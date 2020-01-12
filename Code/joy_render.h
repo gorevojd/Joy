@@ -3,5 +3,10 @@
 
 #include "joy_render_stack.h"
 
+struct Render_State{
+    Render_Stack Stack;
+    
+    
+};
 
 #endif

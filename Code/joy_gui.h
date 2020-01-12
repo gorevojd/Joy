@@ -83,29 +83,29 @@ enum Gui_Layout_Type{
 };
 
 struct Gui_Layout{
-    v2 start;
-    v2 at;
-    v2 dim;
+    v2 Start;
+    v2 At;
+    v2 Dim;
     
-    char name[128];
-    u32 id;
-    u32 type;
+    char Name[128];
+    u32 ID;
+    u32 Type;
     
-    struct Gui_Element* elem;
+    struct Gui_Element* Elem;
     
-    Gui_Layout* next;
-    Gui_Layout* prev;
+    Gui_Layout* Next;
+    Gui_Layout* Prev;
     
-    GuiAdvanceCtx advanceRememberStack[16];
-    int stackCurrentIndex;
+    GuiAdvanceCtx AdvanceRememberStack[16];
+    int StackCurrentIndex;
 };
 
 struct Gui_Window{
-    Gui_Window* nextAlloc;
-    Gui_Window* prevAlloc;
+    Gui_Window* NextAlloc;
+    Gui_Window* PrevAlloc;
     
-    Gui_Window* next;
-    Gui_Window* prev;
+    Gui_Window* Next;
+    Gui_Window* Prev;
     
     rc2 rect;
     
@@ -134,8 +134,8 @@ struct Gui_Page{
     
     Gui_Element* elem;
     
-    Gui_Page* next;
-    Gui_Page* prev;
+    Gui_Page* Next;
+    Gui_Page* Prev;
 };
 
 enum Gui_Element_Type{
@@ -180,11 +180,11 @@ struct Gui_Element{
     u32 id;
     u32 type;
     
-    Gui_Element* next;
-    Gui_Element* prev;
+    Gui_Element* Next;
+    Gui_Element* Prev;
     
-    Gui_Element* nextAlloc;
-    Gui_Element* prevAlloc;
+    Gui_Element* NextAlloc;
+    Gui_Element* PrevAlloc;
     
     Gui_Element* parent;
     Gui_Element* childSentinel;

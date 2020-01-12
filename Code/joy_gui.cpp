@@ -17,50 +17,50 @@ INTERNAL_FUNCTION Gui_Window* GuiGrowWindowFreePool(Gui_State* gui, Memory_Regio
         
         *window = {};
         
-        window->prevAlloc = gui->windowFreeSentinel.prevAlloc;
-        window->nextAlloc = &gui->windowFreeSentinel;
+        window->PrevAlloc = gui->windowFreeSentinel.PrevAlloc;
+        window->NextAlloc = &gui->windowFreeSentinel;
         
-        window->prevAlloc->nextAlloc = window;
-        window->nextAlloc->prevAlloc = window;
+        window->PrevAlloc->NextAlloc = window;
+        window->NextAlloc->PrevAlloc = window;
     }
     
     return(windowFreePoolArray);
 }
 
 inline Gui_Window* GuiPopFromReturnList(Gui_State* gui){
-    Gui_Window* result = gui->windowSentinel4Returning.next;
+    Gui_Window* result = gui->windowSentinel4Returning.Next;
     
     // NOTE(Dima): deleting from return list
-    result->next->prev = result->prev;
-    result->prev->next = result->next;
+    result->Next->Prev = result->Prev;
+    result->Prev->Next = result->Next;
     
-    result->next = 0;
-    result->prev = 0;
+    result->Next = 0;
+    result->Prev = 0;
     
     return(result);
 }
 
 inline void GuiDeallocateWindow(Gui_State* gui, Gui_Window* todo){
-    todo->nextAlloc->prevAlloc = todo->prevAlloc;
-    todo->prevAlloc->nextAlloc = todo->nextAlloc;
+    todo->NextAlloc->PrevAlloc = todo->PrevAlloc;
+    todo->PrevAlloc->NextAlloc = todo->NextAlloc;
     
-    todo->nextAlloc = gui->windowFreeSentinel.nextAlloc;
-    todo->prevAlloc = &gui->windowFreeSentinel;
+    todo->NextAlloc = gui->windowFreeSentinel.NextAlloc;
+    todo->PrevAlloc = &gui->windowFreeSentinel;
     
-    todo->nextAlloc->prevAlloc = todo;
-    todo->prevAlloc->nextAlloc = todo;
+    todo->NextAlloc->PrevAlloc = todo;
+    todo->PrevAlloc->NextAlloc = todo;
 }
 
 INTERNAL_FUNCTION void GuiDeallocateElement(Gui_State* gui, Gui_Element* elem)
 {
-    elem->next->prev = elem->prev;
-    elem->prev->next = elem->next;
+    elem->Next->Prev = elem->Prev;
+    elem->Prev->Next = elem->Next;
     
-    elem->next = gui->freeSentinel.next;
-    elem->prev = &gui->freeSentinel;
+    elem->Next = gui->freeSentinel.Next;
+    elem->Prev = &gui->freeSentinel;
     
-    elem->next->prev = elem;
-    elem->prev->next = elem;
+    elem->Next->Prev = elem;
+    elem->Prev->Next = elem;
 }
 
 INTERNAL_FUNCTION Gui_Element* GuiAllocateElement(
@@ -68,7 +68,7 @@ Gui_State* gui)
 {
     Gui_Element* result = 0;
     
-    if(gui->freeSentinel.nextAlloc != &gui->freeSentinel){
+    if(gui->freeSentinel.NextAlloc != &gui->freeSentinel){
         
     }
     else{
@@ -81,26 +81,26 @@ Gui_State* gui)
         {
             Gui_Element* elem = elemPoolArray + index;
             
-            elem->prevAlloc = gui->freeSentinel.prevAlloc;
-            elem->nextAlloc = &gui->freeSentinel;
+            elem->PrevAlloc = gui->freeSentinel.PrevAlloc;
+            elem->NextAlloc = &gui->freeSentinel;
             
-            elem->prevAlloc->nextAlloc = elem;
-            elem->nextAlloc->prevAlloc = elem;
+            elem->PrevAlloc->NextAlloc = elem;
+            elem->NextAlloc->PrevAlloc = elem;
         }
     }
     
-    result = gui->freeSentinel.nextAlloc;
+    result = gui->freeSentinel.NextAlloc;
     
     // NOTE(Dima): Deallocating from free list
-    result->nextAlloc->prevAlloc = result->prevAlloc;
-    result->prevAlloc->nextAlloc = result->nextAlloc;
+    result->NextAlloc->PrevAlloc = result->PrevAlloc;
+    result->PrevAlloc->NextAlloc = result->NextAlloc;
     
     // NOTE(Dima): Allocating in use list
-    result->nextAlloc = &gui->useSentinel;
-    result->prevAlloc = gui->useSentinel.prevAlloc;
+    result->NextAlloc = &gui->useSentinel;
+    result->PrevAlloc = gui->useSentinel.PrevAlloc;
     
-    result->nextAlloc->prevAlloc = result;
-    result->prevAlloc->nextAlloc = result;
+    result->NextAlloc->PrevAlloc = result;
+    result->PrevAlloc->NextAlloc = result;
     
     return(result);
 }
@@ -118,7 +118,7 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(Gui_State* gui,
     Gui_Element* at = 0;
     Gui_Element* found = 0;
     if(childSentinel){
-        at = childSentinel->next;
+        at = childSentinel->Next;
         
         u32 id = StringHashFNV(name);
         
@@ -128,7 +128,7 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(Gui_State* gui,
                 break;
             }
             
-            at = at->next;
+            at = at->Next;
         }
         
         // NOTE(Dima): if element was not found - then allocate and initialize
@@ -136,11 +136,11 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(Gui_State* gui,
             found = GuiAllocateElement(gui);
             
             // NOTE(Dima): Inserting to list
-            found->next = childSentinel->next;
-            found->prev = childSentinel;
+            found->Next = childSentinel->Next;
+            found->Prev = childSentinel;
             
-            found->next->prev = found;
-            found->prev->next = found;
+            found->Next->Prev = found;
+            found->Prev->Next = found;
             
             // NOTE(Dima): Incrementing parent childCount
             if(found->parent){
@@ -162,8 +162,8 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(Gui_State* gui,
             Gui_Element* fcs = found->childSentinel;
             fcs->parent = found;
             fcs->childSentinel = 0;
-            fcs->next = fcs;
-            fcs->prev = fcs;
+            fcs->Next = fcs;
+            fcs->Prev = fcs;
             CopyStrings(fcs->name, "ChildrenSentinel");
             fcs->id = StringHashFNV(fcs->name);
             fcs->type = GuiElement_ChildrenSentinel;
@@ -223,14 +223,14 @@ INTERNAL_FUNCTION void GuiEndElement(Gui_State* gui, u32 type)
 INTERNAL_FUNCTION void GuiFreeElement(Gui_State* gui,
                                       Gui_Element* elem)
 {
-    elem->nextAlloc->prevAlloc = elem->prevAlloc;
-    elem->prevAlloc->nextAlloc = elem->nextAlloc;
+    elem->NextAlloc->PrevAlloc = elem->PrevAlloc;
+    elem->PrevAlloc->NextAlloc = elem->NextAlloc;
     
-    elem->nextAlloc = gui->freeSentinel.nextAlloc;
-    elem->prevAlloc = &gui->freeSentinel;
+    elem->NextAlloc = gui->freeSentinel.NextAlloc;
+    elem->PrevAlloc = &gui->freeSentinel;
     
-    elem->nextAlloc->prevAlloc = elem;
-    elem->prevAlloc->nextAlloc = elem;
+    elem->NextAlloc->PrevAlloc = elem;
+    elem->PrevAlloc->NextAlloc = elem;
 }
 
 // NOTE(Dima): This function allocates as much windows as we need and 
@@ -241,7 +241,7 @@ INTERNAL_FUNCTION Gui_Window* GuiAllocateWindows(Gui_State* gui, int count)
     // NOTE(Dima): If free list is emty then allocate some more to it
     b32 canAllocateArray = 1;
     int canAllocateCount = count;
-    Gui_Window* checkAt = gui->windowFreeSentinel.nextAlloc;
+    Gui_Window* checkAt = gui->windowFreeSentinel.NextAlloc;
     for(int checkIndex = 0; checkIndex < count; checkIndex++){
         if(checkAt == &gui->windowFreeSentinel){
             canAllocateArray = 0;
@@ -249,7 +249,7 @@ INTERNAL_FUNCTION Gui_Window* GuiAllocateWindows(Gui_State* gui, int count)
             break;
         }
         
-        checkAt = checkAt->nextAlloc;
+        checkAt = checkAt->NextAlloc;
     }
     
     int toAllocateCount = Max(128, count - canAllocateCount);
@@ -258,7 +258,7 @@ INTERNAL_FUNCTION Gui_Window* GuiAllocateWindows(Gui_State* gui, int count)
     }
     
     // NOTE(Dima): Return list shoud be empty before return
-    Assert(gui->windowSentinel4Returning.next == &gui->windowSentinel4Returning);
+    Assert(gui->windowSentinel4Returning.Next == &gui->windowSentinel4Returning);
     
     for(int addIndex = 0;
         addIndex < count;
@@ -267,30 +267,30 @@ INTERNAL_FUNCTION Gui_Window* GuiAllocateWindows(Gui_State* gui, int count)
         // NOTE(Dima): Before in this algo we ensured that we would
         // NOTE(Dima): have as mush elements as we need. But for sure
         // NOTE(Dima): I'll double check if we can grab one more element.
-        Assert(gui->windowFreeSentinel.nextAlloc != &gui->windowFreeSentinel);
+        Assert(gui->windowFreeSentinel.NextAlloc != &gui->windowFreeSentinel);
         
         // NOTE(Dima): Allocating from free list
-        Gui_Window* addWindow = gui->windowFreeSentinel.nextAlloc;
+        Gui_Window* addWindow = gui->windowFreeSentinel.NextAlloc;
         
-        addWindow->prevAlloc->nextAlloc = addWindow->nextAlloc;
-        addWindow->nextAlloc->prevAlloc = addWindow->prevAlloc;
+        addWindow->PrevAlloc->NextAlloc = addWindow->NextAlloc;
+        addWindow->NextAlloc->PrevAlloc = addWindow->PrevAlloc;
         
         // NOTE(Dima): Inserting to use list
-        addWindow->nextAlloc = &gui->windowUseSentinel;
-        addWindow->prevAlloc = gui->windowUseSentinel.prevAlloc;
+        addWindow->NextAlloc = &gui->windowUseSentinel;
+        addWindow->PrevAlloc = gui->windowUseSentinel.PrevAlloc;
         
-        addWindow->nextAlloc->prevAlloc = addWindow;
-        addWindow->prevAlloc->nextAlloc = addWindow;
+        addWindow->NextAlloc->PrevAlloc = addWindow;
+        addWindow->PrevAlloc->NextAlloc = addWindow;
         
         // NOTE(Dima): Inserting to return list
-        addWindow->next = &gui->windowSentinel4Returning;
-        addWindow->prev = gui->windowSentinel4Returning.prev;
+        addWindow->Next = &gui->windowSentinel4Returning;
+        addWindow->Prev = gui->windowSentinel4Returning.Prev;
         
-        addWindow->next->prev = addWindow;
-        addWindow->prev->next = addWindow;
+        addWindow->Next->Prev = addWindow;
+        addWindow->Prev->Next = addWindow;
     }
     
-    Gui_Window* result = gui->windowSentinel4Returning.next;
+    Gui_Window* result = gui->windowSentinel4Returning.Next;
     
     return(result);
 }
@@ -301,7 +301,7 @@ INTERNAL_FUNCTION Gui_Window* GuiAllocateWindow(Gui_State* gui){
     Gui_Window* result = GuiPopFromReturnList(gui);
     
     // NOTE(Dima): Return list shoud be empty before return
-    Assert(gui->windowSentinel4Returning.next == &gui->windowSentinel4Returning);
+    Assert(gui->windowSentinel4Returning.Next == &gui->windowSentinel4Returning);
     
     return(result);
 }
@@ -309,18 +309,18 @@ INTERNAL_FUNCTION Gui_Window* GuiAllocateWindow(Gui_State* gui){
 inline void GuiAddWindowToList(Gui_Window* window, 
                                Gui_Window* Sentinel)
 {
-    window->next = Sentinel;
-    window->prev = Sentinel->prev;
+    window->Next = Sentinel;
+    window->Prev = Sentinel->Prev;
     
-    window->next->prev = window;
-    window->prev->next = window;
+    window->Next->Prev = window;
+    window->Prev->Next = window;
 }
 
 INTERNAL_FUNCTION void GuiInitRoot(Gui_State* gui, Gui_Element** root){
     
     (*root) = GuiAllocateElement(gui);
-    (*root)->next = (*root);
-    (*root)->prev = (*root);
+    (*root)->Next = (*root);
+    (*root)->Prev = (*root);
     (*root)->parent = 0;
     (*root)->type = GuiElement_Root;
     CopyStrings((*root)->name, "RootElement!!!");
@@ -329,8 +329,8 @@ INTERNAL_FUNCTION void GuiInitRoot(Gui_State* gui, Gui_Element** root){
     (*root)->childCount = 0;
     (*root)->childSentinel = GuiAllocateElement(gui);
     Gui_Element* rcs = (*root)->childSentinel;
-    rcs->next = rcs;
-    rcs->prev = rcs;
+    rcs->Next = rcs;
+    rcs->Prev = rcs;
     rcs->parent = (*root);
     rcs->childSentinel = 0;
     CopyStrings(rcs->name, "RootChildrenSentinel");
@@ -343,8 +343,8 @@ void GuiBeginPage(Gui_State* gui, char* name){
     u32 nameID = StringHashFNV(name);
     
     Gui_Page* foundPage = 0;
-    Gui_Page* pageAt = gui->rootPage.next;
-    for(pageAt; pageAt != &gui->rootPage; pageAt = pageAt->next){
+    Gui_Page* pageAt = gui->rootPage.Next;
+    for(pageAt; pageAt != &gui->rootPage; pageAt = pageAt->Next){
         if(nameID == pageAt->id){
             foundPage = pageAt;
             break;
@@ -357,10 +357,10 @@ void GuiBeginPage(Gui_State* gui, char* name){
         CopyStrings(foundPage->name, sizeof(foundPage->name), name);
         foundPage->id = nameID;
         
-        foundPage->next = gui->rootPage.next;
-        foundPage->prev = &gui->rootPage;
-        foundPage->next->prev = foundPage;
-        foundPage->prev->next = foundPage;
+        foundPage->Next = gui->rootPage.Next;
+        foundPage->Prev = &gui->rootPage;
+        foundPage->Next->Prev = foundPage;
+        foundPage->Prev->Next = foundPage;
         
         ++gui->pageCount;
     }
@@ -402,10 +402,10 @@ int height)
     // NOTE(Dima): Init layouts
     gui->layoutCount = 1;
     gui->rootLayout = {};
-    gui->rootLayout.next = &gui->rootLayout;
-    gui->rootLayout.prev = &gui->rootLayout;
-    CopyStrings(gui->rootLayout.name, "RootLayout");
-    gui->rootLayout.id = StringHashFNV(gui->rootLayout.name);
+    gui->rootLayout.Next = &gui->rootLayout;
+    gui->rootLayout.Prev = &gui->rootLayout;
+    CopyStrings(gui->rootLayout.Name, "RootLayout");
+    gui->rootLayout.ID = StringHashFNV(gui->rootLayout.Name);
     
     // NOTE(Dima): Init dim stack
     for(int dimIndex = 0; dimIndex < ARRAY_COUNT(gui->dimStack); dimIndex++){
@@ -418,27 +418,27 @@ int height)
     // NOTE(Dima): Init pages
     gui->pageCount = 1;
     gui->rootPage = {};
-    gui->rootPage.next = &gui->rootPage;
-    gui->rootPage.prev = &gui->rootPage;
+    gui->rootPage.Next = &gui->rootPage;
+    gui->rootPage.Prev = &gui->rootPage;
     CopyStrings(gui->rootPage.name, "RootPage");
     gui->rootPage.id = StringHashFNV(gui->rootPage.name);
     
     // NOTE(Dima): Initializing of window free pool and sentinels
-    gui->windowUseSentinel.nextAlloc = &gui->windowUseSentinel;
-    gui->windowUseSentinel.prevAlloc = &gui->windowUseSentinel;
-    gui->windowFreeSentinel.nextAlloc = &gui->windowFreeSentinel;
-    gui->windowFreeSentinel.prevAlloc = &gui->windowFreeSentinel;
+    gui->windowUseSentinel.NextAlloc = &gui->windowUseSentinel;
+    gui->windowUseSentinel.PrevAlloc = &gui->windowUseSentinel;
+    gui->windowFreeSentinel.NextAlloc = &gui->windowFreeSentinel;
+    gui->windowFreeSentinel.PrevAlloc = &gui->windowFreeSentinel;
     
     GuiGrowWindowFreePool(gui, mem, 128);
     
     // NOTE(Dima): Init window sentinel for returning windows
     // NOTE(Dima): as list when we allocate multiple of them.
-    gui->windowSentinel4Returning.next = &gui->windowSentinel4Returning;
-    gui->windowSentinel4Returning.prev = &gui->windowSentinel4Returning;
+    gui->windowSentinel4Returning.Next = &gui->windowSentinel4Returning;
+    gui->windowSentinel4Returning.Prev = &gui->windowSentinel4Returning;
     
     // NOTE(Dima): Init window leaf sentinel
-    gui->windowLeafSentinel.next = &gui->windowLeafSentinel;
-    gui->windowLeafSentinel.prev = &gui->windowLeafSentinel;
+    gui->windowLeafSentinel.Next = &gui->windowLeafSentinel;
+    gui->windowLeafSentinel.Prev = &gui->windowLeafSentinel;
     
     gui->tempWindow1 = GuiAllocateWindow(gui);
     gui->tempWindow1->rect = RcMinDim(V2(10, 10), V2(1000, 600));
@@ -446,11 +446,11 @@ int height)
     GuiAddWindowToList(gui->tempWindow1, &gui->windowLeafSentinel);
     
     // NOTE(Dima): Initializing elements sentinel
-    gui->freeSentinel.nextAlloc = &gui->freeSentinel;
-    gui->freeSentinel.prevAlloc = &gui->freeSentinel;
+    gui->freeSentinel.NextAlloc = &gui->freeSentinel;
+    gui->freeSentinel.PrevAlloc = &gui->freeSentinel;
     
-    gui->useSentinel.nextAlloc = &gui->useSentinel;
-    gui->useSentinel.prevAlloc = &gui->useSentinel;
+    gui->useSentinel.NextAlloc = &gui->useSentinel;
+    gui->useSentinel.PrevAlloc = &gui->useSentinel;
     
     // NOTE(Dima): Initializing root element
     GuiInitRoot(gui, &gui->rootElement);
@@ -611,7 +611,7 @@ rc2 PrintTextCenteredInRect(Gui_State* gui, char* text, rc2 rect, float scale, v
 INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 layoutType, Gui_Element* layoutElem){
     // NOTE(Dima): initializing references
     layoutElem->data.layout.ref = layout;
-    layout->elem = layoutElem;
+    layout->Elem = layoutElem;
     
     v2 popDim;
     if(!GuiPopDim(gui, &popDim)){
@@ -619,18 +619,18 @@ INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 lay
     }
     
     // NOTE(Dima): Layout initializing
-    layout->type = layoutType;
+    layout->Type = layoutType;
     if(!layoutElem->data.isInit){
-        layout->start = V2(100.0f, 100.0f) * (gui->layoutCount - 1);
-        layout->at = layout->start;
+        layout->Start = V2(200.0f, 200.0f) * (gui->layoutCount - 1);
+        layout->At = layout->Start;
         
         switch(layoutType){
             case GuiLayout_Layout:{
-                layout->dim = V2(gui->width, gui->height);
+                layout->Dim = V2(gui->width, gui->height);
             }break;
             
             case GuiLayout_Window:{
-                layout->dim = popDim;
+                layout->Dim = popDim;
             }break;
         }
         
@@ -638,12 +638,12 @@ INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 lay
     }
     
     // NOTE(Dima): Initializing initial advance ctx
-    layout->advanceRememberStack[0].type = GuiAdvanceType_Column;
-    layout->advanceRememberStack[0].rememberValue = layout->start.y;
-    layout->advanceRememberStack[0].baseline = layout->start.x;
+    layout->AdvanceRememberStack[0].type = GuiAdvanceType_Column;
+    layout->AdvanceRememberStack[0].rememberValue = layout->Start.y;
+    layout->AdvanceRememberStack[0].baseline = layout->Start.x;
     
     if(layoutType == GuiLayout_Window){
-        rc2 windowRc = RcMinDim(layout->start, layout->dim);
+        rc2 windowRc = RcMinDim(layout->Start, layout->Dim);
         PushRect(gui->stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
         
         v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
@@ -661,9 +661,9 @@ void GuiBeginLayout(Gui_State* gui, char* name, u32 layoutType){
     u32 nameID = StringHashFNV(name);
     
     Gui_Layout* foundLayout = 0;
-    Gui_Layout* layoutAt = gui->rootLayout.next;
-    for(layoutAt; layoutAt != &gui->rootLayout; layoutAt = layoutAt->next){
-        if(nameID == layoutAt->id){
+    Gui_Layout* layoutAt = gui->rootLayout.Next;
+    for(layoutAt; layoutAt != &gui->rootLayout; layoutAt = layoutAt->Next){
+        if(nameID == layoutAt->ID){
             foundLayout = layoutAt;
             break;
         }
@@ -672,13 +672,13 @@ void GuiBeginLayout(Gui_State* gui, char* name, u32 layoutType){
     if(!foundLayout){
         foundLayout = PushStruct(gui->mem, Gui_Layout);
         
-        CopyStrings(foundLayout->name, sizeof(foundLayout->name), name);
-        foundLayout->id = nameID;
+        CopyStrings(foundLayout->Name, sizeof(foundLayout->Name), name);
+        foundLayout->ID = nameID;
         
-        foundLayout->next = gui->rootLayout.next;
-        foundLayout->prev = &gui->rootLayout;
-        foundLayout->next->prev = foundLayout;
-        foundLayout->prev->next = foundLayout;
+        foundLayout->Next = gui->rootLayout.Next;
+        foundLayout->Prev = &gui->rootLayout;
+        foundLayout->Next->Prev = foundLayout;
+        foundLayout->Prev->Next = foundLayout;
         
         ++gui->layoutCount;
     }
@@ -692,7 +692,7 @@ void GuiBeginLayout(Gui_State* gui, char* name, u32 layoutType){
 void GuiEndLayout(Gui_State* gui){
     Gui_Layout* lay = GetParentLayout(gui);
     
-    lay->at = lay->start;
+    lay->At = lay->Start;
     
     GuiEndElement(gui, GuiElement_Layout);
 }
@@ -768,31 +768,31 @@ INTERNAL_FUNCTION void GuiSplitWindow(Gui_State* gui,
         Gui_Window* newWindow = GuiPopFromReturnList(gui);
         
         // NOTE(Dima): Adding children to leafs
-        newWindow->next = gui->windowLeafSentinel.next;
-        newWindow->prev = &gui->windowLeafSentinel;
+        newWindow->Next = gui->windowLeafSentinel.Next;
+        newWindow->Prev = &gui->windowLeafSentinel;
         
-        newWindow->next->prev = newWindow;
-        newWindow->prev->next = newWindow;
+        newWindow->Next->Prev = newWindow;
+        newWindow->Prev->Next = newWindow;
         
         newWindow->rect = partsRects[newWindowIndex];
     }
     
     // NOTE(Dima): Deallocating parent because it is not visible
-    window->next->prev = window->prev;
-    window->prev->next = window->next;
+    window->Next->Prev = window->Prev;
+    window->Prev->Next = window->Next;
     
-    window->next = 0;
-    window->prev = 0;
+    window->Next = 0;
+    window->Prev = 0;
     
     GuiDeallocateWindow(gui, window);
     
     // NOTE(Dima): Return list shoud be empty after usage in this function
-    Assert(gui->windowSentinel4Returning.next == &gui->windowSentinel4Returning);
+    Assert(gui->windowSentinel4Returning.Next == &gui->windowSentinel4Returning);
 }
 
 INTERNAL_FUNCTION void GuiUpdateWindow(Gui_State* gui, Gui_Window* window){
     
-    window->layout.start = window->rect.min;
+    window->layout.Start = window->rect.min;
     
     if(window->visible){
         
@@ -868,9 +868,9 @@ INTERNAL_FUNCTION void GuiUpdateWindow(Gui_State* gui, Gui_Window* window){
 }
 
 void GuiUpdateWindows(Gui_State* gui){
-    Gui_Window* updateAt = gui->windowLeafSentinel.next;
+    Gui_Window* updateAt = gui->windowLeafSentinel.Next;
     while(updateAt != &gui->windowLeafSentinel){
-        Gui_Window* tempNext = updateAt->next;
+        Gui_Window* tempNext = updateAt->Next;
         
         GuiUpdateWindow(gui, updateAt);
         
@@ -895,7 +895,7 @@ void GuiFrameBegin(Gui_State* gui){
     
     // NOTE(Dima): Init root layout
     Gui_Element* layoutElem = GuiBeginElement(gui, 
-                                              gui->rootLayout.name, 
+                                              gui->rootLayout.Name, 
                                               GuiElement_Layout, 
                                               JOY_TRUE);
     GuiInitLayout(gui, &gui->rootLayout, GuiLayout_Layout, layoutElem);
@@ -903,7 +903,7 @@ void GuiFrameBegin(Gui_State* gui){
 
 void GuiFrameEnd(Gui_State* gui){
     // NOTE(Dima): Deinit root layout
-    gui->rootLayout.at = gui->rootLayout.start;
+    gui->rootLayout.At = gui->rootLayout.Start;
     GuiEndElement(gui, GuiElement_Layout);
 }
 
@@ -919,22 +919,22 @@ void GuiFramePrepare4Render(Gui_State* gui){
 
 // NOTE(Dima): Default advance type is Column advance
 inline void GuiPreAdvance(Gui_State* gui, Gui_Layout* layout){
-    GuiAdvanceCtx* ctx = &layout->advanceRememberStack[layout->stackCurrentIndex];
+    GuiAdvanceCtx* ctx = &layout->AdvanceRememberStack[layout->StackCurrentIndex];
     b32 rowStarted = ctx->type == GuiAdvanceType_Row;
     
     float rememberValue = ctx->rememberValue;
     
     if(rowStarted){
-        layout->at.y = ctx->baseline;
+        layout->At.y = ctx->baseline;
     }
     else{
-        layout->at.x = ctx->baseline;
-        layout->at.y += GuiGetBaseline(gui);
+        layout->At.x = ctx->baseline;
+        layout->At.y += GuiGetBaseline(gui);
     }
 }
 
 inline void GuiPostAdvance(Gui_State* gui, Gui_Layout* layout, rc2 ElementRect){
-    GuiAdvanceCtx* ctx = &layout->advanceRememberStack[layout->stackCurrentIndex];
+    GuiAdvanceCtx* ctx = &layout->AdvanceRememberStack[layout->StackCurrentIndex];
     b32 rowStarted = (ctx->type == GuiAdvanceType_Row);
     
     float RememberValue = ctx->rememberValue;
@@ -943,11 +943,11 @@ inline void GuiPostAdvance(Gui_State* gui, Gui_Layout* layout, rc2 ElementRect){
     float toY = ElementRect.max.y + GetLineAdvance(gui->mainFont, gui->fontScale) * 0.15f;
     
     if(rowStarted){
-        layout->at.x = toX;
+        layout->At.x = toX;
         ctx->maximum = Max(ctx->maximum, toY);
     }
     else{
-        layout->at.y = toY;
+        layout->At.y = toY;
         ctx->maximum = Max(ctx->maximum, toX);
     }
     ctx->maxHorz = Max(ctx->maxHorz, toX);
@@ -984,10 +984,10 @@ void GuiBeginRow(Gui_State* gui){
         
         Gui_Layout* layout = GetParentLayout(gui);
         
-        Assert(layout->stackCurrentIndex < ArrayCount(layout->advanceRememberStack));
+        Assert(layout->StackCurrentIndex < ArrayCount(layout->AdvanceRememberStack));
         
-        layout->advanceRememberStack[++layout->stackCurrentIndex] = 
-            GuiRowAdvanceCtx(layout->at.x, layout->at.y + GuiGetBaseline(gui));
+        layout->AdvanceRememberStack[++layout->StackCurrentIndex] = 
+            GuiRowAdvanceCtx(layout->At.x, layout->At.y + GuiGetBaseline(gui));
     }
 }
 
@@ -1000,10 +1000,10 @@ void GuiBeginColumn(Gui_State* gui){
         
         Gui_Layout* layout = GetParentLayout(gui);
         
-        Assert(layout->stackCurrentIndex < ArrayCount(layout->advanceRememberStack));
+        Assert(layout->StackCurrentIndex < ArrayCount(layout->AdvanceRememberStack));
         
-        layout->advanceRememberStack[++layout->stackCurrentIndex] = 
-            GuiColumnAdvanceCtx(layout->at.y, layout->at.x);
+        layout->AdvanceRememberStack[++layout->StackCurrentIndex] = 
+            GuiColumnAdvanceCtx(layout->At.y, layout->At.x);
     }
 }
 
@@ -1012,17 +1012,17 @@ void GuiEndRow(Gui_State* gui){
         
         Gui_Layout* layout = GetParentLayout(gui);
         
-        Assert(layout->stackCurrentIndex >= 1);
+        Assert(layout->StackCurrentIndex >= 1);
         
-        GuiAdvanceCtx* ctx = &layout->advanceRememberStack[layout->stackCurrentIndex--];
+        GuiAdvanceCtx* ctx = &layout->AdvanceRememberStack[layout->StackCurrentIndex--];
         Assert(ctx->type == GuiAdvanceType_Row);
         
         // NOTE(Dima): Set X value to the remembered value
-        layout->at.x = ctx->rememberValue;
+        layout->At.x = ctx->rememberValue;
         // NOTE(Dima): Set Y value to the largest vertical value
-        layout->at.y = ctx->maxVert;
+        layout->At.y = ctx->maxVert;
         
-        GuiAdvanceCtx* newCtx = &layout->advanceRememberStack[layout->stackCurrentIndex];
+        GuiAdvanceCtx* newCtx = &layout->AdvanceRememberStack[layout->StackCurrentIndex];
         newCtx->maximum = Max(ctx->maximum, newCtx->maximum);
         
         newCtx->maxHorz = Max(ctx->maxHorz, newCtx->maxHorz);
@@ -1039,17 +1039,17 @@ void GuiEndColumn(Gui_State* gui){
         
         Gui_Layout* layout = GetParentLayout(gui);
         
-        Assert(layout->stackCurrentIndex >= 1);
+        Assert(layout->StackCurrentIndex >= 1);
         
-        GuiAdvanceCtx* ctx = &layout->advanceRememberStack[layout->stackCurrentIndex--];
+        GuiAdvanceCtx* ctx = &layout->AdvanceRememberStack[layout->StackCurrentIndex--];
         Assert(ctx->type == GuiAdvanceType_Column);
         
         // NOTE(Dima): Set Y Value to the remembered value
-        layout->at.y = ctx->rememberValue;
+        layout->At.y = ctx->rememberValue;
         // NOTE(Dima): Set X value to the maximum horizontal value
-        layout->at.x = ctx->maxHorz;
+        layout->At.x = ctx->maxHorz;
         
-        GuiAdvanceCtx* newCtx = &layout->advanceRememberStack[layout->stackCurrentIndex];
+        GuiAdvanceCtx* newCtx = &layout->AdvanceRememberStack[layout->StackCurrentIndex];
         newCtx->maximum = Max(ctx->maximum, newCtx->maximum);
         
         newCtx->maxHorz = Max(ctx->maxHorz, newCtx->maxHorz);
@@ -1096,8 +1096,8 @@ INTERNAL_FUNCTION void GuiPushBut(Gui_State* gui, rc2 rect, u32 type = PushBut_G
 }
 
 inline b32 PotentiallyVisible(Gui_Layout* lay, v2 dim){
-    rc2 layRc = RcMinDim(lay->start, lay->dim);
-    rc2 targetRc = RcMinDim(lay->at, dim);
+    rc2 layRc = RcMinDim(lay->Start, lay->Dim);
+    rc2 targetRc = RcMinDim(lay->At, dim);
     
     b32 res = BoxIntersectsWithBox(layRc, targetRc);
     
@@ -1127,7 +1127,7 @@ void GuiBeginTree(Gui_State* gui, char* name){
         
         GuiPreAdvance(gui, layout);
         
-        rc2 textRc = GetTextRect(gui, name, layout->at);
+        rc2 textRc = GetTextRect(gui, name, layout->At);
         
         v4 textColor = GUI_GETCOLOR_COLSYS(Color_ToxicGreen);
         v4 oulineColor = GUI_GETCOLOR_COLSYS(Color_Red);
@@ -1144,7 +1144,7 @@ void GuiBeginTree(Gui_State* gui, char* name){
                 elem->opened = !elem->opened;
             }
         }
-        PrintText(gui, name, layout->at, textColor);
+        PrintText(gui, name, layout->At, textColor);
         
         GuiPostAdvance(gui, layout, textRc);
     }
@@ -1162,7 +1162,7 @@ void GuiText(Gui_State* gui, char* text){
     {
         GuiPreAdvance(gui, layout);
         
-        rc2 textRc = PrintText(gui, text, layout->at, GUI_GETCOLOR(GuiColor_Text));
+        rc2 textRc = PrintText(gui, text, layout->At, GUI_GETCOLOR(GuiColor_Text));
         
         GuiPostAdvance(gui, layout, textRc);
     }
@@ -1181,7 +1181,7 @@ b32 GuiButton(Gui_State* gui, char* buttonName){
         GuiPreAdvance(gui, layout);
         
         // NOTE(Dima): Printing button and text
-        rc2 textRc = GetTextRect(gui, buttonName, layout->at);
+        rc2 textRc = GetTextRect(gui, buttonName, layout->At);
         textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 3.0f));
         GuiPushBut(gui, textRc);
         
@@ -1214,7 +1214,7 @@ void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value){
         GuiPreAdvance(gui, layout);
         
         // NOTE(Dima): Printing button and text
-        rc2 textRc = GetTextRect(gui, buttonName, layout->at);
+        rc2 textRc = GetTextRect(gui, buttonName, layout->At);
         textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 3.0f));
         GuiPushBut(gui, textRc);
         
@@ -1252,7 +1252,7 @@ void GuiBoolButtonOnOff(Gui_State* gui, char* buttonName, b32* value){
         GuiPreAdvance(gui, layout);
         
         // NOTE(Dima): Button printing
-        rc2 butRc = GetTextRect(gui, "OFF", layout->at);
+        rc2 butRc = GetTextRect(gui, "OFF", layout->At);
         butRc = GetTxtElemRect(gui, layout, butRc, V2(4.0f, 3.0f));
         GuiPushBut(gui, butRc);
         
@@ -1305,7 +1305,7 @@ void GuiCheckbox(Gui_State* gui, char* name, b32* value){
         // NOTE(Dima): Checkbox rendering
         float chkSize = GetLineAdvance(gui->mainFont, gui->fontScale);
         rc2 chkRect;
-        chkRect.min = V2(layout->at.x, layout->at.y - GetScaledAscender(gui->mainFont, gui->fontScale));
+        chkRect.min = V2(layout->At.x, layout->At.y - GetScaledAscender(gui->mainFont, gui->fontScale));
         chkRect.max = chkRect.min + V2(chkSize, chkSize);
         chkRect = GetTxtElemRect(gui, layout, chkRect, V2(2.0f, 2.0f));
         
@@ -1392,7 +1392,7 @@ void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId) {
         GuiPreAdvance(gui, layout);
         
         // NOTE(Dima): Printing button and text
-        rc2 textRc = GetTextRect(gui, name, layout->at);
+        rc2 textRc = GetTextRect(gui, name, layout->At);
         textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 3.0f));
         GuiPushBut(gui, textRc);
         

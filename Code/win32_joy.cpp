@@ -91,7 +91,6 @@ void DSoundInit(DSound_State* dsState, HWND hwnd){
                 &dsState->primBuf, 
                 0);
             
-            
             if(SUCCEEDED(primBufRes)){
                 // NOTE(Dima): setting wave format
                 if(SUCCEEDED(dsState->primBuf->SetFormat(pwf))){
@@ -150,8 +149,8 @@ void DSoundInit(DSound_State* dsState, HWND hwnd){
 		dCaptureDesc.lpDSCFXDesc = NULL;
         
         if (SUCCEEDED(dsState->dCapture->CreateCaptureBuffer(
-			&dCaptureDesc,
-			&dsState->dCaptureBuf, 0)))
+            &dCaptureDesc,
+            &dsState->dCaptureBuf, 0)))
 		{
             dsState->dCaptureDesc = dCaptureDesc;
             dsState->captureBufferCreated = 1;
@@ -167,9 +166,6 @@ void DSoundInit(DSound_State* dsState, HWND hwnd){
             PlatformError_Error, 
             "Can not create DirectSoundCapture object");
     }
-    
-    ASSERT(dsState->secondaryBufferCreated);
-    ASSERT(dsState->captureBufferCreated);
 }
 
 
@@ -1626,6 +1622,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         rc2 ClipRect = RcMinMax(V2(0.0f, 0.0f), V2(windowWidth, windowHeight));
         
         RenderStackBeginFrame(renderStack);
+        renderStack->Width = win32.windowWidth;
+        renderStack->Height = win32.windowHeight;
         
         PushClearColor(renderStack, V3(1.0f, 0.5f, 0.0f));
         
@@ -1719,6 +1717,14 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         GuiText(gui, StackInfo);
         GuiText(gui, "I love Kate");
         GuiText(gui, "I wish joy and happiness for everyone");
+        
+        char TmpBuf[128];
+        stbsp_sprintf(TmpBuf, "fadeoutAlpha: %.2f", fadeoutAlpha);
+        GuiText(gui, TmpBuf);
+        stbsp_sprintf(TmpBuf, "time: %.2f", time);
+        GuiText(gui, TmpBuf);
+        stbsp_sprintf(TmpBuf, "timeSinceShow: %.2f", timeSinceShow);
+        GuiText(gui, TmpBuf);
         GuiEndTree(gui);
         
         //GuiPushDim(gui, V2(100, 100));
@@ -1950,9 +1956,10 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         lastFrameBytesUsed = renderStack->memUsed;
         lastFrameEntryCount = renderStack->entryCount;
         
-        RenderMultithreaded(&platform.highPriorityQueue, renderStack, &win32.bitmap);
+        //RenderMultithreaded(&platform.highPriorityQueue, renderStack, &win32.bitmap);
         
-        GlOutputRender(&gGL, &win32.bitmap);
+        GlOutputRender(&gGL, renderStack);
+        //GlOutputCommands(&gGL, renderStack);
         
         LARGE_INTEGER endClockLI;
         QueryPerformanceCounter(&endClockLI);

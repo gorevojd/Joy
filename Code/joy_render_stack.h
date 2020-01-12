@@ -26,6 +26,9 @@ struct Render_Stack{
     mi memUsed;
     mi memSize;
     
+    float Width;
+    float Height;
+    
     int entryCount;
 };
 

@@ -191,6 +191,7 @@ Bmp_Info LoadBMP(char* FilePath){
     __m128 mmOneOver255 = _mm_set1_ps(1.0f / 255.0f);
     __m128i mmFF = _mm_set1_epi32(0xFF);
     
+#if 1
     int PixelIndex = 0;
     for(PixelIndex;
         PixelIndex < pixelsCountForSIMD;
@@ -207,7 +208,6 @@ Bmp_Info LoadBMP(char* FilePath){
         mmTexel_r = _mm_mul_ps(mmTexel_r, mmTexel_a);
         mmTexel_g = _mm_mul_ps(mmTexel_g, mmTexel_a);
         mmTexel_b = _mm_mul_ps(mmTexel_b, mmTexel_a);
-        
         
         __m128i mmColorShifted_a = _mm_slli_epi32(_mm_cvtps_epi32(_mm_mul_ps(mmTexel_a, mm255)), 24);
         __m128i mmColorShifted_b = _mm_slli_epi32(_mm_cvtps_epi32(_mm_mul_ps(mmTexel_b, mm255)), 16);
@@ -236,6 +236,25 @@ Bmp_Info LoadBMP(char* FilePath){
         
         *((u32*)res.Pixels + PixelIndex) = PackedColor;
     }
+#else
+    
+    for(int PixelIndex = 0;
+        PixelIndex < pixelsCount;
+        PixelIndex++)
+    {
+        u32 Pix = *((u32*)Image + PixelIndex);
+        
+        v4 Color = UnpackRGBA(Pix);
+        Color.r *= Color.a;
+        Color.g *= Color.a;
+        Color.b *= Color.a;
+        
+        u32 PackedColor = PackRGBA(Color);
+        
+        *((u32*)res.Pixels + PixelIndex) = PackedColor;
+    }
+#endif
+    
     
     stbi_image_free(Image);
     
@@ -267,11 +286,11 @@ float* GaussianBox)
 	int LeftBearingX;
     
     u8* Bitmap = stbtt_GetCodepointBitmap(
-		STBFont,
-		FontScale, FontScale,
-		Codepoint,
-		&CharWidth, &CharHeight,
-		&XOffset, &YOffset);
+        STBFont,
+        FontScale, FontScale,
+        Codepoint,
+        &CharWidth, &CharHeight,
+        &XOffset, &YOffset);
     
     if(CharWidth > 9999){
         CharWidth = 0;
@@ -338,32 +357,32 @@ float* GaussianBox)
     //NOTE(dima): Render blur if needed
 	if (Flags & LoadFont_BakeBlur) {
 		Bmp_Info ToBlur = AssetAllocateBitmap(
-			2 * CharBorder + CharWidth,
-			2 * CharBorder + CharHeight);
+            2 * CharBorder + CharWidth,
+            2 * CharBorder + CharHeight);
         
 		Bmp_Info BlurredResult = AssetAllocateBitmap(
-			2 * CharBorder + CharWidth,
-			2 * CharBorder + CharHeight);
+            2 * CharBorder + CharWidth,
+            2 * CharBorder + CharHeight);
         
 		Bmp_Info TempBitmap = AssetAllocateBitmap(
-			2 * CharBorder + CharWidth,
-			2 * CharBorder + CharHeight);
+            2 * CharBorder + CharWidth,
+            2 * CharBorder + CharHeight);
         
 		RenderOneBitmapIntoAnother(
-			&ToBlur,
-			&CharBitmap,
-			CharBorder,
-			CharBorder,
-			V4(1.0f, 1.0f, 1.0f, 1.0f));
+            &ToBlur,
+            &CharBitmap,
+            CharBorder,
+            CharBorder,
+            V4(1.0f, 1.0f, 1.0f, 1.0f));
         
 #if 1
 		BlurBitmapExactGaussian(
-			&ToBlur,
-			BlurredResult.Pixels,
-			ToBlur.Width,
-			ToBlur.Height,
-			BlurRadius,
-			GaussianBox);
+            &ToBlur,
+            BlurredResult.Pixels,
+            ToBlur.Width,
+            ToBlur.Height,
+            BlurRadius,
+            GaussianBox);
         
         
 		for (int Y = 0; Y < ToBlur.Height; Y++) {
@@ -383,21 +402,21 @@ float* GaussianBox)
 		}
         
 		BlurBitmapExactGaussian(
-			&ToBlur,
-			BlurredResult.Pixels,
-			ToBlur.Width,
-			ToBlur.Height,
-			BlurRadius,
-			GaussianBox);
+            &ToBlur,
+            BlurredResult.Pixels,
+            ToBlur.Width,
+            ToBlur.Height,
+            BlurRadius,
+            GaussianBox);
         
 #else
 		BlurBitmapApproximateGaussian(
-			&ToBlur,
-			BlurredResult.Pixels,
-			TempBitmap.Pixels,
-			ToBlur.Width,
-			ToBlur.Height,
-			BlurRadius);
+            &ToBlur,
+            BlurredResult.Pixels,
+            TempBitmap.Pixels,
+            ToBlur.Width,
+            ToBlur.Height,
+            BlurRadius);
 		for (int Y = 0; Y < ToBlur.Height; Y++) {
 			for (int X = 0; X < ToBlur.Width; X++) {
 				u32* FromPix = (u32*)BlurredResult.Pixels + Y * BlurredResult.Width + X;
@@ -411,19 +430,19 @@ float* GaussianBox)
 			}
 		}
 		BlurBitmapApproximateGaussian(
-			&ToBlur,
-			BlurredResult.Pixels,
-			TempBitmap.Pixels,
-			ToBlur.Width,
-			ToBlur.Height,
-			BlurRadius);
+            &ToBlur,
+            BlurredResult.Pixels,
+            TempBitmap.Pixels,
+            ToBlur.Width,
+            ToBlur.Height,
+            BlurRadius);
 #endif
         
 		RenderOneBitmapIntoAnother(
-			&glyph->Bitmap,
-			&BlurredResult,
-			0, 0,
-			V4(0.0f, 0.0f, 0.0f, 1.0f));
+            &glyph->Bitmap,
+            &BlurredResult,
+            0, 0,
+            V4(0.0f, 0.0f, 0.0f, 1.0f));
         
 		AssetDeallocateBitmap(&TempBitmap);
 		AssetDeallocateBitmap(&ToBlur);
@@ -468,10 +487,10 @@ Font_Info LoadFont(char* FilePath, float height, u32 Flags){
 	int LineGap;
     
     stbtt_GetFontVMetrics(
-		&STBFont,
-		&AscenderHeight,
-		&DescenderHeight,
-		&LineGap);
+        &STBFont,
+        &AscenderHeight,
+        &DescenderHeight,
+        &LineGap);
     
     res.AscenderHeight = (float)AscenderHeight * Scale;
 	res.DescenderHeight = (float)DescenderHeight * Scale;
@@ -640,26 +659,6 @@ b32 CalculateTangents)
             DstVerts[Index0].C = Colors[Index0];
             DstVerts[Index1].C = Colors[Index1];
             DstVerts[Index2].C = Colors[Index2];
-        }
-    }
-    
-    // NOTE(Dima): Writing vertices
-    for(int VertexIndex = 0;
-        VertexIndex < VerticesCount;
-        VertexIndex++)
-    {
-        Vertex_Info* Vertex = (Vertex_Info*)Result.Vertices;
-        
-        *Vertex = {};
-        
-        Vertex->P = Positions[VertexIndex];
-        
-        if(TexCoords.size() == VerticesCount){
-            Vertex->UV = TexCoords[VertexIndex];
-        }
-        
-        if(Normals.size() == VerticesCount){
-            Vertex->N = Normals[VertexIndex];
         }
     }
     
@@ -997,6 +996,7 @@ Mesh_Info GenerateCylynder(float Height, float Radius, int SidesCount) {
         Normals.push_back(Normal);
         Normals.push_back(Normal);
         Normals.push_back(Normal);
+        Normals.push_back(Normal);
         
         // NOTE(Dima): Pushing indices
         Indices.push_back(VertexAt);
@@ -1018,7 +1018,6 @@ Mesh_Info GenerateCylynder(float Height, float Radius, int SidesCount) {
                       Indices,
                       JOY_FALSE, 
                       JOY_TRUE);
-    
     
     return(Result);
 }

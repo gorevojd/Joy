@@ -10,6 +10,8 @@ struct Bmp_Info{
     int Height;
     int Pitch;
     float WidthOverHeight;
+    
+    mi Handle;
 };
 
 struct Glyph_Info{
