@@ -1496,7 +1496,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     platform.MemFree = Win32MemFree;
     
     QueryPerformanceFrequency(&win32.performanceFreqLI);
-    win32.oneOverPerformanceFreq = 1.0f / (float)win32.performanceFreqLI.QuadPart;
+    win32.oneOverPerformanceFreq = 1.0 / (double)win32.performanceFreqLI.QuadPart;
     
     // NOTE(Dima): Initializing memory sentinel
     win32.memorySentinel = {};
@@ -1553,7 +1553,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     win32.windowHeight = windowHeight;
     
     void* winBmpMemory = PushSomeMem(&gMem, windowWidth * windowHeight * 4, 64);
-    win32.bitmap = AssetAllocateBitmapInternal(windowWidth, windowHeight, winBmpMemory);
+    win32.bitmap = AllocateBitmapInternal(windowWidth, windowHeight, winBmpMemory);
     win32.bmi = {};
     BITMAPINFO* bmi = &win32.bmi;
     BITMAPINFOHEADER* bmiHeader = &bmi->bmiHeader;
@@ -1569,7 +1569,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     win32.renderCtx = Win32InitOpenGL(glDC);
     
     // NOTE(Dima): Initializing engine systems
-    InitAssets(&gAssets);
+    InitAssets(&gAssets, &gMem);
     DSoundInit(&gDSound, win32.window);
     Win32ClearSoundBuffer(&gDSound);
     
@@ -1639,6 +1639,12 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         
         float fadeoutAlpha = Clamp01((timeSinceShow - toShowTime) / toShowFadeoutTime);
         
+        PushBitmap(renderStack,
+                   &gAssets.MainLargeAtlas.Bitmap,
+                   V2(100, 100),
+                   600,
+                   V4(1.0f, 1.0f, 1.0f, 1.0f));
+        
         PushBitmap(
             renderStack, 
             toShow, 
@@ -1680,298 +1686,23 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         PushBitmap(renderStack, &gAssets.sunrise, V2(700.0f, Sin(time * 1.6f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
 #endif
         
-        
-        char FPSBuf[64];
-        stbsp_sprintf(FPSBuf, "FPS %.2f, ms %.3f", 1.0f / deltaTime, deltaTime);
-        
-        static int lastFrameEntryCount = 0;
-        static int lastFrameBytesUsed = 0;
-        char StackInfo[256];
-        stbsp_sprintf(StackInfo, "EntryCount: %d; BytesUsed: %d;", 
-                      lastFrameEntryCount, 
-                      lastFrameBytesUsed);
-        
-#if 1
-        Gui_State* gui = &gGui;
-        
-        GuiFrameBegin(gui);
-        GuiBeginPage(gui, "Page1");
-        GuiEndPage(gui);
-        
-        GuiBeginPage(gui, "Page2");
-        GuiEndPage(gui);
-        
-        GuiBeginPage(gui, "Animation");
-        GuiEndPage(gui);
-        
-        GuiBeginPage(gui, "Platform");
-        GuiEndPage(gui);
-        
-        GuiBeginPage(gui, "GUI");
-        GuiEndPage(gui);
-        
-        //GuiUpdateWindows(gui);
-        GuiBeginTree(gui, "Some text");
-        GuiText(gui, "Hello world");
-        GuiText(gui, FPSBuf);
-        GuiText(gui, StackInfo);
-        GuiText(gui, "I love Kate");
-        GuiText(gui, "I wish joy and happiness for everyone");
-        
-        char TmpBuf[128];
-        stbsp_sprintf(TmpBuf, "fadeoutAlpha: %.2f", fadeoutAlpha);
-        GuiText(gui, TmpBuf);
-        stbsp_sprintf(TmpBuf, "time: %.2f", time);
-        GuiText(gui, TmpBuf);
-        stbsp_sprintf(TmpBuf, "timeSinceShow: %.2f", timeSinceShow);
-        GuiText(gui, TmpBuf);
-        GuiEndTree(gui);
-        
-        //GuiPushDim(gui, V2(100, 100));
-        GuiBeginLayout(gui, "layout1", GuiLayout_Window);
-        GuiBeginTree(gui, "AddClearButtons");
-        LOCAL_AS_GLOBAL int RectCount = 0;
-        GuiBeginRow(gui);
-        if(GuiButton(gui, "Add")){
-            RectCount++;
-        }
-        if(GuiButton(gui, "Clear")){
-            RectCount--;
-            if(RectCount < 0){
-                RectCount = 0;
-            }
-        }
-        GuiEndRow(gui);
-        for(int i = 0; i < RectCount; i++){
-            PushRect(renderStack, RcMinDim(V2(100 + i * 50, 100), V2(40, 40)));
-        }
-        GuiEndTree(gui);
-        
-        GuiBeginTree(gui, "Buttons and checkboxes");
-        static b32 boolButtonValue;
-        GuiBeginRow(gui);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBoolButton(gui, "boolButton123", &boolButtonValue);
-        GuiBoolButton(gui, "boolButton1234", &boolButtonValue);
-        GuiBoolButton(gui, "boolButtonasdfga", &boolButtonValue);
-        GuiBoolButton(gui, "boolButtonzxcvzxcb", &boolButtonValue);
-        GuiEndRow(gui);
-        
-        static b32 boolButtonOnOffValue;
-        GuiBeginRow(gui);
-        GuiBeginColumn(gui);
-        GuiBoolButtonOnOff(gui, "boolButtonOnOff", &boolButtonValue);
-        GuiBoolButtonOnOff(gui, "boolButtonOnOff1", &boolButtonValue);
-        GuiBoolButtonOnOff(gui, "boolButtonOnOff2", &boolButtonValue);
-        GuiBoolButtonOnOff(gui, "boolButtonOnOff3", &boolButtonValue);
-        GuiEndColumn(gui);
-        
-        GuiBeginColumn(gui);
-        static b32 checkboxValue1;
-        static b32 checkboxValue2;
-        static b32 checkboxValue3;
-        static b32 checkboxValue4;
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiCheckbox(gui, "Checkbox1", &checkboxValue2);
-        GuiCheckbox(gui, "Checkbox2", &checkboxValue3);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiEndColumn(gui);
-        
-        GuiBeginColumn(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiCheckbox(gui, "Checkbox1", &checkboxValue2);
-        GuiCheckbox(gui, "Checkbox2", &checkboxValue3);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiEndColumn(gui);
-        GuiEndRow(gui);
-        
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff4", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox4", &checkboxValue4);
-        GuiEndTree(gui);
-        
-        GuiBeginTree(gui, "Some more buts");
-        GuiBeginRow(gui);
-        GuiBeginColumn(gui);
-        GuiPushDim(gui, V2(100, 40));
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff1", &boolButtonValue);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff2", &boolButtonValue);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff3", &boolButtonValue);
-        GuiEndColumn(gui);
-        
-        GuiBeginColumn(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiCheckbox(gui, "Checkbox1", &checkboxValue2);
-        GuiCheckbox(gui, "Checkbox2", &checkboxValue3);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiEndColumn(gui);
-        
-        GuiEndRow(gui);
-        GuiEndTree(gui);
-        
-        GuiBeginTree(gui, "TestCull");
-        static u32 activeRadio = 0;
-        GuiBeginRow(gui);
-        GuiBeginColumn(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiEndColumn(gui);
-        GuiBeginColumn(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiEndColumn(gui);
-        GuiBeginColumn(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiEndColumn(gui);
-        GuiBeginColumn(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiEndColumn(gui);
-        GuiBeginColumn(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-        GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-        GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-        GuiBoolButton(gui, "boolButton", &boolButtonValue);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiRadioButton(gui, "radio0", 0);
-        GuiEndRadioGroup(gui);
-        GuiEndColumn(gui);
-        GuiEndRow(gui);
-        GuiEndTree(gui);
-        
-        GuiBeginRow(gui);
-        GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-        GuiPushDimBegin(gui, V2(100, 40));
-        GuiRadioButton(gui, "radio0", 0);
-        GuiRadioButton(gui, "radio1", 1);
-        GuiRadioButton(gui, "radio2", 2);
-        GuiRadioButton(gui, "radio3", 3);
-        GuiPushDimEnd(gui);
-        GuiEndRadioGroup(gui);
-        
-        char radioTxt[32];
-        stbsp_sprintf(radioTxt, "radio but value: %u", activeRadio);
-        GuiEndRow(gui);
-        GuiText(gui, radioTxt);
-        
-        GuiTooltip(gui, "Hello world!", gInput.mouseP);
-        
-        GuiFramePrepare4Render(gui);
-        
-        GuiEndLayout(gui);
-        GuiFrameEnd(gui);
-#endif
-        
-        lastFrameBytesUsed = renderStack->memUsed;
-        lastFrameEntryCount = renderStack->entryCount;
+        GuiTest(&gGui, deltaTime);
         
         //RenderMultithreaded(&platform.highPriorityQueue, renderStack, &win32.bitmap);
         
         GlOutputRender(&gGL, renderStack);
         //GlOutputCommands(&gGL, renderStack);
         
-        LARGE_INTEGER endClockLI;
-        QueryPerformanceCounter(&endClockLI);
-        u64 clocksElapsed = endClockLI.QuadPart - beginClockLI.QuadPart;
-        deltaTime = (float)clocksElapsed * win32.oneOverPerformanceFreq;
-        time += deltaTime;
+        SwapBuffers(glDC);
         
         //gDirX.devCtx->ClearRenderTargetView(gDirX.backBuffer, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
         
         //gDirX.swapChain->Present(0, 0);
-        
-        SwapBuffers(glDC);
+        LARGE_INTEGER endClockLI;
+        QueryPerformanceCounter(&endClockLI);
+        u64 clocksElapsed = endClockLI.QuadPart - beginClockLI.QuadPart;
+        deltaTime = (float)((double)clocksElapsed * win32.oneOverPerformanceFreq);
+        time += deltaTime;
     }
     
     //NOTE(dima): Cleanup

@@ -120,7 +120,7 @@ void FreeStringList(Loaded_Strings* list){
     }
 }
 
-Bmp_Info AssetAllocateBitmapInternal(u32 width, u32 height, void* pixelsData) {
+Bmp_Info AllocateBitmapInternal(u32 width, u32 height, void* pixelsData) {
 	Bmp_Info res = {};
     
 	res.Width = width;
@@ -129,23 +129,23 @@ Bmp_Info AssetAllocateBitmapInternal(u32 width, u32 height, void* pixelsData) {
     
 	res.WidthOverHeight = (float)width / (float)height;
     
-	res.Pixels = (u8*)pixelsData;
+	res.Pixels = pixelsData;
     
 	return(res);
 }
 
-Bmp_Info AssetAllocateBitmap(u32 width, u32 height) {
+Bmp_Info AllocateBitmap(u32 width, u32 height) {
 	u32 BitmapDataSize = width * height * 4;
 	void* PixelsData = calloc(BitmapDataSize, 1);
     
 	memset(PixelsData, 0, BitmapDataSize);
     
-	Bmp_Info res = AssetAllocateBitmapInternal(width, height, PixelsData);
+	Bmp_Info res = AllocateBitmapInternal(width, height, PixelsData);
     
 	return(res);
 }
 
-void AssetCopyBitmapData(Bmp_Info* Dst, Bmp_Info* Src) {
+void CopyBitmapData(Bmp_Info* Dst, Bmp_Info* Src) {
 	Assert(Dst->Width == Src->Width);
 	Assert(Dst->Height == Src->Height);
     
@@ -158,7 +158,7 @@ void AssetCopyBitmapData(Bmp_Info* Dst, Bmp_Info* Src) {
 	}
 }
 
-void AssetDeallocateBitmap(Bmp_Info* Buffer) {
+void DeallocateBitmap(Bmp_Info* Buffer) {
 	if (Buffer->Pixels) {
 		free(Buffer->Pixels);
 	}
@@ -183,7 +183,7 @@ Bmp_Info LoadBMP(char* FilePath){
     int ImageSize = pixelsCount * 4;
     
     void* OurImageMem = malloc(ImageSize);
-    res = AssetAllocateBitmapInternal(width, height, OurImageMem);
+    res = AllocateBitmapInternal(width, height, OurImageMem);
     
     int pixelsCountForSIMD = pixelsCount & (~3);
     
@@ -265,7 +265,7 @@ Bmp_Info LoadBMP(char* FilePath){
 void LoadFontAddCodepoint(
 Font_Info* FontInfo, 
 stbtt_fontinfo* STBFont,
-int Codepoint, 
+int Codepoint,
 int* AtlasWidth, 
 int* AtlasHeight,
 float FontScale,
@@ -313,7 +313,7 @@ float* GaussianBox)
     
     glyph->Width = CharBmpWidth + ShadowOffset;
 	glyph->Height = CharBmpHeight + ShadowOffset;
-	glyph->Bitmap = AssetAllocateBitmap(glyph->Width, glyph->Height);
+	glyph->Bitmap = AllocateBitmap(glyph->Width, glyph->Height);
 	glyph->Advance = Advance * FontScale;
 	glyph->LeftBearingX = LeftBearingX * FontScale;
 	glyph->XOffset = XOffset - CharBorder;
@@ -334,7 +334,7 @@ float* GaussianBox)
     //NOTE(dima): Forming char bitmap
 	float OneOver255 = 1.0f / 255.0f;
     
-    Bmp_Info CharBitmap= AssetAllocateBitmap(CharWidth, CharHeight);
+    Bmp_Info CharBitmap= AllocateBitmap(CharWidth, CharHeight);
 	
 	for (int j = 0; j < CharHeight; j++) {
 		for (int i = 0; i < CharWidth; i++) {
@@ -356,15 +356,15 @@ float* GaussianBox)
     
     //NOTE(dima): Render blur if needed
 	if (Flags & LoadFont_BakeBlur) {
-		Bmp_Info ToBlur = AssetAllocateBitmap(
+		Bmp_Info ToBlur = AllocateBitmap(
             2 * CharBorder + CharWidth,
             2 * CharBorder + CharHeight);
         
-		Bmp_Info BlurredResult = AssetAllocateBitmap(
+		Bmp_Info BlurredResult = AllocateBitmap(
             2 * CharBorder + CharWidth,
             2 * CharBorder + CharHeight);
         
-		Bmp_Info TempBitmap = AssetAllocateBitmap(
+		Bmp_Info TempBitmap = AllocateBitmap(
             2 * CharBorder + CharWidth,
             2 * CharBorder + CharHeight);
         
@@ -444,9 +444,9 @@ float* GaussianBox)
             0, 0,
             V4(0.0f, 0.0f, 0.0f, 1.0f));
         
-		AssetDeallocateBitmap(&TempBitmap);
-		AssetDeallocateBitmap(&ToBlur);
-		AssetDeallocateBitmap(&BlurredResult);
+		DeallocateBitmap(&TempBitmap);
+		DeallocateBitmap(&ToBlur);
+		DeallocateBitmap(&BlurredResult);
 	}
     
     if(Flags & LoadFont_BakeShadow){
@@ -467,7 +467,7 @@ float* GaussianBox)
         CharBorder,
         V4(1.0f, 1.0f, 1.0f, 1.0f));
     
-    AssetDeallocateBitmap(&CharBitmap);
+    DeallocateBitmap(&CharBitmap);
     stbtt_FreeBitmap(Bitmap, 0);
 }
 
@@ -665,6 +665,216 @@ b32 CalculateTangents)
     return(Result);
 }
 
+Mesh_Info MakePlane(){
+    Mesh_Info Result = {};
+    
+    std::vector<v3> Positions;
+    std::vector<v2> TexCoords;
+    std::vector<v3> Normals;
+    std::vector<v3> Colors;
+    std::vector<u32> Indices;
+    
+    int VertAt = 0;
+    
+    // NOTE(Dima): Pushing plane
+    v3 Ps[] = {
+        V3(-0.5f, 0.0f, -0.5f),
+        V3(0.5f, 0.0f, -0.5f),
+        V3(0.5f, 0.0f, 0.5f),
+        V3(-0.5f, 0.0f, 0.5f),
+    };
+    
+    v3 Cs[] = {
+        V3(1.0f, 0.0f, 0.0f),
+        V3(0.0f, 1.0f, 0.0f),
+        V3(0.0f, 0.0f, 1.0f),
+        V3(1.0f, 1.0f, 0.0f),
+        V3(1.0f, 0.0f, 1.0f),
+        V3(0.0f, 1.0f, 1.0f),
+        V3(1.0f, 0.5f, 0.0f),
+        V3(0.5f, 1.0f, 0.2f),
+    };
+    
+    v2 T0 = V2(0.0f, 1.0f);
+    v2 T1 = V2(1.0f, 1.0f);
+    v2 T2 = V2(1.0f, 0.0f);
+    v2 T3 = V2(0.0f, 0.0f);
+    
+    
+    Positions.push_back(Ps[0]);
+    Positions.push_back(Ps[1]);
+    Positions.push_back(Ps[2]);
+    Positions.push_back(Ps[3]);
+    
+    Colors.push_back(Cs[0]);
+    Colors.push_back(Cs[1]);
+    Colors.push_back(Cs[2]);
+    Colors.push_back(Cs[3]);
+    
+    v3 n = V3(0.0f, 1.0f, 0.0f);
+    Normals.push_back(n);
+    Normals.push_back(n);
+    Normals.push_back(n);
+    Normals.push_back(n);
+    
+    TexCoords.push_back(T0);
+    TexCoords.push_back(T1);
+    TexCoords.push_back(T2);
+    TexCoords.push_back(T3);
+    
+    Indices.push_back(0);
+    Indices.push_back(1);
+    Indices.push_back(2);
+    
+    Indices.push_back(0);
+    Indices.push_back(2);
+    Indices.push_back(3);
+    
+    Result = MakeMesh(Positions, 
+                      TexCoords, 
+                      Normals, 
+                      std::vector<v3>(), 
+                      Colors,
+                      Indices,
+                      JOY_FALSE, 
+                      JOY_TRUE);
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline 
+void PushSide(std::vector<v3>& Positions,
+              std::vector<v2>& TexCoords,
+              std::vector<v3>& Normals,
+              std::vector<v3>& Colors,
+              std::vector<u32>& Indices,
+              int i1, int i2, int i3, int i4,
+              v3 n, int* Increment)
+{
+    v3 Ps[] = {
+        V3(-0.5f, 0.5f, 0.5f),
+        V3(0.5f, 0.5f, 0.5f),
+        V3(0.5f, -0.5f, 0.5f),
+        V3(-0.5f, -0.5f, 0.5f),
+        V3(-0.5f, 0.5f, -0.5f),
+        V3(0.5f, 0.5f, -0.5f),
+        V3(0.5f, -0.5f, -0.5f),
+        V3(-0.5f, -0.5f, -0.5f),
+    };
+    
+    v3 Cs[] = {
+        V3(1.0f, 0.0f, 0.0f),
+        V3(0.0f, 1.0f, 0.0f),
+        V3(0.0f, 0.0f, 1.0f),
+        V3(1.0f, 1.0f, 0.0f),
+        V3(1.0f, 0.0f, 1.0f),
+        V3(0.0f, 1.0f, 1.0f),
+        V3(1.0f, 0.5f, 0.0f),
+        V3(0.5f, 1.0f, 0.2f),
+    };
+    
+    v2 T0 = V2(0.0f, 1.0f);
+    v2 T1 = V2(1.0f, 1.0f);
+    v2 T2 = V2(1.0f, 0.0f);
+    v2 T3 = V2(0.0f, 0.0f);
+    
+    Positions.push_back(Ps[i1]);
+    Positions.push_back(Ps[i2]);
+    Positions.push_back(Ps[i3]);
+    Positions.push_back(Ps[i4]);
+    
+    Colors.push_back(Cs[i1]);
+    Colors.push_back(Cs[i2]);
+    Colors.push_back(Cs[i3]);
+    Colors.push_back(Cs[i4]);
+    
+    Normals.push_back(n);
+    Normals.push_back(n);
+    Normals.push_back(n);
+    Normals.push_back(n);
+    
+    TexCoords.push_back(T0);
+    TexCoords.push_back(T1);
+    TexCoords.push_back(T2);
+    TexCoords.push_back(T3);
+    
+    Indices.push_back(*Increment);
+    Indices.push_back(*Increment + 1);
+    Indices.push_back(*Increment + 2);
+    
+    Indices.push_back(*Increment);
+    Indices.push_back(*Increment + 2);
+    Indices.push_back(*Increment + 3);
+    *Increment += 4;
+    
+}
+
+Mesh_Info MakeCube(){
+    Mesh_Info Result = {};
+    
+    std::vector<v3> Positions;
+    std::vector<v2> TexCoords;
+    std::vector<v3> Normals;
+    std::vector<v3> Colors;
+    std::vector<u32> Indices;
+    
+    v3 Front = V3(0.0f, 0.0f, 1.0f);
+    v3 Back = V3(0.0f, 0.0f, -1.0f);
+    v3 Up = V3(0.0f, 1.0f, 0.0f);
+    v3 Down = V3(0.0f, -1.0f, 0.0f);
+    v3 Left = V3(1.0f, 0.0f, 0.0f);
+    v3 Right = V3(-1.0f, 0.0f, 0.0f);
+    
+    int VertAt = 0;
+    
+    // NOTE(Dima): Pushing top
+    PushSide(Positions, TexCoords, 
+             Normals, Colors, Indices,
+             4, 5, 1, 0,
+             Up, &VertAt);
+    
+    // NOTE(Dima): Pushing bottom
+    PushSide(Positions, TexCoords,
+             Normals, Colors, Indices,
+             3, 2, 6, 7,
+             Down, &VertAt);
+    
+    // NOTE(Dima): Pushing front
+    PushSide(Positions, TexCoords,
+             Normals, Colors, Indices,
+             0, 1, 2, 3,
+             Front, &VertAt);
+    
+    // NOTE(Dima): Pushing back
+    PushSide(Positions, TexCoords,
+             Normals, Colors, Indices,
+             4, 5, 7, 6,
+             Back, &VertAt);
+    
+    // NOTE(Dima): Pushing left
+    PushSide(Positions, TexCoords,
+             Normals, Colors, Indices,
+             1, 5, 6, 2,
+             Left, &VertAt);
+    
+    // NOTE(Dima): Pushing right
+    PushSide(Positions, TexCoords,
+             Normals, Colors, Indices,
+             4, 0, 3, 7,
+             Right, &VertAt);
+    
+    Result = MakeMesh(Positions, 
+                      TexCoords, 
+                      Normals, 
+                      std::vector<v3>(), 
+                      Colors,
+                      Indices,
+                      JOY_FALSE, 
+                      JOY_TRUE);
+    
+    return(Result);
+}
+
 Mesh_Info MakeSphere(int Segments, int Rings) {
     Mesh_Info Result = {};
     
@@ -822,7 +1032,7 @@ Mesh_Info MakeSphere(int Segments, int Rings) {
     return(Result);
 }
 
-Mesh_Info GenerateCylynder(float Height, float Radius, int SidesCount) {
+Mesh_Info MakeCylynder(float Height, float Radius, int SidesCount) {
     Mesh_Info Result = {};
     
     SidesCount = Max(3, SidesCount);

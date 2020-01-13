@@ -80,7 +80,12 @@ struct RenderEntryRect{
 };
 
 struct RenderEntryGlyph{
+    u32 GlyphIndex;
     
+    v2 P;
+    v2 Dim;
+    
+    v4 ModColor;
 };
 
 struct RenderEntryMesh{

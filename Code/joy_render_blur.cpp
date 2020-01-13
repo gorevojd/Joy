@@ -123,12 +123,12 @@ int BlurRadius)
 	Assert(width == BitmapToBlur->Width);
 	Assert(height == BitmapToBlur->Height);
     
-	Bmp_Info Result = AssetAllocateBitmapInternal(
+	Bmp_Info Result = AllocateBitmapInternal(
 		BitmapToBlur->Width,
 		BitmapToBlur->Height,
 		ResultBitmapMem);
     
-	Bmp_Info TempBitmap = AssetAllocateBitmapInternal(
+	Bmp_Info TempBitmap = AllocateBitmapInternal(
 		BitmapToBlur->Width,
 		BitmapToBlur->Height,
 		TempBitmapMem);
@@ -187,7 +187,7 @@ float* GaussianBox)
 	Assert(width == BitmapToBlur->Width);
 	Assert(height == BitmapToBlur->Height);
     
-	Bmp_Info Result = AssetAllocateBitmapInternal(
+	Bmp_Info Result = AllocateBitmapInternal(
 		BitmapToBlur->Width,
 		BitmapToBlur->Height,
 		ResultBitmapMem);

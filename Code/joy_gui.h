@@ -402,4 +402,6 @@ u32 defaultId);
 void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId);
 void GuiEndRadioGroup(Gui_State* gui);
 
+void GuiTest(Gui_State* gui, float deltaTime);
+
 #endif

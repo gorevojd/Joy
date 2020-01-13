@@ -257,7 +257,6 @@ INTERNAL_FUNCTION void GlRenderGuiRect(Gl_State* gl,
                                        float* RectArr,
                                        size_t RectArrSize)
 {
-    
     glUseProgram(GLGETPID(gl->GuiRectShader));
     glUniform1i(gl->GuiRectShader.BitmapIsSetLoc, BitmapIsSet);
     if(BitmapIsSet){
@@ -311,6 +310,10 @@ void GlOutputCommands(Gl_State* gl, Render_Stack* stack){
                              entry->clearColor01.b,
                              1.0f);
                 glClear(GL_COLOR_BUFFER_BIT);
+            }break;
+            
+            case RenderEntry_Glyph:{
+                
             }break;
             
             case RenderEntry_Gradient:{
@@ -445,10 +448,6 @@ void GlOutputCommands(Gl_State* gl, Render_Stack* stack){
             }break;
             
             case RenderEntry_Mesh:{
-                
-            }break;
-            
-            case RenderEntry_Glyph:{
                 
             }break;
         }

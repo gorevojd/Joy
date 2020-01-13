@@ -191,7 +191,7 @@ struct Win_State{
     Win_Memory_Region memorySentinel;
     
     LARGE_INTEGER performanceFreqLI;
-    float oneOverPerformanceFreq;
+    double oneOverPerformanceFreq;
 };
 
 HGLRC Win32InitOpenGL(HDC realDC);

@@ -27,6 +27,9 @@ struct Glyph_Info{
 	float YOffset;
 	float Advance;
 	float LeftBearingX;
+    
+    v2 MinUV;
+    v2 MaxUV;
 };
 
 

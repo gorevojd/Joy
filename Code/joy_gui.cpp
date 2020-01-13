@@ -1429,3 +1429,273 @@ void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId) {
 void GuiEndRadioGroup(Gui_State* gui) {
     GuiEndElement(gui, GuiElement_RadioGroup);
 }
+
+void GuiTest(Gui_State* gui, float deltaTime){
+    
+    Render_Stack* renderStack = gui->stack;
+    Input* input = gui->input;
+    
+    char FPSBuf[64];
+    stbsp_sprintf(FPSBuf, "FPS %.2f, ms %.3f", 1.0f / deltaTime, deltaTime);
+    
+    static int lastFrameEntryCount = 0;
+    static int lastFrameBytesUsed = 0;
+    char StackInfo[256];
+    stbsp_sprintf(StackInfo, "EntryCount: %d; BytesUsed: %d;", 
+                  lastFrameEntryCount, 
+                  lastFrameBytesUsed);
+    
+    GuiFrameBegin(gui);
+    GuiBeginPage(gui, "Page1");
+    GuiEndPage(gui);
+    
+    GuiBeginPage(gui, "Page2");
+    GuiEndPage(gui);
+    
+    GuiBeginPage(gui, "Animation");
+    GuiEndPage(gui);
+    
+    GuiBeginPage(gui, "Platform");
+    GuiEndPage(gui);
+    
+    GuiBeginPage(gui, "GUI");
+    GuiEndPage(gui);
+    
+    //GuiUpdateWindows(gui);
+    GuiBeginTree(gui, "Some text");
+    GuiText(gui, "Hello world");
+    GuiText(gui, FPSBuf);
+    GuiText(gui, StackInfo);
+    GuiText(gui, "I love Kate");
+    GuiText(gui, "I wish joy and happiness for everyone");
+    
+    GuiEndTree(gui);
+    
+    //GuiPushDim(gui, V2(100, 100));
+    GuiBeginLayout(gui, "layout1", GuiLayout_Window);
+    GuiBeginTree(gui, "AddClearButtons");
+    LOCAL_AS_GLOBAL int RectCount = 0;
+    GuiBeginRow(gui);
+    if(GuiButton(gui, "Add")){
+        RectCount++;
+    }
+    if(GuiButton(gui, "Clear")){
+        RectCount--;
+        if(RectCount < 0){
+            RectCount = 0;
+        }
+    }
+    GuiEndRow(gui);
+    for(int i = 0; i < RectCount; i++){
+        PushRect(renderStack, RcMinDim(V2(100 + i * 50, 100), V2(40, 40)));
+    }
+    GuiEndTree(gui);
+    
+    GuiBeginTree(gui, "Buttons and checkboxes");
+    static b32 boolButtonValue;
+    GuiBeginRow(gui);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBoolButton(gui, "boolButton123", &boolButtonValue);
+    GuiBoolButton(gui, "boolButton1234", &boolButtonValue);
+    GuiBoolButton(gui, "boolButtonasdfga", &boolButtonValue);
+    GuiBoolButton(gui, "boolButtonzxcvzxcb", &boolButtonValue);
+    GuiEndRow(gui);
+    
+    static b32 boolButtonOnOffValue;
+    GuiBeginRow(gui);
+    GuiBeginColumn(gui);
+    GuiBoolButtonOnOff(gui, "boolButtonOnOff", &boolButtonValue);
+    GuiBoolButtonOnOff(gui, "boolButtonOnOff1", &boolButtonValue);
+    GuiBoolButtonOnOff(gui, "boolButtonOnOff2", &boolButtonValue);
+    GuiBoolButtonOnOff(gui, "boolButtonOnOff3", &boolButtonValue);
+    GuiEndColumn(gui);
+    
+    GuiBeginColumn(gui);
+    static b32 checkboxValue1;
+    static b32 checkboxValue2;
+    static b32 checkboxValue3;
+    static b32 checkboxValue4;
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiCheckbox(gui, "Checkbox1", &checkboxValue2);
+    GuiCheckbox(gui, "Checkbox2", &checkboxValue3);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiEndColumn(gui);
+    
+    GuiBeginColumn(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiCheckbox(gui, "Checkbox1", &checkboxValue2);
+    GuiCheckbox(gui, "Checkbox2", &checkboxValue3);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiEndColumn(gui);
+    GuiEndRow(gui);
+    
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff4", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox4", &checkboxValue4);
+    GuiEndTree(gui);
+    
+    GuiBeginTree(gui, "Some more buts");
+    GuiBeginRow(gui);
+    GuiBeginColumn(gui);
+    GuiPushDim(gui, V2(100, 40));
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff1", &boolButtonValue);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff2", &boolButtonValue);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff3", &boolButtonValue);
+    GuiEndColumn(gui);
+    
+    GuiBeginColumn(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiCheckbox(gui, "Checkbox1", &checkboxValue2);
+    GuiCheckbox(gui, "Checkbox2", &checkboxValue3);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiEndColumn(gui);
+    
+    GuiEndRow(gui);
+    GuiEndTree(gui);
+    
+    GuiBeginTree(gui, "TestCull");
+    static u32 activeRadio = 0;
+    GuiBeginRow(gui);
+    GuiBeginColumn(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiEndColumn(gui);
+    GuiBeginColumn(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiEndColumn(gui);
+    GuiBeginColumn(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiEndColumn(gui);
+    GuiBeginColumn(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiEndColumn(gui);
+    GuiBeginColumn(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(gui, "radio0", 0);
+    GuiEndRadioGroup(gui);
+    GuiEndColumn(gui);
+    GuiEndRow(gui);
+    GuiEndTree(gui);
+    
+    GuiBeginRow(gui);
+    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
+    GuiPushDimBegin(gui, V2(100, 40));
+    GuiRadioButton(gui, "radio0", 0);
+    GuiRadioButton(gui, "radio1", 1);
+    GuiRadioButton(gui, "radio2", 2);
+    GuiRadioButton(gui, "radio3", 3);
+    GuiPushDimEnd(gui);
+    GuiEndRadioGroup(gui);
+    
+    char radioTxt[32];
+    stbsp_sprintf(radioTxt, "radio but value: %u", activeRadio);
+    GuiEndRow(gui);
+    GuiText(gui, radioTxt);
+    
+    GuiTooltip(gui, "Hello world!", input->mouseP);
+    
+    GuiFramePrepare4Render(gui);
+    
+    GuiEndLayout(gui);
+    GuiFrameEnd(gui);
+    
+    lastFrameBytesUsed = renderStack->memUsed;
+    lastFrameEntryCount = renderStack->entryCount;
+}

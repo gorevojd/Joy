@@ -8,6 +8,6 @@ SET INCLUDE_PATH=/I"C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Inc
 IF NOT EXIST ..\Build MKDIR ..\Build
 PUSHD ..\Build
 
-cl %COMP_OPTS% %INCLUDE_PATH% ..\Code\win32_joy.cpp ..\Code\joy_software_renderer.cpp ..\Code\joy_assets.cpp ..\Code\joy_gui.cpp ..\Code\joy_platform.cpp ..\Code\joy_render_blur.cpp ..\COde\joy_asset_util.cpp ..\COde\joy_colors.cpp ..\Code\joy_opengl.cpp ..\Code\joy_audio.cpp /link /NOLOGO /INCREMENTAL:no /LIBPATH:"C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)/Lib/x64" /OPT:ref kernel32.lib user32.lib gdi32.lib winmm.lib shell32.lib opengl32.lib dsound.lib
+cl %COMP_OPTS% %INCLUDE_PATH% ..\Code\win32_joy.cpp ..\Code\joy_software_renderer.cpp ..\Code\joy_assets.cpp ..\Code\joy_gui.cpp ..\Code\joy_platform.cpp ..\Code\joy_render_blur.cpp ..\COde\joy_asset_util.cpp ..\COde\joy_colors.cpp ..\Code\joy_opengl.cpp ..\Code\joy_audio.cpp ..\Code\joy_camera.cpp ..\Code\joy_world.cpp ..\Code\joy_game_mode.cpp /link /NOLOGO /INCREMENTAL:no /LIBPATH:"C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)/Lib/x64" /OPT:ref kernel32.lib user32.lib gdi32.lib winmm.lib shell32.lib opengl32.lib dsound.lib
 
 POPD

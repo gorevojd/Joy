@@ -27,6 +27,12 @@ struct Complex_Num {
 	float im;
 };
 
+struct Euler_Angles{
+    float Yaw;
+    float Pitch;
+    float Roll;
+};
+
 //NOTE(dima): Structures
 typedef union v2 {
 	struct {
@@ -144,6 +150,11 @@ typedef union quat {
 } quat;
 
 //NOTE(dima): Helper functions
+inline float CopySign(float Val1, float Val2){
+    float Result = abs(Val1) * (Val2 > 0.0f ? 1.0f : -1.0f);
+    return(Result);
+}
+
 inline float Sqrt(float Value) {
 	float res;
 	res = sqrtf(Value);
@@ -775,6 +786,136 @@ inline quat Slerp(quat A, quat B, float t){
     return(res);
 }
 
+/*Matrix operations*/
+inline m44 Identity(){
+    m44 Result = {};
+    
+    Result.e[0] = 1.0f;
+    Result.e[5] = 1.0f;
+    Result.e[10] = 1.0f;
+    Result.e[15] = 1.0f;
+    
+    return(Result);
+}
+
+inline m44 TranslationMatrix(v3 Translation){
+    m44 Result = Identity();
+    
+	Result.e[12] = Translation.x;
+	Result.e[13] = Translation.y;
+	Result.e[14] = Translation.z;
+    
+	return(Result);
+}
+
+inline m44 InverseTranslationMatrix(v3 Translation){
+    m44 Result = {};
+    
+	Result.e[12] = -Translation.x;
+	Result.e[13] = -Translation.y;
+	Result.e[14] = -Translation.z;
+    
+    return(Result);
+}
+
+inline m44 ScalingMatrix(v3 Scale) {
+	m44 Result = Identity();
+	
+    Result.e[0] = Scale.x;
+	Result.e[5] = Scale.y;
+	Result.e[10] = Scale.z;
+    
+	return(Result);
+}
+
+inline m44 ScalingMatrix(float Scale){
+    m44 Result = Identity();
+    
+    Result.e[0] = Scale;
+	Result.e[5] = Scale;
+	Result.e[10] = Scale;
+    
+	return(Result);
+}
+
+inline m44 Transpose(m44 M) {
+	m44 Result;
+    
+	for (int RowIndex = 0; RowIndex < 4; RowIndex++) {
+		for (int ColumtIndex = 0; ColumtIndex < 4; ColumtIndex++) {
+			Result.e[ColumtIndex * 4 + RowIndex] = M.e[RowIndex * 4 + ColumtIndex];
+		}
+	}
+    
+	return(Result);
+}
+
+inline m44 PerspectiveProjection(int Width, int Height, float Far, float Near)
+{
+	m44 Result = {};
+    
+	float AspectRatio = (float)Width / (float)Height;
+    
+	float S = 1.0f / (Tan(45.0f * 0.5f * JOY_DEG2RAD));
+	float A = S / AspectRatio;
+	float B = S;
+	float OneOverFarMinusNear = 1.0f / (Far - Near);
+	Result.e[0] = A;
+	Result.e[5] = B;
+	Result.e[10] = -(Far + Near) * OneOverFarMinusNear;
+	Result.e[14] = -(2.0f * Far * Near) * OneOverFarMinusNear;
+	Result.e[11] = -1.0f;
+    
+	return(Result);
+}
+
+inline m44 OrthographicProjection(int Width, int Height) {
+	m44 Result = {};
+    
+	Result.e[0] = 2.0f / (float)Width;
+	Result.e[12] = -1.0f;
+	Result.e[5] = 2.0f / (float)Height;
+	Result.e[13] = -1.0f;
+	Result.e[10] = 1.0f;
+	Result.e[15] = 1.0f;
+    
+	return(Result);
+}
+
+inline m44 LookAt(v3 Pos, v3 TargetPos, v3 WorldUp) {
+	m44 Result;
+    
+	v3 Fwd = TargetPos - Pos;
+	Fwd = NOZ(Fwd);
+    
+	v3 Left = Normalize(Cross(WorldUp, Fwd));
+	v3 Up = Normalize(Cross(Fwd, Left));
+    
+	v3 Eye = Pos;
+    
+	Result.e[0] = Left.x;
+	Result.e[1] = Up.x;
+	Result.e[2] = Fwd.x;
+	Result.e[3] = 0.0f;
+    
+	Result.e[4] = Left.y;
+	Result.e[5] = Up.y;
+	Result.e[6] = Fwd.y;
+	Result.e[7] = 0.0f;
+    
+	Result.e[8] = Left.z;
+	Result.e[9] = Up.z;
+	Result.e[10] = Fwd.z;
+	Result.e[11] = 0.0f;
+    
+	Result.e[12] = -Dot(Left, Eye);
+	Result.e[13] = -Dot(Up, Eye);
+	Result.e[14] = -Dot(Fwd, Eye);
+	Result.e[15] = 1.0f;
+    
+	return(Result);
+}
+
 /*Conversions*/
 inline m44 MatrixFromrows(v4 R1, v4 R2, v4 R3, v4 R4){
     m44 res = {};
@@ -863,6 +1004,70 @@ inline m44 QuatToM44(quat Q){
     return(res);
 }
 
+inline v3 GetQuatLeft(quat Q){
+    
+    float x2 = Q.x * Q.x;
+    float y2 = Q.y * Q.y;
+    float z2 = Q.z * Q.z;
+    
+    float xy = Q.x * Q.y;
+    float zw = Q.z * Q.w;
+    float xz = Q.x * Q.z;
+    float yw = Q.y * Q.w;
+    float yz = Q.y * Q.z;
+    float xw = Q.x * Q.w;
+    
+    v3 Result;
+    Result.x = 1.0f - 2.0f * (y2 + z2);
+    Result.y = 2.0f * (xy + zw);
+    Result.z = 2.0f * (xz - yw);
+    
+    return(Result);
+}
+
+inline v3 GetQuatUp(quat Q){
+    float x2 = Q.x * Q.x;
+    float y2 = Q.y * Q.y;
+    float z2 = Q.z * Q.z;
+    
+    float xy = Q.x * Q.y;
+    float zw = Q.z * Q.w;
+    float xz = Q.x * Q.z;
+    float yw = Q.y * Q.w;
+    float yz = Q.y * Q.z;
+    float xw = Q.x * Q.w;
+    
+    v3 Result;
+    
+    Result.x = 2.0f * (xy - zw);
+    Result.y = 1.0f - 2.0f * (x2 + z2);
+    Result.z = 2.0f * (yz + xw);
+    
+    return(Result);
+}
+
+
+inline v3 GetQuatFront(quat Q){
+    float x2 = Q.x * Q.x;
+    float y2 = Q.y * Q.y;
+    float z2 = Q.z * Q.z;
+    
+    float xy = Q.x * Q.y;
+    float zw = Q.z * Q.w;
+    float xz = Q.x * Q.z;
+    float yw = Q.y * Q.w;
+    float yz = Q.y * Q.z;
+    float xw = Q.x * Q.w;
+    
+    v3 Result;
+    
+    Result.x = 2.0f * (xz + yw);
+    Result.y = 2.0f * (yz - xw);
+    Result.z = 1.0f - 2.0f * (x2 + y2);
+    
+    return(Result);
+}
+
 inline quat QuatFrom2DArray(float A[3][3]){
     quat res;
     
@@ -916,6 +1121,48 @@ inline quat QuatLookAt(v3 Front, v3 Up){
     return(res);
 }
 
+inline Euler_Angles Quat2Euler(quat q){
+    Euler_Angles Result = {};
+    
+    // roll (x-axis rotation)
+    float sinr_cosp = 2.0f * (q.w * q.x + q.y * q.z);
+    float cosr_cosp = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
+    Result.Roll = ATan2(sinr_cosp, cosr_cosp);
+    
+    // pitch (y-axis rotation)
+    float sinp = 2.0f * (q.w * q.y - q.z * q.x);
+    if (abs(sinp) >= 1.0f)
+        Result.Pitch = CopySign(JOY_PI / 2.0f, sinp); // use 90 degrees if out of range
+    else
+        Result.Pitch = ASin(sinp);
+    
+    // yaw (z-axis rotation)
+    float siny_cosp = 2.0f * (q.w * q.z + q.x * q.y);
+    float cosy_cosp = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
+    Result.Yaw = ATan2(siny_cosp, cosy_cosp);
+    
+    return(Result);
+}
+
+inline quat Euler2Quat(Euler_Angles A){
+    quat Result = {};
+    
+    // Abbreviations for the various angular functions
+    float cy = cosf(A.Yaw * 0.5f);
+    float sy = sinf(A.Yaw * 0.5f);
+    float cp = cosf(A.Pitch * 0.5f);
+    float sp = sinf(A.Pitch * 0.5f);
+    float cr = cosf(A.Roll * 0.5f);
+    float sr = sinf(A.Roll * 0.5f);
+    
+    Result.w = cy * cp * cr + sy * sp * sr;
+    Result.x = cy * cp * sr - sy * sp * cr;
+    Result.y = sy * cp * sr + cy * sp * cr;
+    Result.z = sy * cp * cr - cy * sp * sr;
+    
+    return(Result);
+}
+
 /* Color math */
 inline uint32_t PackRGBA(v4 Color){
     uint32_t res = 
@@ -938,8 +1185,26 @@ inline v4 UnpackRGBA(uint32_t Color){
     return(res);
 }
 
-/* Complex number math */
+/*Plane math*/
+inline v4 NormalizePlane(v4 Plane) {
+	float NormalLen = Magnitude(Plane.rgb);
+    
+	v4 Result;
+	Result.A = Plane.A / NormalLen;
+	Result.B = Plane.B / NormalLen;
+	Result.C = Plane.C / NormalLen;
+	Result.D = Plane.D / NormalLen;
+    
+	return(Result);
+}
 
+inline float PlanePointTest(v4 Plane, v3 Point) {
+	float Res = Dot(Plane.ABC, Point) + Plane.D;
+    
+	return(Res);
+}
+
+/* Complex number math */
 inline Complex_Num operator+(Complex_Num a, Complex_Num b) {
 	Complex_Num res;
     
@@ -975,7 +1240,6 @@ inline Complex_Num operator*(Complex_Num a, float s) {
     
 	return(res);
 }
-
 
 /* Rectangle math */
 inline rc2 RcMinMax(v2 Min, v2 Max){
