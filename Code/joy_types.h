@@ -26,6 +26,31 @@ typedef size_t mi;
 typedef intptr_t imi;
 typedef uintptr_t umi;
 
+typedef u16 utf16_t;
+typedef u8 utf8_t;
+
+struct Memory_Block{
+    void* Base;
+    size_t Used;
+    size_t Total;
+};
+
+inline void InitMemoryBlock(Memory_Block* block, void* Base, mi Size){
+    block->Base = Base;
+    block->Used = 0;
+    block->Total = Size;
+}
+
+inline Memory_Block InitMemoryBlock(void* Base, mi Size){
+    Memory_Block block;
+    
+    block.Base = Base;
+    block.Used = 0;
+    block.Total = Size;
+    
+    return(block);
+}
+
 inline int SafeTruncateToInt(float Value){
     int Result = (int)(Value + 0.5f);
     
@@ -34,6 +59,12 @@ inline int SafeTruncateToInt(float Value){
 
 inline void ToggleBool(b32* Value){
     *Value = !*Value;
+}
+
+inline void CopyFloats(f32* Dst, f32* Src, int Count){
+    for(int i = 0; i < Count; i++){
+        Dst[i] = Src[i];
+    }
 }
 
 #endif

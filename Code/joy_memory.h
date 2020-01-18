@@ -19,18 +19,18 @@ struct Memory_Region{
     u32 type;
 };
 
+#define MINIMUM_MEMORY_REGION_SIZE Mibibytes(1)
 inline void* PushSomeMem(Memory_Region* region, size_t size, size_t align = 8){
-    size_t beforeAlign = (size_t)region->block.base + region->block.used;
+    size_t beforeAlign = (size_t)region->block.Base + region->block.Used;
     size_t alignedPos = (beforeAlign + align - 1) & (~(align - 1));
     size_t advancedByAlign = alignedPos - beforeAlign;
     
     size_t toAllocateSize = advancedByAlign + size;
-    size_t newUsedCount = region->block.used + toAllocateSize;
+    size_t newUsedCount = region->block.Used + toAllocateSize;
     
     void* result = 0;
     
-#define MINIMUM_MEMORY_REGION_SIZE Kibibytes(512)
-    if(((newUsedCount > region->block.total) || (region->block.base == 0)) && 
+    if(((newUsedCount > region->block.Total) || (region->block.Base == 0)) && 
        region->type == MemoryRegion_Dynamic)
     {
         // NOTE(Dima): Platform is guaranteed to allocate aligned mem
@@ -55,25 +55,25 @@ inline void* PushSomeMem(Memory_Region* region, size_t size, size_t align = 8){
         }
         else{
             Memory_Region* OldRegion = (Memory_Region*)((u8*)newBase + newTotal);
-            OldRegion->block.base = region->block.base;
-            OldRegion->block.used = region->block.used;
-            OldRegion->block.total = region->block.total;
+            OldRegion->block.Base = region->block.Base;
+            OldRegion->block.Used = region->block.Used;
+            OldRegion->block.Total = region->block.Total;
             OldRegion->type = region->type;
         }
         
         region->regionCount++;
-        region->block.base = newBase;
-        region->block.used = newUsed;
-        region->block.total = newTotal;
+        region->block.Base = newBase;
+        region->block.Used = newUsed;
+        region->block.Total = newTotal;
         region->type = MemoryRegion_Dynamic;
         
-        result = region->block.base;
+        result = region->block.Base;
     }
     else{
-        Assert(newUsedCount <= region->block.total);
+        Assert(newUsedCount <= region->block.Total);
         
         result = (void*)alignedPos;
-        region->block.used = newUsedCount;
+        region->block.Used = newUsedCount;
     }
     
     return(result);
@@ -82,7 +82,7 @@ inline void* PushSomeMem(Memory_Region* region, size_t size, size_t align = 8){
 inline void FreeMemoryRegion(Memory_Region* region){
     if(region->type == MemoryRegion_Dynamic){
         while(region->regionCount > 1){
-            Memory_Region* old = (Memory_Region*)((u8*)region->block.base + region->block.total);
+            Memory_Region* old = (Memory_Region*)((u8*)region->block.Base + region->block.Total);
         }
     }
     else{
@@ -94,9 +94,9 @@ inline void FreeMemoryRegion(Memory_Region* region){
 inline Memory_Region PushMemoryRegionStatic(Memory_Region* existing, mi size){
     Memory_Region result = {};
     
-    result.block.base = PushSomeMem(existing, size);
-    result.block.total = size;
-    result.block.used = 0;
+    result.block.Base = PushSomeMem(existing, size);
+    result.block.Total = size;
+    result.block.Used = 0;
     result.type = MemoryRegion_Static;
     
     return(result);
@@ -105,12 +105,19 @@ inline Memory_Region PushMemoryRegionStatic(Memory_Region* existing, mi size){
 inline Memory_Region PushMemoryRegionDynamic(Memory_Region* existing, mi size){
     Memory_Region result = {};
     
-    result.block.base = PushSomeMem(existing, size);
-    result.block.total = size;
-    result.block.used = 0;
+    result.block.Base = PushSomeMem(existing, size);
+    result.block.Total = size;
+    result.block.Used = 0;
     result.type = MemoryRegion_Dynamic;
     
     return(result);
+}
+
+#define PushMemoryStruct(region, type, name, region_member_name) \
+{\
+    type* asd = (type*)PushSomeMem(region, sizeof(type));\
+    asd->##region_member_name = region;\
+    name = asd;\
 }
 
 #define PushSize(region, size) PushSomeMem(region, size)

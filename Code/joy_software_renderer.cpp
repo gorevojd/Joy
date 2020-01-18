@@ -1084,8 +1084,8 @@ rc2 clipRect)
 }
 
 void SoftwareRenderStackToOutput(Render_Stack* stack, Bmp_Info* buf, rc2 clipRect){
-    u8* at = (u8*)stack->mem;
-	u8* stackEnd = (u8*)stack->mem + stack->memUsed;
+    u8* at = (u8*)stack->MemBlock.Base;
+	u8* stackEnd = (u8*)stack->MemBlock.Base + stack->MemBlock.Used;
     
 	while (at < stackEnd) {
         Render_Entry_Header* header = (Render_Entry_Header*)at;
@@ -1144,27 +1144,23 @@ void SoftwareRenderStackToOutput(Render_Stack* stack, Bmp_Info* buf, rc2 clipRec
                 
 #if 1
                 RenderBitmapSSE(buf, 
-                                entry->bitmap,
-                                entry->topLeftP,
-                                entry->pixelHeight,
-                                entry->modulationColor01,
+                                entry->Bitmap,
+                                entry->P,
+                                entry->PixelHeight,
+                                entry->ModulationColor01,
                                 clipRect);
 #else
                 RenderBitmap(buf, 
-                             entry->bitmap,
-                             entry->topLeftP,
-                             entry->pixelHeight,
-                             entry->modulationColor01,
+                             entry->Bitmap,
+                             entry->P,
+                             entry->PixelHeight,
+                             entry->ModulationColor01,
                              clipRect);
 #endif
             }break;
             
-            case RenderEntry_Glyph:{
-                
-            }break;
+            at += header->dataSize;
         }
-        
-        at += header->dataSize;
     }
 }
 
@@ -1198,24 +1194,24 @@ PLATFORM_CALLBACK(RenderQueueRGBA2BGRAWork){
 void RenderMultithreaded(Platform_Job_Queue* queue, Render_Stack* stack, Bmp_Info* buf) {
     
 #if 0
-	rc2 clipRect;
-	clipRect.min = V2(0, 0);
-	clipRect.max = V2(buf->Width, buf->Height);
+    rc2 clipRect;
+    clipRect.min = V2(0, 0);
+    clipRect.max = V2(buf->Width, buf->Height);
     
-	SoftwareRenderStackToOutput(stack, buf, clipRect);
+    SoftwareRenderStackToOutput(stack, buf, clipRect);
 #else
     
 #if 0
 #define SIDE_TILES_COUNT 8
     
-	RenderQueueWork works[SIDE_TILES_COUNT * SIDE_TILES_COUNT];
+    RenderQueueWork works[SIDE_TILES_COUNT * SIDE_TILES_COUNT];
     
-	int sideTileW = buf->Width / SIDE_TILES_COUNT;
+    int sideTileW = buf->Width / SIDE_TILES_COUNT;
     sideTileW = (sideTileW + 15) & (~15);
-	int sideTileH = buf->Height / SIDE_TILES_COUNT;
+    int sideTileH = buf->Height / SIDE_TILES_COUNT;
     
     for (int j = 0; j < SIDE_TILES_COUNT; j++) {
-		for (int i = 0; i < SIDE_TILES_COUNT; i++) {
+        for (int i = 0; i < SIDE_TILES_COUNT; i++) {
             rc2 rect;
             
             rect.min = V2(sideTileW * i, sideTileH * j);
@@ -1237,7 +1233,7 @@ void RenderMultithreaded(Platform_Job_Queue* queue, Render_Stack* stack, Bmp_Inf
             //if ((j & 1) == (i & 1)) {
             PlatformAddEntry(Queue, RenderQueueWork, workData);
             //}
-		}
+        }
     }
 #else
     Render_Queue_Work_Data works[TILES_COUNT];

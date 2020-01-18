@@ -18,6 +18,7 @@
 #include "joy_software_renderer.h"
 #include "joy_platform.h"
 #include "joy_gui.h"
+#include "joy_render.h"
 
 #define JOY_USE_OPENGL 1
 #define JOY_USE_DIRECTX 0
@@ -175,6 +176,9 @@ struct Win_Memory_Region{
     Win_Memory_Region* prev;
 };
 
+#define WIN32_DEBUG_OUTPUT(name) void name(const char* Str)
+typedef WIN32_DEBUG_OUTPUT(win32_debug_output);
+
 struct Win_State{
 	HWND window;
     int windowWidth;
@@ -189,6 +193,8 @@ struct Win_State{
     
     TicketMutex memoryMutex;
     Win_Memory_Region memorySentinel;
+    
+    win32_debug_output* DebugOutputFunc;
     
     LARGE_INTEGER performanceFreqLI;
     double oneOverPerformanceFreq;

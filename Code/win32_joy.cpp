@@ -22,6 +22,7 @@ dima privet , kak dela? i tebia lybly
 */
 
 GLOBAL_VARIABLE Win_State win32;
+GLOBAL_VARIABLE Render_State* gRender;
 GLOBAL_VARIABLE b32 gRunning;
 GLOBAL_VARIABLE Input gInput;
 GLOBAL_VARIABLE Assets gAssets;
@@ -1153,11 +1154,8 @@ PLATFORM_SHOW_ERROR(Win32ShowError){
 }
 
 PLATFORM_DEBUG_OUTPUT_STRING(Win32DebugOutputString){
-    OutputDebugString(text);
-    char Buf[32];
-    Buf[0] = '\n';
-    Buf[1] = 0;
-    OutputDebugString(Buf);
+    win32.DebugOutputFunc(text);
+    win32.DebugOutputFunc("\n");
 }
 
 PLATFORM_MEMALLOC(Win32MemAlloc){
@@ -1387,6 +1385,9 @@ Win32ProcessMessages(Input* input){
                         }
                     }
                 }
+                
+                //TranslateMessage(&msg);
+                //DispatchMessage(&msg);
             }break;
             
             case WM_LBUTTONDOWN:{
@@ -1446,6 +1447,145 @@ Win32ProcessInput(Input* input)
     }
 }
 
+INTERNAL_FUNCTION u32 UTF8_Sequence_Size_For_UCS4(u32 u)
+{
+    // Returns number of bytes required to encode 'u'
+    static const u32 CharBounds[] = { 
+        0x0000007F, 
+        0x000007FF, 
+        0x0000FFFF, 
+        0x001FFFFF, 
+        0x03FFFFFF, 
+        0x7FFFFFFF, 
+        0xFFFFFFFF };
+    
+    u32 bi = 0;
+    while(CharBounds[bi] < u ){
+        ++bi;
+    }
+    return bi+1;
+}
+
+// NOTE(Dima): Thanx Alex Podverbny (BLK Dragon) 4 the code
+INTERNAL_FUNCTION u32 UTF16_To_UTF8(u16* UTF16String, 
+                                    u8* To, u32 ToLen, 
+                                    u32* OutToSize)
+{
+    u8*         s       = To;
+    u8*         s_end   = To + ToLen;
+    u16*  w       = UTF16String;
+    u32        len     = 0;
+    while(*w)
+    {
+        u32    ch = *w ;
+        u32    sz = UTF8_Sequence_Size_For_UCS4( ch );
+        if( s + sz >= s_end )
+            break;
+        if(sz == 1)
+        {
+            // just one byte, no header
+            *s = (u8)(ch);
+            ++s;
+        }
+        else
+        {
+            // write the bits 6 bits at a time, 
+            // except for the first one, which can be less than 6 bits
+            u32 shift = (sz-1) * 6;
+            *s = uint8_t(((ch >> shift) & 0x3F) | (0xFF << (8 - sz)));
+            shift -= 6;
+            ++s;
+            for(u32 i=1; i!=sz; ++i,shift-=6 )
+            {
+                *s = u8(((ch >> shift) & 0x3F) | 0x80);
+                ++s;
+            }
+        }
+        ++len;
+        ++w;
+    }
+    
+    *s = 0x00;
+    if(OutToSize){
+        *OutToSize = (s - To);
+    }
+    
+    return len;
+}
+
+WIN32_DEBUG_OUTPUT(Win32DebugOutputLog){
+    HANDLE HandleOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD CharsWritten; // ignored
+    DWORD Len = StringLength((char*)Str);
+    WriteConsoleA(HandleOut, Str, Len, &CharsWritten, 0);
+}
+
+
+#if 0
+static struct ODS_Buffer
+{
+    DWORD process_id;
+    char  data[4096 - sizeof(DWORD)];
+}* ods_buffer;
+
+static HANDLE ods_data_ready;
+static HANDLE ods_buffer_ready;
+
+INTERNAL_FUNCTION DWORD WINAPI OutputDebugString_Proc(LPVOID arg)
+{
+    DWORD ret = 0;
+    
+    HANDLE StdERR = GetStdHandle(STD_ERROR_HANDLE);
+    Assert(StdERR);
+    
+    for (;;)
+    {
+        SetEvent(ods_buffer_ready);
+        
+        DWORD wait = WaitForSingleObject(ods_data_ready, INFINITE);
+        Assert(wait == WAIT_OBJECT_0);
+        
+        // NOTE(Dima): Getting the str length
+        DWORD length = 0;
+        while (length < sizeof(ods_buffer->data) && ods_buffer->data[length] != 0)
+        {
+            length++;
+        }
+        
+        // NOTE(Dima): Write to StdERR
+        if (length != 0)
+        {
+            DWORD written;
+            WriteFile(StdERR, ods_buffer->data, length, &written, NULL);
+        }
+    }
+}
+
+INTERNAL_FUNCTION void OutputDebugString_Capture()
+{
+    if (IsDebuggerPresent())
+    {
+        return;
+    }
+    
+    HANDLE file = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(*ods_buffer), "DBWIN_BUFFER");
+    Assert(file != INVALID_HANDLE_VALUE);
+    
+    ods_buffer = (ODS_Buffer*)MapViewOfFile(file, SECTION_MAP_READ, 0, 0, 0);
+    Assert(ods_buffer);
+    
+    ods_buffer_ready = CreateEventA(NULL, FALSE, FALSE, "DBWIN_BUFFER_READY");
+    Assert(ods_buffer_ready);
+    
+    ods_data_ready = CreateEventA(NULL, FALSE, FALSE, "DBWIN_DATA_READY");
+    Assert(ods_data_ready);
+    
+    HANDLE thread = CreateThread(NULL, 0, OutputDebugString_Proc, NULL, 0, NULL);
+    Assert(thread);
+}
+#endif
+
+
 LRESULT CALLBACK
 Win32WindowProcessing(
 HWND Window,
@@ -1456,6 +1596,10 @@ LPARAM LParam)
     switch (Message){
         
         case WM_SIZE:{
+            
+        }break;
+        
+        case WM_CHAR:{
             
         }break;
         
@@ -1504,6 +1648,39 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     win32.memorySentinel.next = &win32.memorySentinel;
     
     Memory_Region gMem = {};
+    
+    // NOTE(Dima): Init win32 debug output log func
+    if(IsDebuggerPresent()){
+        win32.DebugOutputFunc = OutputDebugStringA;
+    }
+    else{
+        //AllocConsole();
+        win32.DebugOutputFunc = Win32DebugOutputLog;
+        
+        // redirect unbuffered STDOUT to the console
+        intptr_t stdHandle = reinterpret_cast<intptr_t>(::GetStdHandle(STD_OUTPUT_HANDLE));
+        int	conHandle = _open_osfhandle(stdHandle, _O_TEXT);
+        FILE* file = _fdopen(conHandle, "w");
+        *stdout = *file;
+        setvbuf(stdout, NULL, _IONBF, 0);
+        
+        // redirect unbuffered STDIN to the console
+        stdHandle = reinterpret_cast<intptr_t>(::GetStdHandle(STD_INPUT_HANDLE));
+        conHandle = _open_osfhandle(stdHandle, _O_TEXT);
+        file = _fdopen(conHandle, "r");
+        *stdin = *file;
+        setvbuf(stdin, NULL, _IONBF, 0);
+        
+        // redirect unbuffered STDERR to the console
+        stdHandle = reinterpret_cast<intptr_t>(::GetStdHandle(STD_ERROR_HANDLE));
+        conHandle = _open_osfhandle(stdHandle, _O_TEXT);
+        file = _fdopen(conHandle, "w");
+        *stderr = *file;
+        setvbuf(stderr, NULL, _IONBF, 0);
+        
+        //win32.DebugOutputFunc = OutputDebugStringA;
+        //OutputDebugString_Capture();
+    }
     
     WNDCLASSEXA wndClass = {};
     wndClass.cbSize = sizeof(wndClass);
@@ -1574,7 +1751,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     Win32ClearSoundBuffer(&gDSound);
     
 #if JOY_USE_OPENGL
-    GlInit(&gGL);
+    GlInit(&gGL, & gAssets);
 #endif
     
 #if JOY_USE_DIRECTX
@@ -1584,16 +1761,19 @@ int APIENTRY WinMain(HINSTANCE hInstance,
              win32.windowHeight);
 #endif
     
-    mi renderMemSize = Megabytes(2);
-    void* renderMem = PushSomeMem(&gMem, renderMemSize);
-    Render_Stack renderStack_ = InitRenderStack(renderMem, renderMemSize);
-    Render_Stack* renderStack = &renderStack_;
+    Memory_Region memRender = {};
+    PushMemoryStruct(&memRender, Render_State, gRender, MemRegion);
+    
+    RenderInit(gRender);
+    Render_Stack* renderStack = RenderAddStack(gRender, "Main");
+    Render_Stack* guiStack = RenderAddStack(gRender, "GUI");
+    
     InitGui(
         &gGui, 
         &gInput, 
         &gAssets, 
         &gMem, 
-        renderStack, 
+        guiStack, 
         windowWidth, 
         windowHeight);
     
@@ -1621,9 +1801,15 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         
         rc2 ClipRect = RcMinMax(V2(0.0f, 0.0f), V2(windowWidth, windowHeight));
         
-        RenderStackBeginFrame(renderStack);
-        renderStack->Width = win32.windowWidth;
-        renderStack->Height = win32.windowHeight;
+        RenderBeginFrame(gRender);
+        
+        Render_Frame_Info frameInfo = {};
+        frameInfo.Width = windowWidth;
+        frameInfo.Height = windowHeight;
+        frameInfo.SoftwareBuffer = &win32.bitmap;
+        frameInfo.dt = deltaTime;
+        frameInfo.RendererType = Renderer_OpenGL;
+        RenderSetFrameInfo(gRender, frameInfo);
         
         PushClearColor(renderStack, V3(1.0f, 0.5f, 0.0f));
         
@@ -1639,12 +1825,6 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         
         float fadeoutAlpha = Clamp01((timeSinceShow - toShowTime) / toShowFadeoutTime);
         
-        PushBitmap(renderStack,
-                   &gAssets.MainLargeAtlas.Bitmap,
-                   V2(100, 100),
-                   600,
-                   V4(1.0f, 1.0f, 1.0f, 1.0f));
-        
         PushBitmap(
             renderStack, 
             toShow, 
@@ -1658,6 +1838,13 @@ int APIENTRY WinMain(HINSTANCE hInstance,
             V2(0.0f, 0.0f), 
             toShowNextH, 
             V4(1.0f, 1.0f, 1.0f, fadeoutAlpha));
+        
+        PushBitmap(renderStack,
+                   &gAssets.MainLargeAtlas.Bitmap,
+                   V2(100, 100),
+                   1000,
+                   V4(1.0f, 1.0f, 1.0f, 1.0f));
+        
         
         timeSinceShow += deltaTime * toShowSpeed;
         if(timeSinceShow > toShowTime + toShowFadeoutTime){
@@ -1685,13 +1872,14 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         PushBitmap(renderStack, &gAssets.roadClouds, V2(600.0f, Sin(time * 1.5f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
         PushBitmap(renderStack, &gAssets.sunrise, V2(700.0f, Sin(time * 1.6f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
 #endif
+        GuiFrameBegin(&gGui);
         
         GuiTest(&gGui, deltaTime);
         
-        //RenderMultithreaded(&platform.highPriorityQueue, renderStack, &win32.bitmap);
-        
-        GlOutputRender(&gGL, renderStack);
-        //GlOutputCommands(&gGL, renderStack);
+        GuiFramePrepare4Render(&gGui);
+        GlOutputRender(&gGL, gRender);
+        GuiFrameEnd(&gGui);
+        RenderEndFrame(gRender);
         
         SwapBuffers(glDC);
         

@@ -389,7 +389,7 @@ int width,
 int height)
 {
     gui->mainFont = &assets->inconsolataBold;
-    gui->checkboxMark = &assets->checkboxMark;
+    gui->CheckboxMark = &assets->CheckboxMark;
     gui->fontScale = 1.0f;
     
     gui->stack = stack;
@@ -479,7 +479,8 @@ int height)
     gui->colors[GuiColor_WindowBorderActive] = GUI_GETCOLOR_COLSYS(Color_Blue);
 }
 
-rc2 PrintTextInternal(Font_Info* font, Render_Stack* stack, char* text, v2 p, u32 textOp, float scale, v4 color){
+rc2 PrintTextInternal(Font_Info* font, Render_Stack* stack, char* text, v2 p, u32 textOp, float scale, v4 color)
+{
     rc2 txtRc;
     
     char* at = text;
@@ -499,7 +500,13 @@ rc2 PrintTextInternal(Font_Info* font, Render_Stack* stack, char* text, v2 p, u3
             float bitmapMinY = curP.y + glyph->YOffset * scale;
             float bitmapMinX = curP.x + glyph->XOffset * scale;
             
-            PushBitmap(stack, &glyph->Bitmap, V2(bitmapMinX, bitmapMinY), bitmapDim.y, color);
+            PushGlyph(stack, 
+                      V2(bitmapMinX, bitmapMinY), 
+                      bitmapDim, 
+                      &glyph->Bitmap,
+                      glyph->Bitmap.MinUV,
+                      glyph->Bitmap.MaxUV,
+                      color);
         }
         
         curP.x += ((float)glyph->Advance * scale);
@@ -891,7 +898,6 @@ void GuiFrameBegin(Gui_State* gui){
     // NOTE(Dima): Init dim stack
     gui->dimStackIndex = 0;
     gui->inPushBlock = 0;
-    
     
     // NOTE(Dima): Init root layout
     Gui_Element* layoutElem = GuiBeginElement(gui, 
@@ -1324,7 +1330,13 @@ void GuiCheckbox(Gui_State* gui, char* name, b32* value){
         GuiPushBut(gui, chkRect);
         
         if(*value){
-            PushBitmap(gui->stack, gui->checkboxMark, chkRect.min, GetRectHeight(chkRect), V4(1.0f, 1.0f, 1.0f, 1.0f));
+            PushGlyph(gui->stack,
+                      chkRect.min, 
+                      GetRectDim(chkRect),
+                      gui->CheckboxMark,
+                      gui->CheckboxMark->MinUV,
+                      gui->CheckboxMark->MaxUV,
+                      V4(1.0f, 1.0f, 1.0f, 1.0f));
         }
         
         // NOTE(Dima): Button name text printing
@@ -1445,7 +1457,6 @@ void GuiTest(Gui_State* gui, float deltaTime){
                   lastFrameEntryCount, 
                   lastFrameBytesUsed);
     
-    GuiFrameBegin(gui);
     GuiBeginPage(gui, "Page1");
     GuiEndPage(gui);
     
@@ -1691,11 +1702,8 @@ void GuiTest(Gui_State* gui, float deltaTime){
     
     GuiTooltip(gui, "Hello world!", input->mouseP);
     
-    GuiFramePrepare4Render(gui);
-    
     GuiEndLayout(gui);
-    GuiFrameEnd(gui);
     
-    lastFrameBytesUsed = renderStack->memUsed;
-    lastFrameEntryCount = renderStack->entryCount;
+    lastFrameBytesUsed = renderStack->MemBlock.Used;
+    lastFrameEntryCount = renderStack->EntryCount;
 }

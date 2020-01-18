@@ -798,6 +798,16 @@ inline m44 Identity(){
     return(Result);
 }
 
+inline m44 Floats2Matrix(float Array[16]){
+    m44 Result = {};
+    
+    for(int i = 0; i < 16; i++){
+        Result.e[i] = Array[i];
+    }
+    
+    return(Result);
+}
+
 inline m44 TranslationMatrix(v3 Translation){
     m44 Result = Identity();
     

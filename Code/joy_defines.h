@@ -15,7 +15,7 @@
 #define Gigabytes(count) ((count) * 1000000000)
 
 #define Kibibytes(count) ((count) * 1024)
-#define Mebibytes(count) ((count) * 1024 * 1024)
+#define Mibibytes(count) ((count) * 1024 * 1024)
 #define Gibibytes(count) ((count) * 1024 * 1024 * 1024)
 
 #define GlobalVariable static

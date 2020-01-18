@@ -124,12 +124,6 @@ struct Platform_Job_Queue{
     std::vector<std::thread> threads;
 };
 
-struct Memory_Block{
-    void* base;
-    size_t used;
-    size_t total;
-};
-
 #define PLATFORM_MEMALLOC(name) void* name(mi size)
 typedef PLATFORM_MEMALLOC(Platform_Memalloc);
 

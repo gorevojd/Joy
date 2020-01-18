@@ -4,6 +4,7 @@
 #include "joy_types.h"
 #include "joy_math.h"
 
+
 struct Bmp_Info{
     void* Pixels;
     int Width;
@@ -11,6 +12,11 @@ struct Bmp_Info{
     int Pitch;
     float WidthOverHeight;
     
+    // NOTE(Dima): In atlas info
+    v2 MinUV;
+    v2 MaxUV;
+    
+    // NOTE(Dima): Handle reserved for Graphics API
     mi Handle;
 };
 
@@ -32,6 +38,23 @@ struct Glyph_Info{
     v2 MaxUV;
 };
 
+struct Asset_Atlas{
+    Bmp_Info Bitmap;
+    int AtX;
+    int AtY;
+    int Dim;
+    int MaxInRowHeight;
+    
+    float OneOverDim;
+};
+
+struct In_Atlas_Bitmap{
+    v2 MinUV;
+    v2 MaxUV;
+    
+    int Width;
+    int Height;
+};
 
 #if 0
 enum Vertex_Layout_Type {

@@ -8,16 +8,6 @@
 #include "joy_platform.h"
 #include "joy_memory.h"
 
-struct Asset_Atlas{
-    Bmp_Info Bitmap;
-    int AtX;
-    int AtY;
-    int Dim;
-    int MaxInRowHeight;
-    
-    float OneOverDim;
-};
-
 struct asset{
     union{
         
@@ -42,7 +32,10 @@ struct Assets{
     Bmp_Info* fadeoutBmps;
     int fadeoutBmpsCount;
     
-    Bmp_Info checkboxMark;
+    Bmp_Info CheckboxMark;
+    Bmp_Info AddBmp;
+    Bmp_Info DeleteBmp;
+    Bmp_Info RefreshBmp;
     
     Mesh_Info cube;
     Mesh_Info plane;

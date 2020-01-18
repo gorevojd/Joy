@@ -4,7 +4,7 @@
 #include "joy_input.h"
 #include "joy_assets.h"
 #include "joy_math.h"
-#include "joy_render_stack.h"
+#include "joy_render.h"
 #include "joy_strings.h"
 #include "joy_colors.h"
 
@@ -196,6 +196,7 @@ struct Gui_State{
     float fontScale;
     
     Render_Stack* stack;
+    
     Input* input;
     Memory_Region* mem;
     
@@ -227,7 +228,8 @@ struct Gui_State{
     Gui_Tooltip tooltips[GUI_MAX_TOOLTIPS];
     int tooltipIndex;
     
-    Bmp_Info* checkboxMark;
+    Asset_Atlas* atlas;
+    Bmp_Info* CheckboxMark;
     
     Color_State colorState;
     v4 colors[GuiColor_Count];
@@ -256,7 +258,6 @@ GuiFindElementOfTypeUpInTree(Gui_Element* curElement, u32 elementType) {
 }
 
 
-//TODO(Dima): Delete this
 inline Gui_Layout* GetParentLayout(Gui_State* gui){
     Gui_Layout* res = 0;
     

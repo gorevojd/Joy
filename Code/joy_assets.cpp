@@ -11,63 +11,52 @@
 #include "stb_sprintf.h"
 
 INTERNAL_FUNCTION void AddBitmapToAtlas(Asset_Atlas* atlas, 
-                                        Bmp_Info* bmp, 
-                                        v2* OutMinUV, 
-                                        v2* OutMaxUV)
+                                        Bmp_Info* bmp)
 {
-    if(atlas->AtX + bmp->Width > atlas->Dim){
+    In_Atlas_Bitmap Result = {};
+    
+    int Border = 3;
+    
+    int ActualWidth = bmp->Width + Border * 2;
+    int ActualHeight = bmp->Height + Border * 2;
+    
+    if(atlas->AtX + ActualWidth > atlas->Dim){
         atlas->AtX = 0;
         atlas->AtY = atlas->AtY + atlas->MaxInRowHeight;
         atlas->MaxInRowHeight = 0;
     }
     
-    ASSERT(atlas->AtY + bmp->Height < atlas->Dim);
+    ASSERT(atlas->AtY + ActualHeight  < atlas->Dim);
     
     float OneOverDim = atlas->OneOverDim;
     
-#if 1    
     for (int YIndex = 0; YIndex < bmp->Height; YIndex++) {
         
         for (int XIndex = 0; XIndex < bmp->Width; XIndex++) {
             u32* At = (u32*)bmp->Pixels + YIndex * bmp->Width + XIndex;
-            u32* To = (u32*)atlas->Bitmap.Pixels + (atlas->AtY + YIndex) * atlas->Dim + atlas->AtX + XIndex;
+            u32* To = (u32*)atlas->Bitmap.Pixels + (atlas->AtY + YIndex + Border) * atlas->Dim + atlas->AtX + XIndex + Border;
             
             *To = *At;
         }
     }
-#else
-    RenderOneBitmapIntoAnother(
-        &atlas->Bitmap,
-        bmp,
-        atlas->AtX,
-        atlas->AtY,
-        V4(1.0f, 1.0f, 1.0f, 1.0f));
-#endif
     
-    if(OutMinUV){
-        *OutMinUV = V2(
-            (float)atlas->AtX * OneOverDim, 
-            (float)atlas->AtY * OneOverDim);
-    }
+    bmp->MinUV = V2(
+        (float)(atlas->AtX + Border) * OneOverDim, 
+        (float)(atlas->AtY + Border) * OneOverDim);
     
-    if(OutMaxUV){
-        *OutMaxUV = V2(
-            (float)(atlas->AtX + bmp->Width) * OneOverDim,
-            (float)(atlas->AtY + bmp->Height) * OneOverDim);
-    }
+    bmp->MaxUV = V2(
+        (float)(atlas->AtX + Border + bmp->Width) * OneOverDim,
+        (float)(atlas->AtY + Border + bmp->Height) * OneOverDim);
     
-    atlas->AtX += bmp->Width;
-    atlas->MaxInRowHeight = Max(atlas->MaxInRowHeight, bmp->Height);
+    atlas->AtX += ActualWidth;
+    atlas->MaxInRowHeight = Max(atlas->MaxInRowHeight, ActualHeight);
 }
 
 INTERNAL_FUNCTION void AddFontToAtlas(Asset_Atlas* atlas, Font_Info* font){
     for(int i = 0; i < font->GlyphCount; i++){
         Glyph_Info* glyph = &font->Glyphs[i];
         
-        AddBitmapToAtlas(atlas,
-                         &glyph->Bitmap,
-                         &glyph->MinUV,
-                         &glyph->MaxUV);
+        AddBitmapToAtlas(atlas, &glyph->Bitmap);
     }
 }
 
@@ -117,8 +106,17 @@ void InitAssets(Assets* assets, Memory_Region* Region){
     assets->sunrise = LoadBMP("../Data/Images/sunrise.jpg");
     assets->mountainsFuji = LoadBMP("../Data/Images/mountains_fuji.jpg");
     
-    // NOTE(Dima): Check mark
-    assets->checkboxMark = LoadBMP("../Data/Icons/checkmark512.png");
+    // NOTE(Dima): Icons
+    
+    assets->CheckboxMark = LoadBMP("../Data/Icons/checkmark64.png");
+    assets->AddBmp = LoadBMP("../Data/Icons/add64.png");
+    assets->DeleteBmp = LoadBMP("../Data/Icons/delete64.png");
+    assets->RefreshBmp = LoadBMP("../Data/Icons/refresh64.png");
+    
+    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->CheckboxMark);
+    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->AddBmp);
+    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->DeleteBmp);
+    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->RefreshBmp);
     
     // NOTE(Dima): Meshes
     assets->cube = MakeCube();
@@ -127,16 +125,16 @@ void InitAssets(Assets* assets, Memory_Region* Region){
     assets->cylynder = MakeCylynder(2.0f, 0.5f, 16);
     
     // NOTE(Dima): Fonts
-    assets->liberationMono = LoadFont("../Data/Fonts/LiberationMono-Regular.ttf", 16.0f, LoadFont_BakeShadow);
+    assets->liberationMono = LoadFont("../Data/Fonts/LiberationMono-Regular.ttf", 18.0f, LoadFont_BakeShadow);
     assets->lilitaOne = LoadFont("../Data/Fonts/LilitaOne.ttf", 20.0f, LoadFont_BakeShadow);
     
 #if 1
     assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, LoadFont_BakeBlur);
 #else
-    assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 16.0f, 0);
+    assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, 0);
 #endif
     
-    assets->pfdin = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 16.0f, 0);
+    assets->pfdin = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 18.0f, 0);
     
     AddFontToAtlas(&assets->MainLargeAtlas, &assets->liberationMono);
     AddFontToAtlas(&assets->MainLargeAtlas, &assets->lilitaOne);
