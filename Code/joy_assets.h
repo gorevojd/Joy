@@ -33,9 +33,12 @@ struct Assets{
     int fadeoutBmpsCount;
     
     Bmp_Info CheckboxMark;
-    Bmp_Info AddBmp;
-    Bmp_Info DeleteBmp;
-    Bmp_Info RefreshBmp;
+    Bmp_Info Folder;
+    Bmp_Info ClosePng;
+    Bmp_Info PlayPng;
+    Bmp_Info PlusPng;
+    Bmp_Info StopPng;
+    Bmp_Info PowerPng;
     
     Mesh_Info cube;
     Mesh_Info plane;

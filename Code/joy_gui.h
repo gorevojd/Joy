@@ -167,6 +167,10 @@ struct Gui_Element{
             struct {
                 Gui_Page* ref;
             } page;
+            
+            struct {
+                int CaretPos;
+            } inputText;
         };
         
         // NOTE(Dima): is initialized (b32)
@@ -349,7 +353,15 @@ enum print_text_operation{
     PrintTextOp_GetSize,
 };
 
-rc2 PrintTextInternal(Font_Info* fontInfo, Render_Stack* stack, char* text, v2 P, u32 textOp, float scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
+rc2 PrintTextInternal(Font_Info* fontInfo, 
+                      Render_Stack* stack, 
+                      char* text, 
+                      v2 P, 
+                      u32 textOp, 
+                      float scale = 1.0f, 
+                      v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f), 
+                      int CaretP = 0, 
+                      v2* CaretPrintPOut = 0);
 v2 GetTextSizeInternal(Font_Info* fontInfo, char* text, float scale);
 rc2 PrintTextCenteredInRectInternal(Font_Info* fontInfo, Render_Stack* stack, char* text, rc2 rect, float scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
 
@@ -402,6 +414,8 @@ u32* ref,
 u32 defaultId);
 void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId);
 void GuiEndRadioGroup(Gui_State* gui);
+
+void GuiInputText(Gui_State* gui, char* name, char* Buf, int BufSize);
 
 void GuiTest(Gui_State* gui, float deltaTime);
 

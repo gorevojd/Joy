@@ -8,13 +8,14 @@
 #if defined(JOY_FFT_IMPLEMENTATION) && !defined(JOY_FFT_IMPLEMENTATION_DONE)
 #define JOY_FFT_IMPLEMENTATION_DONE
 
+typedef std::complex<float> joy_cmplx_t; 
 
-void Dft(std::complex<float>* in, std::complex<float>* out, int count) {
+void Dft(joy_cmplx_t* in, joy_cmplx_t* out, int count) {
 	float invCount = 1.0f / (float)count;
 	
 	for (int n = 0; n < count; n++)
 	{
-		std::complex<float> xn = {};
+		joy_cmplx_t xn = {};
         
 		for (int k = 0; k < count; k++) {
 			float angle = 2.0f * PI * (float)k * (float)n * invCount;
@@ -30,12 +31,12 @@ void Dft(std::complex<float>* in, std::complex<float>* out, int count) {
 	}
 }
 
-void DftInv(std::complex<float>* in, int count, std::complex<float>* out) {
+void DftInv(joy_cmplx_t* in, joy_cmplx_t* out, int count) {
 	float invCount = 1.0f / (float)count;
     
 	for (int k = 0; k < count; k++)
 	{
-		std::complex<float> xk = {};
+		joy_cmplx_t xk = {};
         
 		for (int n = 0; n < count; n++)
 		{
@@ -51,5 +52,11 @@ void DftInv(std::complex<float>* in, int count, std::complex<float>* out) {
 		out[k] = xk * invCount;
 	}
 }
+
+void FFT(joy_cmplx_t* in, joy_cmplx_t* out, int count){
+    
+}
+
+
 
 #endif

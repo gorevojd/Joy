@@ -91,20 +91,20 @@ Loaded_Strings LoadStringListFromFile(char* filePath){
             }
         }
         
-        result.count = strings.size();
+        result.Count = strings.size();
         
         size_t totalDataNeeded = 0;
         for(int i = 0; i < strings.size(); i++){
             totalDataNeeded += strings[i].length() + 1 + sizeof(char*);
         }
         
-        result.strings = (char**)malloc(totalDataNeeded);
+        result.Strings = (char**)malloc(totalDataNeeded);
         
         int curSumOfSizes = 0;
-        for(int i = 0; i < result.count; i++){
-            result.strings[i] = (char*)result.strings + result.count * sizeof(char*) + curSumOfSizes;
+        for(int i = 0; i < result.Count; i++){
+            result.Strings[i] = (char*)result.Strings + result.Count * sizeof(char*) + curSumOfSizes;
             curSumOfSizes += strings[i].length() + 1;
-            strcpy(result.strings[i], strings[i].c_str());
+            strcpy(result.Strings[i], strings[i].c_str());
         }
         
         FreeDataBuffer(&buf);
@@ -114,9 +114,9 @@ Loaded_Strings LoadStringListFromFile(char* filePath){
 }
 
 void FreeStringList(Loaded_Strings* list){
-    if(list->strings){
-        free(list->strings);
-        list->strings = 0;
+    if(list->Strings){
+        free(list->Strings);
+        list->Strings = 0;
     }
 }
 

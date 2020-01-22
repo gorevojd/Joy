@@ -117,6 +117,7 @@ enum KeyType{
 struct KeyState{
     b32 endedDown;
     b32 transitionHappened;
+    int RepeatCount;
 };
 
 struct Input{
@@ -125,6 +126,9 @@ struct Input{
     //NOTE(Dima): In window coords top-left
     v2 lastMouseP;
     v2 mouseP;
+    
+    char FrameInput[32];
+    int FrameInputLen;
 };
 
 inline b32 KeyIsDown(Input* input, u32 keyType){

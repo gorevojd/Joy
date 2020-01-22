@@ -1129,6 +1129,87 @@ PLATFORM_WRITE_FILE(Win32WriteFile){
     return(result);
 }
 
+PLATFORM_BEGIN_LIST_FILES_IN_DIR(Win32BeginListFilesInDir){
+    Loaded_Strings Result = {};
+    
+    ASSERT(win32.InListFilesBlock == 0);
+    win32.InListFilesBlock = 1;
+    
+    char NewDirPath[MAX_PATH];
+    CopyStrings(NewDirPath, DirectoryPath);
+    ChangeAllChars(NewDirPath, '\\', '/');
+    int DirPathLen = StringLength(NewDirPath);
+    char* LastSymbol = &NewDirPath[DirPathLen];
+    if(*LastSymbol != '/'){
+        *LastSymbol++ = '/';
+    }
+    *LastSymbol = 0;
+    
+    char NewWildcard[16];
+    if(Wildcard){
+        CopyStrings(NewWildcard, Wildcard);
+    }
+    else{
+        CopyStrings(NewWildcard, "*");
+    }
+    
+    char ActualFindString[MAX_PATH];
+    ConcatStringsUnsafe(ActualFindString, NewDirPath, NewWildcard);
+    
+    win32.LoadedStringsHolder.resize(0);
+    
+    size_t MemNeeded = 0;
+    
+    WIN32_FIND_DATAA FindData;
+    HANDLE FileHandle =  FindFirstFileA(
+        ActualFindString,
+        &FindData);
+    
+    if(FileHandle != INVALID_HANDLE_VALUE){
+        win32.LoadedStringsHolder.push_back(std::string(FindData.cFileName));
+        
+        size_t Str1Size = lstrlenA(FindData.cFileName) + 1;
+        MemNeeded += Str1Size;
+        
+        while(FindNextFileA(FileHandle, &FindData)){
+            win32.LoadedStringsHolder.push_back(std::string(FindData.cFileName));
+            
+            size_t StrSize = lstrlenA(FindData.cFileName) + 1;
+            MemNeeded += StrSize;
+        }
+        
+        MemNeeded += win32.LoadedStringsHolder.size() * sizeof(char*);
+        
+        Result.Strings = (char**)malloc(MemNeeded);
+        Result.Count = win32.LoadedStringsHolder.size();
+        
+        char* AtStr = (char*)Result.Strings + sizeof(char*) * Result.Count;
+        for(int i = 0; i < win32.LoadedStringsHolder.size(); i++){
+            Result.Strings[i] = AtStr;
+            CopyStrings(Result.Strings[i], (char*)win32.LoadedStringsHolder[i].c_str());
+            AtStr += win32.LoadedStringsHolder[i].length() + 1;
+        }
+        
+        FindClose(FileHandle);
+    }
+    else{
+        
+    }
+    
+    return(Result);
+}
+
+PLATFORM_END_LIST_FILES_IN_DIR(Win32EndListFilesInDir){
+    ASSERT(win32.InListFilesBlock == 1);
+    win32.InListFilesBlock = 0;
+    
+    if(Strings->Strings){
+        free(Strings->Strings);
+        Strings->Strings = 0;
+        Strings->Count = 0;
+    }
+}
+
 PLATFORM_SHOW_ERROR(Win32ShowError){
     char* captionText = "Error";
     u32 mbType = MB_OK;
@@ -1252,12 +1333,13 @@ Win32ToggleFullscreen(Win_State* win32)
     }
 }
 
-inline void Win32ProcessKey(KeyState* key, b32 isDown){
+inline void Win32ProcessKey(KeyState* key, b32 isDown, int RepeatCount){
     if(key->endedDown != isDown){
         key->endedDown = isDown;
         
         key->transitionHappened = 1;
     }
+    key->RepeatCount = RepeatCount;
 }
 
 INTERNAL_FUNCTION void 
@@ -1274,10 +1356,11 @@ Win32ProcessMessages(Input* input){
                 b32 wasDown = ((msg.lParam & (1 << 30)) != 0);
                 b32 isDown = ((msg.lParam & (1 << 31)) == 0);
                 b32 altKeyWasDown = ((msg.lParam & (1 << 29)) != 0);
+                int RepeatCount = msg.lParam & 0xFFFF;
                 
                 //NOTE(dima): If state of key was changed
+                u32 keyType = 0xFFFFFFFF;
                 if(wasDown != isDown){
-                    u32 keyType;
                     switch(vKey){
                         case VK_LBUTTON: { keyType = KeyMouse_Left; }break;
                         case VK_RBUTTON: { keyType = KeyMouse_Right; }break;
@@ -1370,8 +1453,7 @@ Win32ProcessMessages(Input* input){
                         case VK_VOLUME_MUTE: { keyType = Key_VolumeMute; }break;
                         case VK_VOLUME_UP: { keyType = Key_VolumeUp; }break;
                         case VK_VOLUME_DOWN: { keyType = Key_VolumeDown; }break;
-                        
-                        Win32ProcessKey(&input->keyStates[keyType], isDown);
+                        default: {}break;
                     }
                     
                     if(isDown){
@@ -1386,8 +1468,12 @@ Win32ProcessMessages(Input* input){
                     }
                 }
                 
-                //TranslateMessage(&msg);
-                //DispatchMessage(&msg);
+                if(keyType != 0xFFFFFFFF){
+                    Win32ProcessKey(&input->keyStates[keyType], isDown, RepeatCount);
+                }
+                
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
             }break;
             
             case WM_LBUTTONDOWN:{
@@ -1417,6 +1503,18 @@ Win32ProcessMessages(Input* input){
 }
 
 INTERNAL_FUNCTION void
+Win32PreProcessInput(Input* input){
+    // NOTE(Dima): Char input
+    input->FrameInput[0] = 0;
+    input->FrameInputLen = 0;
+    
+    for(int keyIndex = 0; keyIndex < Key_Count; keyIndex++){
+        input->keyStates[keyIndex].transitionHappened = 0;
+        input->keyStates[keyIndex].RepeatCount = 0;
+    }
+}
+
+INTERNAL_FUNCTION void
 Win32ProcessInput(Input* input)
 {
     POINT point;
@@ -1443,7 +1541,7 @@ Win32ProcessInput(Input* input)
         input->keyStates[MouseKey_Left + mouseKeyIndex].transitionHappened = 0;
         SHORT winMouseKeyState = GetKeyState(win32MouseKeyID[mouseKeyIndex]);
         
-        Win32ProcessKey(&input->keyStates[MouseKey_Left + mouseKeyIndex], winMouseKeyState & (1 << 15));
+        Win32ProcessKey(&input->keyStates[MouseKey_Left + mouseKeyIndex], winMouseKeyState & (1 << 15), 0);
     }
 }
 
@@ -1600,7 +1698,8 @@ LPARAM LParam)
         }break;
         
         case WM_CHAR:{
-            
+            gInput.FrameInput[gInput.FrameInputLen++] = (char)WParam;
+            gInput.FrameInput[gInput.FrameInputLen] = 0;
         }break;
         
         case WM_DESTROY:{
@@ -1791,11 +1890,16 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     float timeSinceShow = 0.0f;
     float toShowSpeed = 1.0f;
     
+    Loaded_Strings List1 = Win32BeginListFilesInDir("../Code/", "*.cpp");
+    Win32EndListFilesInDir(&List1);
+    Loaded_Strings List = Win32BeginListFilesInDir("../Code/", "*.h");
+    
     gRunning = 1;
     while(gRunning){
         LARGE_INTEGER beginClockLI;
         QueryPerformanceCounter(&beginClockLI);
         
+        Win32PreProcessInput(&gInput);
         Win32ProcessMessages(&gInput);
         Win32ProcessInput(&gInput);
         
@@ -1863,7 +1967,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 #endif
         
         
-#if 0        
+#if 0
         PushBitmap(renderStack, &gAssets.sunset, V2(100.0f, Sin(time * 1.0f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
         PushBitmap(renderStack, &gAssets.sunsetOrange, V2(200.0f, Sin(time * 1.1f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
         PushBitmap(renderStack, &gAssets.sunsetField, V2(300.0f, Sin(time * 1.2f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -1875,6 +1979,18 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         GuiFrameBegin(&gGui);
         
         GuiTest(&gGui, deltaTime);
+        
+#if 1
+        GuiBeginTree(&gGui, "String List");
+        char ListInfo[64];
+        stbsp_sprintf(ListInfo, "String list count: %d", List.Count);
+        GuiText(&gGui, ListInfo);
+        
+        for(int i = 0; i < List.Count; i++){
+            GuiText(&gGui, List.Strings[i]);
+        }
+        GuiEndTree(&gGui);
+#endif
         
         GuiFramePrepare4Render(&gGui);
         GlOutputRender(&gGL, gRender);

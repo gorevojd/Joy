@@ -17,11 +17,6 @@ enum load_font_flags{
     LoadFont_BakeBlur = 2,
 };
 
-struct Loaded_Strings{
-    char** strings;
-    int count;
-};
-
 // NOTE(Dima): Data buffers utility functions
 Data_Buffer ReadFileToDataBuffer(char* fileName);
 void FreeDataBuffer(Data_Buffer* dataBuffer);

@@ -184,6 +184,9 @@ struct Win_State{
     int windowWidth;
     int windowHeight;
     
+    std::vector<std::string> LoadedStringsHolder;
+    b32 InListFilesBlock;
+    
     WINDOWPLACEMENT windowPlacement;
     
     HGLRC renderCtx;

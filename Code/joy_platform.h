@@ -138,6 +138,28 @@ PLATFORM_ADD_ENTRY(PlatformAddEntry);
 typedef PLATFORM_WAIT_FOR_COMPLETION(Platform_Wait_For_Completion);
 PLATFORM_WAIT_FOR_COMPLETION(PlatformWaitForCompletion);
 
+#define PLATFORM_BEGIN_LIST_FILES_IN_DIR(name) Loaded_Strings name(char* DirectoryPath, char* Wildcard)
+typedef PLATFORM_BEGIN_LIST_FILES_IN_DIR(Platform_Begin_List_Files_In_Dir);
+
+#define PLATFORM_END_LIST_FILES_IN_DIR(name) void name(Loaded_Strings* Strings)
+typedef PLATFORM_END_LIST_FILES_IN_DIR(Platform_End_List_Files_In_Dir);
+
+enum Platform_File_Flags{
+    File_Archive = 1,
+    File_Compressed = 2,
+    File_Directory = 4,
+    File_Hidden = 8,
+    File_Normal = 16,
+    File_Readonly = 32,
+    File_System = 64,
+};
+
+struct Platform_File_Handle{
+    mi Handle;
+    
+    u32 Flags;
+};
+
 struct Platform{
     Platform_Read_File* ReadFile;
     Platform_Write_File* WriteFile;
@@ -151,6 +173,9 @@ struct Platform{
     
     Platform_Memalloc* MemAlloc;
     Platform_Memfree* MemFree;
+    
+    Platform_Begin_List_Files_In_Dir* BeginListFilesInDir;
+    Platform_End_List_Files_In_Dir* EndListFilesInDir;
     
     Platform_Add_Entry* AddEntry;
     Platform_Wait_For_Completion* WaitForCompletion;

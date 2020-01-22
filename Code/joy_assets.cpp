@@ -86,11 +86,11 @@ void InitAssets(Assets* assets, Memory_Region* Region){
     
     // NOTE(Dima): images
     Loaded_Strings bmpStrs = LoadStringListFromFile("../Data/Images/ToLoadImages.txt");
-    assets->fadeoutBmps = (Bmp_Info*)platform.MemAlloc(sizeof(Bmp_Info) * bmpStrs.count);
-    assets->fadeoutBmpsCount = bmpStrs.count;
-    for(int i = 0; i < bmpStrs.count; i++){
+    assets->fadeoutBmps = (Bmp_Info*)platform.MemAlloc(sizeof(Bmp_Info) * bmpStrs.Count);
+    assets->fadeoutBmpsCount = bmpStrs.Count;
+    for(int i = 0; i < bmpStrs.Count; i++){
         char tmpBuf[256];
-        stbsp_sprintf(tmpBuf, "../Data/Images/%s", bmpStrs.strings[i]);
+        stbsp_sprintf(tmpBuf, "../Data/Images/%s", bmpStrs.Strings[i]);
         
         assets->fadeoutBmps[i] = LoadBMP(tmpBuf);
     }
@@ -107,16 +107,21 @@ void InitAssets(Assets* assets, Memory_Region* Region){
     assets->mountainsFuji = LoadBMP("../Data/Images/mountains_fuji.jpg");
     
     // NOTE(Dima): Icons
-    
     assets->CheckboxMark = LoadBMP("../Data/Icons/checkmark64.png");
-    assets->AddBmp = LoadBMP("../Data/Icons/add64.png");
-    assets->DeleteBmp = LoadBMP("../Data/Icons/delete64.png");
-    assets->RefreshBmp = LoadBMP("../Data/Icons/refresh64.png");
+    assets->Folder = LoadBMP("../Data/Icons/folder32.png");
+    assets->ClosePng = LoadBMP("../Data/Icons/close.png");
+    assets->PlayPng = LoadBMP("../Data/Icons/play.png");
+    assets->PlusPng = LoadBMP("../Data/Icons/plus.png");
+    assets->StopPng = LoadBMP("../Data/Icons/stop.png");
+    assets->PowerPng = LoadBMP("../Data/Icons/power.png");
     
     AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->CheckboxMark);
-    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->AddBmp);
-    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->DeleteBmp);
-    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->RefreshBmp);
+    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->Folder);
+    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->ClosePng);
+    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->PlayPng);
+    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->PlusPng);
+    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->StopPng);
+    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->PowerPng);
     
     // NOTE(Dima): Meshes
     assets->cube = MakeCube();

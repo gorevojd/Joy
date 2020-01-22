@@ -479,7 +479,7 @@ int height)
     gui->colors[GuiColor_WindowBorderActive] = GUI_GETCOLOR_COLSYS(Color_Blue);
 }
 
-rc2 PrintTextInternal(Font_Info* font, Render_Stack* stack, char* text, v2 p, u32 textOp, float scale, v4 color)
+rc2 PrintTextInternal(Font_Info* font, Render_Stack* stack, char* text, v2 p, u32 textOp, float scale, v4 color, int CaretP, v2* CaretPrintPOut)
 {
     rc2 txtRc;
     
@@ -489,29 +489,48 @@ rc2 PrintTextInternal(Font_Info* font, Render_Stack* stack, char* text, v2 p, u3
     
     while(*at){
         
-        int glyphIndex = font->Codepoint2Glyph[*at];
-        Glyph_Info* glyph = &font->Glyphs[glyphIndex];
-        
-        float bmpScale = glyph->Height * scale;
-        
-        v2 bitmapDim = { glyph->Bitmap.WidthOverHeight * bmpScale, bmpScale };
-        
-        if(textOp == PrintTextOp_Print){
-            float bitmapMinY = curP.y + glyph->YOffset * scale;
-            float bitmapMinX = curP.x + glyph->XOffset * scale;
-            
-            PushGlyph(stack, 
-                      V2(bitmapMinX, bitmapMinY), 
-                      bitmapDim, 
-                      &glyph->Bitmap,
-                      glyph->Bitmap.MinUV,
-                      glyph->Bitmap.MaxUV,
-                      color);
+        if(text + CaretP == at){
+            if(CaretPrintPOut){
+                *CaretPrintPOut = curP;
+            }
         }
         
-        curP.x += ((float)glyph->Advance * scale);
+        if(*at >= ' ' && *at <= '~'){
+            
+            int glyphIndex = font->Codepoint2Glyph[*at];
+            Glyph_Info* glyph = &font->Glyphs[glyphIndex];
+            
+            float bmpScale = glyph->Height * scale;
+            
+            v2 bitmapDim = { glyph->Bitmap.WidthOverHeight * bmpScale, bmpScale };
+            
+            if(textOp == PrintTextOp_Print){
+                float bitmapMinY = curP.y + glyph->YOffset * scale;
+                float bitmapMinX = curP.x + glyph->XOffset * scale;
+                
+                PushGlyph(stack, 
+                          V2(bitmapMinX, bitmapMinY), 
+                          bitmapDim, 
+                          &glyph->Bitmap,
+                          glyph->Bitmap.MinUV,
+                          glyph->Bitmap.MaxUV,
+                          color);
+            }
+            
+            curP.x += ((float)glyph->Advance * scale);
+            
+        }
+        else if(*at == '\t'){
+            curP.x += ((float)font->AscenderHeight * 4 * scale);
+        }
         
-        *at++;
+        at++;
+    }
+    
+    if(text + CaretP == at){
+        if(CaretPrintPOut){
+            *CaretPrintPOut = curP;
+        }
     }
     
     txtRc.min.x = p.x;
@@ -520,6 +539,17 @@ rc2 PrintTextInternal(Font_Info* font, Render_Stack* stack, char* text, v2 p, u3
     txtRc.max.y = curP.y - font->DescenderHeight * scale;
     
     return(txtRc);
+}
+
+void PrintCaret(Gui_State* gui, v2 PrintP, v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f)){
+    float bmpScale = GuiGetLineAdvance(gui);
+    
+    float CaretMinY = PrintP.y - GetScaledAscender(gui->mainFont, gui->fontScale);
+    float CaretMinX = PrintP.x;;
+    
+    v2 CaretMin = V2(CaretMinX, CaretMinY);
+    v2 CaretDim = V2(bmpScale * 0.6f, bmpScale);
+    PushRect(gui->stack, RcMinDim(CaretMin, CaretDim), Color);
 }
 
 v2 GetTextSizeInternal(Font_Info* font, char* Text, float scale){
@@ -603,6 +633,23 @@ rc2 PrintText(Gui_State* gui, char* text, v2 p, v4 color, float scale){
     
     return(TextRc);
 }
+
+
+v2 GetCaretPrintP(Gui_State* gui, char* text, v2 p, int CaretP){
+    v2 Result;
+    
+    rc2 TextRc = PrintTextInternal(
+        gui->mainFont, 
+        gui->stack, 
+        text, p, 
+        PrintTextOp_Print, 
+        gui->fontScale * gui->fontScale,
+        V4(0.0f, 0.0f, 0.0f, 0.0f), 
+        CaretP, &Result);
+    
+    return(Result);
+}
+
 
 rc2 PrintTextCenteredInRect(Gui_State* gui, char* text, rc2 rect, float scale, v4 color){
     rc2 result = PrintTextCenteredInRectInternal(gui->mainFont,
@@ -1072,15 +1119,21 @@ enum Push_But_Type{
     PushBut_Back,
     PushBut_Grad,
     PushBut_Outline,
+    PushBut_RectAndOutline,
+    PushBut_AlphaBlack,
 };
 
-INTERNAL_FUNCTION void GuiPushBut(Gui_State* gui, rc2 rect, u32 type = PushBut_Grad, v4 color = V4(0.0f, 0.0f, 0.0f, 0.0f)){
+INTERNAL_FUNCTION void GuiPushBut(Gui_State* gui, rc2 rect, u32 type = PushBut_Grad, v4 color = V4(0.0f, 0.0f, 0.0f, 1.0f)){
     
     
     
     switch(type){
         case PushBut_Empty:{
             
+        }break;
+        
+        case PushBut_AlphaBlack:{
+            PushRect(gui->stack, rect, GUI_GETCOLOR(GuiColor_WindowBackground));
         }break;
         
         case PushBut_Back:{
@@ -1097,6 +1150,11 @@ INTERNAL_FUNCTION void GuiPushBut(Gui_State* gui, rc2 rect, u32 type = PushBut_G
         
         case PushBut_Outline:{
             PushRectOutline(gui->stack, rect, 2, color);
+        }break;
+        
+        case PushBut_RectAndOutline:{
+            PushRect(gui->stack, rect, GUI_GETCOLOR(GuiColor_ButtonBackground));
+            PushRectOutline(gui->stack, rect, 1, color);
         }break;
     }
 }
@@ -1442,6 +1500,136 @@ void GuiEndRadioGroup(Gui_State* gui) {
     GuiEndElement(gui, GuiElement_RadioGroup);
 }
 
+void GuiInputText(Gui_State* gui, char* name, char* Buf, int BufSize){
+    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_Item, JOY_TRUE);
+    Gui_Layout* layout = GetParentLayout(gui);
+    
+    if(GuiElementOpenedInTree(elem) && 
+       PotentiallyVisibleSmall(layout))
+    {
+        GuiPreAdvance(gui, layout);
+        
+        // NOTE(Dima): Printing button and text
+        rc2 textRc = GetTextRect(gui, 
+                                 "                            ", 
+                                 layout->At);
+        textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 3.0f));
+        GuiPushBut(gui, textRc, PushBut_AlphaBlack);
+        
+        int* CaretP = &elem->data.inputText.CaretPos;
+        
+        char FrameInputProcessed[32];
+        int FrameInputProcessedAt = 0;
+        FrameInputProcessed[0] = 0;
+        
+        for(int i = 0; i < gui->input->FrameInputLen; i++){
+            char AtChar = gui->input->FrameInput[i];
+            if(AtChar >= ' ' && AtChar <= '~'){
+                FrameInputProcessed[FrameInputProcessedAt++] = AtChar;
+                FrameInputProcessed[FrameInputProcessedAt] = 0;
+            }
+        }
+        
+        char TmpBuf[256];
+        *CaretP += 
+            InsertStringToString(Buf, TmpBuf, BufSize, 
+                                 *CaretP, 
+                                 FrameInputProcessed);
+        
+        if(KeyIsDown(gui->input, Key_Left)){
+            if(KeyIsDown(gui->input, Key_Control)){
+                for(int i = 0; i < gui->input->keyStates[Key_Left].RepeatCount; i++){
+                    int FoundIndex = FindSkipPrev(Buf, *CaretP);
+                    *CaretP = FoundIndex;
+                }
+            }
+            else{
+                for(int i = 0; i < gui->input->keyStates[Key_Left].RepeatCount; i++){
+                    *CaretP = *CaretP - 1;
+                }
+            }
+        }
+        
+        if(KeyIsDown(gui->input, Key_Right)){
+            if(KeyIsDown(gui->input, Key_Control)){
+                for(int i = 0; i < gui->input->keyStates[Key_Right].RepeatCount; i++){
+                    int FoundIndex = FindSkipNext(Buf, *CaretP);
+                    *CaretP = FoundIndex;
+                }
+            }
+            else{
+                for(int i = 0; i < gui->input->keyStates[Key_Right].RepeatCount; i++){
+                    *CaretP = *CaretP + 1;
+                }
+            }
+        }
+        
+        if(KeyWentDown(gui->input, Key_Backspace)){
+            if(KeyIsDown(gui->input, Key_Control)){
+                *CaretP += EraseToNonLetterPrev(Buf, *CaretP);
+            }
+            else{
+                *CaretP += ErasePrevCharFromString(Buf, *CaretP);
+            }
+        }
+        
+        if(KeyWentDown(gui->input, Key_Delete)){
+            if(KeyIsDown(gui->input, Key_Control)){
+                
+            }
+            else{
+                *CaretP += EraseNextCharFromString(Buf, *CaretP);
+            }
+        }
+        
+        *CaretP = Max(0, *CaretP);
+        *CaretP = Min(*CaretP, Min(StringLength(Buf), BufSize - 1));
+        
+        v4 textC = V4(1.0f, 1.0f, 1.0f, 1.0f);
+        //PrintTextCenteredInRect(gui, Buf, textRc, 1.0f, textC);
+        v2 BufTextSize = GetTextSize(gui, Buf, 1.0f);
+        float PrintPX;
+        float FieldDimX = GetRectDim(textRc).x;
+        if(BufTextSize.x < FieldDimX){
+            PrintPX = textRc.min.x;
+        }
+        else{
+            PrintPX = textRc.max.x - BufTextSize.x;
+        }
+        float PrintPY = GetCenteredTextOffsetY(gui->mainFont,
+                                               textRc, 
+                                               gui->fontScale);
+        v2 PrintP = V2(PrintPX, PrintPY);
+        v2 CaretPrintP = GetCaretPrintP(gui, Buf, PrintP, *CaretP);
+        
+        v4 CaretColor = V4(0.0f, 1.0f, 0.0f, 1.0f);
+        PrintCaret(gui, 
+                   CaretPrintP,
+                   CaretColor); 
+        PrintText(gui, Buf, PrintP, GUI_GETCOLOR(GuiColor_Text));
+        
+        
+        float nameStartY = GetCenteredTextOffsetY(gui->mainFont, textRc, gui->fontScale);
+        v2 nameStart = V2(textRc.max.x + GetScaledAscender(gui->mainFont, gui->fontScale) * 0.5f, nameStartY);
+        char DebugBuf[256];
+        
+#if 1
+        stbsp_sprintf(DebugBuf, "CaretP: %d; LeftRC: %d", *CaretP, 
+                      gui->input->keyStates[Key_Left].RepeatCount);
+        rc2 NameRc = PrintText(gui, DebugBuf, nameStart, GUI_GETCOLOR(GuiColor_Text));
+#else
+        rc2 NameRc = PrintText(gui, name, nameStart, GUI_GETCOLOR(GuiColor_Text));
+#endif
+        
+        
+        rc2 AdvanceRect = GetBoundingRect(NameRc, textRc);
+        
+        GuiPostAdvance(gui, layout, AdvanceRect);
+    }
+    
+    GuiEndElement(gui, GuiElement_Item);
+}
+
 void GuiTest(Gui_State* gui, float deltaTime){
     
     Render_Stack* renderStack = gui->stack;
@@ -1484,6 +1672,8 @@ void GuiTest(Gui_State* gui, float deltaTime){
     
     //GuiPushDim(gui, V2(100, 100));
     GuiBeginLayout(gui, "layout1", GuiLayout_Window);
+    static char InputTextBuf[256];
+    GuiInputText(gui, "Input Text", InputTextBuf, 256);
     GuiBeginTree(gui, "AddClearButtons");
     LOCAL_AS_GLOBAL int RectCount = 0;
     GuiBeginRow(gui);
