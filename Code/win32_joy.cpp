@@ -231,6 +231,63 @@ Win32ClearSoundBuffer(DSound_State* ds)
     }
 }
 
+INTERNAL_FUNCTION void 
+Win32FillSoundBufferWithSound(DSound_State* ds, Sound_Info* sound)
+{
+    void* region1;
+    DWORD region1Size;
+    void* region2;
+    DWORD region2Size;
+    
+    HRESULT lockResult = ds->secBuf->Lock(
+        0, 
+        ds->secBufDesc.dwBufferBytes,
+        &region1,
+        &region1Size,
+        &region2,
+        &region2Size,
+        DSBLOCK_ENTIREBUFFER);
+    
+    if(SUCCEEDED(lockResult)){
+        int r1NBlocks = region1Size / (ds->waveFormat.nBlockAlign);
+        int r2NBlocks = region2Size / (ds->waveFormat.nBlockAlign);
+        
+        i16* sampleAt = (i16*)region1;
+        i16* sampleFromLeft = (i16*)sound->Samples[0];
+        i16* sampleFromRight = (i16*)sound->Samples[1];
+        
+        for(int bIndex = 0; 
+            bIndex < r1NBlocks;
+            bIndex++)
+        {
+            *sampleAt++ = *sampleFromLeft++;
+            *sampleAt++ = *sampleFromRight++;
+        }
+        
+        sampleAt = (i16*)region2;
+        for(int bIndex = 0;
+            bIndex < r2NBlocks;
+            bIndex++)
+        {
+            *sampleAt++ = *sampleFromLeft++;
+            *sampleAt++ = *sampleFromRight++;
+        }
+        
+        HRESULT unlockResult = ds->secBuf->Unlock(region1, region1Size,
+                                                  region2, region2Size);
+    }
+}
+
+INTERNAL_FUNCTION void 
+Win32PlayDirectSoundBuffer(DSound_State* ds){
+    ds->secBuf->Play(0, 0, DSBPLAY_LOOPING);
+}
+
+INTERNAL_FUNCTION void
+Win32StopDirectSoundBuffer(DSound_State* ds){
+    
+}
+
 LRESULT CALLBACK
 TmpOpenGLWndProc(
 HWND Window,
@@ -1848,6 +1905,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     InitAssets(&gAssets, &gMem);
     DSoundInit(&gDSound, win32.window);
     Win32ClearSoundBuffer(&gDSound);
+    Win32FillSoundBufferWithSound(&gDSound, &gAssets.SineTest2);
+    Win32PlayDirectSoundBuffer(&gDSound);
     
 #if JOY_USE_OPENGL
     GlInit(&gGL, & gAssets);

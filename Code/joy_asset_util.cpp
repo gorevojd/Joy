@@ -1231,3 +1231,90 @@ Mesh_Info MakeCylynder(float Height, float Radius, int SidesCount) {
     
     return(Result);
 }
+
+Sound_Info MakeSound(const std::vector<i16>& Samples,
+                     int SamplesPerSec)
+{
+    Sound_Info Result = {};
+    
+    Result.SamplesPerSec = SamplesPerSec;
+    
+    if(Samples.size()){
+        
+        size_t MemNeeded = Samples.size() * sizeof(i16) * 2;
+        i16* ResultSamples = (i16*)malloc(MemNeeded);
+        
+        Result.Samples[0] = ResultSamples;
+        Result.Samples[1] = ResultSamples + Samples.size();
+        
+        Result.SampleCount = Samples.size();
+        
+#if 0
+        std::copy(Samples.begin(), Samples.end(), Result.Samples[0]);
+        std::copy(Samples.begin(), Samples.end(), Result.Samples[1]);
+#else
+        
+        for(int i = 0; i < Samples.size(); i++){
+            *(Result.Samples[0] + i) = Samples[i];
+            *(Result.Samples[1] + i) = Samples[i];
+        }
+#endif
+        
+    }
+    
+    return(Result);
+}
+
+Sound_Info MakeSineSound(const std::vector<int>& Frequencies, 
+                         int SampleCount, 
+                         int SamplesPerSec)
+{
+    std::vector<i16> Samples;
+    Samples.reserve(SampleCount);
+    
+    if(Frequencies.size()){
+        
+        float MasterVolume = 0.5f;
+        
+        float OneOverFreqCount = 1.0f / Frequencies.size();
+        
+        for(int SampleIndex = 0; SampleIndex < SampleCount; SampleIndex++){
+            float ResultSumAmpl = 0.0f;
+            
+            for(int FreqIndex = 0; FreqIndex < Frequencies.size(); FreqIndex++){
+                float SamplesPerPeriod = ((float)SamplesPerSec / (float)Frequencies[FreqIndex]);
+                float Phase = (float)SampleIndex * 2.0f * 3.14159265359f / SamplesPerPeriod;
+                
+                ResultSumAmpl += sinf(Phase);
+            }
+            
+            ResultSumAmpl = ResultSumAmpl * OneOverFreqCount * MasterVolume;
+            
+#if 1
+            i16 ResultSample = (i16)std::roundf(ResultSumAmpl * INT16_MAX);
+#else
+            if(ResultSumAmpl > 0){
+                ResultSample = (i16)(ResultSumAmpl * (float)INT16_MAX + 0.5f);
+            }
+            else{
+                ResultSample = (i16)(ResultSumAmpl * (float)(-INT16_MIN) - 0.5f);
+            }
+#endif
+            
+            Samples.push_back(ResultSample);
+        }
+    }
+    
+    Sound_Info Result = MakeSound(Samples, SamplesPerSec);
+    
+    return(Result);
+}
+
+Sound_Info MakeSineSound256(int SampleCount, int SamplesPerSec){
+    std::vector<int> Freq{256};
+    
+    Sound_Info Result = MakeSineSound(Freq, SampleCount, SamplesPerSec);
+    
+    return(Result);
+}
+

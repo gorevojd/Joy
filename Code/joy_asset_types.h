@@ -20,6 +20,14 @@ struct Bmp_Info{
     mi Handle;
 };
 
+struct Sound_Info{
+    // NOTE(Dima): Left and Right channels
+    i16* Samples[2];
+    
+    int SampleCount;
+    int SamplesPerSec;
+};
+
 struct Glyph_Info{
     int Codepoint;
     

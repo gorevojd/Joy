@@ -40,6 +40,9 @@ struct Assets{
     Bmp_Info StopPng;
     Bmp_Info PowerPng;
     
+    Sound_Info SineTest1;
+    Sound_Info SineTest2;
+    
     Mesh_Info cube;
     Mesh_Info plane;
     Mesh_Info sphere;

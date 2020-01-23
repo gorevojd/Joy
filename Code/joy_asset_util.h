@@ -43,13 +43,16 @@ std::vector<v3>& Colors,
 std::vector<u32> Indices,
 b32 CalculateNormals,
 b32 CalculateTangents);
-
 Mesh_Info MakePlane();
-
 Mesh_Info MakeCube();
-
 Mesh_Info MakeSphere(int Segments, int Rings);
-
 Mesh_Info MakeCylynder(float Height, float Radius, int SidesCount) ;
+
+Sound_Info MakeSound(const std::vector<i16>& Samples,
+                     int SamplesPerSec);
+Sound_Info MakeSineSound(const std::vector<int>& Frequencies, 
+                         int SampleCount,
+                         int SamplesPerSec);
+Sound_Info MakeSineSound256(int SampleCount, int SamplesPerSec);
 
 #endif

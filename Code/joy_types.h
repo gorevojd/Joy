@@ -72,4 +72,10 @@ inline void CopyFloats(f32* Dst, f32* Src, int Count){
     }
 }
 
+template<typename t> inline void CopyTypeArray(t* Dst, t* Src, int Count){
+    for(int CopyIndex = 0; CopyIndex < Count; CopyIndex++){
+        Dst[CopyIndex] = Src[CopyIndex];
+    }
+}
+
 #endif
