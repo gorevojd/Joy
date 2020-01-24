@@ -244,6 +244,125 @@ struct Gui_State{
     b32 inPushBlock;
 };
 
+enum Gui_Interaction_Type{
+    GuiInteraction_None,
+    GuiInteraction_Variable,
+    GuiInteraction_Move,
+    GuiInteraction_Resize,
+};
+
+struct Gui_Interaction{
+    u32 ID;
+    u32 InteractionType;
+    
+    virtual void Interact(Gui_State* gui) = 0;
+};
+
+template<typename  t> struct Gui_Variable_Interaction : public Gui_Interaction{
+    t* Variable;
+};
+
+enum class Gui_Resize_Interaction_Type{
+    None,
+    Default,
+    Proportional,
+    Horizontal,
+    Vertical,
+};
+
+struct Gui_Resize_Interaction : public Gui_Interaction{
+    v2* DimensionPtr;
+	v2 Position;
+	v2 MinDim;
+	v2 OffsetInAnchor;
+    Gui_Resize_Interaction_Type Type;
+    
+    Gui_Resize_Interaction(v2 Position, v2* Dimension, Gui_Resize_Interaction_Type Type){
+        this->InteractionType = GuiInteraction_Resize;
+        
+        this->DimensionPtr = DimensionPtr;
+        this->Type = Type;
+        this->MinDim = V2(0.0f, 0.0f);
+        this->OffsetInAnchor = V2(0.0f, 0.0f);
+        this->Position = Position;
+    }
+    
+    virtual void Interact(Gui_State* gui) override {
+        v2 WorkRectP = this->Position;
+        v2 MouseP = gui->input->MouseP - this->OffsetInAnchor;
+        
+        v2* WorkDim = this->DimensionPtr;
+        
+        switch (this->Type) {
+            case Gui_Resize_Interaction_Type::Default: {
+                *WorkDim = MouseP - WorkRectP;
+                
+                if (MouseP.x - WorkRectP.x < this->MinDim.x) {
+                    WorkDim->x = this->MinDim.x;
+                }
+                
+                if (MouseP.y - WorkRectP.y < this->MinDim.y) {
+                    WorkDim->y = this->MinDim.y;
+                }
+            }break;
+            
+            case Gui_Resize_Interaction_Type::Horizontal: {
+                if (MouseP.x - WorkRectP.x < this->MinDim.x) {
+                    WorkDim->x = this->MinDim.x;
+                }
+            }break;
+            
+            case Gui_Resize_Interaction_Type::Vertical: {
+                if (MouseP.y - WorkRectP.y < this->MinDim.y) {
+                    WorkDim->y = this->MinDim.y;
+                }
+            }break;
+            
+            case Gui_Resize_Interaction_Type::Proportional: {
+                float WidthToHeight = WorkDim->x / WorkDim->y;
+                WorkDim->y = MouseP.y - WorkRectP.y;
+                WorkDim->x = WorkDim->y * WidthToHeight;
+                
+                if (WorkDim->y < this->MinDim.y) {
+                    WorkDim->y = this->MinDim.y;
+                    WorkDim->x = WorkDim->y * WidthToHeight;
+                }
+            }break;
+        }
+    }
+};
+
+enum class Gui_Move_Interaction_Type{
+    None,
+    Move,
+};
+
+struct Gui_Move_Interaction : public Gui_Interaction{
+    v2* MovePosition;
+    Gui_Move_Interaction_Type Type;
+    v2 OffsetInAnchor;
+    
+    Gui_Move_Interaction(v2* MovePosition, Gui_Move_Interaction_Type Type){
+        this->InteractionType = GuiInteraction_Move;
+        
+        this->Type = Type;
+        this->OffsetInAnchor = V2(0.0f, 0.0f);
+        this->MovePosition = MovePosition;
+    }
+    
+    virtual void Interact(Gui_State* gui) override {
+        v2* WorkP = this->MovePosition;
+        v2 MouseP = gui->input->MouseP - this->OffsetInAnchor;
+        
+        switch (this->Type) {
+            case Gui_Move_Interaction_Type::Move: {
+                *WorkP = MouseP;
+            }break;
+        }
+    }
+};
+
+
 inline Gui_Element* 
 GuiFindElementOfTypeUpInTree(Gui_Element* curElement, u32 elementType) {
     Gui_Element* result = 0;
@@ -416,6 +535,7 @@ void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId);
 void GuiEndRadioGroup(Gui_State* gui);
 
 void GuiInputText(Gui_State* gui, char* name, char* Buf, int BufSize);
+void GuiSliderFloat(Gui_State* gui, float* Value, float Min, float Max, char* Name);
 
 void GuiTest(Gui_State* gui, float deltaTime);
 

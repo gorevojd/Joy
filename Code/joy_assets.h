@@ -9,6 +9,8 @@
 #include "joy_memory.h"
 
 struct asset{
+    Memory_Entry* DataMemoryEntry;
+    
     union{
         
     };
@@ -18,6 +20,10 @@ struct asset{
 struct Assets{
     Memory_Region* Region;
     
+    // NOTE(Dima): Memory entries
+    Memory_Box MemBox;
+    
+    // NOTE(Dima): Assets
     Asset_Atlas MainLargeAtlas;
     
     Bmp_Info sunset;

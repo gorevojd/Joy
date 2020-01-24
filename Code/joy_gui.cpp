@@ -469,8 +469,8 @@ int height)
     gui->colors[GuiColor_ButtonForeground] = GUI_GETCOLOR_COLSYS(Color_White);
     gui->colors[GuiColor_ButtonForegroundHot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
     gui->colors[GuiColor_ButtonForegroundDisabled] = gui->colors[GuiColor_ButtonForeground] * 0.75f;
-    gui->colors[GuiColor_ButtonGrad1] = ColorFromHex("#2277DD");
-    gui->colors[GuiColor_ButtonGrad2] = ColorFromHex("#4b0082");
+    gui->colors[GuiColor_ButtonGrad1] = ColorFromHex("#FD6a02");
+    gui->colors[GuiColor_ButtonGrad2] = ColorFromHex("#883000");
     
     gui->windowAlpha = 0.85f;
     gui->colors[GuiColor_WindowBackground] = V4(0.0f, 0.0f, 0.0f, gui->windowAlpha);
@@ -865,9 +865,9 @@ INTERNAL_FUNCTION void GuiUpdateWindow(Gui_State* gui, Gui_Window* window){
                 v2 windowHalfDim = windowDim * 0.5f;
                 v2 windowCenter = windowRc.min + windowHalfDim;
                 
-                v2 mouseP = gui->input->mouseP;
-                mouseP = ClampInRect(mouseP, windowRc);
-                v2 diffFromCenter = mouseP - windowCenter;
+                v2 MouseP = gui->input->MouseP;
+                MouseP = ClampInRect(MouseP, windowRc);
+                v2 diffFromCenter = MouseP - windowCenter;
                 v2 diffRelative;
                 diffRelative.x = diffFromCenter.x / windowHalfDim.x;
                 diffRelative.y = diffFromCenter.y / windowHalfDim.y;
@@ -1116,31 +1116,34 @@ void GuiEndColumn(Gui_State* gui){
 
 enum Push_But_Type{
     PushBut_Empty,
-    PushBut_Back,
-    PushBut_Grad,
+    PushBut_Color,
     PushBut_Outline,
+    PushBut_DefaultBack,
+    PushBut_DefaultGrad,
     PushBut_RectAndOutline,
     PushBut_AlphaBlack,
 };
 
-INTERNAL_FUNCTION void GuiPushBut(Gui_State* gui, rc2 rect, u32 type = PushBut_Grad, v4 color = V4(0.0f, 0.0f, 0.0f, 1.0f)){
-    
-    
+INTERNAL_FUNCTION void GuiPushBut(Gui_State* gui, rc2 rect, u32 type = PushBut_DefaultGrad, v4 color = V4(0.0f, 0.0f, 0.0f, 1.0f)){
     
     switch(type){
         case PushBut_Empty:{
             
         }break;
         
+        case PushBut_Color:{
+            PushRect(gui->stack, rect, color);
+        }break;
+        
         case PushBut_AlphaBlack:{
             PushRect(gui->stack, rect, GUI_GETCOLOR(GuiColor_WindowBackground));
         }break;
         
-        case PushBut_Back:{
+        case PushBut_DefaultBack:{
             PushRect(gui->stack, rect, GUI_GETCOLOR(GuiColor_ButtonBackground));
         }break;
         
-        case PushBut_Grad:{
+        case PushBut_DefaultGrad:{
             PushGradient(
                 gui->stack, rect, 
                 GUI_GETCOLOR(GuiColor_ButtonGrad1),
@@ -1196,7 +1199,7 @@ void GuiBeginTree(Gui_State* gui, char* name){
         v4 textColor = GUI_GETCOLOR_COLSYS(Color_ToxicGreen);
         v4 oulineColor = GUI_GETCOLOR_COLSYS(Color_Red);
         
-        GuiPushBut(gui, textRc, PushBut_Grad, oulineColor);
+        GuiPushBut(gui, textRc, PushBut_DefaultGrad, oulineColor);
         if(elem->opened){
             GuiPushBut(gui, textRc, PushBut_Outline, oulineColor);
         }
@@ -1500,6 +1503,39 @@ void GuiEndRadioGroup(Gui_State* gui) {
     GuiEndElement(gui, GuiElement_RadioGroup);
 }
 
+void GuiSliderFloat(Gui_State* gui, float* Value, float Min, float Max, char* Name){
+    Gui_Element* elem = GuiBeginElement(gui, Name, GuiElement_Item, JOY_TRUE);
+    Gui_Layout* layout = GetParentLayout(gui);
+    
+    if(GuiElementOpenedInTree(elem) && 
+       PotentiallyVisibleSmall(layout))
+    {
+        GuiPreAdvance(gui, layout);
+        
+        rc2 textRc = GetTextRect(gui, 
+                                 "                ", 
+                                 layout->At);
+        textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 4.0f));
+        GuiPushBut(gui, textRc, PushBut_Color, V4(0.05f, 0.05f, 0.1f, 1.0f));
+        
+        char Buf[32];
+        stbsp_sprintf(Buf, "%.3f", *Value);
+        v4 textC = GUI_GETCOLOR(GuiColor_ButtonForeground);
+        PrintTextCenteredInRect(gui, Buf, textRc, 1.0f, textC);
+        
+        float NameStartY = GetCenteredTextOffsetY(gui->mainFont, textRc, gui->fontScale);
+        v2 NameStart = V2(textRc.max.x + GetScaledAscender(gui->mainFont, gui->fontScale) * 0.5f, NameStartY);
+        
+        rc2 NameRc = PrintText(gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
+        
+        rc2 AdvanceRect = GetBoundingRect(NameRc, textRc);
+        GuiPostAdvance(gui, layout, AdvanceRect);
+    }
+    
+    GuiEndElement(gui, GuiElement_Item);
+    
+}
+
 void GuiInputText(Gui_State* gui, char* name, char* Buf, int BufSize){
     Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_Item, JOY_TRUE);
     Gui_Layout* layout = GetParentLayout(gui);
@@ -1538,13 +1574,13 @@ void GuiInputText(Gui_State* gui, char* name, char* Buf, int BufSize){
         
         if(KeyIsDown(gui->input, Key_Left)){
             if(KeyIsDown(gui->input, Key_Control)){
-                for(int i = 0; i < gui->input->keyStates[Key_Left].RepeatCount; i++){
+                for(int i = 0; i < gui->input->KeyStates[Key_Left].RepeatCount; i++){
                     int FoundIndex = FindSkipPrev(Buf, *CaretP);
                     *CaretP = FoundIndex;
                 }
             }
             else{
-                for(int i = 0; i < gui->input->keyStates[Key_Left].RepeatCount; i++){
+                for(int i = 0; i < gui->input->KeyStates[Key_Left].RepeatCount; i++){
                     *CaretP = *CaretP - 1;
                 }
             }
@@ -1552,13 +1588,13 @@ void GuiInputText(Gui_State* gui, char* name, char* Buf, int BufSize){
         
         if(KeyIsDown(gui->input, Key_Right)){
             if(KeyIsDown(gui->input, Key_Control)){
-                for(int i = 0; i < gui->input->keyStates[Key_Right].RepeatCount; i++){
+                for(int i = 0; i < gui->input->KeyStates[Key_Right].RepeatCount; i++){
                     int FoundIndex = FindSkipNext(Buf, *CaretP);
                     *CaretP = FoundIndex;
                 }
             }
             else{
-                for(int i = 0; i < gui->input->keyStates[Key_Right].RepeatCount; i++){
+                for(int i = 0; i < gui->input->KeyStates[Key_Right].RepeatCount; i++){
                     *CaretP = *CaretP + 1;
                 }
             }
@@ -1615,7 +1651,7 @@ void GuiInputText(Gui_State* gui, char* name, char* Buf, int BufSize){
         
 #if 1
         stbsp_sprintf(DebugBuf, "CaretP: %d; LeftRC: %d", *CaretP, 
-                      gui->input->keyStates[Key_Left].RepeatCount);
+                      gui->input->KeyStates[Key_Left].RepeatCount);
         rc2 NameRc = PrintText(gui, DebugBuf, nameStart, GUI_GETCOLOR(GuiColor_Text));
 #else
         rc2 NameRc = PrintText(gui, name, nameStart, GUI_GETCOLOR(GuiColor_Text));
@@ -1674,6 +1710,8 @@ void GuiTest(Gui_State* gui, float deltaTime){
     GuiBeginLayout(gui, "layout1", GuiLayout_Window);
     static char InputTextBuf[256];
     GuiInputText(gui, "Input Text", InputTextBuf, 256);
+    static float TestFloat4Slider;
+    GuiSliderFloat(gui, &TestFloat4Slider, -5.0f, 10.0f, "FloatSlider");
     GuiBeginTree(gui, "AddClearButtons");
     LOCAL_AS_GLOBAL int RectCount = 0;
     GuiBeginRow(gui);
@@ -1890,7 +1928,7 @@ void GuiTest(Gui_State* gui, float deltaTime){
     GuiEndRow(gui);
     GuiText(gui, radioTxt);
     
-    GuiTooltip(gui, "Hello world!", input->mouseP);
+    GuiTooltip(gui, "Hello world!", input->MouseP);
     
     GuiEndLayout(gui);
     

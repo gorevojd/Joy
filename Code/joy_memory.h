@@ -6,10 +6,7 @@
 #include <stdint.h>
 #include <string.h>
 
-enum MemoryRegionType{
-    MemoryRegion_Dynamic,
-    MemoryRegion_Static,
-};
+// TODO(Dima): Add minimum block size param to allocation function
 
 struct Memory_Region{
     Memory_Block block;
@@ -17,6 +14,35 @@ struct Memory_Region{
     int regionCount;
     
     u32 type;
+};
+
+
+enum Memory_Entry_State{
+    MemoryEntry_Released,
+    MemoryEntry_Used,
+};
+
+struct Memory_Entry{
+    Memory_Entry* NextAlloc;
+    Memory_Entry* PrevAlloc;
+    
+    Memory_Entry* Next;
+    Memory_Entry* Prev;
+    
+    
+    void* Data;
+    u32 DataSize;
+    
+    u32 State;
+};
+
+struct Memory_Box{
+    Memory_Entry Use;
+    Memory_Entry Free;
+    
+    Memory_Entry* First;
+    
+    Memory_Region* Region;
 };
 
 #define MINIMUM_MEMORY_REGION_SIZE Mibibytes(1)
@@ -30,8 +56,7 @@ inline void* PushSomeMem(Memory_Region* region, size_t size, size_t align = 8){
     
     void* result = 0;
     
-    if(((newUsedCount > region->block.Total) || (region->block.Base == 0)) && 
-       region->type == MemoryRegion_Dynamic)
+    if((newUsedCount > region->block.Total) || (region->block.Base == 0))
     {
         // NOTE(Dima): Platform is guaranteed to allocate aligned mem
         // NOTE(Dima): so here i allocate only Size but not ToAllocateSize
@@ -65,7 +90,6 @@ inline void* PushSomeMem(Memory_Region* region, size_t size, size_t align = 8){
         region->block.Base = newBase;
         region->block.Used = newUsed;
         region->block.Total = newTotal;
-        region->type = MemoryRegion_Dynamic;
         
         result = region->block.Base;
     }
@@ -80,37 +104,9 @@ inline void* PushSomeMem(Memory_Region* region, size_t size, size_t align = 8){
 }
 
 inline void FreeMemoryRegion(Memory_Region* region){
-    if(region->type == MemoryRegion_Dynamic){
-        while(region->regionCount > 1){
-            Memory_Region* old = (Memory_Region*)((u8*)region->block.Base + region->block.Total);
-        }
+    while(region->regionCount > 1){
+        Memory_Region* old = (Memory_Region*)((u8*)region->block.Base + region->block.Total);
     }
-    else{
-        
-    }
-}
-
-// NOTE(Dima): Pushed region will can grow
-inline Memory_Region PushMemoryRegionStatic(Memory_Region* existing, mi size){
-    Memory_Region result = {};
-    
-    result.block.Base = PushSomeMem(existing, size);
-    result.block.Total = size;
-    result.block.Used = 0;
-    result.type = MemoryRegion_Static;
-    
-    return(result);
-}
-
-inline Memory_Region PushMemoryRegionDynamic(Memory_Region* existing, mi size){
-    Memory_Region result = {};
-    
-    result.block.Base = PushSomeMem(existing, size);
-    result.block.Total = size;
-    result.block.Used = 0;
-    result.type = MemoryRegion_Dynamic;
-    
-    return(result);
 }
 
 #define PushMemoryStruct(region, type, name, region_member_name) \
@@ -125,5 +121,9 @@ inline Memory_Region PushMemoryRegionDynamic(Memory_Region* existing, mi size){
 #define PushArray(region, type, count) (type*)PushSomeMem(region, sizeof(type) * count)
 #define PushString(region, text) (char*)PushSomeMem(region, strlen(text) + 1)
 #define PushStringSize(region, text, textlen) (char*)PushSomeMem(region, (textlen) + 1)
+
+Memory_Box InitMemoryBox(Memory_Region* Region, u32 BoxSizeInBytes);
+Memory_Entry* AllocateMemoryFromBox(Memory_Box* box, u32 RequestMemorySize);
+void ReleaseMemoryFromBox(Memory_Box* box, Memory_Entry* memEntry);
 
 #endif

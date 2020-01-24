@@ -125,7 +125,7 @@ void InitAssets(Assets* assets, Memory_Region* Region){
     
     // NOTE(Dima): Sounds
     assets->SineTest1 = MakeSineSound256(44100 * 4, 44100);
-    assets->SineTest2 = MakeSineSound(std::vector<int>{256, 512, 1024}, 44100 * 4, 44100);
+    assets->SineTest2 = MakeSineSound(std::vector<int>{256, 128, 430}, 44100 * 4, 44100);
     
     // NOTE(Dima): Meshes
     assets->cube = MakeCube();

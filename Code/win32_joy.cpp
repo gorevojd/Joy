@@ -1526,7 +1526,7 @@ Win32ProcessMessages(Input* input){
                 }
                 
                 if(keyType != 0xFFFFFFFF){
-                    Win32ProcessKey(&input->keyStates[keyType], isDown, RepeatCount);
+                    Win32ProcessKey(&input->KeyStates[keyType], isDown, RepeatCount);
                 }
                 
                 TranslateMessage(&msg);
@@ -1566,8 +1566,8 @@ Win32PreProcessInput(Input* input){
     input->FrameInputLen = 0;
     
     for(int keyIndex = 0; keyIndex < Key_Count; keyIndex++){
-        input->keyStates[keyIndex].transitionHappened = 0;
-        input->keyStates[keyIndex].RepeatCount = 0;
+        input->KeyStates[keyIndex].transitionHappened = 0;
+        input->KeyStates[keyIndex].RepeatCount = 0;
     }
 }
 
@@ -1578,9 +1578,9 @@ Win32ProcessInput(Input* input)
     BOOL getCursorPosRes = GetCursorPos(&point);
     BOOL screenToClientRec = ScreenToClient(win32.window, &point);
     
-    v2 mouseP = V2(point.x, point.y);
-    input->lastMouseP = input->mouseP;
-    input->mouseP = mouseP;
+    v2 MouseP = V2(point.x, point.y);
+    input->LastMouseP = input->MouseP;
+    input->MouseP = MouseP;
     
     //NOTE(Dima): Processing mouse buttons
     DWORD win32MouseKeyID[] = {
@@ -1595,10 +1595,10 @@ Win32ProcessInput(Input* input)
         mouseKeyIndex < ARRAY_COUNT(win32MouseKeyID);
         mouseKeyIndex++)
     {
-        input->keyStates[MouseKey_Left + mouseKeyIndex].transitionHappened = 0;
+        input->KeyStates[MouseKey_Left + mouseKeyIndex].transitionHappened = 0;
         SHORT winMouseKeyState = GetKeyState(win32MouseKeyID[mouseKeyIndex]);
         
-        Win32ProcessKey(&input->keyStates[MouseKey_Left + mouseKeyIndex], winMouseKeyState & (1 << 15), 0);
+        Win32ProcessKey(&input->KeyStates[MouseKey_Left + mouseKeyIndex], winMouseKeyState & (1 << 15), 0);
     }
 }
 
@@ -1905,7 +1905,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     InitAssets(&gAssets, &gMem);
     DSoundInit(&gDSound, win32.window);
     Win32ClearSoundBuffer(&gDSound);
-    Win32FillSoundBufferWithSound(&gDSound, &gAssets.SineTest2);
+    Win32FillSoundBufferWithSound(&gDSound, &gAssets.SineTest1);
     Win32PlayDirectSoundBuffer(&gDSound);
     
 #if JOY_USE_OPENGL

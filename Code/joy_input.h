@@ -121,24 +121,24 @@ struct KeyState{
 };
 
 struct Input{
-    KeyState keyStates[Key_Count];
+    KeyState KeyStates[Key_Count];
     
     //NOTE(Dima): In window coords top-left
-    v2 lastMouseP;
-    v2 mouseP;
+    v2 LastMouseP;
+    v2 MouseP;
     
     char FrameInput[32];
     int FrameInputLen;
 };
 
 inline b32 KeyIsDown(Input* input, u32 keyType){
-    b32 res = input->keyStates[keyType].endedDown;
+    b32 res = input->KeyStates[keyType].endedDown;
     
     return(res);
 }
 
 inline b32 KeyWentDown(Input* input, u32 keyType){
-    KeyState* Key = &input->keyStates[keyType];
+    KeyState* Key = &input->KeyStates[keyType];
     
     b32 res = Key->endedDown && Key->transitionHappened;
     
@@ -146,7 +146,7 @@ inline b32 KeyWentDown(Input* input, u32 keyType){
 }
 
 inline b32 KeyWentUp(Input* input, u32 keyType){
-    KeyState* Key = &input->keyStates[keyType];
+    KeyState* Key = &input->KeyStates[keyType];
     
     b32 res = !Key->endedDown && Key->transitionHappened;
     
@@ -157,10 +157,10 @@ inline b32 MouseInRect(Input* input, rc2 rect) {
 	b32 res = 0;
     
 	res =
-		(input->mouseP.x >= rect.min.x) &&
-		(input->mouseP.y >= rect.min.y) &&
-		(input->mouseP.x <= rect.max.x) &&
-		(input->mouseP.y <= rect.max.y);
+		(input->MouseP.x >= rect.min.x) &&
+		(input->MouseP.y >= rect.min.y) &&
+		(input->MouseP.x <= rect.max.x) &&
+		(input->MouseP.y <= rect.max.y);
     
 	return(res);
 }
