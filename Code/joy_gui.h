@@ -158,23 +158,27 @@ struct Gui_Element{
             struct{
                 u32* ref;
                 u32 activeId;
-            } radioGroup;
+            } RadioGroup;
             
             struct {
                 Gui_Layout* ref;
-            } layout;
+            } Layout;
             
             struct {
                 Gui_Page* ref;
-            } page;
+            } Page;
             
             struct {
                 int CaretPos;
-            } inputText;
+            } InputText;
+            
+            struct {
+                v2 OffsetInAnchor;
+            } Anchor;
         };
         
         // NOTE(Dima): is initialized (b32)
-        b32 isInit;
+        b32 IsInit;
     }data;
     
     b32 opened;
@@ -195,6 +199,41 @@ struct Gui_Element{
     int childCount;
 };
 
+
+
+enum Gui_Interaction_Type{
+    GuiInteraction_None,
+    GuiInteraction_Variable,
+    GuiInteraction_Move,
+    GuiInteraction_Resize,
+    GuiInteraction_BoolInRect,
+    GuiInteraction_Empty,
+};
+
+struct Gui_Interaction{
+    u32 ID;
+    Gui_Element* Owner;
+    u32 InteractionType;
+    
+    union{
+        v2 OffsetInAnchor;
+    };
+    
+    b32 WasHotInInteraction;
+    b32 WasActiveInInteraction;
+    
+    Gui_Interaction(u32 InteractionType, Gui_Element* Owner){
+        this->InteractionType = InteractionType;
+        this->Owner = Owner;
+        this->ID = Owner->id;
+        this->WasHotInInteraction = 0;
+        this->WasActiveInInteraction = 0;
+    }
+    
+    virtual void Interact(struct Gui_State* gui) = 0;
+};
+
+
 struct Gui_State{
     Font_Info* mainFont;
     float fontScale;
@@ -203,6 +242,9 @@ struct Gui_State{
     
     Input* input;
     Memory_Region* mem;
+    
+    u32 HotInteraction;
+    u32 ActiveInteraction;
     
     Gui_Page rootPage;
     Gui_Page* currentPage;
@@ -244,22 +286,95 @@ struct Gui_State{
     b32 inPushBlock;
 };
 
-enum Gui_Interaction_Type{
-    GuiInteraction_None,
-    GuiInteraction_Variable,
-    GuiInteraction_Move,
-    GuiInteraction_Resize,
-};
 
-struct Gui_Interaction{
-    u32 ID;
-    u32 InteractionType;
+inline b32 GuiIsHot(Gui_State* gui,
+                    Gui_Interaction* interaction)
+{
+    b32 Result = gui->HotInteraction == interaction->ID;
     
-    virtual void Interact(Gui_State* gui) = 0;
+    return(Result);
+}
+
+inline void GuiSetHot(Gui_State* gui, u32 InteractionID, b32 ToSet){
+    if(ToSet){
+        
+        if(gui->HotInteraction == 0){
+            gui->HotInteraction = InteractionID;
+        }
+    }
+    else{
+        if(gui->HotInteraction == InteractionID){
+            gui->HotInteraction = 0;
+        }
+    }
+}
+
+
+inline b32 GuiIsActive(Gui_State* gui, Gui_Interaction* interaction){
+    b32 Result = gui->ActiveInteraction == interaction->ID;
+    
+    return(Result);
+}
+
+inline void GuiSetActive(Gui_State* gui, Gui_Interaction* interaction){
+    if(GuiIsHot(gui, interaction)){
+        gui->ActiveInteraction = interaction->ID;
+        GuiSetHot(gui, interaction->ID, JOY_FALSE);
+    }
+}
+
+inline void GuiReleaseInteraction(Gui_State* gui, Gui_Interaction* interaction){
+    if(interaction){
+        if(GuiIsActive(gui, interaction)){
+            gui->ActiveInteraction = 0;
+        }
+    }
+}
+
+
+struct Gui_Empty_Interaction : public Gui_Interaction{
+    Gui_Empty_Interaction(Gui_Element* Owner) : Gui_Interaction(GuiInteraction_Empty, Owner)
+    {
+        
+    }
+    
+    virtual void Interact(Gui_State* gui) override {
+        this->WasHotInInteraction = 0;
+        this->WasActiveInInteraction = 0;
+    }
 };
 
-template<typename  t> struct Gui_Variable_Interaction : public Gui_Interaction{
-    t* Variable;
+struct Gui_BoolInRect_Interaction : public Gui_Interaction{
+    b32* Value;
+    rc2 Rect;
+    
+    Gui_BoolInRect_Interaction(b32* Value, rc2 Rect, Gui_Element* Owner) : 
+    Gui_Interaction(GuiInteraction_BoolInRect, Owner) 
+    {
+        this->Value = Value;
+        this->Rect = Rect;
+    }
+    
+    virtual void Interact(Gui_State* gui) override {
+        
+        this->WasHotInInteraction = 0;
+        this->WasActiveInInteraction = 0;
+        
+        if(MouseInRect(gui->input, Rect)){
+            GuiSetHot(gui, this->ID, JOY_TRUE);
+            this->WasHotInInteraction = JOY_TRUE;
+            
+            if(KeyWentDown(gui->input, MouseKey_Left)){
+                GuiSetActive(gui, this);
+                *Value = !*Value;
+                this->WasActiveInInteraction = JOY_TRUE;
+                GuiReleaseInteraction(gui, this);
+            }
+        }
+        else{
+            GuiSetHot(gui, this->ID, JOY_FALSE);
+        }
+    }
 };
 
 enum class Gui_Resize_Interaction_Type{
@@ -274,15 +389,18 @@ struct Gui_Resize_Interaction : public Gui_Interaction{
     v2* DimensionPtr;
 	v2 Position;
 	v2 MinDim;
-	v2 OffsetInAnchor;
     Gui_Resize_Interaction_Type Type;
     
-    Gui_Resize_Interaction(v2 Position, v2* Dimension, Gui_Resize_Interaction_Type Type){
-        this->InteractionType = GuiInteraction_Resize;
-        
-        this->DimensionPtr = DimensionPtr;
+    Gui_Resize_Interaction(v2 Position, 
+                           v2* Dimension,
+                           v2 MinDim,
+                           Gui_Resize_Interaction_Type Type, 
+                           Gui_Element* Owner) : 
+    Gui_Interaction(GuiInteraction_Resize, Owner)
+    {
+        this->DimensionPtr = Dimension;
         this->Type = Type;
-        this->MinDim = V2(0.0f, 0.0f);
+        this->MinDim = MinDim;
         this->OffsetInAnchor = V2(0.0f, 0.0f);
         this->Position = Position;
     }
@@ -340,11 +458,12 @@ enum class Gui_Move_Interaction_Type{
 struct Gui_Move_Interaction : public Gui_Interaction{
     v2* MovePosition;
     Gui_Move_Interaction_Type Type;
-    v2 OffsetInAnchor;
     
-    Gui_Move_Interaction(v2* MovePosition, Gui_Move_Interaction_Type Type){
-        this->InteractionType = GuiInteraction_Move;
-        
+    Gui_Move_Interaction(v2* MovePosition, 
+                         Gui_Move_Interaction_Type Type, 
+                         Gui_Element* Owner) : 
+    Gui_Interaction(GuiInteraction_Move, Owner)
+    {
         this->Type = Type;
         this->OffsetInAnchor = V2(0.0f, 0.0f);
         this->MovePosition = MovePosition;
@@ -361,6 +480,7 @@ struct Gui_Move_Interaction : public Gui_Interaction{
         }
     }
 };
+
 
 
 inline Gui_Element* 
@@ -392,7 +512,7 @@ inline Gui_Layout* GetParentLayout(Gui_State* gui){
         res = &gui->rootLayout;
     }
     else{
-        res = layoutElem->data.layout.ref;
+        res = layoutElem->data.Layout.ref;
     }
     
     return(res);
@@ -539,4 +659,10 @@ void GuiSliderFloat(Gui_State* gui, float* Value, float Min, float Max, char* Na
 
 void GuiTest(Gui_State* gui, float deltaTime);
 
+void GuiAnchor(Gui_State* gui, 
+               char* Name, 
+               v2 Pos, v2 Dim, 
+               b32 Resize,
+               b32 Centered, 
+               v2* RectP, v2* RectDim);
 #endif

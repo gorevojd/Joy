@@ -121,6 +121,10 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(Gui_State* gui,
         at = childSentinel->Next;
         
         u32 id = StringHashFNV(name);
+        u32 InTreeID = id;
+        if(at->parent){
+            InTreeID *= at->parent->id + 7853;
+        }
         
         while(at != childSentinel){
             if(id == at->id){
@@ -371,7 +375,7 @@ void GuiBeginPage(Gui_State* gui, char* name){
                                             GuiElement_Page,
                                             JOY_TRUE);
     // NOTE(Dima): Init references
-    pageElem->data.page.ref = foundPage;
+    pageElem->data.Page.ref = foundPage;
     foundPage->elem = pageElem;
 }
 
@@ -664,7 +668,7 @@ rc2 PrintTextCenteredInRect(Gui_State* gui, char* text, rc2 rect, float scale, v
 
 INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 layoutType, Gui_Element* layoutElem){
     // NOTE(Dima): initializing references
-    layoutElem->data.layout.ref = layout;
+    layoutElem->data.Layout.ref = layout;
     layout->Elem = layoutElem;
     
     v2 popDim;
@@ -674,7 +678,7 @@ INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 lay
     
     // NOTE(Dima): Layout initializing
     layout->Type = layoutType;
-    if(!layoutElem->data.isInit){
+    if(!layoutElem->data.IsInit){
         layout->Start = V2(200.0f, 200.0f) * (gui->layoutCount - 1);
         layout->At = layout->Start;
         
@@ -688,7 +692,7 @@ INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 lay
             }break;
         }
         
-        layoutElem->data.isInit = JOY_TRUE;
+        layoutElem->data.IsInit = JOY_TRUE;
     }
     
     // NOTE(Dima): Initializing initial advance ctx
@@ -697,6 +701,27 @@ INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 lay
     layout->AdvanceRememberStack[0].baseline = layout->Start.x;
     
     if(layoutType == GuiLayout_Window){
+        
+#if 1    
+        
+        GuiAnchor(gui, "Anchor1", 
+                  layout->Start + layout->Dim,
+                  V2(10, 10),
+                  JOY_TRUE,
+                  JOY_TRUE,
+                  &layout->Start,
+                  &layout->Dim);
+        
+        GuiAnchor(gui, "Anchor2", 
+                  layout->Start,
+                  V2(10, 10),
+                  JOY_FALSE,
+                  JOY_TRUE,
+                  &layout->Start,
+                  &layout->Dim);
+        
+#endif
+        
         rc2 windowRc = RcMinDim(layout->Start, layout->Dim);
         PushRect(gui->stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
         
@@ -1185,11 +1210,105 @@ void GuiTooltip(Gui_State* gui, char* tooltipText, v2 at){
     ttip->at = at;
 }
 
+void GuiAnchor(Gui_State* gui, 
+               char* Name, 
+               v2 Pos, v2 Dim, 
+               b32 Resize,
+               b32 Centered, 
+               v2* RectP, v2* RectDim)
+{
+    Gui_Element* elem = GuiBeginElement(gui, Name, GuiElement_Item, JOY_FALSE);
+    Gui_Layout* layout = GetParentLayout(gui);
+    
+    if(GuiElementOpenedInTree(elem) && 
+       PotentiallyVisibleSmall(layout))
+    {
+        v2 MinP;
+        if(Centered){
+            MinP = Pos - Dim * 0.5f;
+        }
+        else{
+            MinP = Pos;
+        }
+        
+        rc2 WorkRect = RcMinDim(MinP, Dim);
+        
+        v4 WorkColor = GUI_GETCOLOR_COLSYS(Color_Orange);
+        
+        v2 MouseP = gui->input->MouseP;
+        
+        if(!elem->data.IsInit){
+            
+            elem->data.Anchor.OffsetInAnchor = {};
+            
+            elem->data.IsInit = JOY_TRUE;
+        }
+        v2* OffsetInAnchor = &elem->data.Anchor.OffsetInAnchor;
+        
+        Gui_Interaction* interaction = 0;
+        if(Resize){
+            Gui_Resize_Interaction ResizeInteraction(*RectP,
+                                                     RectDim,
+                                                     V2(50, 50),
+                                                     Gui_Resize_Interaction_Type::Default,
+                                                     elem);
+            interaction = &ResizeInteraction;
+        }
+        else{
+            Gui_Move_Interaction MoveInteraction(RectP,
+                                                 Gui_Move_Interaction_Type::Move,
+                                                 elem);
+            
+            interaction = &MoveInteraction;
+        }
+        
+        
+        if(MouseInRect(gui->input, WorkRect)){
+            GuiSetHot(gui, interaction->ID, JOY_TRUE);
+            
+            if(KeyWentDown(gui->input, MouseKey_Left)){
+                GuiSetActive(gui, interaction);
+                
+                *OffsetInAnchor = MouseP - Pos;
+            }
+        }
+        else{
+            GuiSetHot(gui, interaction->ID, JOY_FALSE);
+        }
+        
+        if(KeyWentUp(gui->input, MouseKey_Left)){
+            GuiReleaseInteraction(gui, interaction);
+            
+            *OffsetInAnchor = {};
+        }
+        
+        v4 AnchorColor = GUI_GETCOLOR_COLSYS(Color_Orange);
+        
+        if(GuiIsActive(gui, interaction)){
+            MouseP = MouseP - *OffsetInAnchor;
+            
+            ASSERT((interaction->InteractionType == GuiInteraction_Move) || 
+                   (interaction->InteractionType == GuiInteraction_Resize));
+            
+            interaction->OffsetInAnchor = *OffsetInAnchor;
+            
+            interaction->Interact(gui);
+            
+            AnchorColor = GUI_GETCOLOR_COLSYS(Color_Blue);
+        }
+        
+        PushRect(gui->stack, WorkRect, AnchorColor);
+    }
+    
+    GuiEndElement(gui, GuiElement_Item);
+}
 
 void GuiBeginTree(Gui_State* gui, char* name){
     Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_Item, JOY_FALSE);
+    Gui_Layout* layout = GetParentLayout(gui);
     
-    if(GuiElementOpenedInTree(elem)){
+    if(GuiElementOpenedInTree(elem) && PotentiallyVisibleSmall(layout))
+    {
         Gui_Layout* layout = GetParentLayout(gui);
         
         GuiPreAdvance(gui, layout);
@@ -1204,12 +1323,21 @@ void GuiBeginTree(Gui_State* gui, char* name){
             GuiPushBut(gui, textRc, PushBut_Outline, oulineColor);
         }
         
+        Gui_Empty_Interaction Interaction(elem);
+        
         if(MouseInRect(gui->input, textRc)){
+            GuiSetHot(gui, Interaction.ID, JOY_TRUE);
             textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
             if(KeyWentDown(gui->input, MouseKey_Left)){
+                GuiSetActive(gui, &Interaction);
+                GuiReleaseInteraction(gui, &Interaction);
+                
                 elem->opened = !elem->opened;
             }
+        }
+        else{
+            GuiSetHot(gui, Interaction.ID, JOY_FALSE);
         }
         PrintText(gui, name, layout->At, textColor);
         
@@ -1254,12 +1382,21 @@ b32 GuiButton(Gui_State* gui, char* buttonName){
         
         // NOTE(Dima): Event processing
         v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
+        
+        Gui_Empty_Interaction Interaction(elem);
+        
         if(MouseInRect(gui->input, textRc)){
+            GuiSetHot(gui, Interaction.ID, JOY_TRUE);
             textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
             if(KeyWentDown(gui->input, MouseKey_Left)){
+                GuiSetActive(gui, &Interaction);
+                GuiReleaseInteraction(gui, &Interaction);
                 result = 1;
             }
+        }
+        else{
+            GuiSetHot(gui, Interaction.ID, JOY_FALSE);
         }
         
         PrintTextCenteredInRect(gui, buttonName, textRc, 1.0f, textColor);
@@ -1293,12 +1430,11 @@ void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value){
                 textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundDisabled);
             }
             
-            if(MouseInRect(gui->input, textRc)){
+            Gui_BoolInRect_Interaction Interaction(value, textRc, elem);
+            Interaction.Interact(gui);
+            
+            if(Interaction.WasHotInInteraction){
                 textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
-                
-                if(KeyWentDown(gui->input, MouseKey_Left)){
-                    *value = !*value;
-                }
             }
         }
         
@@ -1306,6 +1442,7 @@ void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value){
         
         GuiPostAdvance(gui, layout, textRc);
     }
+    
     GuiEndElement(gui, GuiElement_Item);
 }
 
@@ -1342,12 +1479,11 @@ void GuiBoolButtonOnOff(Gui_State* gui, char* buttonName, b32* value){
                 CopyStrings(buttonText, "OFF");
             }
             
-            if(MouseInRect(gui->input, butRc)){
+            Gui_BoolInRect_Interaction Interaction(value, butRc, elem);
+            Interaction.Interact(gui);
+            
+            if(Interaction.WasHotInInteraction){
                 buttonTextC = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
-                
-                if(KeyWentDown(gui->input, MouseKey_Left)){
-                    *value = !*value;
-                }
             }
         }
         
@@ -1379,12 +1515,12 @@ void GuiCheckbox(Gui_State* gui, char* name, b32* value){
         // NOTE(Dima): Event processing
         v4 backC = GUI_GETCOLOR(GuiColor_ButtonBackground);
         if(value){
-            if(MouseInRect(gui->input, chkRect)){
+            
+            Gui_BoolInRect_Interaction Interaction(value, chkRect, elem);
+            Interaction.Interact(gui);
+            
+            if(Interaction.WasHotInInteraction){
                 backC = GUI_GETCOLOR(GuiColor_ButtonBackgroundHot);
-                
-                if(KeyWentDown(gui->input, MouseKey_Left)){
-                    *value = !*value;
-                }
             }
         }
         
@@ -1408,6 +1544,7 @@ void GuiCheckbox(Gui_State* gui, char* name, b32* value){
         rc2 advanceRect = GetBoundingRect(chkRect, nameRc);
         GuiPostAdvance(gui, layout, advanceRect);
     }
+    
     GuiEndElement(gui, GuiElement_Item);
 }
 
@@ -1422,11 +1559,11 @@ u32 defaultId)
                                            GuiElement_RadioGroup, 
                                            JOY_TRUE);
     
-    if (!element->data.isInit) {
-        element->data.radioGroup.activeId = defaultId;
-        element->data.radioGroup.ref = ref;
+    if (!element->data.IsInit) {
+        element->data.RadioGroup.activeId = defaultId;
+        element->data.RadioGroup.ref = ref;
         
-        element->data.isInit = 1;
+        element->data.IsInit = 1;
     }
 }
 
@@ -1447,6 +1584,7 @@ GuiFindRadioGroupParent(Gui_Element* curElement) {
     return(result);
 }
 
+
 void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId) {
     Gui_Element* radioBut = GuiBeginElement(gui, name, GuiElement_Item, JOY_TRUE);
     Gui_Element* radioGroup = GuiFindRadioGroupParent(gui->curElement);
@@ -1457,7 +1595,7 @@ void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId) {
         PotentiallyVisibleSmall(layout)) 
     {
         b32 isActive = 0;
-        if (radioGroup->data.radioGroup.activeId == uniqueId) {
+        if (radioGroup->data.RadioGroup.activeId == uniqueId) {
             isActive = 1;
         }
         
@@ -1479,16 +1617,24 @@ void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId) {
             textC = GUI_GETCOLOR(GuiColor_ButtonForegroundDisabled);
         }
         
+        Gui_Empty_Interaction Interaction(radioBut);
         if (MouseInRect(gui->input, textRc)) {
+            GuiSetHot(gui, Interaction.ID, JOY_TRUE);
             textC = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
             if (KeyWentDown(gui->input, MouseKey_Left)) {
+                GuiSetActive(gui, &Interaction);
                 
-                if(radioGroup->data.radioGroup.ref){
-                    *radioGroup->data.radioGroup.ref = uniqueId;
+                if(radioGroup->data.RadioGroup.ref){
+                    *radioGroup->data.RadioGroup.ref = uniqueId;
                 }
-                radioGroup->data.radioGroup.activeId = uniqueId;
+                radioGroup->data.RadioGroup.activeId = uniqueId;
+                
+                GuiReleaseInteraction(gui, &Interaction);
             }
+        }
+        else{
+            GuiSetHot(gui, Interaction.ID, JOY_FALSE);
         }
         
         PrintTextCenteredInRect(gui, name, textRc, 1.0f, textC);
@@ -1552,70 +1698,95 @@ void GuiInputText(Gui_State* gui, char* name, char* Buf, int BufSize){
         textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 3.0f));
         GuiPushBut(gui, textRc, PushBut_AlphaBlack);
         
-        int* CaretP = &elem->data.inputText.CaretPos;
+        int* CaretP = &elem->data.InputText.CaretPos;
         
-        char FrameInputProcessed[32];
-        int FrameInputProcessedAt = 0;
-        FrameInputProcessed[0] = 0;
+        Gui_Empty_Interaction Interaction(elem);
         
-        for(int i = 0; i < gui->input->FrameInputLen; i++){
-            char AtChar = gui->input->FrameInput[i];
-            if(AtChar >= ' ' && AtChar <= '~'){
-                FrameInputProcessed[FrameInputProcessedAt++] = AtChar;
-                FrameInputProcessed[FrameInputProcessedAt] = 0;
+        if(MouseInRect(gui->input, textRc)){
+            GuiSetHot(gui, Interaction.ID, JOY_TRUE);
+            
+            if(KeyWentDown(gui->input, MouseKey_Left)){
+                GuiSetActive(gui, &Interaction);
             }
         }
-        
-        char TmpBuf[256];
-        *CaretP += 
-            InsertStringToString(Buf, TmpBuf, BufSize, 
-                                 *CaretP, 
-                                 FrameInputProcessed);
-        
-        if(KeyIsDown(gui->input, Key_Left)){
-            if(KeyIsDown(gui->input, Key_Control)){
-                for(int i = 0; i < gui->input->KeyStates[Key_Left].RepeatCount; i++){
-                    int FoundIndex = FindSkipPrev(Buf, *CaretP);
-                    *CaretP = FoundIndex;
-                }
+        else{
+            if(KeyWentDown(gui->input, MouseKey_Left) ||
+               KeyWentDown(gui->input, MouseKey_Right))
+            {
+                GuiReleaseInteraction(gui, &Interaction);
             }
-            else{
-                for(int i = 0; i < gui->input->KeyStates[Key_Left].RepeatCount; i++){
-                    *CaretP = *CaretP - 1;
-                }
-            }
+            
+            GuiSetHot(gui, Interaction.ID, JOY_FALSE);
         }
         
-        if(KeyIsDown(gui->input, Key_Right)){
-            if(KeyIsDown(gui->input, Key_Control)){
-                for(int i = 0; i < gui->input->KeyStates[Key_Right].RepeatCount; i++){
-                    int FoundIndex = FindSkipNext(Buf, *CaretP);
-                    *CaretP = FoundIndex;
+        if(GuiIsActive(gui, &Interaction)){
+            
+            char FrameInputProcessed[32];
+            int FrameInputProcessedAt = 0;
+            FrameInputProcessed[0] = 0;
+            
+            for(int i = 0; i < gui->input->FrameInputLen; i++){
+                char AtChar = gui->input->FrameInput[i];
+                if(AtChar >= ' ' && AtChar <= '~'){
+                    FrameInputProcessed[FrameInputProcessedAt++] = AtChar;
+                    FrameInputProcessed[FrameInputProcessedAt] = 0;
                 }
             }
-            else{
-                for(int i = 0; i < gui->input->KeyStates[Key_Right].RepeatCount; i++){
-                    *CaretP = *CaretP + 1;
+            
+            char TmpBuf[256];
+            *CaretP += 
+                InsertStringToString(Buf, TmpBuf, BufSize, 
+                                     *CaretP, 
+                                     FrameInputProcessed);
+            
+            if(KeyIsDown(gui->input, Key_Left)){
+                if(KeyIsDown(gui->input, Key_Control)){
+                    for(int i = 0; i < gui->input->KeyStates[Key_Left].RepeatCount; i++){
+                        int FoundIndex = FindSkipPrev(Buf, *CaretP);
+                        *CaretP = FoundIndex;
+                    }
+                }
+                else{
+                    for(int i = 0; i < gui->input->KeyStates[Key_Left].RepeatCount; i++){
+                        *CaretP = *CaretP - 1;
+                    }
                 }
             }
-        }
-        
-        if(KeyWentDown(gui->input, Key_Backspace)){
-            if(KeyIsDown(gui->input, Key_Control)){
-                *CaretP += EraseToNonLetterPrev(Buf, *CaretP);
+            
+            if(KeyIsDown(gui->input, Key_Right)){
+                if(KeyIsDown(gui->input, Key_Control)){
+                    for(int i = 0; i < gui->input->KeyStates[Key_Right].RepeatCount; i++){
+                        int FoundIndex = FindSkipNext(Buf, *CaretP);
+                        *CaretP = FoundIndex;
+                    }
+                }
+                else{
+                    for(int i = 0; i < gui->input->KeyStates[Key_Right].RepeatCount; i++){
+                        *CaretP = *CaretP + 1;
+                    }
+                }
             }
-            else{
-                *CaretP += ErasePrevCharFromString(Buf, *CaretP);
+            
+            if(KeyWentDown(gui->input, Key_Backspace)){
+                if(KeyIsDown(gui->input, Key_Control)){
+                    *CaretP += EraseToNonLetterPrev(Buf, *CaretP);
+                }
+                else{
+                    *CaretP += ErasePrevCharFromString(Buf, *CaretP);
+                }
             }
-        }
-        
-        if(KeyWentDown(gui->input, Key_Delete)){
-            if(KeyIsDown(gui->input, Key_Control)){
-                
+            
+            if(KeyWentDown(gui->input, Key_Delete)){
+                if(KeyIsDown(gui->input, Key_Control)){
+                    
+                }
+                else{
+                    *CaretP += EraseNextCharFromString(Buf, *CaretP);
+                }
             }
-            else{
-                *CaretP += EraseNextCharFromString(Buf, *CaretP);
-            }
+            
+            v4 oulineColor = GUI_GETCOLOR_COLSYS(Color_Red);
+            GuiPushBut(gui, textRc, PushBut_Outline, oulineColor);
         }
         
         *CaretP = Max(0, *CaretP);
