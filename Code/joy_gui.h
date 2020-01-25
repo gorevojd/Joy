@@ -42,6 +42,9 @@ enum GuiColorType{
     GuiColor_HotText,
     GuiColor_Borders,
     
+    GuiColor_Hot,
+    GuiColor_Active,
+    
     GuiColor_ButtonBackground,
     GuiColor_ButtonBackgroundHot,
     GuiColor_ButtonForeground,
@@ -120,6 +123,7 @@ enum GuiWindowSnapType{
     GuiWindowSnap_Top,
     GuiWindowSnap_Bottom,
     GuiWindowSnap_Whole,
+    GuiWindowSnap_CenterHalf,
 };
 
 #define GUI_TOOLTIP_MAX_SIZE 256

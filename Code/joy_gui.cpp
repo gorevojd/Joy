@@ -468,6 +468,9 @@ int height)
     gui->colors[GuiColor_HotText] = GUI_GETCOLOR_COLSYS(Color_Yellow);
     gui->colors[GuiColor_Borders] = GUI_GETCOLOR_COLSYS(Color_Black);
     
+    gui->colors[GuiColor_Hot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
+    gui->colors[GuiColor_Active] = GUI_GETCOLOR_COLSYS(Color_Red);
+    
     gui->colors[GuiColor_ButtonBackground] = GUI_COLORHEX("#337733");
     gui->colors[GuiColor_ButtonBackgroundHot] = GUI_GETCOLOR_COLSYS(Color_Cyan);
     gui->colors[GuiColor_ButtonForeground] = GUI_GETCOLOR_COLSYS(Color_White);
@@ -666,115 +669,6 @@ rc2 PrintTextCenteredInRect(Gui_State* gui, char* text, rc2 rect, float scale, v
     return(result);
 }
 
-INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 layoutType, Gui_Element* layoutElem){
-    // NOTE(Dima): initializing references
-    layoutElem->data.Layout.ref = layout;
-    layout->Elem = layoutElem;
-    
-    v2 popDim;
-    if(!GuiPopDim(gui, &popDim)){
-        popDim = V2(640, 480);
-    }
-    
-    // NOTE(Dima): Layout initializing
-    layout->Type = layoutType;
-    if(!layoutElem->data.IsInit){
-        layout->Start = V2(200.0f, 200.0f) * (gui->layoutCount - 1);
-        layout->At = layout->Start;
-        
-        switch(layoutType){
-            case GuiLayout_Layout:{
-                layout->Dim = V2(gui->width, gui->height);
-            }break;
-            
-            case GuiLayout_Window:{
-                layout->Dim = popDim;
-            }break;
-        }
-        
-        layoutElem->data.IsInit = JOY_TRUE;
-    }
-    
-    // NOTE(Dima): Initializing initial advance ctx
-    layout->AdvanceRememberStack[0].type = GuiAdvanceType_Column;
-    layout->AdvanceRememberStack[0].rememberValue = layout->Start.y;
-    layout->AdvanceRememberStack[0].baseline = layout->Start.x;
-    
-    if(layoutType == GuiLayout_Window){
-        
-#if 1    
-        
-        GuiAnchor(gui, "Anchor1", 
-                  layout->Start + layout->Dim,
-                  V2(10, 10),
-                  JOY_TRUE,
-                  JOY_TRUE,
-                  &layout->Start,
-                  &layout->Dim);
-        
-        GuiAnchor(gui, "Anchor2", 
-                  layout->Start,
-                  V2(10, 10),
-                  JOY_FALSE,
-                  JOY_TRUE,
-                  &layout->Start,
-                  &layout->Dim);
-        
-#endif
-        
-        rc2 windowRc = RcMinDim(layout->Start, layout->Dim);
-        PushRect(gui->stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
-        
-        v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
-        if(MouseInRect(gui->input, windowRc)){
-            outlineColor = GUI_GETCOLOR(GuiColor_WindowBorderHot);
-        }
-        
-        // NOTE(Dima): Pushing inner outline
-        PushRectOutline(gui->stack, windowRc, 2, outlineColor);
-    }
-}
-
-void GuiBeginLayout(Gui_State* gui, char* name, u32 layoutType){
-    // NOTE(Dima): In list inserting
-    u32 nameID = StringHashFNV(name);
-    
-    Gui_Layout* foundLayout = 0;
-    Gui_Layout* layoutAt = gui->rootLayout.Next;
-    for(layoutAt; layoutAt != &gui->rootLayout; layoutAt = layoutAt->Next){
-        if(nameID == layoutAt->ID){
-            foundLayout = layoutAt;
-            break;
-        }
-    }
-    
-    if(!foundLayout){
-        foundLayout = PushStruct(gui->mem, Gui_Layout);
-        
-        CopyStrings(foundLayout->Name, sizeof(foundLayout->Name), name);
-        foundLayout->ID = nameID;
-        
-        foundLayout->Next = gui->rootLayout.Next;
-        foundLayout->Prev = &gui->rootLayout;
-        foundLayout->Next->Prev = foundLayout;
-        foundLayout->Prev->Next = foundLayout;
-        
-        ++gui->layoutCount;
-    }
-    
-    // NOTE(Dima): Beginnning layout elem
-    Gui_Element* layoutElem = GuiBeginElement(gui, name, GuiElement_Layout, JOY_TRUE);
-    
-    GuiInitLayout(gui, foundLayout, layoutType, layoutElem);
-}
-
-void GuiEndLayout(Gui_State* gui){
-    Gui_Layout* lay = GetParentLayout(gui);
-    
-    lay->At = lay->Start;
-    
-    GuiEndElement(gui, GuiElement_Layout);
-}
 
 struct GuiSnapInWindowResult{
     union{
@@ -825,12 +719,186 @@ GuiSnapInWindowResult GuiSnapInWindowRect(rc2 WindowRect, u32 SnapType){
             result.restRect = {};
         }break;
         
+        case GuiWindowSnap_CenterHalf:{
+            result.result = RcMinDim(Min + WindowHalfDim * 0.5f, WindowHalfDim);
+        }break;
+        
         default:{
             INVALID_CODE_PATH;
         }break;
     }
     
     return(result);
+}
+
+inline void GuiSnapInWindowRect(Gui_State* gui, v2* P, v2* Dim, u32 SnapType){
+    rc2 WindowRc = RcMinDim(V2(0.0f, 0.0f), V2(gui->width, gui->height));
+    GuiSnapInWindowResult Res = GuiSnapInWindowRect(WindowRc, SnapType);
+    
+    v2 ResultP = Res.result.min;
+    v2 ResultDim = GetRectDim(Res.result);
+    
+    if(P){
+        *P = ResultP;
+    }
+    
+    if(Dim){
+        *Dim = ResultDim;
+    }
+}
+
+INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 layoutType, Gui_Element* layoutElem){
+    // NOTE(Dima): initializing references
+    layoutElem->data.Layout.ref = layout;
+    layout->Elem = layoutElem;
+    
+    v2 popDim;
+    if(!GuiPopDim(gui, &popDim)){
+        popDim = V2(640, 480);
+    }
+    
+    // NOTE(Dima): Layout initializing
+    layout->Type = layoutType;
+    if(!layoutElem->data.IsInit){
+        layout->Start = V2(200.0f, 200.0f) * (gui->layoutCount - 1);
+        layout->At = layout->Start;
+        
+        switch(layoutType){
+            case GuiLayout_Layout:{
+                layout->Dim = V2(gui->width, gui->height);
+            }break;
+            
+            case GuiLayout_Window:{
+                layout->Dim = popDim;
+            }break;
+        }
+        
+        layoutElem->data.IsInit = JOY_TRUE;
+    }
+    
+    // NOTE(Dima): Initializing initial advance ctx
+    layout->AdvanceRememberStack[0].type = GuiAdvanceType_Column;
+    layout->AdvanceRememberStack[0].rememberValue = layout->Start.y;
+    layout->AdvanceRememberStack[0].baseline = layout->Start.x;
+    
+    if(layoutType == GuiLayout_Window){
+        
+        Gui_Empty_Interaction Interaction(layoutElem);
+        
+#if 1    
+        
+        GuiAnchor(gui, "Anchor1", 
+                  layout->Start + layout->Dim,
+                  V2(10, 10),
+                  JOY_TRUE,
+                  JOY_TRUE,
+                  &layout->Start,
+                  &layout->Dim);
+        
+        GuiAnchor(gui, "Anchor2", 
+                  layout->Start,
+                  V2(10, 10),
+                  JOY_FALSE,
+                  JOY_TRUE,
+                  &layout->Start,
+                  &layout->Dim);
+        
+#endif
+        
+        rc2 windowRc = RcMinDim(layout->Start, layout->Dim);
+        PushRect(gui->stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
+        
+        v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
+        if(MouseInRect(gui->input, windowRc)){
+            GuiSetHot(gui, Interaction.ID, JOY_TRUE);
+            if(GuiIsHot(gui, &Interaction)){
+                outlineColor = GUI_GETCOLOR(GuiColor_Hot);
+            }
+            
+            if(KeyWentDown(gui->input, MouseKey_Left)){
+                GuiSetActive(gui, &Interaction);
+            }
+            
+        }
+        else{
+            
+            if(KeyWentDown(gui->input, MouseKey_Left) ||
+               KeyWentDown(gui->input, MouseKey_Right))
+            {
+                GuiReleaseInteraction(gui, &Interaction);
+            }
+            
+            GuiSetHot(gui, Interaction.ID, JOY_FALSE);
+        }
+        
+        if(GuiIsActive(gui, &Interaction)){
+            outlineColor = GUI_GETCOLOR(GuiColor_Active);
+            
+            if(KeyWentDown(gui->input, Key_Left)){
+                GuiSnapInWindowRect(gui, &layout->Start, &layout->Dim, GuiWindowSnap_Left);
+            }
+            
+            if(KeyWentDown(gui->input, Key_Right)){
+                GuiSnapInWindowRect(gui, &layout->Start, &layout->Dim, GuiWindowSnap_Right);
+            }
+            
+            if(KeyWentDown(gui->input, Key_Up)){
+                GuiSnapInWindowRect(gui, &layout->Start, &layout->Dim, GuiWindowSnap_Top);
+            }
+            
+            if(KeyWentDown(gui->input, Key_Down)){
+                GuiSnapInWindowRect(gui, &layout->Start, &layout->Dim, GuiWindowSnap_Bottom);
+            }
+            
+            if(KeyWentDown(gui->input, MouseKey_Right)){
+                GuiSnapInWindowRect(gui, &layout->Start, &layout->Dim, GuiWindowSnap_CenterHalf);
+            }
+        }
+        
+        // NOTE(Dima): Pushing inner outline
+        PushRectOutline(gui->stack, windowRc, 2, outlineColor);
+    }
+}
+
+void GuiBeginLayout(Gui_State* gui, char* name, u32 layoutType){
+    // NOTE(Dima): In list inserting
+    u32 nameID = StringHashFNV(name);
+    
+    Gui_Layout* foundLayout = 0;
+    Gui_Layout* layoutAt = gui->rootLayout.Next;
+    for(layoutAt; layoutAt != &gui->rootLayout; layoutAt = layoutAt->Next){
+        if(nameID == layoutAt->ID){
+            foundLayout = layoutAt;
+            break;
+        }
+    }
+    
+    if(!foundLayout){
+        foundLayout = PushStruct(gui->mem, Gui_Layout);
+        
+        CopyStrings(foundLayout->Name, sizeof(foundLayout->Name), name);
+        foundLayout->ID = nameID;
+        
+        foundLayout->Next = gui->rootLayout.Next;
+        foundLayout->Prev = &gui->rootLayout;
+        foundLayout->Next->Prev = foundLayout;
+        foundLayout->Prev->Next = foundLayout;
+        
+        ++gui->layoutCount;
+    }
+    
+    // NOTE(Dima): Beginnning layout elem
+    Gui_Element* layoutElem = GuiBeginElement(gui, name, GuiElement_Layout, JOY_TRUE);
+    
+    GuiInitLayout(gui, foundLayout, layoutType, layoutElem);
+}
+
+void GuiEndLayout(Gui_State* gui){
+    Gui_Layout* lay = GetParentLayout(gui);
+    
+    lay->At = lay->Start;
+    
+    GuiEndElement(gui, GuiElement_Layout);
 }
 
 INTERNAL_FUNCTION void GuiSplitWindow(Gui_State* gui, 
