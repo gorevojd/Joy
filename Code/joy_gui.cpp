@@ -1835,21 +1835,30 @@ void GuiInputText(Gui_State* gui, char* name, char* Buf, int BufSize){
                 }
             }
             
-            if(KeyWentDown(gui->input, Key_Backspace)){
+            if(KeyIsDown(gui->input, Key_Backspace)){
                 if(KeyIsDown(gui->input, Key_Control)){
-                    *CaretP += EraseToNonLetterPrev(Buf, *CaretP);
+                    for(int i = 0; i < gui->input->KeyStates[Key_Backspace].RepeatCount; i++){
+                        *CaretP += EraseToNonLetterPrev(Buf, *CaretP);
+                    }
                 }
                 else{
-                    *CaretP += ErasePrevCharFromString(Buf, *CaretP);
+                    for(int i = 0; i < gui->input->KeyStates[Key_Backspace].RepeatCount; i++){
+                        *CaretP += ErasePrevCharFromString(Buf, *CaretP);
+                    }
                 }
             }
             
-            if(KeyWentDown(gui->input, Key_Delete)){
+            
+            if(KeyIsDown(gui->input, Key_Delete)){
                 if(KeyIsDown(gui->input, Key_Control)){
-                    
+                    for(int i = 0; i < gui->input->KeyStates[Key_Backspace].RepeatCount; i++){
+                        //f***CaretP += EraseToNonLetterNext(Buf, *CaretP);
+                    }
                 }
                 else{
-                    *CaretP += EraseNextCharFromString(Buf, *CaretP);
+                    for(int i = 0; i < gui->input->KeyStates[Key_Backspace].RepeatCount; i++){
+                        *CaretP += EraseNextCharFromString(Buf, *CaretP);
+                    }
                 }
             }
             
