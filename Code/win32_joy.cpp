@@ -1417,101 +1417,103 @@ Win32ProcessMessages(Input* input){
                 
                 //NOTE(dima): If state of key was changed
                 u32 keyType = 0xFFFFFFFF;
+                
+                switch(vKey){
+                    case VK_LBUTTON: { keyType = KeyMouse_Left; }break;
+                    case VK_RBUTTON: { keyType = KeyMouse_Right; }break;
+                    case VK_MBUTTON: { keyType = KeyMouse_Middle; }break;
+                    case VK_XBUTTON1: { keyType = KeyMouse_X1; }break;
+                    case VK_XBUTTON2: { keyType = KeyMouse_X2; }break;
+                    case VK_LEFT: { keyType = Key_Left; }break;
+                    case VK_RIGHT: { keyType = Key_Right; }break;
+                    case VK_UP: { keyType = Key_Up; }break;
+                    case VK_DOWN: { keyType = Key_Down; }break;
+                    case VK_BACK: { keyType = Key_Backspace; }break;
+                    case VK_TAB: { keyType = Key_Tab; }break;
+                    case VK_RETURN: { keyType = Key_Return; }break;
+                    case VK_SHIFT: { keyType = Key_Shift; }break;
+                    case VK_CONTROL: { keyType = Key_Control; }break;
+                    case VK_ESCAPE: { keyType= Key_Escape; }break;
+                    case VK_SPACE: { keyType = Key_Space; }break;
+                    case VK_HOME: { keyType = Key_Home; }break;
+                    case VK_END: { keyType = Key_End; }break;
+                    case VK_INSERT: { keyType = Key_Insert; }break;
+                    case VK_DELETE: { keyType = Key_Delete; }break;
+                    case VK_HELP: { keyType = Key_Help; }break;
+                    
+                    case 0x30:{ keyType = Key_0; }break;
+                    case 0x31:{ keyType = Key_1; }break;
+                    case 0x32:{ keyType = Key_2; }break;
+                    case 0x33:{ keyType = Key_3; }break;
+                    case 0x34:{ keyType = Key_4; }break;
+                    case 0x35:{ keyType = Key_5; }break;
+                    case 0x36:{ keyType = Key_6; }break;
+                    case 0x37:{ keyType = Key_7; }break;
+                    case 0x38:{ keyType = Key_8; }break;
+                    case 0x39:{ keyType = Key_9; }
+                    
+                    case 'A':{ keyType = Key_A; }break;
+                    case 'B':{ keyType = Key_B; }break;
+                    case 'C':{ keyType = Key_C; }break;
+                    case 'D':{ keyType = Key_D; }break;
+                    case 'E':{ keyType = Key_E; }break;
+                    case 'F':{ keyType = Key_F; }break;
+                    case 'G':{ keyType = Key_G; }break;
+                    case 'H':{ keyType = Key_H; }break;
+                    case 'I':{ keyType = Key_I; }break;
+                    case 'J':{ keyType = Key_J; }break;
+                    case 'K':{ keyType = Key_K; }break;
+                    case 'L':{ keyType = Key_L; }break;
+                    case 'M':{ keyType = Key_M; }break;
+                    case 'N':{ keyType = Key_N; }break;
+                    case 'O':{ keyType = Key_O; }break;
+                    case 'P':{ keyType = Key_P; }break;
+                    case 'Q':{ keyType = Key_Q; }break;
+                    case 'R':{ keyType = Key_R; }break;
+                    case 'S':{ keyType = Key_S; }break;
+                    case 'T':{ keyType = Key_T; }break;
+                    case 'U':{ keyType = Key_U; }break;
+                    case 'V':{ keyType = Key_V; }break;
+                    case 'W':{ keyType = Key_W; }break;
+                    case 'X':{ keyType = Key_X; }break;
+                    case 'Y':{ keyType = Key_Y; }break;
+                    case 'Z':{ keyType = Key_Z; }break;
+                    
+                    case VK_NUMPAD0: { keyType = Key_Num0; }break;
+                    case VK_NUMPAD1: { keyType = Key_Num1; }break;
+                    case VK_NUMPAD2: { keyType = Key_Num2; }break;
+                    case VK_NUMPAD3: { keyType = Key_Num3; }break;
+                    case VK_NUMPAD4: { keyType = Key_Num4; }break;
+                    case VK_NUMPAD5: { keyType = Key_Num5; }break;
+                    case VK_NUMPAD6: { keyType = Key_Num6; }break;
+                    case VK_NUMPAD7: { keyType = Key_Num7; }break;
+                    case VK_NUMPAD8: { keyType = Key_Num8; }break;
+                    case VK_NUMPAD9: { keyType = Key_Num9; }break;
+                    case VK_MULTIPLY: { keyType = Key_Multiply; }break;
+                    case VK_ADD: { keyType = Key_Add; }break;
+                    case VK_DIVIDE: { keyType = Key_Divide; }break;
+                    case VK_SUBTRACT: { keyType = Key_Subtract; }break;
+                    case VK_SEPARATOR: { keyType = Key_Separator; }break;
+                    case VK_DECIMAL: { keyType = Key_Decimal; }break;
+                    case VK_F1: {  keyType = Key_F1; }break;
+                    case VK_F2: {  keyType = Key_F2; }break;
+                    case VK_F3: {  keyType = Key_F3; }break;
+                    case VK_F4: {  keyType = Key_F4; }break;
+                    case VK_F5: {  keyType = Key_F5; }break;
+                    case VK_F6: {  keyType = Key_F6; }break;
+                    case VK_F7: {  keyType = Key_F7; }break;
+                    case VK_F8: {  keyType = Key_F8; }break;
+                    case VK_F9: {  keyType = Key_F9; }break;
+                    case VK_F10: {  keyType = Key_F10; }break;
+                    case VK_F11: {  keyType = Key_F11; }break;
+                    case VK_F12: {  keyType = Key_F12; }break;
+                    case VK_VOLUME_MUTE: { keyType = Key_VolumeMute; }break;
+                    case VK_VOLUME_UP: { keyType = Key_VolumeUp; }break;
+                    case VK_VOLUME_DOWN: { keyType = Key_VolumeDown; }break;
+                    default: {}break;
+                }
+                
                 if(wasDown != isDown){
-                    switch(vKey){
-                        case VK_LBUTTON: { keyType = KeyMouse_Left; }break;
-                        case VK_RBUTTON: { keyType = KeyMouse_Right; }break;
-                        case VK_MBUTTON: { keyType = KeyMouse_Middle; }break;
-                        case VK_XBUTTON1: { keyType = KeyMouse_X1; }break;
-                        case VK_XBUTTON2: { keyType = KeyMouse_X2; }break;
-                        case VK_LEFT: { keyType = Key_Left; }break;
-                        case VK_RIGHT: { keyType = Key_Right; }break;
-                        case VK_UP: { keyType = Key_Up; }break;
-                        case VK_DOWN: { keyType = Key_Down; }break;
-                        case VK_BACK: { keyType = Key_Backspace; }break;
-                        case VK_TAB: { keyType = Key_Tab; }break;
-                        case VK_RETURN: { keyType = Key_Return; }break;
-                        case VK_SHIFT: { keyType = Key_Shift; }break;
-                        case VK_CONTROL: { keyType = Key_Control; }break;
-                        case VK_ESCAPE: { keyType= Key_Escape; }break;
-                        case VK_SPACE: { keyType = Key_Space; }break;
-                        case VK_HOME: { keyType = Key_Home; }break;
-                        case VK_END: { keyType = Key_End; }break;
-                        case VK_INSERT: { keyType = Key_Insert; }break;
-                        case VK_DELETE: { keyType = Key_Delete; }break;
-                        case VK_HELP: { keyType = Key_Help; }break;
-                        
-                        case 0x30:{ keyType = Key_0; }break;
-                        case 0x31:{ keyType = Key_1; }break;
-                        case 0x32:{ keyType = Key_2; }break;
-                        case 0x33:{ keyType = Key_3; }break;
-                        case 0x34:{ keyType = Key_4; }break;
-                        case 0x35:{ keyType = Key_5; }break;
-                        case 0x36:{ keyType = Key_6; }break;
-                        case 0x37:{ keyType = Key_7; }break;
-                        case 0x38:{ keyType = Key_8; }break;
-                        case 0x39:{ keyType = Key_9; }
-                        
-                        case 'A':{ keyType = Key_A; }break;
-                        case 'B':{ keyType = Key_B; }break;
-                        case 'C':{ keyType = Key_C; }break;
-                        case 'D':{ keyType = Key_D; }break;
-                        case 'E':{ keyType = Key_E; }break;
-                        case 'F':{ keyType = Key_F; }break;
-                        case 'G':{ keyType = Key_G; }break;
-                        case 'H':{ keyType = Key_H; }break;
-                        case 'I':{ keyType = Key_I; }break;
-                        case 'J':{ keyType = Key_J; }break;
-                        case 'K':{ keyType = Key_K; }break;
-                        case 'L':{ keyType = Key_L; }break;
-                        case 'M':{ keyType = Key_M; }break;
-                        case 'N':{ keyType = Key_N; }break;
-                        case 'O':{ keyType = Key_O; }break;
-                        case 'P':{ keyType = Key_P; }break;
-                        case 'Q':{ keyType = Key_Q; }break;
-                        case 'R':{ keyType = Key_R; }break;
-                        case 'S':{ keyType = Key_S; }break;
-                        case 'T':{ keyType = Key_T; }break;
-                        case 'U':{ keyType = Key_U; }break;
-                        case 'V':{ keyType = Key_V; }break;
-                        case 'W':{ keyType = Key_W; }break;
-                        case 'X':{ keyType = Key_X; }break;
-                        case 'Y':{ keyType = Key_Y; }break;
-                        case 'Z':{ keyType = Key_Z; }break;
-                        
-                        case VK_NUMPAD0: { keyType = Key_Num0; }break;
-                        case VK_NUMPAD1: { keyType = Key_Num1; }break;
-                        case VK_NUMPAD2: { keyType = Key_Num2; }break;
-                        case VK_NUMPAD3: { keyType = Key_Num3; }break;
-                        case VK_NUMPAD4: { keyType = Key_Num4; }break;
-                        case VK_NUMPAD5: { keyType = Key_Num5; }break;
-                        case VK_NUMPAD6: { keyType = Key_Num6; }break;
-                        case VK_NUMPAD7: { keyType = Key_Num7; }break;
-                        case VK_NUMPAD8: { keyType = Key_Num8; }break;
-                        case VK_NUMPAD9: { keyType = Key_Num9; }break;
-                        case VK_MULTIPLY: { keyType = Key_Multiply; }break;
-                        case VK_ADD: { keyType = Key_Add; }break;
-                        case VK_DIVIDE: { keyType = Key_Divide; }break;
-                        case VK_SUBTRACT: { keyType = Key_Subtract; }break;
-                        case VK_SEPARATOR: { keyType = Key_Separator; }break;
-                        case VK_DECIMAL: { keyType = Key_Decimal; }break;
-                        case VK_F1: {  keyType = Key_F1; }break;
-                        case VK_F2: {  keyType = Key_F2; }break;
-                        case VK_F3: {  keyType = Key_F3; }break;
-                        case VK_F4: {  keyType = Key_F4; }break;
-                        case VK_F5: {  keyType = Key_F5; }break;
-                        case VK_F6: {  keyType = Key_F6; }break;
-                        case VK_F7: {  keyType = Key_F7; }break;
-                        case VK_F8: {  keyType = Key_F8; }break;
-                        case VK_F9: {  keyType = Key_F9; }break;
-                        case VK_F10: {  keyType = Key_F10; }break;
-                        case VK_F11: {  keyType = Key_F11; }break;
-                        case VK_F12: {  keyType = Key_F12; }break;
-                        case VK_VOLUME_MUTE: { keyType = Key_VolumeMute; }break;
-                        case VK_VOLUME_UP: { keyType = Key_VolumeUp; }break;
-                        case VK_VOLUME_DOWN: { keyType = Key_VolumeDown; }break;
-                        default: {}break;
-                    }
                     
                     if(isDown){
                         
