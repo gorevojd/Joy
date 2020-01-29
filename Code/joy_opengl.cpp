@@ -114,12 +114,12 @@ INTERNAL_FUNCTION GLuint GlLoadFromSourceCompute(char* ComputeCode){
 	return(Program);
 }
 
-INTERNAL_FUNCTION Gl_Shader GlLoadProgram(Gl_State* gl, char* vertexPath, char* fragmentPath, char* geometryPath = 0) {
-    assert(gl->ProgramsCount < ARRAY_COUNT(gl->Programs));
-	int resultIndex = gl->ProgramsCount;
-    Gl_Program* result = gl->Programs + gl->ProgramsCount++;
+INTERNAL_FUNCTION gl_shader GlLoadProgram(gl_state* GL, char* vertexPath, char* fragmentPath, char* geometryPath = 0) {
+    assert(GL->ProgramsCount < ARRAY_COUNT(GL->Programs));
+	int resultIndex = GL->ProgramsCount;
+    gl_program* result = GL->Programs + GL->ProgramsCount++;
     
-    Gl_Shader ResultShader = {};
+    gl_shader ResultShader = {};
     
 	Platform_Read_File_Result vFile = PlatformReadFile(vertexPath);
 	Platform_Read_File_Result fFile = PlatformReadFile(fragmentPath);
@@ -149,26 +149,26 @@ INTERNAL_FUNCTION Gl_Shader GlLoadProgram(Gl_State* gl, char* vertexPath, char* 
 }
 
 
-INTERNAL_FUNCTION void GlSetShader(Gl_Shader* shader, Gl_Shader src){
+INTERNAL_FUNCTION void GlSetShader(gl_shader* shader, gl_shader src){
     shader->ID = src.ID;
     shader->Type = src.Type;
     shader->_InternalProgramIndex = src._InternalProgramIndex;
 }
 
-INTERNAL_FUNCTION Gl_Screen_Shader& GlLoadScreenShader(Gl_State* gl, char* pathV, char* pathF){
-    Gl_Screen_Shader& Result = gl->ScreenShader;
+INTERNAL_FUNCTION Gl_Screen_Shader& GlLoadScreenShader(gl_state* GL, char* pathV, char* pathF){
+    Gl_Screen_Shader& Result = GL->ScreenShader;
     
-    GlSetShader(&Result, GlLoadProgram(gl, pathV, pathF));
+    GlSetShader(&Result, GlLoadProgram(GL, pathV, pathF));
     
     GLGETU(ScreenTexture);
     
     return(Result);
 }
 
-INTERNAL_FUNCTION Gl_Simple_Shader& GlLoadSimpleShader(Gl_State* gl, char* PathV, char* PathF){
-    Gl_Simple_Shader& Result = gl->SimpleShader;
+INTERNAL_FUNCTION Gl_Simple_Shader& GlLoadSimpleShader(gl_state* GL, char* PathV, char* PathF){
+    Gl_Simple_Shader& Result = GL->SimpleShader;
     
-    GlSetShader(&Result, GlLoadProgram(gl, PathV, PathF));
+    GlSetShader(&Result, GlLoadProgram(GL, PathV, PathF));
     
     GLGETU(Model);
     GLGETU(View);
@@ -183,10 +183,10 @@ INTERNAL_FUNCTION Gl_Simple_Shader& GlLoadSimpleShader(Gl_State* gl, char* PathV
     return(Result);
 }
 
-INTERNAL_FUNCTION Gl_GuiRect_Shader& GlLoadGuiRectShader(Gl_State* gl, char* PathV, char* PathF){
-    Gl_GuiRect_Shader& Result = gl->GuiRectShader;
+INTERNAL_FUNCTION Gl_GuiRect_Shader& GlLoadGuiRectShader(gl_state* GL, char* PathV, char* PathF){
+    Gl_GuiRect_Shader& Result = GL->GuiRectShader;
     
-    GlSetShader(&Result, GlLoadProgram(gl, PathV, PathF));
+    GlSetShader(&Result, GlLoadProgram(GL, PathV, PathF));
     
     GLGETU(Projection);
     GLGETU(BitmapIsSet);
@@ -199,10 +199,10 @@ INTERNAL_FUNCTION Gl_GuiRect_Shader& GlLoadGuiRectShader(Gl_State* gl, char* Pat
 }
 
 INTERNAL_FUNCTION Gl_GuiGeom_Shader&
-GlLoadGuiGeomShader(Gl_State* gl, char* PathV, char* PathF){
-    Gl_GuiGeom_Shader& Result = gl->GuiGeomShader;
+GlLoadGuiGeomShader(gl_state* GL, char* PathV, char* PathF){
+    Gl_GuiGeom_Shader& Result = GL->GuiGeomShader;
     
-    GlSetShader(&Result, GlLoadProgram(gl, PathV, PathF));
+    GlSetShader(&Result, GlLoadProgram(GL, PathV, PathF));
     
     GLGETU(Projection);
     GLGETU(Bitmap);
@@ -241,18 +241,18 @@ INTERNAL_FUNCTION GLuint GlAllocateTexture(Bmp_Info* bmp){
     return(GenerateTex);
 }
 
-void GlInit(Gl_State* gl, Assets* assets){
-    gl->ProgramsCount = 0;
-    GlLoadScreenShader(gl, 
+void GlInit(gl_state* GL, assets* Assets){
+    GL->ProgramsCount = 0;
+    GlLoadScreenShader(GL, 
                        "../Data/Shaders/screen.vs",
                        "../Data/Shaders/screen.fs");
-    GlLoadSimpleShader(gl,
+    GlLoadSimpleShader(GL,
                        "../Data/Shaders/simple.vs",
                        "../Data/Shaders/simple.fs");
-    GlLoadGuiRectShader(gl,
+    GlLoadGuiRectShader(GL,
                         "../Data/Shaders/gui_rect.vs",
                         "../Data/Shaders/gui_rect.fs");
-    GlLoadGuiGeomShader(gl,
+    GlLoadGuiGeomShader(GL,
                         "../Data/Shaders/gui_geom.vs",
                         "../Data/Shaders/gui_geom.fs");
     
@@ -269,11 +269,11 @@ void GlInit(Gl_State* gl, Assets* assets){
         -1.0f, -1.0f, 0.0f, 1.0f,
     };
     
-    glGenVertexArrays(1, &gl->ScreenVAO);
-    glGenBuffers(1, &gl->ScreenVBO);
+    glGenVertexArrays(1, &GL->ScreenVAO);
+    glGenBuffers(1, &GL->ScreenVBO);
     
-    glBindVertexArray(gl->ScreenVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, gl->ScreenVBO);
+    glBindVertexArray(GL->ScreenVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, GL->ScreenVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(screenFaceVerts), screenFaceVerts, GL_STATIC_DRAW);
     
     glEnableVertexAttribArray(0);
@@ -281,20 +281,20 @@ void GlInit(Gl_State* gl, Assets* assets){
     glBindVertexArray(0);
     
     // NOTE(Dima): Initializing GuiRect mesh
-    glGenVertexArrays(1, &gl->GuiRectVAO);
-    glGenBuffers(1, &gl->GuiRectVBO);
+    glGenVertexArrays(1, &GL->GuiRectVAO);
+    glGenBuffers(1, &GL->GuiRectVBO);
     
-    glBindVertexArray(gl->GuiRectVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, gl->GuiRectVBO);
+    glBindVertexArray(GL->GuiRectVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, GL->GuiRectVBO);
     glBufferData(GL_ARRAY_BUFFER, 6 * 8 * FS, 0, GL_DYNAMIC_DRAW);
     
-    if(GlArrayIsValid(gl->GuiRectShader.PUVAttrLoc)){
-        glEnableVertexAttribArray(gl->GuiRectShader.PUVAttrLoc);
+    if(GlArrayIsValid(GL->GuiRectShader.PUVAttrLoc)){
+        glEnableVertexAttribArray(GL->GuiRectShader.PUVAttrLoc);
         glVertexAttribPointer(0, 4, GL_FLOAT, 0, 8 * FS, 0);
     }
     
-    if(GlArrayIsValid(gl->GuiRectShader.CAttrLoc)){
-        glEnableVertexAttribArray(gl->GuiRectShader.CAttrLoc);
+    if(GlArrayIsValid(GL->GuiRectShader.CAttrLoc)){
+        glEnableVertexAttribArray(GL->GuiRectShader.CAttrLoc);
         glVertexAttribPointer(1, 4, GL_FLOAT, 0, 8 * FS, (void*)(4 * FS));
     }
     
@@ -302,77 +302,77 @@ void GlInit(Gl_State* gl, Assets* assets){
     glBindVertexArray(0);
     
     // NOTE(Dima): Init LargeAtlas bitmap
-    gl->LargeAtlasHandle = GlAllocateTexture(&assets->MainLargeAtlas.Bitmap);
+    GL->LargeAtlasHandle = GlAllocateTexture(&Assets->MainLargeAtlas.Bitmap);
     
     // NOTE(Dima): Binding gui shader texture to 0 unit
-    glUseProgram(gl->GuiRectShader.ID);
-    glUniform1i(gl->GuiRectShader.BitmapLoc, 0);
+    glUseProgram(GL->GuiRectShader.ID);
+    glUniform1i(GL->GuiRectShader.BitmapLoc, 0);
     glUseProgram(0);
     
     // NOTE(Dima): Init GuiGeom buffer objects
-    glGenVertexArrays(1, &gl->GuiGeomVAO);
-    glGenBuffers(1, &gl->GuiGeomVBO);
-    glGenBuffers(1, &gl->GuiGeomEBO);
-    glGenBuffers(1, &gl->GuiGeomTB);
+    glGenVertexArrays(1, &GL->GuiGeomVAO);
+    glGenBuffers(1, &GL->GuiGeomVBO);
+    glGenBuffers(1, &GL->GuiGeomEBO);
+    glGenBuffers(1, &GL->GuiGeomTB);
     
-    glBindVertexArray(gl->GuiGeomVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, gl->GuiGeomVBO);
-    if(GlArrayIsValid(gl->GuiGeomShader.PUVAttrLoc)){
-        glEnableVertexAttribArray(gl->GuiGeomShader.PUVAttrLoc);
-        glVertexAttribPointer(gl->GuiGeomShader.PUVAttrLoc, 
+    glBindVertexArray(GL->GuiGeomVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, GL->GuiGeomVBO);
+    if(GlArrayIsValid(GL->GuiGeomShader.PUVAttrLoc)){
+        glEnableVertexAttribArray(GL->GuiGeomShader.PUVAttrLoc);
+        glVertexAttribPointer(GL->GuiGeomShader.PUVAttrLoc, 
                               4, GL_FLOAT, 0, 8 * FS, 0);
     }
     
-    if(GlArrayIsValid(gl->GuiGeomShader.CAttrLoc)){
-        glEnableVertexAttribArray(gl->GuiGeomShader.CAttrLoc);
-        glVertexAttribPointer(gl->GuiGeomShader.CAttrLoc, 
+    if(GlArrayIsValid(GL->GuiGeomShader.CAttrLoc)){
+        glEnableVertexAttribArray(GL->GuiGeomShader.CAttrLoc);
+        glVertexAttribPointer(GL->GuiGeomShader.CAttrLoc, 
                               4, GL_FLOAT, 0, 8 * FS, (void*)(4 * FS));
     }
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 }
 
-void GlFree(Gl_State* gl){
+void GlFree(gl_state* GL){
     // NOTE(Dima): Freeing all of the shader programs
     for(int ProgramIndex = 0;
-        ProgramIndex < gl->ProgramsCount;
+        ProgramIndex < GL->ProgramsCount;
         ProgramIndex++)
     {
-        glDeleteProgram(gl->Programs[ProgramIndex].ID);
+        glDeleteProgram(GL->Programs[ProgramIndex].ID);
     }
     
     // NOTE(Dima): Deleting main large atlas texture
-    glDeleteTextures(1, &gl->LargeAtlasHandle);
+    glDeleteTextures(1, &GL->LargeAtlasHandle);
     
     // NOTE(Dima): Free GuiGeom buffer objects
-    glDeleteBuffers(1, &gl->GuiGeomEBO);
-    glDeleteBuffers(1, &gl->GuiGeomVBO);
-    glDeleteBuffers(1, &gl->GuiGeomTB);
-    glDeleteVertexArrays(1, &gl->GuiGeomVAO);
+    glDeleteBuffers(1, &GL->GuiGeomEBO);
+    glDeleteBuffers(1, &GL->GuiGeomVBO);
+    glDeleteBuffers(1, &GL->GuiGeomTB);
+    glDeleteVertexArrays(1, &GL->GuiGeomVAO);
 }
 
-INTERNAL_FUNCTION void GlRenderGuiRect(Gl_State* gl,
+INTERNAL_FUNCTION void GlRenderGuiRect(gl_state* GL,
                                        float* GuiOrtho,
                                        b32 BitmapSetFlag,
                                        GLuint BmpHandle,
                                        float* RectArr,
                                        size_t RectArrSize)
 {
-    glUseProgram(gl->GuiRectShader.ID);
-    glUniform1i(gl->GuiRectShader.BitmapIsSetLoc, BitmapSetFlag);
+    glUseProgram(GL->GuiRectShader.ID);
+    glUniform1i(GL->GuiRectShader.BitmapIsSetLoc, BitmapSetFlag);
     
     if(BitmapSetFlag == 1){
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, BmpHandle);
-        glUniform1i(gl->GuiRectShader.BitmapLoc, 0);
+        glUniform1i(GL->GuiRectShader.BitmapLoc, 0);
     }
     
-    glUniformMatrix4fv(gl->GuiRectShader.ProjectionLoc,
+    glUniformMatrix4fv(GL->GuiRectShader.ProjectionLoc,
                        1, GL_TRUE,
                        GuiOrtho);
     
-    glBindVertexArray(gl->GuiRectVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, gl->GuiRectVBO);
+    glBindVertexArray(GL->GuiRectVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, GL->GuiRectVBO);
     glBufferSubData(GL_ARRAY_BUFFER, 0, RectArrSize, RectArr);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
@@ -404,7 +404,7 @@ INTERNAL_FUNCTION inline void GlBindBufferAndFill(GLenum Target, GLenum Usage,
     }
 }
 
-INTERNAL_FUNCTION void GlShowDynamicBitmap(Gl_State* gl, Bmp_Info* bmp){
+INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, Bmp_Info* bmp){
     
     // NOTE(Dima): Blit texture load
     GLuint BlitTex;
@@ -428,12 +428,12 @@ INTERNAL_FUNCTION void GlShowDynamicBitmap(Gl_State* gl, Bmp_Info* bmp){
     glBindTexture(GL_TEXTURE_2D, 0);
     
     // NOTE(Dima): Drawing screen rect
-    glBindVertexArray(gl->ScreenVAO);
-    glUseProgram(gl->ScreenShader.ID);
+    glBindVertexArray(GL->ScreenVAO);
+    glUseProgram(GL->ScreenShader.ID);
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, BlitTex);
-    glUniform1i(gl->ScreenShader.ScreenTextureLoc, 0);
+    glUniform1i(GL->ScreenShader.ScreenTextureLoc, 0);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindTexture(GL_TEXTURE_2D, 0);
     
@@ -444,16 +444,16 @@ INTERNAL_FUNCTION void GlShowDynamicBitmap(Gl_State* gl, Bmp_Info* bmp){
     glDeleteTextures(1, &BlitTex);
 }
 
-void GlOutputCommands(Gl_State* gl, Render_Stack* stack){
-    u8* at = (u8*)stack->MemBlock.Base;
-    u8* stackEnd = (u8*)stack->MemBlock.Base + stack->MemBlock.Used;
+void GlOutputCommands(gl_state* GL, render_stack* Stack){
+    u8* at = (u8*)Stack->MemBlock.Base;
+    u8* StackEnd = (u8*)Stack->MemBlock.Base + Stack->MemBlock.Used;
     
-    while (at < stackEnd) {
-        Render_Entry_Header* header = (Render_Entry_Header*)at;
+    while (at < StackEnd) {
+        render_entry_header* Header = (render_entry_header*)at;
         
-        at += sizeof(Render_Entry_Header);
+        at += sizeof(render_entry_header);
         
-        switch(header->type){
+        switch(Header->type){
             case RenderEntry_ClearColor:{
                 RENDER_GET_ENTRY(RenderEntryClearColor);
                 
@@ -491,7 +491,7 @@ void GlOutputCommands(Gl_State* gl, Render_Stack* stack){
                 };
                 
 #if 1                
-                GlRenderGuiRect(gl, gl->GuiOrtho.e, JOY_TRUE, 
+                GlRenderGuiRect(GL, GL->GuiOrtho.e, JOY_TRUE, 
                                 entry->Bitmap->Handle,
                                 RectArr, sizeof(RectArr));
 #endif
@@ -507,11 +507,11 @@ void GlOutputCommands(Gl_State* gl, Render_Stack* stack){
             }break;
         }
         
-        at += header->dataSize;
+        at += Header->dataSize;
     }
 }
 
-void GlOutputRender(Gl_State* gl, Render_State* render){
+void GlOutputRender(gl_state* GL, render_state* Render){
     glEnable(GL_BLEND);
     //glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     //glBlendEquation(GL_FUNC_ADD);
@@ -523,9 +523,9 @@ void GlOutputRender(Gl_State* gl, Render_State* render){
     // NOTE(Dima): Calculating gui orthographic projection matrix
     int WindowWidth = 1366;
     int WindowHeight = 768;
-    if(render->FrameInfoIsSet){
-        WindowWidth = render->FrameInfo.Width;
-        WindowHeight = render->FrameInfo.Height;
+    if(Render->FrameInfoIsSet){
+        WindowWidth = Render->FrameInfo.Width;
+        WindowHeight = Render->FrameInfo.Height;
     }
     
     float a = 2.0f / WindowWidth;
@@ -538,63 +538,63 @@ void GlOutputRender(Gl_State* gl, Render_State* render){
         -1.0f, 1.0f, 0.0f, 1.0f
     };
     
-    gl->GuiOrtho = Floats2Matrix(GuiOrtho);
+    GL->GuiOrtho = Floats2Matrix(GuiOrtho);
     
     // NOTE(Dima): Actual rendering
-    if(render->RendererType == Renderer_Software){
-        if(render->FrameInfoIsSet){
-            ASSERT(render->FrameInfoIsSet);
+    if(Render->RendererType == Renderer_Software){
+        if(Render->FrameInfoIsSet){
+            ASSERT(Render->FrameInfoIsSet);
             
-            Bmp_Info* SoftBuf = render->FrameInfo.SoftwareBuffer;
+            Bmp_Info* SoftBuf = Render->FrameInfo.SoftwareBuffer;
             if(SoftBuf){
-                GlShowDynamicBitmap(gl, SoftBuf);
+                GlShowDynamicBitmap(GL, SoftBuf);
             }
             else{
                 // NOTE(Dima): Render through WinAPI
             }
         }
     }
-    else if (render->RendererType == Renderer_OpenGL){
-        GlOutputCommands(gl, &render->Stacks[0]);
+    else if (Render->RendererType == Renderer_OpenGL){
+        GlOutputCommands(GL, &Render->Stacks[0]);
         
-        glBindVertexArray(gl->GuiGeomVAO);
+        glBindVertexArray(GL->GuiGeomVAO);
         GlBindBufferAndFill(GL_ARRAY_BUFFER,
                             GL_DYNAMIC_DRAW,
-                            render->GuiGeom.Vertices,
-                            render->GuiGeom.VerticesCount * sizeof(Render_Gui_Geom_Vertex),
-                            gl->GuiGeomVBO);
+                            Render->GuiGeom.Vertices,
+                            Render->GuiGeom.VerticesCount * sizeof(render_gui_geom_vertex),
+                            GL->GuiGeomVBO);
         
         GlBindBufferAndFill(GL_ELEMENT_ARRAY_BUFFER,
                             GL_DYNAMIC_DRAW,
-                            render->GuiGeom.Indices,
-                            render->GuiGeom.IndicesCount * sizeof(u32),
-                            gl->GuiGeomEBO);
+                            Render->GuiGeom.Indices,
+                            Render->GuiGeom.IndicesCount * sizeof(u32),
+                            GL->GuiGeomEBO);
         
         GlBindBufferAndFill(GL_TEXTURE_BUFFER,
                             GL_DYNAMIC_DRAW,
-                            render->GuiGeom.TriangleGeomTypes,
-                            render->GuiGeom.TriangleGeomTypesCount,
-                            gl->GuiGeomTB);
+                            Render->GuiGeom.TriangleGeomTypes,
+                            Render->GuiGeom.TriangleGeomTypesCount,
+                            GL->GuiGeomTB);
         
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, gl->LargeAtlasHandle);
+        glBindTexture(GL_TEXTURE_2D, GL->LargeAtlasHandle);
         
         // NOTE(Dima): Passing geom types
         GLuint TexBufTex;
         glActiveTexture(GL_TEXTURE1);
         glGenTextures(1, &TexBufTex);
         glBindTexture(GL_TEXTURE_BUFFER, TexBufTex);
-        glTexBuffer(GL_TEXTURE_BUFFER, GL_R8I, gl->GuiGeomTB);
+        glTexBuffer(GL_TEXTURE_BUFFER, GL_R8I, GL->GuiGeomTB);
         
-        gl->GuiGeomShader.Use();
-        gl->GuiGeomShader.SetM44(gl->GuiGeomShader.ProjectionLoc, gl->GuiOrtho.e);
+        GL->GuiGeomShader.Use();
+        GL->GuiGeomShader.SetM44(GL->GuiGeomShader.ProjectionLoc, GL->GuiOrtho.e);
         
         // NOTE(Dima): Passing Bitmap uniforms to shader
-        glUniform1i(gl->GuiGeomShader.BitmapLoc, 0);
-        glUniform1i(gl->GuiGeomShader.TriangleGeomTypesLoc, 1);
+        glUniform1i(GL->GuiGeomShader.BitmapLoc, 0);
+        glUniform1i(GL->GuiGeomShader.TriangleGeomTypesLoc, 1);
         
-        glBindVertexArray(gl->GuiGeomVAO);
-        glDrawElements(GL_TRIANGLES, render->GuiGeom.IndicesCount, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(GL->GuiGeomVAO);
+        glDrawElements(GL_TRIANGLES, Render->GuiGeom.IndicesCount, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
         
         glDeleteTextures(1, &TexBufTex);

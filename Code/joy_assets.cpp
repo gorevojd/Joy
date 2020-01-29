@@ -60,11 +60,11 @@ INTERNAL_FUNCTION void AddFontToAtlas(Asset_Atlas* atlas, Font_Info* font){
     }
 }
 
-INTERNAL_FUNCTION Asset_Atlas InitAtlas(Memory_Region* region, int Dim){
+INTERNAL_FUNCTION Asset_Atlas InitAtlas(mem_region* Region, int Dim){
     Asset_Atlas atlas = {};
     
     mi LargeAtlasMemNeeded = Dim * Dim * 4;
-    void* LargeAtlasMem = PushSomeMem(region, LargeAtlasMemNeeded, 16);
+    void* LargeAtlasMem = PushSomeMem(Region, LargeAtlasMemNeeded, 16);
     atlas.Bitmap = AllocateBitmapInternal(
         Dim, 
         Dim,
@@ -78,75 +78,77 @@ INTERNAL_FUNCTION Asset_Atlas InitAtlas(Memory_Region* region, int Dim){
     return(atlas);
 }
 
-void InitAssets(Assets* assets, Memory_Region* Region){
-    assets->Region = Region;
+void InitAssets(assets* Assets){
+    // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // NOTE(Dima): Memory region is already initialized
+    // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     // NOTE(Dima): Large atlas initialization
-    assets->MainLargeAtlas = InitAtlas(Region, 1024);
+    Assets->MainLargeAtlas = InitAtlas(Assets->Region, 1024);
     
     // NOTE(Dima): images
     Loaded_Strings bmpStrs = LoadStringListFromFile("../Data/Images/ToLoadImages.txt");
-    assets->fadeoutBmps = (Bmp_Info*)platform.MemAlloc(sizeof(Bmp_Info) * bmpStrs.Count);
-    assets->fadeoutBmpsCount = bmpStrs.Count;
+    Assets->fadeoutBmps = (Bmp_Info*)platform.MemAlloc(sizeof(Bmp_Info) * bmpStrs.Count);
+    Assets->fadeoutBmpsCount = bmpStrs.Count;
     for(int i = 0; i < bmpStrs.Count; i++){
         char tmpBuf[256];
         stbsp_sprintf(tmpBuf, "../Data/Images/%s", bmpStrs.Strings[i]);
         
-        assets->fadeoutBmps[i] = LoadBMP(tmpBuf);
+        Assets->fadeoutBmps[i] = LoadBMP(tmpBuf);
     }
     FreeStringList(&bmpStrs);
     
     // NOTE(Dima): Sunsets
-    assets->sunset = LoadBMP("../Data/Images/sunset.jpg");
-    assets->sunsetOrange = LoadBMP("../Data/Images/sunset_orange.jpg");
-    assets->sunsetField = LoadBMP("../Data/Images/sunset_field.jpg");
-    assets->roadClouds = LoadBMP("../Data/Images/road.jpg");
-    assets->sunsetMountains = LoadBMP("../Data/Images/sunset_monts.jpg");
-    assets->sunsetPurple = LoadBMP("../Data/Images/sunset_purple.jpg");
-    assets->sunrise = LoadBMP("../Data/Images/sunrise.jpg");
-    assets->mountainsFuji = LoadBMP("../Data/Images/mountains_fuji.jpg");
+    Assets->sunset = LoadBMP("../Data/Images/sunset.jpg");
+    Assets->sunsetOrange = LoadBMP("../Data/Images/sunset_orange.jpg");
+    Assets->sunsetField = LoadBMP("../Data/Images/sunset_field.jpg");
+    Assets->roadClouds = LoadBMP("../Data/Images/road.jpg");
+    Assets->sunsetMountains = LoadBMP("../Data/Images/sunset_monts.jpg");
+    Assets->sunsetPurple = LoadBMP("../Data/Images/sunset_purple.jpg");
+    Assets->sunrise = LoadBMP("../Data/Images/sunrise.jpg");
+    Assets->mountainsFuji = LoadBMP("../Data/Images/mountains_fuji.jpg");
     
     // NOTE(Dima): Icons
-    assets->CheckboxMark = LoadBMP("../Data/Icons/checkmark64.png");
-    assets->Folder = LoadBMP("../Data/Icons/folder32.png");
-    assets->ClosePng = LoadBMP("../Data/Icons/close.png");
-    assets->PlayPng = LoadBMP("../Data/Icons/play.png");
-    assets->PlusPng = LoadBMP("../Data/Icons/plus.png");
-    assets->StopPng = LoadBMP("../Data/Icons/stop.png");
-    assets->PowerPng = LoadBMP("../Data/Icons/power.png");
+    Assets->CheckboxMark = LoadBMP("../Data/Icons/checkmark64.png");
+    Assets->Folder = LoadBMP("../Data/Icons/folder32.png");
+    Assets->ClosePng = LoadBMP("../Data/Icons/close.png");
+    Assets->PlayPng = LoadBMP("../Data/Icons/play.png");
+    Assets->PlusPng = LoadBMP("../Data/Icons/plus.png");
+    Assets->StopPng = LoadBMP("../Data/Icons/stop.png");
+    Assets->PowerPng = LoadBMP("../Data/Icons/power.png");
     
-    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->CheckboxMark);
-    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->Folder);
-    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->ClosePng);
-    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->PlayPng);
-    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->PlusPng);
-    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->StopPng);
-    AddBitmapToAtlas(&assets->MainLargeAtlas, &assets->PowerPng);
+    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->CheckboxMark);
+    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->Folder);
+    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->ClosePng);
+    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->PlayPng);
+    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->PlusPng);
+    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->StopPng);
+    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->PowerPng);
     
     // NOTE(Dima): Sounds
-    assets->SineTest1 = MakeSineSound256(44100 * 4, 44100);
-    assets->SineTest2 = MakeSineSound(std::vector<int>{256, 128, 430}, 44100 * 4, 44100);
+    Assets->SineTest1 = MakeSineSound256(44100 * 4, 44100);
+    Assets->SineTest2 = MakeSineSound(std::vector<int>{256, 128, 430}, 44100 * 4, 44100);
     
     // NOTE(Dima): Meshes
-    assets->cube = MakeCube();
-    assets->plane = MakePlane();
-    assets->sphere = MakeSphere(20, 12);
-    assets->cylynder = MakeCylynder(2.0f, 0.5f, 16);
+    Assets->cube = MakeCube();
+    Assets->plane = MakePlane();
+    Assets->sphere = MakeSphere(20, 12);
+    Assets->cylynder = MakeCylynder(2.0f, 0.5f, 16);
     
     // NOTE(Dima): Fonts
-    assets->liberationMono = LoadFont("../Data/Fonts/LiberationMono-Regular.ttf", 18.0f, LoadFont_BakeShadow);
-    assets->lilitaOne = LoadFont("../Data/Fonts/LilitaOne.ttf", 20.0f, LoadFont_BakeShadow);
+    Assets->liberationMono = LoadFont("../Data/Fonts/LiberationMono-Regular.ttf", 18.0f, LoadFont_BakeShadow);
+    Assets->lilitaOne = LoadFont("../Data/Fonts/LilitaOne.ttf", 20.0f, LoadFont_BakeShadow);
     
 #if 1
-    assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, LoadFont_BakeBlur);
+    Assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, LoadFont_BakeBlur);
 #else
-    assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, 0);
+    Assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, 0);
 #endif
     
-    assets->pfdin = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 18.0f, 0);
+    Assets->pfdin = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 18.0f, 0);
     
-    AddFontToAtlas(&assets->MainLargeAtlas, &assets->liberationMono);
-    AddFontToAtlas(&assets->MainLargeAtlas, &assets->lilitaOne);
-    AddFontToAtlas(&assets->MainLargeAtlas, &assets->inconsolataBold);
-    AddFontToAtlas(&assets->MainLargeAtlas, &assets->pfdin);
+    AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->liberationMono);
+    AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->lilitaOne);
+    AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->inconsolataBold);
+    AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->pfdin);
 }

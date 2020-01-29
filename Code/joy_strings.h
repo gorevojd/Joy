@@ -323,6 +323,15 @@ inline b32 IsLetter(char C){
     return(0);
 }
 
+inline b32 IsUpper(char C){
+    b32 Result = JOY_FALSE;
+    if(C >= 'A' && C <= 'Z'){
+        Result = JOY_TRUE;
+    }
+    
+    return(Result);
+}
+
 inline b32 IsWhitespace(char C){
     b32 Result = 0;
     
@@ -334,6 +343,33 @@ inline b32 IsWhitespace(char C){
     }
     
     return(Result);
+}
+
+inline void StringToUpper(char* To, char* From){
+    char* AtFrom = From;
+    char* AtTo = To;
+    
+    if(AtFrom && AtTo){
+        while(*AtFrom){
+            
+            if(IsLetter(*AtFrom)){
+                if(IsUpper(*AtFrom)){
+                    *AtTo = *AtFrom;
+                }
+                else{
+                    *AtTo = *AtFrom - 'a' + 'A';
+                }
+            }
+            else{
+                *AtTo = *AtFrom;
+            }
+            
+            AtFrom++;
+            AtTo++;
+        }
+        
+        *AtTo = 0;
+    }
 }
 
 // NOTE(Dima): Returns the found index

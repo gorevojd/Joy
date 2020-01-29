@@ -6,7 +6,7 @@
 #include "stb_sprintf.h"
 
 // NOTE(Dima): Returns newly pushed window array
-INTERNAL_FUNCTION Gui_Window* GuiGrowWindowFreePool(Gui_State* gui, Memory_Region* mem,  int count){
+INTERNAL_FUNCTION Gui_Window* GuiGrowWindowFreePool(gui_state* Gui, mem_region* mem,  int count){
     Gui_Window* windowFreePoolArray = PushArray(mem, Gui_Window, count);
     
     for(int index = 0; 
@@ -17,8 +17,8 @@ INTERNAL_FUNCTION Gui_Window* GuiGrowWindowFreePool(Gui_State* gui, Memory_Regio
         
         *window = {};
         
-        window->PrevAlloc = gui->windowFreeSentinel.PrevAlloc;
-        window->NextAlloc = &gui->windowFreeSentinel;
+        window->PrevAlloc = Gui->windowFreeSentinel.PrevAlloc;
+        window->NextAlloc = &Gui->windowFreeSentinel;
         
         window->PrevAlloc->NextAlloc = window;
         window->NextAlloc->PrevAlloc = window;
@@ -27,8 +27,8 @@ INTERNAL_FUNCTION Gui_Window* GuiGrowWindowFreePool(Gui_State* gui, Memory_Regio
     return(windowFreePoolArray);
 }
 
-inline Gui_Window* GuiPopFromReturnList(Gui_State* gui){
-    Gui_Window* result = gui->windowSentinel4Returning.Next;
+inline Gui_Window* GuiPopFromReturnList(gui_state* Gui){
+    Gui_Window* result = Gui->windowSentinel4Returning.Next;
     
     // NOTE(Dima): deleting from return list
     result->Next->Prev = result->Prev;
@@ -40,40 +40,40 @@ inline Gui_Window* GuiPopFromReturnList(Gui_State* gui){
     return(result);
 }
 
-inline void GuiDeallocateWindow(Gui_State* gui, Gui_Window* todo){
+inline void GuiDeallocateWindow(gui_state* Gui, Gui_Window* todo){
     todo->NextAlloc->PrevAlloc = todo->PrevAlloc;
     todo->PrevAlloc->NextAlloc = todo->NextAlloc;
     
-    todo->NextAlloc = gui->windowFreeSentinel.NextAlloc;
-    todo->PrevAlloc = &gui->windowFreeSentinel;
+    todo->NextAlloc = Gui->windowFreeSentinel.NextAlloc;
+    todo->PrevAlloc = &Gui->windowFreeSentinel;
     
     todo->NextAlloc->PrevAlloc = todo;
     todo->PrevAlloc->NextAlloc = todo;
 }
 
-INTERNAL_FUNCTION void GuiDeallocateElement(Gui_State* gui, Gui_Element* elem)
+INTERNAL_FUNCTION void GuiDeallocateElement(gui_state* Gui, Gui_Element* elem)
 {
     elem->Next->Prev = elem->Prev;
     elem->Prev->Next = elem->Next;
     
-    elem->Next = gui->freeSentinel.Next;
-    elem->Prev = &gui->freeSentinel;
+    elem->Next = Gui->freeSentinel.Next;
+    elem->Prev = &Gui->freeSentinel;
     
     elem->Next->Prev = elem;
     elem->Prev->Next = elem;
 }
 
 INTERNAL_FUNCTION Gui_Element* GuiAllocateElement(
-Gui_State* gui)
+gui_state* Gui)
 {
     Gui_Element* result = 0;
     
-    if(gui->freeSentinel.NextAlloc != &gui->freeSentinel){
+    if(Gui->freeSentinel.NextAlloc != &Gui->freeSentinel){
         
     }
     else{
         const int count = 128;
-        Gui_Element* elemPoolArray = PushArray(gui->mem, Gui_Element, count);
+        Gui_Element* elemPoolArray = PushArray(Gui->Mem, Gui_Element, count);
         
         for(int index = 0; 
             index < count;
@@ -81,23 +81,23 @@ Gui_State* gui)
         {
             Gui_Element* elem = elemPoolArray + index;
             
-            elem->PrevAlloc = gui->freeSentinel.PrevAlloc;
-            elem->NextAlloc = &gui->freeSentinel;
+            elem->PrevAlloc = Gui->freeSentinel.PrevAlloc;
+            elem->NextAlloc = &Gui->freeSentinel;
             
             elem->PrevAlloc->NextAlloc = elem;
             elem->NextAlloc->PrevAlloc = elem;
         }
     }
     
-    result = gui->freeSentinel.NextAlloc;
+    result = Gui->freeSentinel.NextAlloc;
     
     // NOTE(Dima): Deallocating from free list
     result->NextAlloc->PrevAlloc = result->PrevAlloc;
     result->PrevAlloc->NextAlloc = result->NextAlloc;
     
     // NOTE(Dima): Allocating in use list
-    result->NextAlloc = &gui->useSentinel;
-    result->PrevAlloc = gui->useSentinel.PrevAlloc;
+    result->NextAlloc = &Gui->useSentinel;
+    result->PrevAlloc = Gui->useSentinel.PrevAlloc;
     
     result->NextAlloc->PrevAlloc = result;
     result->PrevAlloc->NextAlloc = result;
@@ -105,7 +105,7 @@ Gui_State* gui)
     return(result);
 }
 
-INTERNAL_FUNCTION Gui_Element* GuiInitElement(Gui_State* gui,
+INTERNAL_FUNCTION Gui_Element* GuiInitElement(gui_state* Gui,
                                               char* name,
                                               Gui_Element** cur,
                                               u32 type, 
@@ -137,7 +137,7 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(Gui_State* gui,
         
         // NOTE(Dima): if element was not found - then allocate and initialize
         if(!found){
-            found = GuiAllocateElement(gui);
+            found = GuiAllocateElement(Gui);
             
             // NOTE(Dima): Inserting to list
             found->Next = childSentinel->Next;
@@ -162,7 +162,7 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(Gui_State* gui,
             
             // NOTE(Dima): Initializing children sentinel
             found->childCount = 0;
-            found->childSentinel = GuiAllocateElement(gui);
+            found->childSentinel = GuiAllocateElement(Gui);
             Gui_Element* fcs = found->childSentinel;
             fcs->parent = found;
             fcs->childSentinel = 0;
@@ -187,14 +187,14 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(Gui_State* gui,
 }
 
 
-INTERNAL_FUNCTION Gui_Element* GuiBeginElement(Gui_State* gui,
+INTERNAL_FUNCTION Gui_Element* GuiBeginElement(gui_state* Gui,
                                                char* name,
                                                u32 type,
                                                b32 opened)
 {
-    Gui_Element* Result = GuiInitElement(gui, 
+    Gui_Element* Result = GuiInitElement(Gui, 
                                          name, 
-                                         &gui->curElement, 
+                                         &Gui->curElement, 
                                          type,
                                          opened);
     
@@ -217,21 +217,21 @@ INTERNAL_FUNCTION b32 GuiElementOpenedInTree(Gui_Element* elem){
     return(Result);
 }
 
-INTERNAL_FUNCTION void GuiEndElement(Gui_State* gui, u32 type)
+INTERNAL_FUNCTION void GuiEndElement(gui_state* Gui, u32 type)
 {
-    ASSERT(gui->curElement->type == type);
+    ASSERT(Gui->curElement->type == type);
     
-    gui->curElement = gui->curElement->parent;
+    Gui->curElement = Gui->curElement->parent;
 }
 
-INTERNAL_FUNCTION void GuiFreeElement(Gui_State* gui,
+INTERNAL_FUNCTION void GuiFreeElement(gui_state* Gui,
                                       Gui_Element* elem)
 {
     elem->NextAlloc->PrevAlloc = elem->PrevAlloc;
     elem->PrevAlloc->NextAlloc = elem->NextAlloc;
     
-    elem->NextAlloc = gui->freeSentinel.NextAlloc;
-    elem->PrevAlloc = &gui->freeSentinel;
+    elem->NextAlloc = Gui->freeSentinel.NextAlloc;
+    elem->PrevAlloc = &Gui->freeSentinel;
     
     elem->NextAlloc->PrevAlloc = elem;
     elem->PrevAlloc->NextAlloc = elem;
@@ -240,14 +240,14 @@ INTERNAL_FUNCTION void GuiFreeElement(Gui_State* gui,
 // NOTE(Dima): This function allocates as much windows as we need and 
 // NOTE(Dima): then adds them to return list. It returns first element
 // NOTE(Dima): of that list
-INTERNAL_FUNCTION Gui_Window* GuiAllocateWindows(Gui_State* gui, int count)
+INTERNAL_FUNCTION Gui_Window* GuiAllocateWindows(gui_state* Gui, int count)
 {
     // NOTE(Dima): If free list is emty then allocate some more to it
     b32 canAllocateArray = 1;
     int canAllocateCount = count;
-    Gui_Window* checkAt = gui->windowFreeSentinel.NextAlloc;
+    Gui_Window* checkAt = Gui->windowFreeSentinel.NextAlloc;
     for(int checkIndex = 0; checkIndex < count; checkIndex++){
-        if(checkAt == &gui->windowFreeSentinel){
+        if(checkAt == &Gui->windowFreeSentinel){
             canAllocateArray = 0;
             canAllocateCount = checkIndex;
             break;
@@ -258,11 +258,11 @@ INTERNAL_FUNCTION Gui_Window* GuiAllocateWindows(Gui_State* gui, int count)
     
     int toAllocateCount = Max(128, count - canAllocateCount);
     if(!canAllocateArray){
-        GuiGrowWindowFreePool(gui, gui->mem, toAllocateCount);
+        GuiGrowWindowFreePool(Gui, Gui->Mem, toAllocateCount);
     }
     
     // NOTE(Dima): Return list shoud be empty before return
-    Assert(gui->windowSentinel4Returning.Next == &gui->windowSentinel4Returning);
+    Assert(Gui->windowSentinel4Returning.Next == &Gui->windowSentinel4Returning);
     
     for(int addIndex = 0;
         addIndex < count;
@@ -271,41 +271,41 @@ INTERNAL_FUNCTION Gui_Window* GuiAllocateWindows(Gui_State* gui, int count)
         // NOTE(Dima): Before in this algo we ensured that we would
         // NOTE(Dima): have as mush elements as we need. But for sure
         // NOTE(Dima): I'll double check if we can grab one more element.
-        Assert(gui->windowFreeSentinel.NextAlloc != &gui->windowFreeSentinel);
+        Assert(Gui->windowFreeSentinel.NextAlloc != &Gui->windowFreeSentinel);
         
         // NOTE(Dima): Allocating from free list
-        Gui_Window* addWindow = gui->windowFreeSentinel.NextAlloc;
+        Gui_Window* addWindow = Gui->windowFreeSentinel.NextAlloc;
         
         addWindow->PrevAlloc->NextAlloc = addWindow->NextAlloc;
         addWindow->NextAlloc->PrevAlloc = addWindow->PrevAlloc;
         
         // NOTE(Dima): Inserting to use list
-        addWindow->NextAlloc = &gui->windowUseSentinel;
-        addWindow->PrevAlloc = gui->windowUseSentinel.PrevAlloc;
+        addWindow->NextAlloc = &Gui->windowUseSentinel;
+        addWindow->PrevAlloc = Gui->windowUseSentinel.PrevAlloc;
         
         addWindow->NextAlloc->PrevAlloc = addWindow;
         addWindow->PrevAlloc->NextAlloc = addWindow;
         
         // NOTE(Dima): Inserting to return list
-        addWindow->Next = &gui->windowSentinel4Returning;
-        addWindow->Prev = gui->windowSentinel4Returning.Prev;
+        addWindow->Next = &Gui->windowSentinel4Returning;
+        addWindow->Prev = Gui->windowSentinel4Returning.Prev;
         
         addWindow->Next->Prev = addWindow;
         addWindow->Prev->Next = addWindow;
     }
     
-    Gui_Window* result = gui->windowSentinel4Returning.Next;
+    Gui_Window* result = Gui->windowSentinel4Returning.Next;
     
     return(result);
 }
 
-INTERNAL_FUNCTION Gui_Window* GuiAllocateWindow(Gui_State* gui){
-    GuiAllocateWindows(gui, 1);
+INTERNAL_FUNCTION Gui_Window* GuiAllocateWindow(gui_state* Gui){
+    GuiAllocateWindows(Gui, 1);
     
-    Gui_Window* result = GuiPopFromReturnList(gui);
+    Gui_Window* result = GuiPopFromReturnList(Gui);
     
     // NOTE(Dima): Return list shoud be empty before return
-    Assert(gui->windowSentinel4Returning.Next == &gui->windowSentinel4Returning);
+    Assert(Gui->windowSentinel4Returning.Next == &Gui->windowSentinel4Returning);
     
     return(result);
 }
@@ -320,9 +320,9 @@ inline void GuiAddWindowToList(Gui_Window* window,
     window->Prev->Next = window;
 }
 
-INTERNAL_FUNCTION void GuiInitRoot(Gui_State* gui, Gui_Element** root){
+INTERNAL_FUNCTION void GuiInitRoot(gui_state* Gui, Gui_Element** root){
     
-    (*root) = GuiAllocateElement(gui);
+    (*root) = GuiAllocateElement(Gui);
     (*root)->Next = (*root);
     (*root)->Prev = (*root);
     (*root)->parent = 0;
@@ -331,7 +331,7 @@ INTERNAL_FUNCTION void GuiInitRoot(Gui_State* gui, Gui_Element** root){
     (*root)->id = StringHashFNV((*root)->name);
     
     (*root)->childCount = 0;
-    (*root)->childSentinel = GuiAllocateElement(gui);
+    (*root)->childSentinel = GuiAllocateElement(Gui);
     Gui_Element* rcs = (*root)->childSentinel;
     rcs->Next = rcs;
     rcs->Prev = rcs;
@@ -343,12 +343,12 @@ INTERNAL_FUNCTION void GuiInitRoot(Gui_State* gui, Gui_Element** root){
     
 }
 
-void GuiBeginPage(Gui_State* gui, char* name){
+void GuiBeginPage(gui_state* Gui, char* name){
     u32 nameID = StringHashFNV(name);
     
     Gui_Page* foundPage = 0;
-    Gui_Page* pageAt = gui->rootPage.Next;
-    for(pageAt; pageAt != &gui->rootPage; pageAt = pageAt->Next){
+    Gui_Page* pageAt = Gui->rootPage.Next;
+    for(pageAt; pageAt != &Gui->rootPage; pageAt = pageAt->Next){
         if(nameID == pageAt->id){
             foundPage = pageAt;
             break;
@@ -356,21 +356,21 @@ void GuiBeginPage(Gui_State* gui, char* name){
     }
     
     if(!foundPage){
-        foundPage = PushStruct(gui->mem, Gui_Page);
+        foundPage = PushStruct(Gui->Mem, Gui_Page);
         
         CopyStrings(foundPage->name, sizeof(foundPage->name), name);
         foundPage->id = nameID;
         
-        foundPage->Next = gui->rootPage.Next;
-        foundPage->Prev = &gui->rootPage;
+        foundPage->Next = Gui->rootPage.Next;
+        foundPage->Prev = &Gui->rootPage;
         foundPage->Next->Prev = foundPage;
         foundPage->Prev->Next = foundPage;
         
-        ++gui->pageCount;
+        ++Gui->pageCount;
     }
     
     // NOTE(Dima): Init page element
-    Gui_Element* pageElem = GuiBeginElement(gui, 
+    Gui_Element* pageElem = GuiBeginElement(Gui, 
                                             name,
                                             GuiElement_Page,
                                             JOY_TRUE);
@@ -379,114 +379,106 @@ void GuiBeginPage(Gui_State* gui, char* name){
     foundPage->elem = pageElem;
 }
 
-void GuiEndPage(Gui_State* gui){
-    GuiEndElement(gui, GuiElement_Page);
+void GuiEndPage(gui_state* Gui){
+    GuiEndElement(Gui, GuiElement_Page);
 }
 
 void InitGui(
-Gui_State* gui, 
-Input* input, 
-Assets* assets, 
-Memory_Region* mem, 
-Render_Stack* stack,
-int width,
-int height)
+gui_state* Gui, 
+assets* Assets)
 {
-    gui->mainFont = &assets->inconsolataBold;
-    gui->CheckboxMark = &assets->CheckboxMark;
-    gui->fontScale = 1.0f;
+    // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // NOTE(Dima): memory region is already initialized
+    // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
-    gui->stack = stack;
-    gui->input = input;
-    gui->mem = mem;
-    
-    gui->width = width;
-    gui->height = height;
+    Gui->mainFont = &Assets->inconsolataBold;
+    Gui->CheckboxMark = &Assets->CheckboxMark;
+    Gui->fontScale = 1.0f;
     
     // NOTE(Dima): Init layouts
-    gui->layoutCount = 1;
-    gui->rootLayout = {};
-    gui->rootLayout.Next = &gui->rootLayout;
-    gui->rootLayout.Prev = &gui->rootLayout;
-    CopyStrings(gui->rootLayout.Name, "RootLayout");
-    gui->rootLayout.ID = StringHashFNV(gui->rootLayout.Name);
+    Gui->layoutCount = 1;
+    Gui->rootLayout = {};
+    Gui->rootLayout.Next = &Gui->rootLayout;
+    Gui->rootLayout.Prev = &Gui->rootLayout;
+    CopyStrings(Gui->rootLayout.Name, "RootLayout");
+    Gui->rootLayout.ID = StringHashFNV(Gui->rootLayout.Name);
     
     // NOTE(Dima): Init dim stack
-    for(int dimIndex = 0; dimIndex < ARRAY_COUNT(gui->dimStack); dimIndex++){
-        gui->dimStack[dimIndex] = {};
+    for(int dimIndex = 0; dimIndex < ARRAY_COUNT(Gui->dimStack); dimIndex++){
+        Gui->dimStack[dimIndex] = {};
     }
-    gui->dimStackIndex = 0;
-    gui->inPushBlock = 0;
+    Gui->dimStackIndex = 0;
+    Gui->inPushBlock = 0;
     
     
     // NOTE(Dima): Init pages
-    gui->pageCount = 1;
-    gui->rootPage = {};
-    gui->rootPage.Next = &gui->rootPage;
-    gui->rootPage.Prev = &gui->rootPage;
-    CopyStrings(gui->rootPage.name, "RootPage");
-    gui->rootPage.id = StringHashFNV(gui->rootPage.name);
+    Gui->pageCount = 1;
+    Gui->rootPage = {};
+    Gui->rootPage.Next = &Gui->rootPage;
+    Gui->rootPage.Prev = &Gui->rootPage;
+    CopyStrings(Gui->rootPage.name, "RootPage");
+    Gui->rootPage.id = StringHashFNV(Gui->rootPage.name);
     
     // NOTE(Dima): Initializing of window free pool and sentinels
-    gui->windowUseSentinel.NextAlloc = &gui->windowUseSentinel;
-    gui->windowUseSentinel.PrevAlloc = &gui->windowUseSentinel;
-    gui->windowFreeSentinel.NextAlloc = &gui->windowFreeSentinel;
-    gui->windowFreeSentinel.PrevAlloc = &gui->windowFreeSentinel;
+    Gui->windowUseSentinel.NextAlloc = &Gui->windowUseSentinel;
+    Gui->windowUseSentinel.PrevAlloc = &Gui->windowUseSentinel;
+    Gui->windowFreeSentinel.NextAlloc = &Gui->windowFreeSentinel;
+    Gui->windowFreeSentinel.PrevAlloc = &Gui->windowFreeSentinel;
     
-    GuiGrowWindowFreePool(gui, mem, 128);
+    GuiGrowWindowFreePool(Gui, Gui->Mem, 128);
     
     // NOTE(Dima): Init window sentinel for returning windows
     // NOTE(Dima): as list when we allocate multiple of them.
-    gui->windowSentinel4Returning.Next = &gui->windowSentinel4Returning;
-    gui->windowSentinel4Returning.Prev = &gui->windowSentinel4Returning;
+    Gui->windowSentinel4Returning.Next = &Gui->windowSentinel4Returning;
+    Gui->windowSentinel4Returning.Prev = &Gui->windowSentinel4Returning;
     
     // NOTE(Dima): Init window leaf sentinel
-    gui->windowLeafSentinel.Next = &gui->windowLeafSentinel;
-    gui->windowLeafSentinel.Prev = &gui->windowLeafSentinel;
+    Gui->windowLeafSentinel.Next = &Gui->windowLeafSentinel;
+    Gui->windowLeafSentinel.Prev = &Gui->windowLeafSentinel;
     
-    gui->tempWindow1 = GuiAllocateWindow(gui);
-    gui->tempWindow1->rect = RcMinDim(V2(10, 10), V2(1000, 600));
-    gui->tempWindow1->visible = 1;
-    GuiAddWindowToList(gui->tempWindow1, &gui->windowLeafSentinel);
+    Gui->tempWindow1 = GuiAllocateWindow(Gui);
+    Gui->tempWindow1->rect = RcMinDim(V2(10, 10), V2(1000, 600));
+    Gui->tempWindow1->visible = 1;
+    GuiAddWindowToList(Gui->tempWindow1, &Gui->windowLeafSentinel);
     
     // NOTE(Dima): Initializing elements sentinel
-    gui->freeSentinel.NextAlloc = &gui->freeSentinel;
-    gui->freeSentinel.PrevAlloc = &gui->freeSentinel;
+    Gui->freeSentinel.NextAlloc = &Gui->freeSentinel;
+    Gui->freeSentinel.PrevAlloc = &Gui->freeSentinel;
     
-    gui->useSentinel.NextAlloc = &gui->useSentinel;
-    gui->useSentinel.PrevAlloc = &gui->useSentinel;
+    Gui->useSentinel.NextAlloc = &Gui->useSentinel;
+    Gui->useSentinel.PrevAlloc = &Gui->useSentinel;
     
     // NOTE(Dima): Initializing root element
-    GuiInitRoot(gui, &gui->rootElement);
+    GuiInitRoot(Gui, &Gui->rootElement);
     
     // NOTE(Dima): Setting current element
-    gui->curElement = gui->rootElement;
+    Gui->curElement = Gui->rootElement;
     
     // NOTE(Dima): Initializing colors
-    InitColorsState(&gui->colorState, mem);
-    gui->colors[GuiColor_Text] = GUI_GETCOLOR_COLSYS(Color_White);
-    gui->colors[GuiColor_HotText] = GUI_GETCOLOR_COLSYS(Color_Yellow);
-    gui->colors[GuiColor_Borders] = GUI_GETCOLOR_COLSYS(Color_Black);
+    InitColorsState(&Gui->colorState, Gui->Mem);
+    Gui->colors[GuiColor_Text] = GUI_GETCOLOR_COLSYS(Color_White);
+    Gui->colors[GuiColor_HotText] = GUI_GETCOLOR_COLSYS(Color_Yellow);
+    Gui->colors[GuiColor_Borders] = GUI_GETCOLOR_COLSYS(Color_Black);
     
-    gui->colors[GuiColor_Hot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
-    gui->colors[GuiColor_Active] = GUI_GETCOLOR_COLSYS(Color_Red);
+    Gui->colors[GuiColor_Hot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
+    Gui->colors[GuiColor_Active] = GUI_GETCOLOR_COLSYS(Color_Red);
     
-    gui->colors[GuiColor_ButtonBackground] = GUI_COLORHEX("#337733");
-    gui->colors[GuiColor_ButtonBackgroundHot] = GUI_GETCOLOR_COLSYS(Color_Cyan);
-    gui->colors[GuiColor_ButtonForeground] = GUI_GETCOLOR_COLSYS(Color_White);
-    gui->colors[GuiColor_ButtonForegroundHot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
-    gui->colors[GuiColor_ButtonForegroundDisabled] = gui->colors[GuiColor_ButtonForeground] * 0.75f;
-    gui->colors[GuiColor_ButtonGrad1] = ColorFromHex("#FD6a02");
-    gui->colors[GuiColor_ButtonGrad2] = ColorFromHex("#883000");
+    Gui->colors[GuiColor_ButtonBackground] = GUI_COLORHEX("#337733");
+    Gui->colors[GuiColor_ButtonBackgroundHot] = GUI_GETCOLOR_COLSYS(Color_Cyan);
+    Gui->colors[GuiColor_ButtonForeground] = GUI_GETCOLOR_COLSYS(Color_White);
+    Gui->colors[GuiColor_ButtonForegroundHot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
+    Gui->colors[GuiColor_ButtonForegroundDisabled] = Gui->colors[GuiColor_ButtonForeground] * 0.75f;
+    Gui->colors[GuiColor_ButtonGrad1] = ColorFromHex("#FD6a02");
+    Gui->colors[GuiColor_ButtonGrad2] = ColorFromHex("#883000");
     
-    gui->windowAlpha = 0.85f;
-    gui->colors[GuiColor_WindowBackground] = V4(0.0f, 0.0f, 0.0f, gui->windowAlpha);
-    gui->colors[GuiColor_WindowBorder] = GUI_GETCOLOR_COLSYS(Color_Black);
-    gui->colors[GuiColor_WindowBorderHot] = GUI_GETCOLOR_COLSYS(Color_Magenta);
-    gui->colors[GuiColor_WindowBorderActive] = GUI_GETCOLOR_COLSYS(Color_Blue);
+    Gui->windowAlpha = 0.85f;
+    Gui->colors[GuiColor_WindowBackground] = V4(0.0f, 0.0f, 0.0f, Gui->windowAlpha);
+    Gui->colors[GuiColor_WindowBorder] = GUI_GETCOLOR_COLSYS(Color_Black);
+    Gui->colors[GuiColor_WindowBorderHot] = GUI_GETCOLOR_COLSYS(Color_Magenta);
+    Gui->colors[GuiColor_WindowBorderActive] = GUI_GETCOLOR_COLSYS(Color_Blue);
 }
 
-rc2 PrintTextInternal(Font_Info* font, Render_Stack* stack, char* text, v2 p, u32 textOp, float scale, v4 color, int CaretP, v2* CaretPrintPOut)
+rc2 PrintTextInternal(Font_Info* font, render_stack* stack, char* text, v2 p, u32 textOp, float scale, v4 color, int CaretP, v2* CaretPrintPOut)
 {
     rc2 txtRc;
     
@@ -548,15 +540,15 @@ rc2 PrintTextInternal(Font_Info* font, Render_Stack* stack, char* text, v2 p, u3
     return(txtRc);
 }
 
-void PrintCaret(Gui_State* gui, v2 PrintP, v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f)){
-    float bmpScale = GuiGetLineAdvance(gui);
+void PrintCaret(gui_state* Gui, v2 PrintP, v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f)){
+    float bmpScale = GuiGetLineAdvance(Gui);
     
-    float CaretMinY = PrintP.y - GetScaledAscender(gui->mainFont, gui->fontScale);
+    float CaretMinY = PrintP.y - GetScaledAscender(Gui->mainFont, Gui->fontScale);
     float CaretMinX = PrintP.x;;
     
     v2 CaretMin = V2(CaretMinX, CaretMinY);
     v2 CaretDim = V2(bmpScale * 0.6f, bmpScale);
-    PushRect(gui->stack, RcMinDim(CaretMin, CaretDim), Color);
+    PushRect(Gui->Stack, RcMinDim(CaretMin, CaretDim), Color);
 }
 
 v2 GetTextSizeInternal(Font_Info* font, char* Text, float scale){
@@ -598,7 +590,7 @@ inline v2 GetCenteredTextOffset(Font_Info* font, char* Text, rc2 rect, float sca
 
 rc2 PrintTextCenteredInRectInternal(
 Font_Info* font, 
-Render_Stack* stack, 
+render_stack* stack, 
 char* text, 
 rc2 rect, 
 float scale, 
@@ -610,47 +602,47 @@ v4 color)
     return(result);
 }
 
-v2 GetTextSize(Gui_State* gui, char* text, float scale){
-    v2 result = GetTextSizeInternal(gui->mainFont, 
+v2 GetTextSize(gui_state* Gui, char* text, float scale){
+    v2 result = GetTextSizeInternal(Gui->mainFont, 
                                     text, 
-                                    gui->fontScale * scale);
+                                    Gui->fontScale * scale);
     
     return(result);
 }
 
-rc2 GetTextRect(Gui_State* gui, char* text, v2 p, float scale){
+rc2 GetTextRect(gui_state* Gui, char* text, v2 p, float scale){
     rc2 TextRc = PrintTextInternal(
-        gui->mainFont, 
-        gui->stack, 
+        Gui->mainFont, 
+        Gui->Stack, 
         text, p, 
         PrintTextOp_GetSize, 
-        gui->fontScale * scale);
+        Gui->fontScale * scale);
     
     return(TextRc);
 }
 
-rc2 PrintText(Gui_State* gui, char* text, v2 p, v4 color, float scale){
+rc2 PrintText(gui_state* Gui, char* text, v2 p, v4 color, float scale){
     rc2 TextRc = PrintTextInternal(
-        gui->mainFont, 
-        gui->stack, 
+        Gui->mainFont, 
+        Gui->Stack, 
         text, p, 
         PrintTextOp_Print, 
-        gui->fontScale * scale,
+        Gui->fontScale * scale,
         color);
     
     return(TextRc);
 }
 
 
-v2 GetCaretPrintP(Gui_State* gui, char* text, v2 p, int CaretP){
+v2 GetCaretPrintP(gui_state* Gui, char* text, v2 p, int CaretP){
     v2 Result;
     
     rc2 TextRc = PrintTextInternal(
-        gui->mainFont, 
-        gui->stack, 
+        Gui->mainFont, 
+        Gui->Stack, 
         text, p, 
         PrintTextOp_Print, 
-        gui->fontScale * gui->fontScale,
+        Gui->fontScale * Gui->fontScale,
         V4(0.0f, 0.0f, 0.0f, 0.0f), 
         CaretP, &Result);
     
@@ -658,12 +650,12 @@ v2 GetCaretPrintP(Gui_State* gui, char* text, v2 p, int CaretP){
 }
 
 
-rc2 PrintTextCenteredInRect(Gui_State* gui, char* text, rc2 rect, float scale, v4 color){
-    rc2 result = PrintTextCenteredInRectInternal(gui->mainFont,
-                                                 gui->stack,
+rc2 PrintTextCenteredInRect(gui_state* Gui, char* text, rc2 rect, float scale, v4 color){
+    rc2 result = PrintTextCenteredInRectInternal(Gui->mainFont,
+                                                 Gui->Stack,
                                                  text, 
                                                  rect,
-                                                 gui->fontScale * scale,
+                                                 Gui->fontScale * scale,
                                                  color);
     
     return(result);
@@ -731,8 +723,8 @@ GuiSnapInWindowResult GuiSnapInWindowRect(rc2 WindowRect, u32 SnapType){
     return(result);
 }
 
-inline void GuiSnapInWindowRect(Gui_State* gui, v2* P, v2* Dim, u32 SnapType){
-    rc2 WindowRc = RcMinDim(V2(0.0f, 0.0f), V2(gui->width, gui->height));
+inline void GuiSnapInWindowRect(gui_state* Gui, v2* P, v2* Dim, u32 SnapType){
+    rc2 WindowRc = RcMinDim(V2(0.0f, 0.0f), V2(Gui->Width, Gui->Height));
     GuiSnapInWindowResult Res = GuiSnapInWindowRect(WindowRc, SnapType);
     
     v2 ResultP = Res.result.min;
@@ -747,25 +739,25 @@ inline void GuiSnapInWindowRect(Gui_State* gui, v2* P, v2* Dim, u32 SnapType){
     }
 }
 
-INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 layoutType, Gui_Element* layoutElem){
+INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 layoutType, Gui_Element* layoutElem){
     // NOTE(Dima): initializing references
     layoutElem->data.Layout.ref = layout;
     layout->Elem = layoutElem;
     
     v2 popDim;
-    if(!GuiPopDim(gui, &popDim)){
+    if(!GuiPopDim(Gui, &popDim)){
         popDim = V2(640, 480);
     }
     
     // NOTE(Dima): Layout initializing
     layout->Type = layoutType;
     if(!layoutElem->data.IsInit){
-        layout->Start = V2(200.0f, 200.0f) * (gui->layoutCount - 1);
+        layout->Start = V2(200.0f, 200.0f) * (Gui->layoutCount - 1);
         layout->At = layout->Start;
         
         switch(layoutType){
             case GuiLayout_Layout:{
-                layout->Dim = V2(gui->width, gui->height);
+                layout->Dim = V2(Gui->Width, Gui->Height);
             }break;
             
             case GuiLayout_Window:{
@@ -787,7 +779,7 @@ INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 lay
         
 #if 1    
         
-        GuiAnchor(gui, "Anchor1", 
+        GuiAnchor(Gui, "Anchor1", 
                   layout->Start + layout->Dim,
                   V2(10, 10),
                   JOY_TRUE,
@@ -795,7 +787,7 @@ INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 lay
                   &layout->Start,
                   &layout->Dim);
         
-        GuiAnchor(gui, "Anchor2", 
+        GuiAnchor(Gui, "Anchor2", 
                   layout->Start,
                   V2(10, 10),
                   JOY_FALSE,
@@ -806,67 +798,67 @@ INTERNAL_FUNCTION void GuiInitLayout(Gui_State* gui, Gui_Layout* layout, u32 lay
 #endif
         
         rc2 windowRc = RcMinDim(layout->Start, layout->Dim);
-        PushRect(gui->stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
+        PushRect(Gui->Stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
         
         v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
-        if(MouseInRect(gui->input, windowRc)){
-            GuiSetHot(gui, Interaction.ID, JOY_TRUE);
-            if(GuiIsHot(gui, &Interaction)){
+        if(MouseInRect(Gui->Input, windowRc)){
+            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
+            if(GuiIsHot(Gui, &Interaction)){
                 outlineColor = GUI_GETCOLOR(GuiColor_Hot);
             }
             
-            if(KeyWentDown(gui->input, MouseKey_Left)){
-                GuiSetActive(gui, &Interaction);
+            if(KeyWentDown(Gui->Input, MouseKey_Left)){
+                GuiSetActive(Gui, &Interaction);
             }
             
         }
         else{
             
-            if(KeyWentDown(gui->input, MouseKey_Left) ||
-               KeyWentDown(gui->input, MouseKey_Right))
+            if(KeyWentDown(Gui->Input, MouseKey_Left) ||
+               KeyWentDown(Gui->Input, MouseKey_Right))
             {
-                GuiReleaseInteraction(gui, &Interaction);
+                GuiReleaseInteraction(Gui, &Interaction);
             }
             
-            GuiSetHot(gui, Interaction.ID, JOY_FALSE);
+            GuiSetHot(Gui, Interaction.ID, JOY_FALSE);
         }
         
-        if(GuiIsActive(gui, &Interaction)){
+        if(GuiIsActive(Gui, &Interaction)){
             outlineColor = GUI_GETCOLOR(GuiColor_Active);
             
-            if(KeyWentDown(gui->input, Key_Left)){
-                GuiSnapInWindowRect(gui, &layout->Start, &layout->Dim, GuiWindowSnap_Left);
+            if(KeyWentDown(Gui->Input, Key_Left)){
+                GuiSnapInWindowRect(Gui, &layout->Start, &layout->Dim, GuiWindowSnap_Left);
             }
             
-            if(KeyWentDown(gui->input, Key_Right)){
-                GuiSnapInWindowRect(gui, &layout->Start, &layout->Dim, GuiWindowSnap_Right);
+            if(KeyWentDown(Gui->Input, Key_Right)){
+                GuiSnapInWindowRect(Gui, &layout->Start, &layout->Dim, GuiWindowSnap_Right);
             }
             
-            if(KeyWentDown(gui->input, Key_Up)){
-                GuiSnapInWindowRect(gui, &layout->Start, &layout->Dim, GuiWindowSnap_Top);
+            if(KeyWentDown(Gui->Input, Key_Up)){
+                GuiSnapInWindowRect(Gui, &layout->Start, &layout->Dim, GuiWindowSnap_Top);
             }
             
-            if(KeyWentDown(gui->input, Key_Down)){
-                GuiSnapInWindowRect(gui, &layout->Start, &layout->Dim, GuiWindowSnap_Bottom);
+            if(KeyWentDown(Gui->Input, Key_Down)){
+                GuiSnapInWindowRect(Gui, &layout->Start, &layout->Dim, GuiWindowSnap_Bottom);
             }
             
-            if(KeyWentDown(gui->input, MouseKey_Right)){
-                GuiSnapInWindowRect(gui, &layout->Start, &layout->Dim, GuiWindowSnap_CenterHalf);
+            if(KeyWentDown(Gui->Input, MouseKey_Right)){
+                GuiSnapInWindowRect(Gui, &layout->Start, &layout->Dim, GuiWindowSnap_CenterHalf);
             }
         }
         
         // NOTE(Dima): Pushing inner outline
-        PushRectOutline(gui->stack, windowRc, 2, outlineColor);
+        PushRectOutline(Gui->Stack, windowRc, 2, outlineColor);
     }
 }
 
-void GuiBeginLayout(Gui_State* gui, char* name, u32 layoutType){
+void GuiBeginLayout(gui_state* Gui, char* name, u32 layoutType){
     // NOTE(Dima): In list inserting
     u32 nameID = StringHashFNV(name);
     
     Gui_Layout* foundLayout = 0;
-    Gui_Layout* layoutAt = gui->rootLayout.Next;
-    for(layoutAt; layoutAt != &gui->rootLayout; layoutAt = layoutAt->Next){
+    Gui_Layout* layoutAt = Gui->rootLayout.Next;
+    for(layoutAt; layoutAt != &Gui->rootLayout; layoutAt = layoutAt->Next){
         if(nameID == layoutAt->ID){
             foundLayout = layoutAt;
             break;
@@ -874,49 +866,49 @@ void GuiBeginLayout(Gui_State* gui, char* name, u32 layoutType){
     }
     
     if(!foundLayout){
-        foundLayout = PushStruct(gui->mem, Gui_Layout);
+        foundLayout = PushStruct(Gui->Mem, Gui_Layout);
         
         CopyStrings(foundLayout->Name, sizeof(foundLayout->Name), name);
         foundLayout->ID = nameID;
         
-        foundLayout->Next = gui->rootLayout.Next;
-        foundLayout->Prev = &gui->rootLayout;
+        foundLayout->Next = Gui->rootLayout.Next;
+        foundLayout->Prev = &Gui->rootLayout;
         foundLayout->Next->Prev = foundLayout;
         foundLayout->Prev->Next = foundLayout;
         
-        ++gui->layoutCount;
+        ++Gui->layoutCount;
     }
     
     // NOTE(Dima): Beginnning layout elem
-    Gui_Element* layoutElem = GuiBeginElement(gui, name, GuiElement_Layout, JOY_TRUE);
+    Gui_Element* layoutElem = GuiBeginElement(Gui, name, GuiElement_Layout, JOY_TRUE);
     
-    GuiInitLayout(gui, foundLayout, layoutType, layoutElem);
+    GuiInitLayout(Gui, foundLayout, layoutType, layoutElem);
 }
 
-void GuiEndLayout(Gui_State* gui){
-    Gui_Layout* lay = GetParentLayout(gui);
+void GuiEndLayout(gui_state* Gui){
+    Gui_Layout* lay = GetParentLayout(Gui);
     
     lay->At = lay->Start;
     
-    GuiEndElement(gui, GuiElement_Layout);
+    GuiEndElement(Gui, GuiElement_Layout);
 }
 
-INTERNAL_FUNCTION void GuiSplitWindow(Gui_State* gui, 
+INTERNAL_FUNCTION void GuiSplitWindow(gui_state* Gui, 
                                       Gui_Window* window, 
                                       int partsCount, 
                                       rc2* partsRects)
 {
-    GuiAllocateWindows(gui, partsCount);
+    GuiAllocateWindows(Gui, partsCount);
     
     for(int newWindowIndex = 0;
         newWindowIndex < partsCount;
         newWindowIndex++)
     {
-        Gui_Window* newWindow = GuiPopFromReturnList(gui);
+        Gui_Window* newWindow = GuiPopFromReturnList(Gui);
         
         // NOTE(Dima): Adding children to leafs
-        newWindow->Next = gui->windowLeafSentinel.Next;
-        newWindow->Prev = &gui->windowLeafSentinel;
+        newWindow->Next = Gui->windowLeafSentinel.Next;
+        newWindow->Prev = &Gui->windowLeafSentinel;
         
         newWindow->Next->Prev = newWindow;
         newWindow->Prev->Next = newWindow;
@@ -931,23 +923,23 @@ INTERNAL_FUNCTION void GuiSplitWindow(Gui_State* gui,
     window->Next = 0;
     window->Prev = 0;
     
-    GuiDeallocateWindow(gui, window);
+    GuiDeallocateWindow(Gui, window);
     
     // NOTE(Dima): Return list shoud be empty after usage in this function
-    Assert(gui->windowSentinel4Returning.Next == &gui->windowSentinel4Returning);
+    Assert(Gui->windowSentinel4Returning.Next == &Gui->windowSentinel4Returning);
 }
 
-INTERNAL_FUNCTION void GuiUpdateWindow(Gui_State* gui, Gui_Window* window){
+INTERNAL_FUNCTION void GuiUpdateWindow(gui_state* Gui, Gui_Window* window){
     
     window->layout.Start = window->rect.min;
     
     if(window->visible){
         
         rc2 windowRc = window->rect;
-        PushRect(gui->stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
+        PushRect(Gui->Stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
         
         v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
-        if(MouseInRect(gui->input, windowRc)){
+        if(MouseInRect(Gui->Input, windowRc)){
             outlineColor = GUI_GETCOLOR(GuiColor_WindowBorderHot);
             
             b32 conditionForSnapping = 0;
@@ -958,7 +950,7 @@ INTERNAL_FUNCTION void GuiUpdateWindow(Gui_State* gui, Gui_Window* window){
                 v2 windowHalfDim = windowDim * 0.5f;
                 v2 windowCenter = windowRc.min + windowHalfDim;
                 
-                v2 MouseP = gui->input->MouseP;
+                v2 MouseP = Gui->Input->MouseP;
                 MouseP = ClampInRect(MouseP, windowRc);
                 v2 diffFromCenter = MouseP - windowCenter;
                 v2 diffRelative;
@@ -1000,71 +992,78 @@ INTERNAL_FUNCTION void GuiUpdateWindow(Gui_State* gui, Gui_Window* window){
                 if(snapType != GuiWindowSnap_Whole){
                     GuiSnapInWindowResult snapRes = GuiSnapInWindowRect(windowRc, snapType);
                     v4 snapColor = V4(1.0f, 0.0f, 1.0f, 0.4f);
-                    PushRect(gui->stack, snapRes.result, snapColor);
+                    PushRect(Gui->Stack, snapRes.result, snapColor);
                     
-                    if(KeyWentDown(gui->input, MouseKey_Left)){
-                        GuiSplitWindow(gui, window, 2, snapRes.rects);
+                    if(KeyWentDown(Gui->Input, MouseKey_Left)){
+                        GuiSplitWindow(Gui, window, 2, snapRes.rects);
                     }
                 }
             }
         }
         
         // NOTE(Dima): Pushing inner outline
-        PushRectInnerOutline(gui->stack, windowRc, 1, outlineColor);
+        PushRectInnerOutline(Gui->Stack, windowRc, 1, outlineColor);
     }
 }
 
-void GuiUpdateWindows(Gui_State* gui){
-    Gui_Window* updateAt = gui->windowLeafSentinel.Next;
-    while(updateAt != &gui->windowLeafSentinel){
+void GuiUpdateWindows(gui_state* Gui){
+    Gui_Window* updateAt = Gui->windowLeafSentinel.Next;
+    while(updateAt != &Gui->windowLeafSentinel){
         Gui_Window* tempNext = updateAt->Next;
         
-        GuiUpdateWindow(gui, updateAt);
+        GuiUpdateWindow(Gui, updateAt);
         
         updateAt = tempNext;
     }
 }
 
-void GuiBeginUpdateWindows(Gui_State* gui){
+void GuiBeginUpdateWindows(gui_state* Gui){
     
 }
 
-void GuiEndUpdateWindows(Gui_State* gui){
-    GuiUpdateWindows(gui);
+void GuiEndUpdateWindows(gui_state* Gui){
+    GuiUpdateWindows(Gui);
 }
 
-void GuiFrameBegin(Gui_State* gui){
+void GuiFrameBegin(gui_state* Gui, gui_frame_info GuiFrameInfo){
+    Gui->FrameInfo = GuiFrameInfo;
+    
+    Gui->Input = Gui->FrameInfo.Input;
+    Gui->Stack = Gui->FrameInfo.Stack;
+    Gui->Width = Gui->FrameInfo.Width;
+    Gui->Height = Gui->FrameInfo.Height;
+    
     // NOTE(Dima): Init dim stack
     // NOTE(Dima): Init dim stack
-    gui->dimStackIndex = 0;
-    gui->inPushBlock = 0;
+    Gui->dimStackIndex = 0;
+    Gui->inPushBlock = 0;
     
     // NOTE(Dima): Init root layout
-    Gui_Element* layoutElem = GuiBeginElement(gui, 
-                                              gui->rootLayout.Name, 
+    Gui_Element* layoutElem = GuiBeginElement(Gui, 
+                                              Gui->rootLayout.Name, 
                                               GuiElement_Layout, 
                                               JOY_TRUE);
-    GuiInitLayout(gui, &gui->rootLayout, GuiLayout_Layout, layoutElem);
+    GuiInitLayout(Gui, &Gui->rootLayout, GuiLayout_Layout, layoutElem);
 }
 
-void GuiFrameEnd(Gui_State* gui){
+void GuiFrameEnd(gui_state* Gui){
     // NOTE(Dima): Deinit root layout
-    gui->rootLayout.At = gui->rootLayout.Start;
-    GuiEndElement(gui, GuiElement_Layout);
+    Gui->rootLayout.At = Gui->rootLayout.Start;
+    GuiEndElement(Gui, GuiElement_Layout);
 }
 
-void GuiFramePrepare4Render(Gui_State* gui){
+void GuiFramePrepare4Render(gui_state* Gui){
     for(int tooltipIndex = 0; tooltipIndex < GUI_MAX_TOOLTIPS; tooltipIndex++){
-        Gui_Tooltip* ttip= &gui->tooltips[tooltipIndex];
+        Gui_Tooltip* ttip= &Gui->tooltips[tooltipIndex];
         
-        PrintText(gui, ttip->text, ttip->at, GUI_GETCOLOR(GuiColor_Text), 1.0f);
+        PrintText(Gui, ttip->text, ttip->at, GUI_GETCOLOR(GuiColor_Text), 1.0f);
     }
-    gui->tooltipIndex = 0;
+    Gui->tooltipIndex = 0;
 }
 
 
 // NOTE(Dima): Default advance type is Column advance
-inline void GuiPreAdvance(Gui_State* gui, Gui_Layout* layout){
+inline void GuiPreAdvance(gui_state* Gui, Gui_Layout* layout){
     GuiAdvanceCtx* ctx = &layout->AdvanceRememberStack[layout->StackCurrentIndex];
     b32 rowStarted = ctx->type == GuiAdvanceType_Row;
     
@@ -1075,18 +1074,18 @@ inline void GuiPreAdvance(Gui_State* gui, Gui_Layout* layout){
     }
     else{
         layout->At.x = ctx->baseline;
-        layout->At.y += GuiGetBaseline(gui);
+        layout->At.y += GuiGetBaseline(Gui);
     }
 }
 
-inline void GuiPostAdvance(Gui_State* gui, Gui_Layout* layout, rc2 ElementRect){
+inline void GuiPostAdvance(gui_state* Gui, Gui_Layout* layout, rc2 ElementRect){
     GuiAdvanceCtx* ctx = &layout->AdvanceRememberStack[layout->StackCurrentIndex];
     b32 rowStarted = (ctx->type == GuiAdvanceType_Row);
     
     float RememberValue = ctx->rememberValue;
     
-    float toX = ElementRect.max.x + GetScaledAscender(gui->mainFont, gui->fontScale) * 0.5f;
-    float toY = ElementRect.max.y + GetLineAdvance(gui->mainFont, gui->fontScale) * 0.15f;
+    float toX = ElementRect.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f;
+    float toY = ElementRect.max.y + GetLineAdvance(Gui->mainFont, Gui->fontScale) * 0.15f;
     
     if(rowStarted){
         layout->At.x = toX;
@@ -1121,30 +1120,30 @@ inline GuiAdvanceCtx GuiColumnAdvanceCtx(float rememberY, float baseline){
     return(ctx);
 }
 
-void GuiBeginRow(Gui_State* gui){
+void GuiBeginRow(gui_state* Gui){
     char name[64];
-    stbsp_sprintf(name, "Row or Column: %d", gui->curElement->childCount);
+    stbsp_sprintf(name, "Row or Column: %d", Gui->curElement->childCount);
     
-    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_RowColumn, JOY_TRUE);
+    Gui_Element* elem = GuiBeginElement(Gui, name, GuiElement_RowColumn, JOY_TRUE);
     if(GuiElementOpenedInTree(elem)){
         
-        Gui_Layout* layout = GetParentLayout(gui);
+        Gui_Layout* layout = GetParentLayout(Gui);
         
         Assert(layout->StackCurrentIndex < ArrayCount(layout->AdvanceRememberStack));
         
         layout->AdvanceRememberStack[++layout->StackCurrentIndex] = 
-            GuiRowAdvanceCtx(layout->At.x, layout->At.y + GuiGetBaseline(gui));
+            GuiRowAdvanceCtx(layout->At.x, layout->At.y + GuiGetBaseline(Gui));
     }
 }
 
-void GuiBeginColumn(Gui_State* gui){
+void GuiBeginColumn(gui_state* Gui){
     char name[64];
-    stbsp_sprintf(name, "Row or Column: %d", gui->curElement->childCount);
+    stbsp_sprintf(name, "Row or Column: %d", Gui->curElement->childCount);
     
-    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_RowColumn, JOY_TRUE);
+    Gui_Element* elem = GuiBeginElement(Gui, name, GuiElement_RowColumn, JOY_TRUE);
     if(GuiElementOpenedInTree(elem)){
         
-        Gui_Layout* layout = GetParentLayout(gui);
+        Gui_Layout* layout = GetParentLayout(Gui);
         
         Assert(layout->StackCurrentIndex < ArrayCount(layout->AdvanceRememberStack));
         
@@ -1153,10 +1152,10 @@ void GuiBeginColumn(Gui_State* gui){
     }
 }
 
-void GuiEndRow(Gui_State* gui){
-    if(GuiElementOpenedInTree(gui->curElement)){
+void GuiEndRow(gui_state* Gui){
+    if(GuiElementOpenedInTree(Gui->curElement)){
         
-        Gui_Layout* layout = GetParentLayout(gui);
+        Gui_Layout* layout = GetParentLayout(Gui);
         
         Assert(layout->StackCurrentIndex >= 1);
         
@@ -1177,13 +1176,13 @@ void GuiEndRow(Gui_State* gui){
         ctx->maximum = 0.0f;
     }
     
-    GuiEndElement(gui, GuiElement_RowColumn);
+    GuiEndElement(Gui, GuiElement_RowColumn);
 }
 
-void GuiEndColumn(Gui_State* gui){
-    if(GuiElementOpenedInTree(gui->curElement)){
+void GuiEndColumn(gui_state* Gui){
+    if(GuiElementOpenedInTree(Gui->curElement)){
         
-        Gui_Layout* layout = GetParentLayout(gui);
+        Gui_Layout* layout = GetParentLayout(Gui);
         
         Assert(layout->StackCurrentIndex >= 1);
         
@@ -1204,7 +1203,7 @@ void GuiEndColumn(Gui_State* gui){
         ctx->maximum = 0.0f;
     }
     
-    GuiEndElement(gui, GuiElement_RowColumn);
+    GuiEndElement(Gui, GuiElement_RowColumn);
 }
 
 enum Push_But_Type{
@@ -1217,7 +1216,7 @@ enum Push_But_Type{
     PushBut_AlphaBlack,
 };
 
-INTERNAL_FUNCTION void GuiPushBut(Gui_State* gui, rc2 rect, u32 type = PushBut_DefaultGrad, v4 color = V4(0.0f, 0.0f, 0.0f, 1.0f)){
+INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui, rc2 rect, u32 type = PushBut_DefaultGrad, v4 color = V4(0.0f, 0.0f, 0.0f, 1.0f)){
     
     switch(type){
         case PushBut_Empty:{
@@ -1225,32 +1224,32 @@ INTERNAL_FUNCTION void GuiPushBut(Gui_State* gui, rc2 rect, u32 type = PushBut_D
         }break;
         
         case PushBut_Color:{
-            PushRect(gui->stack, rect, color);
+            PushRect(Gui->Stack, rect, color);
         }break;
         
         case PushBut_AlphaBlack:{
-            PushRect(gui->stack, rect, GUI_GETCOLOR(GuiColor_WindowBackground));
+            PushRect(Gui->Stack, rect, GUI_GETCOLOR(GuiColor_WindowBackground));
         }break;
         
         case PushBut_DefaultBack:{
-            PushRect(gui->stack, rect, GUI_GETCOLOR(GuiColor_ButtonBackground));
+            PushRect(Gui->Stack, rect, GUI_GETCOLOR(GuiColor_ButtonBackground));
         }break;
         
         case PushBut_DefaultGrad:{
             PushGradient(
-                gui->stack, rect, 
+                Gui->Stack, rect, 
                 GUI_GETCOLOR(GuiColor_ButtonGrad1),
                 GUI_GETCOLOR(GuiColor_ButtonGrad2),
                 RenderEntryGradient_Vertical);
         }break;
         
         case PushBut_Outline:{
-            PushRectOutline(gui->stack, rect, 2, color);
+            PushRectOutline(Gui->Stack, rect, 2, color);
         }break;
         
         case PushBut_RectAndOutline:{
-            PushRect(gui->stack, rect, GUI_GETCOLOR(GuiColor_ButtonBackground));
-            PushRectOutline(gui->stack, rect, 1, color);
+            PushRect(Gui->Stack, rect, GUI_GETCOLOR(GuiColor_ButtonBackground));
+            PushRectOutline(Gui->Stack, rect, 1, color);
         }break;
     }
 }
@@ -1270,23 +1269,23 @@ inline b32 PotentiallyVisibleSmall(Gui_Layout* lay){
     return(PotentiallyVisible(lay, dim));
 }
 
-void GuiTooltip(Gui_State* gui, char* tooltipText, v2 at){
-    Assert(gui->tooltipIndex < GUI_MAX_TOOLTIPS);
-    Gui_Tooltip* ttip = &gui->tooltips[gui->tooltipIndex++];
+void GuiTooltip(gui_state* Gui, char* tooltipText, v2 at){
+    Assert(Gui->tooltipIndex < GUI_MAX_TOOLTIPS);
+    Gui_Tooltip* ttip = &Gui->tooltips[Gui->tooltipIndex++];
     
     CopyStrings(ttip->text, GUI_TOOLTIP_MAX_SIZE, tooltipText);
     ttip->at = at;
 }
 
-void GuiAnchor(Gui_State* gui, 
+void GuiAnchor(gui_state* Gui, 
                char* Name, 
                v2 Pos, v2 Dim, 
                b32 Resize,
                b32 Centered, 
                v2* RectP, v2* RectDim)
 {
-    Gui_Element* elem = GuiBeginElement(gui, Name, GuiElement_Item, JOY_FALSE);
-    Gui_Layout* layout = GetParentLayout(gui);
+    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, JOY_FALSE);
+    Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
        PotentiallyVisibleSmall(layout))
@@ -1303,7 +1302,7 @@ void GuiAnchor(Gui_State* gui,
         
         v4 WorkColor = GUI_GETCOLOR_COLSYS(Color_Orange);
         
-        v2 MouseP = gui->input->MouseP;
+        v2 MouseP = Gui->Input->MouseP;
         
         if(!elem->data.IsInit){
             
@@ -1331,28 +1330,28 @@ void GuiAnchor(Gui_State* gui,
         }
         
         
-        if(MouseInRect(gui->input, WorkRect)){
-            GuiSetHot(gui, interaction->ID, JOY_TRUE);
+        if(MouseInRect(Gui->Input, WorkRect)){
+            GuiSetHot(Gui, interaction->ID, JOY_TRUE);
             
-            if(KeyWentDown(gui->input, MouseKey_Left)){
-                GuiSetActive(gui, interaction);
+            if(KeyWentDown(Gui->Input, MouseKey_Left)){
+                GuiSetActive(Gui, interaction);
                 
                 *OffsetInAnchor = MouseP - Pos;
             }
         }
         else{
-            GuiSetHot(gui, interaction->ID, JOY_FALSE);
+            GuiSetHot(Gui, interaction->ID, JOY_FALSE);
         }
         
-        if(KeyWentUp(gui->input, MouseKey_Left)){
-            GuiReleaseInteraction(gui, interaction);
+        if(KeyWentUp(Gui->Input, MouseKey_Left)){
+            GuiReleaseInteraction(Gui, interaction);
             
             *OffsetInAnchor = {};
         }
         
         v4 AnchorColor = GUI_GETCOLOR_COLSYS(Color_Orange);
         
-        if(GuiIsActive(gui, interaction)){
+        if(GuiIsActive(Gui, interaction)){
             MouseP = MouseP - *OffsetInAnchor;
             
             ASSERT((interaction->InteractionType == GuiInteraction_Move) || 
@@ -1360,135 +1359,135 @@ void GuiAnchor(Gui_State* gui,
             
             interaction->OffsetInAnchor = *OffsetInAnchor;
             
-            interaction->Interact(gui);
+            interaction->Interact(Gui);
             
             AnchorColor = GUI_GETCOLOR_COLSYS(Color_Blue);
         }
         
-        PushRect(gui->stack, WorkRect, AnchorColor);
+        PushRect(Gui->Stack, WorkRect, AnchorColor);
     }
     
-    GuiEndElement(gui, GuiElement_Item);
+    GuiEndElement(Gui, GuiElement_Item);
 }
 
-void GuiBeginTree(Gui_State* gui, char* name){
-    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_Item, JOY_FALSE);
-    Gui_Layout* layout = GetParentLayout(gui);
+void GuiBeginTree(gui_state* Gui, char* name){
+    Gui_Element* elem = GuiBeginElement(Gui, name, GuiElement_Item, JOY_FALSE);
+    Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && PotentiallyVisibleSmall(layout))
     {
-        Gui_Layout* layout = GetParentLayout(gui);
+        Gui_Layout* layout = GetParentLayout(Gui);
         
-        GuiPreAdvance(gui, layout);
+        GuiPreAdvance(Gui, layout);
         
-        rc2 textRc = GetTextRect(gui, name, layout->At);
+        rc2 textRc = GetTextRect(Gui, name, layout->At);
         
         v4 textColor = GUI_GETCOLOR_COLSYS(Color_ToxicGreen);
         v4 oulineColor = GUI_GETCOLOR_COLSYS(Color_Red);
         
-        GuiPushBut(gui, textRc, PushBut_DefaultGrad, oulineColor);
+        GuiPushBut(Gui, textRc, PushBut_DefaultGrad, oulineColor);
         if(elem->opened){
-            GuiPushBut(gui, textRc, PushBut_Outline, oulineColor);
+            GuiPushBut(Gui, textRc, PushBut_Outline, oulineColor);
         }
         
         Gui_Empty_Interaction Interaction(elem);
         
-        if(MouseInRect(gui->input, textRc)){
-            GuiSetHot(gui, Interaction.ID, JOY_TRUE);
+        if(MouseInRect(Gui->Input, textRc)){
+            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
             textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
-            if(KeyWentDown(gui->input, MouseKey_Left)){
-                GuiSetActive(gui, &Interaction);
-                GuiReleaseInteraction(gui, &Interaction);
+            if(KeyWentDown(Gui->Input, MouseKey_Left)){
+                GuiSetActive(Gui, &Interaction);
+                GuiReleaseInteraction(Gui, &Interaction);
                 
                 elem->opened = !elem->opened;
             }
         }
         else{
-            GuiSetHot(gui, Interaction.ID, JOY_FALSE);
+            GuiSetHot(Gui, Interaction.ID, JOY_FALSE);
         }
-        PrintText(gui, name, layout->At, textColor);
+        PrintText(Gui, name, layout->At, textColor);
         
-        GuiPostAdvance(gui, layout, textRc);
+        GuiPostAdvance(Gui, layout, textRc);
     }
 }
-void GuiEndTree(Gui_State* gui){
-    GuiEndElement(gui, GuiElement_Item);
+void GuiEndTree(gui_state* Gui){
+    GuiEndElement(Gui, GuiElement_Item);
 }
 
-void GuiText(Gui_State* gui, char* text){
-    Gui_Element* elem = GuiBeginElement(gui, text, GuiElement_Item, JOY_TRUE);
-    Gui_Layout* layout = GetParentLayout(gui);
+void GuiText(gui_state* Gui, char* text){
+    Gui_Element* elem = GuiBeginElement(Gui, text, GuiElement_Item, JOY_TRUE);
+    Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
        PotentiallyVisibleSmall(layout))
     {
-        GuiPreAdvance(gui, layout);
+        GuiPreAdvance(Gui, layout);
         
-        rc2 textRc = PrintText(gui, text, layout->At, GUI_GETCOLOR(GuiColor_Text));
+        rc2 textRc = PrintText(Gui, text, layout->At, GUI_GETCOLOR(GuiColor_Text));
         
-        GuiPostAdvance(gui, layout, textRc);
+        GuiPostAdvance(Gui, layout, textRc);
     }
-    GuiEndElement(gui, GuiElement_Item);
+    GuiEndElement(Gui, GuiElement_Item);
 }
 
-b32 GuiButton(Gui_State* gui, char* buttonName){
+b32 GuiButton(gui_state* Gui, char* buttonName){
     b32 result = 0;
     
-    Gui_Element* elem = GuiBeginElement(gui, buttonName, GuiElement_Item, JOY_TRUE);
-    Gui_Layout* layout = GetParentLayout(gui);
+    Gui_Element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, JOY_TRUE);
+    Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
        PotentiallyVisibleSmall(layout))
     {
-        GuiPreAdvance(gui, layout);
+        GuiPreAdvance(Gui, layout);
         
         // NOTE(Dima): Printing button and text
-        rc2 textRc = GetTextRect(gui, buttonName, layout->At);
-        textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 3.0f));
-        GuiPushBut(gui, textRc);
+        rc2 textRc = GetTextRect(Gui, buttonName, layout->At);
+        textRc = GetTxtElemRect(Gui, layout, textRc, V2(4.0f, 3.0f));
+        GuiPushBut(Gui, textRc);
         
         // NOTE(Dima): Event processing
         v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
         
         Gui_Empty_Interaction Interaction(elem);
         
-        if(MouseInRect(gui->input, textRc)){
-            GuiSetHot(gui, Interaction.ID, JOY_TRUE);
+        if(MouseInRect(Gui->Input, textRc)){
+            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
             textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
-            if(KeyWentDown(gui->input, MouseKey_Left)){
-                GuiSetActive(gui, &Interaction);
-                GuiReleaseInteraction(gui, &Interaction);
+            if(KeyWentDown(Gui->Input, MouseKey_Left)){
+                GuiSetActive(Gui, &Interaction);
+                GuiReleaseInteraction(Gui, &Interaction);
                 result = 1;
             }
         }
         else{
-            GuiSetHot(gui, Interaction.ID, JOY_FALSE);
+            GuiSetHot(Gui, Interaction.ID, JOY_FALSE);
         }
         
-        PrintTextCenteredInRect(gui, buttonName, textRc, 1.0f, textColor);
+        PrintTextCenteredInRect(Gui, buttonName, textRc, 1.0f, textColor);
         
-        GuiPostAdvance(gui, layout, textRc);
+        GuiPostAdvance(Gui, layout, textRc);
     }
-    GuiEndElement(gui, GuiElement_Item);
+    GuiEndElement(Gui, GuiElement_Item);
     
     return(result);
 }
 
-void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value){
-    Gui_Element* elem = GuiBeginElement(gui, buttonName, GuiElement_Item, JOY_TRUE);
-    Gui_Layout* layout = GetParentLayout(gui);
+void GuiBoolButton(gui_state* Gui, char* buttonName, b32* value){
+    Gui_Element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, JOY_TRUE);
+    Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
        PotentiallyVisibleSmall(layout))
     {
-        GuiPreAdvance(gui, layout);
+        GuiPreAdvance(Gui, layout);
         
         // NOTE(Dima): Printing button and text
-        rc2 textRc = GetTextRect(gui, buttonName, layout->At);
-        textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 3.0f));
-        GuiPushBut(gui, textRc);
+        rc2 textRc = GetTextRect(Gui, buttonName, layout->At);
+        textRc = GetTxtElemRect(Gui, layout, textRc, V2(4.0f, 3.0f));
+        GuiPushBut(Gui, textRc);
         
         v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
         
@@ -1499,39 +1498,39 @@ void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value){
             }
             
             Gui_BoolInRect_Interaction Interaction(value, textRc, elem);
-            Interaction.Interact(gui);
+            Interaction.Interact(Gui);
             
             if(Interaction.WasHotInInteraction){
                 textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             }
         }
         
-        PrintTextCenteredInRect(gui, buttonName, textRc, 1.0f, textColor);
+        PrintTextCenteredInRect(Gui, buttonName, textRc, 1.0f, textColor);
         
-        GuiPostAdvance(gui, layout, textRc);
+        GuiPostAdvance(Gui, layout, textRc);
     }
     
-    GuiEndElement(gui, GuiElement_Item);
+    GuiEndElement(Gui, GuiElement_Item);
 }
 
-void GuiBoolButtonOnOff(Gui_State* gui, char* buttonName, b32* value){
-    Gui_Element* elem = GuiBeginElement(gui, buttonName, GuiElement_Item, JOY_TRUE);
-    Gui_Layout* layout = GetParentLayout(gui);
+void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value){
+    Gui_Element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, JOY_TRUE);
+    Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
        PotentiallyVisibleSmall(layout))
     {
-        GuiPreAdvance(gui, layout);
+        GuiPreAdvance(Gui, layout);
         
         // NOTE(Dima): Button printing
-        rc2 butRc = GetTextRect(gui, "OFF", layout->At);
-        butRc = GetTxtElemRect(gui, layout, butRc, V2(4.0f, 3.0f));
-        GuiPushBut(gui, butRc);
+        rc2 butRc = GetTextRect(Gui, "OFF", layout->At);
+        butRc = GetTxtElemRect(Gui, layout, butRc, V2(4.0f, 3.0f));
+        GuiPushBut(Gui, butRc);
         
         // NOTE(Dima): Button name text printing
-        float nameStartY = GetCenteredTextOffsetY(gui->mainFont, butRc, gui->fontScale);
-        v2 nameStart = V2(butRc.max.x + GetScaledAscender(gui->mainFont, gui->fontScale) * 0.5f, nameStartY);
-        rc2 NameRc = PrintText(gui, buttonName, nameStart, GUI_GETCOLOR(GuiColor_Text));
+        float nameStartY = GetCenteredTextOffsetY(Gui->mainFont, butRc, Gui->fontScale);
+        v2 nameStart = V2(butRc.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f, nameStartY);
+        rc2 NameRc = PrintText(Gui, buttonName, nameStart, GUI_GETCOLOR(GuiColor_Text));
         
         // NOTE(Dima): Event processing
         char buttonText[4];
@@ -1548,81 +1547,81 @@ void GuiBoolButtonOnOff(Gui_State* gui, char* buttonName, b32* value){
             }
             
             Gui_BoolInRect_Interaction Interaction(value, butRc, elem);
-            Interaction.Interact(gui);
+            Interaction.Interact(Gui);
             
             if(Interaction.WasHotInInteraction){
                 buttonTextC = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             }
         }
         
-        PrintTextCenteredInRect(gui, buttonText, butRc, 1.0f, buttonTextC);
+        PrintTextCenteredInRect(Gui, buttonText, butRc, 1.0f, buttonTextC);
         
         rc2 AdvanceRect = GetBoundingRect(butRc, NameRc);
-        GuiPostAdvance(gui, layout, AdvanceRect);
+        GuiPostAdvance(Gui, layout, AdvanceRect);
     }
-    GuiEndElement(gui, GuiElement_Item);
+    GuiEndElement(Gui, GuiElement_Item);
 }
 
-void GuiCheckbox(Gui_State* gui, char* name, b32* value){
-    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_Item, JOY_TRUE);
-    Gui_Layout* layout = GetParentLayout(gui);
+void GuiCheckbox(gui_state* Gui, char* name, b32* value){
+    Gui_Element* elem = GuiBeginElement(Gui, name, GuiElement_Item, JOY_TRUE);
+    Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
        PotentiallyVisibleSmall(layout))
     {
         
-        GuiPreAdvance(gui, layout);
+        GuiPreAdvance(Gui, layout);
         
         // NOTE(Dima): Checkbox rendering
-        float chkSize = GetLineAdvance(gui->mainFont, gui->fontScale);
+        float chkSize = GetLineAdvance(Gui->mainFont, Gui->fontScale);
         rc2 chkRect;
-        chkRect.min = V2(layout->At.x, layout->At.y - GetScaledAscender(gui->mainFont, gui->fontScale));
+        chkRect.min = V2(layout->At.x, layout->At.y - GetScaledAscender(Gui->mainFont, Gui->fontScale));
         chkRect.max = chkRect.min + V2(chkSize, chkSize);
-        chkRect = GetTxtElemRect(gui, layout, chkRect, V2(2.0f, 2.0f));
+        chkRect = GetTxtElemRect(Gui, layout, chkRect, V2(2.0f, 2.0f));
         
         // NOTE(Dima): Event processing
         v4 backC = GUI_GETCOLOR(GuiColor_ButtonBackground);
         if(value){
             
             Gui_BoolInRect_Interaction Interaction(value, chkRect, elem);
-            Interaction.Interact(gui);
+            Interaction.Interact(Gui);
             
             if(Interaction.WasHotInInteraction){
                 backC = GUI_GETCOLOR(GuiColor_ButtonBackgroundHot);
             }
         }
         
-        GuiPushBut(gui, chkRect);
+        GuiPushBut(Gui, chkRect);
         
         if(*value){
-            PushGlyph(gui->stack,
+            PushGlyph(Gui->Stack,
                       chkRect.min, 
                       GetRectDim(chkRect),
-                      gui->CheckboxMark,
-                      gui->CheckboxMark->MinUV,
-                      gui->CheckboxMark->MaxUV,
+                      Gui->CheckboxMark,
+                      Gui->CheckboxMark->MinUV,
+                      Gui->CheckboxMark->MaxUV,
                       V4(1.0f, 1.0f, 1.0f, 1.0f));
         }
         
         // NOTE(Dima): Button name text printing
-        float nameStartY = GetCenteredTextOffsetY(gui->mainFont, chkRect, gui->fontScale);
-        v2 nameStart = V2(chkRect.max.x + GetScaledAscender(gui->mainFont, gui->fontScale) * 0.5f, nameStartY);
-        rc2 nameRc = PrintText(gui, name, nameStart, GUI_GETCOLOR(GuiColor_Text));
+        float nameStartY = GetCenteredTextOffsetY(Gui->mainFont, chkRect, Gui->fontScale);
+        v2 nameStart = V2(chkRect.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f, nameStartY);
+        rc2 nameRc = PrintText(Gui, name, nameStart, GUI_GETCOLOR(GuiColor_Text));
         
         rc2 advanceRect = GetBoundingRect(chkRect, nameRc);
-        GuiPostAdvance(gui, layout, advanceRect);
+        GuiPostAdvance(Gui, layout, advanceRect);
     }
     
-    GuiEndElement(gui, GuiElement_Item);
+    GuiEndElement(Gui, GuiElement_Item);
 }
 
 void GuiBeginRadioGroup(
-Gui_State* gui, 
+gui_state* Gui, 
 char* name, 
 u32* ref, 
 u32 defaultId) 
 {
-    Gui_Element* element = GuiBeginElement(gui, 
+    Gui_Element* element = GuiBeginElement(Gui, 
                                            name, 
                                            GuiElement_RadioGroup, 
                                            JOY_TRUE);
@@ -1653,10 +1652,10 @@ GuiFindRadioGroupParent(Gui_Element* curElement) {
 }
 
 
-void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId) {
-    Gui_Element* radioBut = GuiBeginElement(gui, name, GuiElement_Item, JOY_TRUE);
-    Gui_Element* radioGroup = GuiFindRadioGroupParent(gui->curElement);
-    Gui_Layout* layout = GetParentLayout(gui);
+void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId) {
+    Gui_Element* radioBut = GuiBeginElement(Gui, name, GuiElement_Item, JOY_TRUE);
+    Gui_Element* radioGroup = GuiFindRadioGroupParent(Gui->curElement);
+    Gui_Layout* layout = GetParentLayout(Gui);
     
     if (radioGroup && 
         GuiElementOpenedInTree(radioBut) && 
@@ -1668,133 +1667,133 @@ void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId) {
         }
         
         
-        GuiPreAdvance(gui, layout);
+        GuiPreAdvance(Gui, layout);
         
         // NOTE(Dima): Printing button and text
-        rc2 textRc = GetTextRect(gui, name, layout->At);
-        textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 3.0f));
-        GuiPushBut(gui, textRc);
+        rc2 textRc = GetTextRect(Gui, name, layout->At);
+        textRc = GetTxtElemRect(Gui, layout, textRc, V2(4.0f, 3.0f));
+        GuiPushBut(Gui, textRc);
         
         v4 textC;
         if(isActive){
             textC = GUI_GETCOLOR(GuiColor_ButtonForeground);
             v4 oulineColor = GUI_GETCOLOR_COLSYS(Color_Red);
-            GuiPushBut(gui, textRc, PushBut_Outline, oulineColor);
+            GuiPushBut(Gui, textRc, PushBut_Outline, oulineColor);
         }
         else{
             textC = GUI_GETCOLOR(GuiColor_ButtonForegroundDisabled);
         }
         
         Gui_Empty_Interaction Interaction(radioBut);
-        if (MouseInRect(gui->input, textRc)) {
-            GuiSetHot(gui, Interaction.ID, JOY_TRUE);
+        if (MouseInRect(Gui->Input, textRc)) {
+            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
             textC = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
-            if (KeyWentDown(gui->input, MouseKey_Left)) {
-                GuiSetActive(gui, &Interaction);
+            if (KeyWentDown(Gui->Input, MouseKey_Left)) {
+                GuiSetActive(Gui, &Interaction);
                 
                 if(radioGroup->data.RadioGroup.ref){
                     *radioGroup->data.RadioGroup.ref = uniqueId;
                 }
                 radioGroup->data.RadioGroup.activeId = uniqueId;
                 
-                GuiReleaseInteraction(gui, &Interaction);
+                GuiReleaseInteraction(Gui, &Interaction);
             }
         }
         else{
-            GuiSetHot(gui, Interaction.ID, JOY_FALSE);
+            GuiSetHot(Gui, Interaction.ID, JOY_FALSE);
         }
         
-        PrintTextCenteredInRect(gui, name, textRc, 1.0f, textC);
+        PrintTextCenteredInRect(Gui, name, textRc, 1.0f, textC);
         
-        GuiPostAdvance(gui, layout, textRc);
+        GuiPostAdvance(Gui, layout, textRc);
     }
     
-    GuiEndElement(gui, GuiElement_Item);
+    GuiEndElement(Gui, GuiElement_Item);
 }
 
-void GuiEndRadioGroup(Gui_State* gui) {
-    GuiEndElement(gui, GuiElement_RadioGroup);
+void GuiEndRadioGroup(gui_state* Gui) {
+    GuiEndElement(Gui, GuiElement_RadioGroup);
 }
 
-void GuiSliderFloat(Gui_State* gui, float* Value, float Min, float Max, char* Name){
-    Gui_Element* elem = GuiBeginElement(gui, Name, GuiElement_Item, JOY_TRUE);
-    Gui_Layout* layout = GetParentLayout(gui);
+void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Name){
+    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, JOY_TRUE);
+    Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
        PotentiallyVisibleSmall(layout))
     {
-        GuiPreAdvance(gui, layout);
+        GuiPreAdvance(Gui, layout);
         
-        rc2 textRc = GetTextRect(gui, 
+        rc2 textRc = GetTextRect(Gui, 
                                  "                ", 
                                  layout->At);
-        textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 4.0f));
-        GuiPushBut(gui, textRc, PushBut_Color, V4(0.05f, 0.05f, 0.1f, 1.0f));
+        textRc = GetTxtElemRect(Gui, layout, textRc, V2(4.0f, 4.0f));
+        GuiPushBut(Gui, textRc, PushBut_Color, V4(0.05f, 0.05f, 0.1f, 1.0f));
         
         char Buf[32];
         stbsp_sprintf(Buf, "%.3f", *Value);
         v4 textC = GUI_GETCOLOR(GuiColor_ButtonForeground);
-        PrintTextCenteredInRect(gui, Buf, textRc, 1.0f, textC);
+        PrintTextCenteredInRect(Gui, Buf, textRc, 1.0f, textC);
         
-        float NameStartY = GetCenteredTextOffsetY(gui->mainFont, textRc, gui->fontScale);
-        v2 NameStart = V2(textRc.max.x + GetScaledAscender(gui->mainFont, gui->fontScale) * 0.5f, NameStartY);
+        float NameStartY = GetCenteredTextOffsetY(Gui->mainFont, textRc, Gui->fontScale);
+        v2 NameStart = V2(textRc.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f, NameStartY);
         
-        rc2 NameRc = PrintText(gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
+        rc2 NameRc = PrintText(Gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
         
         rc2 AdvanceRect = GetBoundingRect(NameRc, textRc);
-        GuiPostAdvance(gui, layout, AdvanceRect);
+        GuiPostAdvance(Gui, layout, AdvanceRect);
     }
     
-    GuiEndElement(gui, GuiElement_Item);
+    GuiEndElement(Gui, GuiElement_Item);
     
 }
 
-void GuiInputText(Gui_State* gui, char* name, char* Buf, int BufSize){
-    Gui_Element* elem = GuiBeginElement(gui, name, GuiElement_Item, JOY_TRUE);
-    Gui_Layout* layout = GetParentLayout(gui);
+void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
+    Gui_Element* elem = GuiBeginElement(Gui, name, GuiElement_Item, JOY_TRUE);
+    Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
        PotentiallyVisibleSmall(layout))
     {
-        GuiPreAdvance(gui, layout);
+        GuiPreAdvance(Gui, layout);
         
         // NOTE(Dima): Printing button and text
-        rc2 textRc = GetTextRect(gui, 
+        rc2 textRc = GetTextRect(Gui, 
                                  "                            ", 
                                  layout->At);
-        textRc = GetTxtElemRect(gui, layout, textRc, V2(4.0f, 3.0f));
-        GuiPushBut(gui, textRc, PushBut_AlphaBlack);
+        textRc = GetTxtElemRect(Gui, layout, textRc, V2(4.0f, 3.0f));
+        GuiPushBut(Gui, textRc, PushBut_AlphaBlack);
         
         int* CaretP = &elem->data.InputText.CaretPos;
         
         Gui_Empty_Interaction Interaction(elem);
         
-        if(MouseInRect(gui->input, textRc)){
-            GuiSetHot(gui, Interaction.ID, JOY_TRUE);
+        if(MouseInRect(Gui->Input, textRc)){
+            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
             
-            if(KeyWentDown(gui->input, MouseKey_Left)){
-                GuiSetActive(gui, &Interaction);
+            if(KeyWentDown(Gui->Input, MouseKey_Left)){
+                GuiSetActive(Gui, &Interaction);
             }
         }
         else{
-            if(KeyWentDown(gui->input, MouseKey_Left) ||
-               KeyWentDown(gui->input, MouseKey_Right))
+            if(KeyWentDown(Gui->Input, MouseKey_Left) ||
+               KeyWentDown(Gui->Input, MouseKey_Right))
             {
-                GuiReleaseInteraction(gui, &Interaction);
+                GuiReleaseInteraction(Gui, &Interaction);
             }
             
-            GuiSetHot(gui, Interaction.ID, JOY_FALSE);
+            GuiSetHot(Gui, Interaction.ID, JOY_FALSE);
         }
         
-        if(GuiIsActive(gui, &Interaction)){
+        if(GuiIsActive(Gui, &Interaction)){
             
             char FrameInputProcessed[32];
             int FrameInputProcessedAt = 0;
             FrameInputProcessed[0] = 0;
             
-            for(int i = 0; i < gui->input->FrameInputLen; i++){
-                char AtChar = gui->input->FrameInput[i];
+            for(int i = 0; i < Gui->Input->FrameInputLen; i++){
+                char AtChar = Gui->Input->FrameInput[i];
                 if(AtChar >= ' ' && AtChar <= '~'){
                     FrameInputProcessed[FrameInputProcessedAt++] = AtChar;
                     FrameInputProcessed[FrameInputProcessedAt] = 0;
@@ -1807,71 +1806,71 @@ void GuiInputText(Gui_State* gui, char* name, char* Buf, int BufSize){
                                      *CaretP, 
                                      FrameInputProcessed);
             
-            if(KeyIsDown(gui->input, Key_Left)){
-                if(KeyIsDown(gui->input, Key_Control)){
-                    for(int i = 0; i < gui->input->KeyStates[Key_Left].RepeatCount; i++){
+            if(KeyIsDown(Gui->Input, Key_Left)){
+                if(KeyIsDown(Gui->Input, Key_Control)){
+                    for(int i = 0; i < Gui->Input->KeyStates[Key_Left].RepeatCount; i++){
                         int FoundIndex = FindSkipPrev(Buf, *CaretP);
                         *CaretP = FoundIndex;
                     }
                 }
                 else{
-                    for(int i = 0; i < gui->input->KeyStates[Key_Left].RepeatCount; i++){
+                    for(int i = 0; i < Gui->Input->KeyStates[Key_Left].RepeatCount; i++){
                         *CaretP = *CaretP - 1;
                     }
                 }
             }
             
-            if(KeyIsDown(gui->input, Key_Right)){
-                if(KeyIsDown(gui->input, Key_Control)){
-                    for(int i = 0; i < gui->input->KeyStates[Key_Right].RepeatCount; i++){
+            if(KeyIsDown(Gui->Input, Key_Right)){
+                if(KeyIsDown(Gui->Input, Key_Control)){
+                    for(int i = 0; i < Gui->Input->KeyStates[Key_Right].RepeatCount; i++){
                         int FoundIndex = FindSkipNext(Buf, *CaretP);
                         *CaretP = FoundIndex;
                     }
                 }
                 else{
-                    for(int i = 0; i < gui->input->KeyStates[Key_Right].RepeatCount; i++){
+                    for(int i = 0; i < Gui->Input->KeyStates[Key_Right].RepeatCount; i++){
                         *CaretP = *CaretP + 1;
                     }
                 }
             }
             
-            if(KeyIsDown(gui->input, Key_Backspace)){
-                if(KeyIsDown(gui->input, Key_Control)){
-                    for(int i = 0; i < gui->input->KeyStates[Key_Backspace].RepeatCount; i++){
+            if(KeyIsDown(Gui->Input, Key_Backspace)){
+                if(KeyIsDown(Gui->Input, Key_Control)){
+                    for(int i = 0; i < Gui->Input->KeyStates[Key_Backspace].RepeatCount; i++){
                         *CaretP += EraseToNonLetterPrev(Buf, *CaretP);
                     }
                 }
                 else{
-                    for(int i = 0; i < gui->input->KeyStates[Key_Backspace].RepeatCount; i++){
+                    for(int i = 0; i < Gui->Input->KeyStates[Key_Backspace].RepeatCount; i++){
                         *CaretP += ErasePrevCharFromString(Buf, *CaretP);
                     }
                 }
             }
             
             
-            if(KeyIsDown(gui->input, Key_Delete)){
-                if(KeyIsDown(gui->input, Key_Control)){
-                    for(int i = 0; i < gui->input->KeyStates[Key_Backspace].RepeatCount; i++){
+            if(KeyIsDown(Gui->Input, Key_Delete)){
+                if(KeyIsDown(Gui->Input, Key_Control)){
+                    for(int i = 0; i < Gui->Input->KeyStates[Key_Backspace].RepeatCount; i++){
                         //f***CaretP += EraseToNonLetterNext(Buf, *CaretP);
                     }
                 }
                 else{
-                    for(int i = 0; i < gui->input->KeyStates[Key_Backspace].RepeatCount; i++){
+                    for(int i = 0; i < Gui->Input->KeyStates[Key_Backspace].RepeatCount; i++){
                         *CaretP += EraseNextCharFromString(Buf, *CaretP);
                     }
                 }
             }
             
             v4 oulineColor = GUI_GETCOLOR_COLSYS(Color_Red);
-            GuiPushBut(gui, textRc, PushBut_Outline, oulineColor);
+            GuiPushBut(Gui, textRc, PushBut_Outline, oulineColor);
         }
         
         *CaretP = Max(0, *CaretP);
         *CaretP = Min(*CaretP, Min(StringLength(Buf), BufSize - 1));
         
         v4 textC = V4(1.0f, 1.0f, 1.0f, 1.0f);
-        //PrintTextCenteredInRect(gui, Buf, textRc, 1.0f, textC);
-        v2 BufTextSize = GetTextSize(gui, Buf, 1.0f);
+        //PrintTextCenteredInRect(Gui, Buf, textRc, 1.0f, textC);
+        v2 BufTextSize = GetTextSize(Gui, Buf, 1.0f);
         float PrintPX;
         float FieldDimX = GetRectDim(textRc).x;
         if(BufTextSize.x < FieldDimX){
@@ -1880,47 +1879,47 @@ void GuiInputText(Gui_State* gui, char* name, char* Buf, int BufSize){
         else{
             PrintPX = textRc.max.x - BufTextSize.x;
         }
-        float PrintPY = GetCenteredTextOffsetY(gui->mainFont,
+        float PrintPY = GetCenteredTextOffsetY(Gui->mainFont,
                                                textRc, 
-                                               gui->fontScale);
+                                               Gui->fontScale);
         v2 PrintP = V2(PrintPX, PrintPY);
-        v2 CaretPrintP = GetCaretPrintP(gui, Buf, PrintP, *CaretP);
+        v2 CaretPrintP = GetCaretPrintP(Gui, Buf, PrintP, *CaretP);
         
         v4 CaretColor = V4(0.0f, 1.0f, 0.0f, 1.0f);
-        PrintCaret(gui, 
+        PrintCaret(Gui, 
                    CaretPrintP,
                    CaretColor); 
-        PrintText(gui, Buf, PrintP, GUI_GETCOLOR(GuiColor_Text));
+        PrintText(Gui, Buf, PrintP, GUI_GETCOLOR(GuiColor_Text));
         
         
-        float nameStartY = GetCenteredTextOffsetY(gui->mainFont, textRc, gui->fontScale);
-        v2 nameStart = V2(textRc.max.x + GetScaledAscender(gui->mainFont, gui->fontScale) * 0.5f, nameStartY);
+        float nameStartY = GetCenteredTextOffsetY(Gui->mainFont, textRc, Gui->fontScale);
+        v2 nameStart = V2(textRc.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f, nameStartY);
         char DebugBuf[256];
         
 #if 1
         stbsp_sprintf(DebugBuf, "CaretP: %d; LeftRC: %d", *CaretP, 
-                      gui->input->KeyStates[Key_Left].RepeatCount);
-        rc2 NameRc = PrintText(gui, DebugBuf, nameStart, GUI_GETCOLOR(GuiColor_Text));
+                      Gui->Input->KeyStates[Key_Left].RepeatCount);
+        rc2 NameRc = PrintText(Gui, DebugBuf, nameStart, GUI_GETCOLOR(GuiColor_Text));
 #else
-        rc2 NameRc = PrintText(gui, name, nameStart, GUI_GETCOLOR(GuiColor_Text));
+        rc2 NameRc = PrintText(Gui, name, nameStart, GUI_GETCOLOR(GuiColor_Text));
 #endif
         
         
         rc2 AdvanceRect = GetBoundingRect(NameRc, textRc);
         
-        GuiPostAdvance(gui, layout, AdvanceRect);
+        GuiPostAdvance(Gui, layout, AdvanceRect);
     }
     
-    GuiEndElement(gui, GuiElement_Item);
+    GuiEndElement(Gui, GuiElement_Item);
 }
 
-void GuiTest(Gui_State* gui, float deltaTime){
+void GuiTest(gui_state* Gui, float deltaTime){
     
-    Render_Stack* renderStack = gui->stack;
-    Input* input = gui->input;
+    render_stack* renderStack = Gui->Stack;
+    input_state* input = Gui->Input;
     
     char FPSBuf[64];
-    stbsp_sprintf(FPSBuf, "FPS %.2f, ms %.3f", 1.0f / deltaTime, deltaTime);
+    stbsp_sprintf(FPSBuf, "FPS %.2f, delta time(sec) %.3f", 1.0f / deltaTime, deltaTime);
     
     static int lastFrameEntryCount = 0;
     static int lastFrameBytesUsed = 0;
@@ -1929,256 +1928,256 @@ void GuiTest(Gui_State* gui, float deltaTime){
                   lastFrameEntryCount, 
                   lastFrameBytesUsed);
     
-    GuiBeginPage(gui, "Page1");
-    GuiEndPage(gui);
+    GuiBeginPage(Gui, "Page1");
+    GuiEndPage(Gui);
     
-    GuiBeginPage(gui, "Page2");
-    GuiEndPage(gui);
+    GuiBeginPage(Gui, "Page2");
+    GuiEndPage(Gui);
     
-    GuiBeginPage(gui, "Animation");
-    GuiEndPage(gui);
+    GuiBeginPage(Gui, "Animation");
+    GuiEndPage(Gui);
     
-    GuiBeginPage(gui, "Platform");
-    GuiEndPage(gui);
+    GuiBeginPage(Gui, "Platform");
+    GuiEndPage(Gui);
     
-    GuiBeginPage(gui, "GUI");
-    GuiEndPage(gui);
+    GuiBeginPage(Gui, "GUI");
+    GuiEndPage(Gui);
     
-    //GuiUpdateWindows(gui);
-    GuiBeginTree(gui, "Some text");
-    GuiText(gui, "Hello world");
-    GuiText(gui, FPSBuf);
-    GuiText(gui, StackInfo);
-    GuiText(gui, "I love Kate");
-    GuiText(gui, "I wish joy and happiness for everyone");
+    //GuiUpdateWindows(Gui);
+    GuiBeginTree(Gui, "Some text");
+    GuiText(Gui, "Hello world");
+    GuiText(Gui, FPSBuf);
+    GuiText(Gui, StackInfo);
+    GuiText(Gui, "I love Kate");
+    GuiText(Gui, "I wish joy and happiness for everyone");
     
-    GuiEndTree(gui);
+    GuiEndTree(Gui);
     
-    //GuiPushDim(gui, V2(100, 100));
-    GuiBeginLayout(gui, "layout1", GuiLayout_Window);
+    //GuiPushDim(Gui, V2(100, 100));
+    GuiBeginLayout(Gui, "layout1", GuiLayout_Window);
     static char InputTextBuf[256];
-    GuiInputText(gui, "Input Text", InputTextBuf, 256);
+    GuiInputText(Gui, "Input Text", InputTextBuf, 256);
     static float TestFloat4Slider;
-    GuiSliderFloat(gui, &TestFloat4Slider, -5.0f, 10.0f, "FloatSlider");
-    GuiBeginTree(gui, "AddClearButtons");
+    GuiSliderFloat(Gui, &TestFloat4Slider, -5.0f, 10.0f, "FloatSlider");
+    GuiBeginTree(Gui, "AddClearButtons");
     LOCAL_AS_GLOBAL int RectCount = 0;
-    GuiBeginRow(gui);
-    if(GuiButton(gui, "Add")){
+    GuiBeginRow(Gui);
+    if(GuiButton(Gui, "Add")){
         RectCount++;
     }
-    if(GuiButton(gui, "Clear")){
+    if(GuiButton(Gui, "Clear")){
         RectCount--;
         if(RectCount < 0){
             RectCount = 0;
         }
     }
-    GuiEndRow(gui);
+    GuiEndRow(Gui);
     for(int i = 0; i < RectCount; i++){
         PushRect(renderStack, RcMinDim(V2(100 + i * 50, 100), V2(40, 40)));
     }
-    GuiEndTree(gui);
+    GuiEndTree(Gui);
     
-    GuiBeginTree(gui, "Buttons and checkboxes");
+    GuiBeginTree(Gui, "Buttons and checkboxes");
     static b32 boolButtonValue;
-    GuiBeginRow(gui);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBoolButton(gui, "boolButton123", &boolButtonValue);
-    GuiBoolButton(gui, "boolButton1234", &boolButtonValue);
-    GuiBoolButton(gui, "boolButtonasdfga", &boolButtonValue);
-    GuiBoolButton(gui, "boolButtonzxcvzxcb", &boolButtonValue);
-    GuiEndRow(gui);
+    GuiBeginRow(Gui);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBoolButton(Gui, "boolButton123", &boolButtonValue);
+    GuiBoolButton(Gui, "boolButton1234", &boolButtonValue);
+    GuiBoolButton(Gui, "boolButtonasdfga", &boolButtonValue);
+    GuiBoolButton(Gui, "boolButtonzxcvzxcb", &boolButtonValue);
+    GuiEndRow(Gui);
     
     static b32 boolButtonOnOffValue;
-    GuiBeginRow(gui);
-    GuiBeginColumn(gui);
-    GuiBoolButtonOnOff(gui, "boolButtonOnOff", &boolButtonValue);
-    GuiBoolButtonOnOff(gui, "boolButtonOnOff1", &boolButtonValue);
-    GuiBoolButtonOnOff(gui, "boolButtonOnOff2", &boolButtonValue);
-    GuiBoolButtonOnOff(gui, "boolButtonOnOff3", &boolButtonValue);
-    GuiEndColumn(gui);
+    GuiBeginRow(Gui);
+    GuiBeginColumn(Gui);
+    GuiBoolButtonOnOff(Gui, "boolButtonOnOff", &boolButtonValue);
+    GuiBoolButtonOnOff(Gui, "boolButtonOnOff1", &boolButtonValue);
+    GuiBoolButtonOnOff(Gui, "boolButtonOnOff2", &boolButtonValue);
+    GuiBoolButtonOnOff(Gui, "boolButtonOnOff3", &boolButtonValue);
+    GuiEndColumn(Gui);
     
-    GuiBeginColumn(gui);
+    GuiBeginColumn(Gui);
     static b32 checkboxValue1;
     static b32 checkboxValue2;
     static b32 checkboxValue3;
     static b32 checkboxValue4;
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiCheckbox(gui, "Checkbox1", &checkboxValue2);
-    GuiCheckbox(gui, "Checkbox2", &checkboxValue3);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiEndColumn(gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiCheckbox(Gui, "Checkbox1", &checkboxValue2);
+    GuiCheckbox(Gui, "Checkbox2", &checkboxValue3);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiEndColumn(Gui);
     
-    GuiBeginColumn(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiCheckbox(gui, "Checkbox1", &checkboxValue2);
-    GuiCheckbox(gui, "Checkbox2", &checkboxValue3);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiEndColumn(gui);
-    GuiEndRow(gui);
+    GuiBeginColumn(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiCheckbox(Gui, "Checkbox1", &checkboxValue2);
+    GuiCheckbox(Gui, "Checkbox2", &checkboxValue3);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiEndColumn(Gui);
+    GuiEndRow(Gui);
     
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff4", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox4", &checkboxValue4);
-    GuiEndTree(gui);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff4", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox4", &checkboxValue4);
+    GuiEndTree(Gui);
     
-    GuiBeginTree(gui, "Some more buts");
-    GuiBeginRow(gui);
-    GuiBeginColumn(gui);
-    GuiPushDim(gui, V2(100, 40));
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff1", &boolButtonValue);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff2", &boolButtonValue);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff3", &boolButtonValue);
-    GuiEndColumn(gui);
+    GuiBeginTree(Gui, "Some more buts");
+    GuiBeginRow(Gui);
+    GuiBeginColumn(Gui);
+    GuiPushDim(Gui, V2(100, 40));
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff1", &boolButtonValue);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff2", &boolButtonValue);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff3", &boolButtonValue);
+    GuiEndColumn(Gui);
     
-    GuiBeginColumn(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiCheckbox(gui, "Checkbox1", &checkboxValue2);
-    GuiCheckbox(gui, "Checkbox2", &checkboxValue3);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiEndColumn(gui);
+    GuiBeginColumn(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiCheckbox(Gui, "Checkbox1", &checkboxValue2);
+    GuiCheckbox(Gui, "Checkbox2", &checkboxValue3);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiEndColumn(Gui);
     
-    GuiEndRow(gui);
-    GuiEndTree(gui);
+    GuiEndRow(Gui);
+    GuiEndTree(Gui);
     
-    GuiBeginTree(gui, "TestCull");
+    GuiBeginTree(Gui, "TestCull");
     static u32 activeRadio = 0;
-    GuiBeginRow(gui);
-    GuiBeginColumn(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiEndColumn(gui);
-    GuiBeginColumn(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiEndColumn(gui);
-    GuiBeginColumn(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiEndColumn(gui);
-    GuiBeginColumn(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiEndColumn(gui);
-    GuiBeginColumn(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiCheckbox(gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(gui, "radio0", 0);
-    GuiEndRadioGroup(gui);
-    GuiEndColumn(gui);
-    GuiEndRow(gui);
-    GuiEndTree(gui);
+    GuiBeginRow(Gui);
+    GuiBeginColumn(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiEndColumn(Gui);
+    GuiBeginColumn(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiEndColumn(Gui);
+    GuiBeginColumn(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiEndColumn(Gui);
+    GuiBeginColumn(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiEndColumn(Gui);
+    GuiBeginColumn(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
+    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
+    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiEndRadioGroup(Gui);
+    GuiEndColumn(Gui);
+    GuiEndRow(Gui);
+    GuiEndTree(Gui);
     
-    GuiBeginRow(gui);
-    GuiBeginRadioGroup(gui, "radioGroup1", &activeRadio, 0);
-    GuiPushDimBegin(gui, V2(100, 40));
-    GuiRadioButton(gui, "radio0", 0);
-    GuiRadioButton(gui, "radio1", 1);
-    GuiRadioButton(gui, "radio2", 2);
-    GuiRadioButton(gui, "radio3", 3);
-    GuiPushDimEnd(gui);
-    GuiEndRadioGroup(gui);
+    GuiBeginRow(Gui);
+    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    GuiPushDimBegin(Gui, V2(100, 40));
+    GuiRadioButton(Gui, "radio0", 0);
+    GuiRadioButton(Gui, "radio1", 1);
+    GuiRadioButton(Gui, "radio2", 2);
+    GuiRadioButton(Gui, "radio3", 3);
+    GuiPushDimEnd(Gui);
+    GuiEndRadioGroup(Gui);
     
     char radioTxt[32];
     stbsp_sprintf(radioTxt, "radio but value: %u", activeRadio);
-    GuiEndRow(gui);
-    GuiText(gui, radioTxt);
+    GuiEndRow(Gui);
+    GuiText(Gui, radioTxt);
     
-    GuiTooltip(gui, "Hello world!", input->MouseP);
+    GuiTooltip(Gui, "Hello world!", input->MouseP);
     
-    GuiEndLayout(gui);
+    GuiEndLayout(Gui);
     
     lastFrameBytesUsed = renderStack->MemBlock.Used;
     lastFrameEntryCount = renderStack->EntryCount;

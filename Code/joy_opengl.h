@@ -25,28 +25,28 @@ inline b32 GlArrayIsValid(GLint Arr){
     return(Result);
 }
 
-struct Gl_Program{
+struct gl_program{
     GLuint ID;
 };
 
-inline GLint GlGetUniform(Gl_Program program, char* text){
+inline GLint GlGetUniform(gl_program program, char* text){
     GLint Result = glGetUniformLocation(program.ID, text);
     
     return(Result);
 }
 
-inline GLint GlGetAttribLoc(Gl_Program program, char* text){
+inline GLint GlGetAttribLoc(gl_program program, char* text){
     GLint Result = glGetAttribLocation(program.ID, text);
     
     return(Result);
 }
 
-enum Gl_Shader_Type{
+enum gl_shader_type{
     GlShader_Simple,
     GlShader_Compute,
 };
 
-struct Gl_Shader{
+struct gl_shader{
     GLuint ID;
     u32 Type;
     int _InternalProgramIndex;
@@ -76,11 +76,11 @@ struct Gl_Shader{
     }
 };
 
-struct Gl_Screen_Shader : public Gl_Shader{
+struct Gl_Screen_Shader : public gl_shader{
     GLint ScreenTextureLoc;
 };
 
-struct Gl_Simple_Shader : public Gl_Shader{
+struct Gl_Simple_Shader : public gl_shader{
     GLint ModelLoc;
     GLint ViewLoc;
     GLint ProjectionLoc;
@@ -92,7 +92,7 @@ struct Gl_Simple_Shader : public Gl_Shader{
     GLint CAttrLoc;
 };
 
-struct Gl_GuiRect_Shader : public Gl_Shader{
+struct Gl_GuiRect_Shader : public gl_shader{
     GLint BitmapLoc;
     GLint BitmapIsSetLoc;
     GLint ProjectionLoc;
@@ -101,7 +101,7 @@ struct Gl_GuiRect_Shader : public Gl_Shader{
     GLint CAttrLoc;
 };
 
-struct Gl_GuiGeom_Shader : public Gl_Shader{
+struct Gl_GuiGeom_Shader : public gl_shader{
     GLint BitmapLoc;
     GLint TriangleGeomTypesLoc;
     GLint ProjectionLoc;
@@ -110,8 +110,8 @@ struct Gl_GuiGeom_Shader : public Gl_Shader{
     GLint CAttrLoc;
 };
 
-struct Gl_State{
-    Gl_Program Programs[256];
+struct gl_state{
+    gl_program Programs[256];
     int ProgramsCount;
     
     GLuint LargeAtlasHandle;
@@ -138,9 +138,9 @@ struct Gl_State{
     m44 GuiOrtho;
 };
 
-void GlInit(Gl_State* gl, Assets* assets);
-void GlFree(Gl_State* gl);
-void GlOutputRender(Gl_State* GL, Render_State* render);
-void GlOutputCommands(Gl_State* gl, Render_Stack* stack);
+void GlInit(gl_state* gl, assets* Assets);
+void GlFree(gl_state* gl);
+void GlOutputRender(gl_state* GL, render_state* Render);
+void GlOutputCommands(gl_state* gl, render_stack* Stack);
 
 #endif

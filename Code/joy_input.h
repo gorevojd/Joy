@@ -3,6 +3,10 @@
 
 #include "joy_types.h"
 #include "joy_math.h"
+#include "joy_memory.h"
+
+#define INPUT_PLATFORM_PROCESS(name) void name()
+typedef INPUT_PLATFORM_PROCESS(input_platform_process);
 
 enum KeyType{
     KeyMouse_Left,
@@ -120,7 +124,10 @@ struct KeyState{
     int RepeatCount;
 };
 
-struct Input{
+struct input_state{
+    // NOTE(Dima): Put here for later usage
+    mem_region* Region;
+    
     KeyState KeyStates[Key_Count];
     
     //NOTE(Dima): In window coords top-left
@@ -131,13 +138,13 @@ struct Input{
     int FrameInputLen;
 };
 
-inline b32 KeyIsDown(Input* input, u32 keyType){
+inline b32 KeyIsDown(input_state* input, u32 keyType){
     b32 res = input->KeyStates[keyType].endedDown;
     
     return(res);
 }
 
-inline b32 KeyWentDown(Input* input, u32 keyType){
+inline b32 KeyWentDown(input_state* input, u32 keyType){
     KeyState* Key = &input->KeyStates[keyType];
     
     b32 res = Key->endedDown && Key->transitionHappened;
@@ -145,7 +152,7 @@ inline b32 KeyWentDown(Input* input, u32 keyType){
     return(res);
 }
 
-inline b32 KeyWentUp(Input* input, u32 keyType){
+inline b32 KeyWentUp(input_state* input, u32 keyType){
     KeyState* Key = &input->KeyStates[keyType];
     
     b32 res = !Key->endedDown && Key->transitionHappened;
@@ -153,7 +160,7 @@ inline b32 KeyWentUp(Input* input, u32 keyType){
     return(res);
 }
 
-inline b32 MouseInRect(Input* input, rc2 rect) {
+inline b32 MouseInRect(input_state* input, rc2 rect) {
 	b32 res = 0;
     
 	res =
@@ -165,7 +172,7 @@ inline b32 MouseInRect(Input* input, rc2 rect) {
 	return(res);
 }
 
-inline b32 MouseInRect(Input* input, v2 P, v2 Dim) {
+inline b32 MouseInRect(input_state* input, v2 P, v2 Dim) {
 	b32 res = 0;
     
 	rc2 rect;
@@ -177,7 +184,7 @@ inline b32 MouseInRect(Input* input, v2 P, v2 Dim) {
     return(res);
 }
 
-inline b32 MouseLeftWentDownInRect(Input* input, rc2 rect) {
+inline b32 MouseLeftWentDownInRect(input_state* input, rc2 rect) {
 	b32 res = 0;
     
 	if (MouseInRect(input, rect)) {
@@ -189,7 +196,7 @@ inline b32 MouseLeftWentDownInRect(Input* input, rc2 rect) {
 	return(res);
 }
 
-inline b32 MouseRightWentDownInRect(Input* input, rc2 rect) {
+inline b32 MouseRightWentDownInRect(input_state* input, rc2 rect) {
 	b32 res = 0;
     
 	if (MouseInRect(input, rect)) {

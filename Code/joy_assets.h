@@ -9,7 +9,7 @@
 #include "joy_memory.h"
 
 struct asset{
-    Memory_Entry* DataMemoryEntry;
+    mem_entry* DataMemoryEntry;
     
     union{
         
@@ -17,11 +17,11 @@ struct asset{
 };
 
 // NOTE(dima): Bitmaps are stored in gamma-corrected premultiplied alpha format
-struct Assets{
-    Memory_Region* Region;
+struct assets{
+    mem_region* Region;
     
     // NOTE(Dima): Memory entries
-    Memory_Box MemBox;
+    mem_box MemBox;
     
     // NOTE(Dima): Assets
     Asset_Atlas MainLargeAtlas;
@@ -60,6 +60,6 @@ struct Assets{
     Font_Info pfdin;
 };
 
-void InitAssets(Assets* assets, Memory_Region* region);
+void InitAssets(assets* Assets);
 
 #endif

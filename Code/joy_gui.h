@@ -61,8 +61,8 @@ enum GuiColorType{
     GuiColor_Count,
 };
 
-#define GUI_GETCOLOR(color) gui->colors[color]
-#define GUI_GETCOLOR_COLSYS(index) gui->colorState.colorTable[index].color
+#define GUI_GETCOLOR(color) Gui->colors[color]
+#define GUI_GETCOLOR_COLSYS(index) Gui->colorState.colorTable[index].color
 #define GUI_COLORHEX(str) ColorFromHex(str)
 
 enum GuiAdvanceType{
@@ -234,18 +234,28 @@ struct Gui_Interaction{
         this->WasActiveInInteraction = 0;
     }
     
-    virtual void Interact(struct Gui_State* gui) = 0;
+    virtual void Interact(struct gui_state* Gui) = 0;
 };
 
+struct gui_frame_info{
+    render_stack* Stack;
+    input_state* Input;
+    int Width;
+    int Height;
+};
 
-struct Gui_State{
+struct gui_state{
     Font_Info* mainFont;
     float fontScale;
     
-    Render_Stack* stack;
+    gui_frame_info FrameInfo;
     
-    Input* input;
-    Memory_Region* mem;
+    render_stack* Stack;
+    input_state* Input;
+    int Width;
+    int Height;
+    
+    mem_region* Mem;
     
     u32 HotInteraction;
     u32 ActiveInteraction;
@@ -271,9 +281,6 @@ struct Gui_State{
     Gui_Element freeSentinel;
     Gui_Element useSentinel;
     
-    int width;
-    int height;
-    
 #define GUI_MAX_TOOLTIPS 256
     Gui_Tooltip tooltips[GUI_MAX_TOOLTIPS];
     int tooltipIndex;
@@ -291,46 +298,46 @@ struct Gui_State{
 };
 
 
-inline b32 GuiIsHot(Gui_State* gui,
+inline b32 GuiIsHot(gui_state* Gui,
                     Gui_Interaction* interaction)
 {
-    b32 Result = gui->HotInteraction == interaction->ID;
+    b32 Result = Gui->HotInteraction == interaction->ID;
     
     return(Result);
 }
 
-inline void GuiSetHot(Gui_State* gui, u32 InteractionID, b32 ToSet){
+inline void GuiSetHot(gui_state* Gui, u32 InteractionID, b32 ToSet){
     if(ToSet){
         
-        if(gui->HotInteraction == 0){
-            gui->HotInteraction = InteractionID;
+        if(Gui->HotInteraction == 0){
+            Gui->HotInteraction = InteractionID;
         }
     }
     else{
-        if(gui->HotInteraction == InteractionID){
-            gui->HotInteraction = 0;
+        if(Gui->HotInteraction == InteractionID){
+            Gui->HotInteraction = 0;
         }
     }
 }
 
 
-inline b32 GuiIsActive(Gui_State* gui, Gui_Interaction* interaction){
-    b32 Result = gui->ActiveInteraction == interaction->ID;
+inline b32 GuiIsActive(gui_state* Gui, Gui_Interaction* interaction){
+    b32 Result = Gui->ActiveInteraction == interaction->ID;
     
     return(Result);
 }
 
-inline void GuiSetActive(Gui_State* gui, Gui_Interaction* interaction){
-    if(GuiIsHot(gui, interaction)){
-        gui->ActiveInteraction = interaction->ID;
-        GuiSetHot(gui, interaction->ID, JOY_FALSE);
+inline void GuiSetActive(gui_state* Gui, Gui_Interaction* interaction){
+    if(GuiIsHot(Gui, interaction)){
+        Gui->ActiveInteraction = interaction->ID;
+        GuiSetHot(Gui, interaction->ID, JOY_FALSE);
     }
 }
 
-inline void GuiReleaseInteraction(Gui_State* gui, Gui_Interaction* interaction){
+inline void GuiReleaseInteraction(gui_state* Gui, Gui_Interaction* interaction){
     if(interaction){
-        if(GuiIsActive(gui, interaction)){
-            gui->ActiveInteraction = 0;
+        if(GuiIsActive(Gui, interaction)){
+            Gui->ActiveInteraction = 0;
         }
     }
 }
@@ -342,7 +349,7 @@ struct Gui_Empty_Interaction : public Gui_Interaction{
         
     }
     
-    virtual void Interact(Gui_State* gui) override {
+    virtual void Interact(gui_state* Gui) override {
         this->WasHotInInteraction = 0;
         this->WasActiveInInteraction = 0;
     }
@@ -359,24 +366,24 @@ struct Gui_BoolInRect_Interaction : public Gui_Interaction{
         this->Rect = Rect;
     }
     
-    virtual void Interact(Gui_State* gui) override {
+    virtual void Interact(gui_state* Gui) override {
         
         this->WasHotInInteraction = 0;
         this->WasActiveInInteraction = 0;
         
-        if(MouseInRect(gui->input, Rect)){
-            GuiSetHot(gui, this->ID, JOY_TRUE);
+        if(MouseInRect(Gui->Input, Rect)){
+            GuiSetHot(Gui, this->ID, JOY_TRUE);
             this->WasHotInInteraction = JOY_TRUE;
             
-            if(KeyWentDown(gui->input, MouseKey_Left)){
-                GuiSetActive(gui, this);
+            if(KeyWentDown(Gui->FrameInfo.Input, MouseKey_Left)){
+                GuiSetActive(Gui, this);
                 *Value = !*Value;
                 this->WasActiveInInteraction = JOY_TRUE;
-                GuiReleaseInteraction(gui, this);
+                GuiReleaseInteraction(Gui, this);
             }
         }
         else{
-            GuiSetHot(gui, this->ID, JOY_FALSE);
+            GuiSetHot(Gui, this->ID, JOY_FALSE);
         }
     }
 };
@@ -409,9 +416,9 @@ struct Gui_Resize_Interaction : public Gui_Interaction{
         this->Position = Position;
     }
     
-    virtual void Interact(Gui_State* gui) override {
+    virtual void Interact(gui_state* Gui) override {
         v2 WorkRectP = this->Position;
-        v2 MouseP = gui->input->MouseP - this->OffsetInAnchor;
+        v2 MouseP = Gui->FrameInfo.Input->MouseP - this->OffsetInAnchor;
         
         v2* WorkDim = this->DimensionPtr;
         
@@ -473,9 +480,9 @@ struct Gui_Move_Interaction : public Gui_Interaction{
         this->MovePosition = MovePosition;
     }
     
-    virtual void Interact(Gui_State* gui) override {
+    virtual void Interact(gui_state* Gui) override {
         v2* WorkP = this->MovePosition;
-        v2 MouseP = gui->input->MouseP - this->OffsetInAnchor;
+        v2 MouseP = Gui->FrameInfo.Input->MouseP - this->OffsetInAnchor;
         
         switch (this->Type) {
             case Gui_Move_Interaction_Type::Move: {
@@ -505,15 +512,15 @@ GuiFindElementOfTypeUpInTree(Gui_Element* curElement, u32 elementType) {
 }
 
 
-inline Gui_Layout* GetParentLayout(Gui_State* gui){
+inline Gui_Layout* GetParentLayout(gui_state* Gui){
     Gui_Layout* res = 0;
     
     Gui_Element* layoutElem = GuiFindElementOfTypeUpInTree(
-        gui->curElement, 
+        Gui->curElement, 
         GuiElement_Layout);
     
     if(!layoutElem){
-        res = &gui->rootLayout;
+        res = &Gui->rootLayout;
     }
     else{
         res = layoutElem->data.Layout.ref;
@@ -522,71 +529,71 @@ inline Gui_Layout* GetParentLayout(Gui_State* gui){
     return(res);
 }
 
-inline void GuiPushDim(Gui_State* gui, v2 dim){
-    ASSERT(gui->dimStackIndex < ARRAY_COUNT(gui->dimStack));
-    ASSERT(!gui->inPushBlock);
+inline void GuiPushDim(gui_state* Gui, v2 dim){
+    ASSERT(Gui->dimStackIndex < ARRAY_COUNT(Gui->dimStack));
+    ASSERT(!Gui->inPushBlock);
     
     // NOTE(Dima): can't push if inside push block
-    if(gui->inPushBlock){
+    if(Gui->inPushBlock){
         
     }
     else{
-        gui->dimStack[gui->dimStackIndex++] = dim;
+        Gui->dimStack[Gui->dimStackIndex++] = dim;
     }
 }
 
-inline b32 GuiPopDim(Gui_State* gui, v2* outDim){
+inline b32 GuiPopDim(gui_state* Gui, v2* outDim){
     b32 result = 0;
     
-    int decrementValue = gui->inPushBlock ? 0 : 1;
+    int decrementValue = Gui->inPushBlock ? 0 : 1;
     
-    if(gui->dimStackIndex > 0){
+    if(Gui->dimStackIndex > 0){
         result = 1;
         
         if(outDim){
-            int viewIndex = gui->dimStackIndex - 1;
-            *outDim = gui->dimStack[viewIndex];
+            int viewIndex = Gui->dimStackIndex - 1;
+            *outDim = Gui->dimStack[viewIndex];
         }
-        gui->dimStackIndex -= decrementValue;
+        Gui->dimStackIndex -= decrementValue;
     }
     
     return(result);
 }
 
 
-inline void GuiPushDimBegin(Gui_State* gui, v2 dim){
-    gui->dimStack[gui->dimStackIndex++] = dim;
+inline void GuiPushDimBegin(gui_state* Gui, v2 dim){
+    Gui->dimStack[Gui->dimStackIndex++] = dim;
     
-    gui->inPushBlock = 1;
+    Gui->inPushBlock = 1;
 }
 
-inline void GuiPushDimEnd(Gui_State* gui){
-    gui->inPushBlock = 0;
+inline void GuiPushDimEnd(gui_state* Gui){
+    Gui->inPushBlock = 0;
     
-    GuiPopDim(gui, 0);
+    GuiPopDim(Gui, 0);
 }
 
-inline rc2 GetTxtElemRect(Gui_State* gui, Gui_Layout* lay, rc2 txtRc, v2 growScale){
+inline rc2 GetTxtElemRect(gui_state* Gui, Gui_Layout* lay, rc2 txtRc, v2 growScale){
     v2 popDim;
-    if(GuiPopDim(gui, &popDim)){
+    if(GuiPopDim(Gui, &popDim)){
         txtRc.max = txtRc.min + popDim;
     }
     else{
-        rc2 tempTextRc = GrowRectByScaledValue(txtRc, growScale, gui->fontScale);
+        rc2 tempTextRc = GrowRectByScaledValue(txtRc, growScale, Gui->fontScale);
         txtRc.max = txtRc.min + GetRectDim(tempTextRc);
     }
     
     return(txtRc);
 }
 
-inline float GuiGetBaseline(Gui_State* gui, float scale = 1.0f){
-    float res = GetBaseline(gui->mainFont, gui->fontScale * scale);
+inline float GuiGetBaseline(gui_state* Gui, float scale = 1.0f){
+    float res = GetBaseline(Gui->mainFont, Gui->fontScale * scale);
     
     return(res);
 }
 
-inline float GuiGetLineAdvance(Gui_State* gui, float scale = 1.0f){
-    float res = GetLineAdvance(gui->mainFont, gui->fontScale * scale);
+inline float GuiGetLineAdvance(gui_state* Gui, float scale = 1.0f){
+    float res = GetLineAdvance(Gui->mainFont, Gui->fontScale * scale);
     
     return(res);
 }
@@ -597,7 +604,7 @@ enum print_text_operation{
 };
 
 rc2 PrintTextInternal(Font_Info* fontInfo, 
-                      Render_Stack* stack, 
+                      render_stack* Stack, 
                       char* text, 
                       v2 P, 
                       u32 textOp, 
@@ -606,64 +613,59 @@ rc2 PrintTextInternal(Font_Info* fontInfo,
                       int CaretP = 0, 
                       v2* CaretPrintPOut = 0);
 v2 GetTextSizeInternal(Font_Info* fontInfo, char* text, float scale);
-rc2 PrintTextCenteredInRectInternal(Font_Info* fontInfo, Render_Stack* stack, char* text, rc2 rect, float scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
+rc2 PrintTextCenteredInRectInternal(Font_Info* fontInfo, render_stack* Stack, char* text, rc2 rect, float scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
 
-v2 GetTextSize(Gui_State* gui, char* Text, float scale = 1.0f);
-rc2 GetTextRect(Gui_State* gui, char* Text, v2 p, float scale = 1.0f);
-rc2 PrintText(Gui_State* gui, char* text, v2 P, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f), float scale = 1.0f);
-rc2 PrintTextCenteredInRect(Gui_State* gui, char* text, rc2 tect, float scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
+v2 GetTextSize(gui_state* Gui, char* Text, float scale = 1.0f);
+rc2 GetTextRect(gui_state* Gui, char* Text, v2 p, float scale = 1.0f);
+rc2 PrintText(gui_state* Gui, char* text, v2 P, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f), float scale = 1.0f);
+rc2 PrintTextCenteredInRect(gui_state* Gui, char* text, rc2 tect, float scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
 
-void GuiUpdateWindows(Gui_State* gui);
+void GuiUpdateWindows(gui_state* Gui);
 
 void InitGui(
-Gui_State* gui, 
-Input* input, 
-Assets* assets, 
-Memory_Region* mem, 
-Render_Stack* stack,
-int width,
-int height);
+gui_state* Gui,
+assets* Assets);
 
-void GuiFrameBegin(Gui_State* gui);
-void GuiFrameEnd(Gui_State* gui);
+void GuiFrameBegin(gui_state* Gui, gui_frame_info GuiFrameInfo);
+void GuiFrameEnd(gui_state* Gui);
 
-void GuiBeginLayout(Gui_State* gui, char* name, u32 layoutType);
-void GuiEndLayout(Gui_State* gui);
+void GuiBeginLayout(gui_state* Gui, char* name, u32 layoutType);
+void GuiEndLayout(gui_state* Gui);
 
-void GuiBeginPage(Gui_State* gui, char* name);
-void GuiEndPage(Gui_State* gui);
+void GuiBeginPage(gui_state* Gui, char* name);
+void GuiEndPage(gui_state* Gui);
 
-void GuiBeginRow(Gui_State* gui);
-void GuiEndRow(Gui_State* gui);
-void GuiBeginColumn(Gui_State* gui);
-void GuiEndColumn(Gui_State* gui);
+void GuiBeginRow(gui_state* Gui);
+void GuiEndRow(gui_state* Gui);
+void GuiBeginColumn(gui_state* Gui);
+void GuiEndColumn(gui_state* Gui);
 
-void GuiFramePrepare4Render(Gui_State* gui);
+void GuiFramePrepare4Render(gui_state* Gui);
 
-void GuiTooltip(Gui_State* gui, char* tooltipText, v2 at);
-void GuiText(Gui_State* gui, char* text);
-b32 GuiButton(Gui_State* gui, char* buttonName);
-void GuiBoolButton(Gui_State* gui, char* buttonName, b32* value);
-void GuiBoolButtonOnOff(Gui_State* gui, char* buttonName, b32* value);
-void GuiCheckbox(Gui_State* gui, char* name, b32* value);
+void GuiTooltip(gui_state* Gui, char* tooltipText, v2 at);
+void GuiText(gui_state* Gui, char* text);
+b32 GuiButton(gui_state* Gui, char* buttonName);
+void GuiBoolButton(gui_state* Gui, char* buttonName, b32* value);
+void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value);
+void GuiCheckbox(gui_state* Gui, char* name, b32* value);
 
-void GuiBeginTree(Gui_State* gui, char* name);
-void GuiEndTree(Gui_State* gui);
+void GuiBeginTree(gui_state* Gui, char* name);
+void GuiEndTree(gui_state* Gui);
 
 void GuiBeginRadioGroup(
-Gui_State* gui, 
+gui_state* Gui, 
 char* name, 
 u32* ref, 
 u32 defaultId);
-void GuiRadioButton(Gui_State* gui, char* name, u32 uniqueId);
-void GuiEndRadioGroup(Gui_State* gui);
+void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId);
+void GuiEndRadioGroup(gui_state* Gui);
 
-void GuiInputText(Gui_State* gui, char* name, char* Buf, int BufSize);
-void GuiSliderFloat(Gui_State* gui, float* Value, float Min, float Max, char* Name);
+void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize);
+void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Name);
 
-void GuiTest(Gui_State* gui, float deltaTime);
+void GuiTest(gui_state* Gui, float deltaTime);
 
-void GuiAnchor(Gui_State* gui, 
+void GuiAnchor(gui_state* Gui, 
                char* Name, 
                v2 Pos, v2 Dim, 
                b32 Resize,

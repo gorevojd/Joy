@@ -1083,14 +1083,14 @@ rc2 clipRect)
 	u32 PixelFillCount = (MaxY - MinY) * (MaxX - MinX);
 }
 
-void SoftwareRenderStackToOutput(Render_Stack* stack, Bmp_Info* buf, rc2 clipRect){
+void SoftwareRenderStackToOutput(render_stack* stack, Bmp_Info* buf, rc2 clipRect){
     u8* at = (u8*)stack->MemBlock.Base;
 	u8* stackEnd = (u8*)stack->MemBlock.Base + stack->MemBlock.Used;
     
 	while (at < stackEnd) {
-        Render_Entry_Header* header = (Render_Entry_Header*)at;
+        render_entry_header* header = (render_entry_header*)at;
         
-        at += sizeof(Render_Entry_Header);
+        at += sizeof(render_entry_header);
         
         switch(header->type){
             case RenderEntry_ClearColor:{
@@ -1167,7 +1167,7 @@ void SoftwareRenderStackToOutput(Render_Stack* stack, Bmp_Info* buf, rc2 clipRec
 struct Render_Queue_Work_Data{
     Bmp_Info* buf;
     rc2 clipRect;
-    Render_Stack* stack;
+    render_stack* stack;
 };
 
 PLATFORM_CALLBACK(RenderQueueWork){
@@ -1191,7 +1191,7 @@ PLATFORM_CALLBACK(RenderQueueRGBA2BGRAWork){
 }
 
 #define TILES_COUNT 32
-void RenderMultithreaded(Platform_Job_Queue* queue, Render_Stack* stack, Bmp_Info* buf) {
+void RenderMultithreaded(Platform_Job_Queue* queue, render_stack* stack, Bmp_Info* buf) {
     
 #if 0
     rc2 clipRect;

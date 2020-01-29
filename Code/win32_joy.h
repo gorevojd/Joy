@@ -19,6 +19,7 @@
 #include "joy_platform.h"
 #include "joy_gui.h"
 #include "joy_render.h"
+#include "joy_game.h"
 
 #define JOY_USE_OPENGL 1
 #define JOY_USE_DIRECTX 0
@@ -179,16 +180,17 @@ struct Win_Memory_Region{
 #define WIN32_DEBUG_OUTPUT(name) void name(const char* Str)
 typedef WIN32_DEBUG_OUTPUT(win32_debug_output);
 
-struct Win_State{
+struct win_state{
 	HWND window;
-    int windowWidth;
-    int windowHeight;
+    int WindowWidth;
+    int WindowHeight;
     
     std::vector<std::string> LoadedStringsHolder;
     b32 InListFilesBlock;
     
     WINDOWPLACEMENT windowPlacement;
     
+    HDC glDC;
     HGLRC renderCtx;
     
     Bmp_Info bitmap;
@@ -199,8 +201,8 @@ struct Win_State{
     
     win32_debug_output* DebugOutputFunc;
     
-    LARGE_INTEGER performanceFreqLI;
-    double oneOverPerformanceFreq;
+    LARGE_INTEGER PerformanceFreqLI;
+    double OneOverPerformanceFreq;
 };
 
 HGLRC Win32InitOpenGL(HDC realDC);

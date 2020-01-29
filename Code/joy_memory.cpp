@@ -1,8 +1,8 @@
 #include "joy_memory.h"
 
 
-INTERNAL_FUNCTION inline Memory_Entry* AllocateMemoryEntry(Memory_Box* box) {
-	Memory_Entry* Result = 0;
+INTERNAL_FUNCTION inline mem_entry* AllocateMemoryEntry(mem_box* box) {
+	mem_entry* Result = 0;
     
 	if (box->Free.NextAlloc == &box->Free) 
 	{
@@ -14,9 +14,9 @@ INTERNAL_FUNCTION inline Memory_Entry* AllocateMemoryEntry(Memory_Box* box) {
         
 		//NOTE(dima): Allocating new entries array
 		int NewEntriesCount = 1200;
-		Memory_Entry* NewEntriesArray = PushArray(
+		mem_entry* NewEntriesArray = PushArray(
 			box->Region,
-			Memory_Entry,
+			mem_entry,
 			NewEntriesCount);
         
 		//NOTE(dima): Inserting new entries to freelist
@@ -24,7 +24,7 @@ INTERNAL_FUNCTION inline Memory_Entry* AllocateMemoryEntry(Memory_Box* box) {
              EntryIndex < NewEntriesCount;
              EntryIndex++)
 		{
-			Memory_Entry* CurrentEntry = NewEntriesArray + EntryIndex;
+			mem_entry* CurrentEntry = NewEntriesArray + EntryIndex;
             
 			*CurrentEntry = {};
             
@@ -56,8 +56,8 @@ INTERNAL_FUNCTION inline Memory_Entry* AllocateMemoryEntry(Memory_Box* box) {
 }
 
 INTERNAL_FUNCTION inline void DeallocateMemoryEntry(
-Memory_Box* box,
-Memory_Entry* to)
+mem_box* box,
+mem_entry* to)
 {
 	to->NextAlloc->PrevAlloc = to->PrevAlloc;
 	to->PrevAlloc->NextAlloc = to->NextAlloc;
@@ -75,9 +75,9 @@ Memory_Entry* to)
  2 parts and then returns first splited part with the
  requested memory size
 */
-INTERNAL_FUNCTION Memory_Entry* SplitMemoryEntry(
-Memory_Box* box,
-Memory_Entry* toSplit,
+INTERNAL_FUNCTION mem_entry* SplitMemoryEntry(
+mem_box* box,
+mem_entry* toSplit,
 u32 SplitOffset)
 {
 	/*
@@ -87,8 +87,8 @@ u32 SplitOffset)
 	ASSERT(SplitOffset <= toSplit->DataSize);
     
 	//NOTE(dima): allocating entries
-	Memory_Entry* NewEntry1 = AllocateMemoryEntry(box);
-	Memory_Entry* NewEntry2 = AllocateMemoryEntry(box);
+	mem_entry* NewEntry1 = AllocateMemoryEntry(box);
+	mem_entry* NewEntry2 = AllocateMemoryEntry(box);
     
 	NewEntry1->Prev = toSplit->Prev;
 	NewEntry1->Next = NewEntry2;
@@ -124,10 +124,10 @@ u32 SplitOffset)
  Return value is equal to the First parameter and 
  contatains merged block.
 */
-INTERNAL_FUNCTION Memory_Entry* MergeMemoryEntries(
-Memory_Box* box, 
-Memory_Entry* First,
-Memory_Entry* Second) 
+INTERNAL_FUNCTION mem_entry* MergeMemoryEntries(
+mem_box* box, 
+mem_entry* First,
+mem_entry* Second) 
 {
 	Assert(First->Next == Second);
     
@@ -137,15 +137,15 @@ Memory_Entry* Second)
     
 	DeallocateMemoryEntry(box, Second);
     
-	Memory_Entry* Result = First;
+	mem_entry* Result = First;
 	return(Result);
 }
 
-Memory_Entry* AllocateMemoryFromBox(
-Memory_Box* box,
+mem_entry* AllocateMemoryFromBox(
+mem_box* box,
 u32 RequestMemorySize)
 {
-	Memory_Entry* Result = 0;
+	mem_entry* Result = 0;
     
 	/*
   NOTE(dima): Merge loop.
@@ -153,10 +153,10 @@ u32 RequestMemorySize)
   and try to merge those that lie near each other
  */
 	int TempCounter = 0;
-	Memory_Entry* At = box->First;
+	mem_entry* At = box->First;
     
 	while (At) {
-		Memory_Entry* NextAt = At->Next;
+		mem_entry* NextAt = At->Next;
         
 		if (At->State == MemoryEntry_Released) {
             
@@ -206,13 +206,13 @@ u32 RequestMemorySize)
     return(Result);
 }
 
-void ReleaseMemoryFromBox(Memory_Box* box, Memory_Entry* memEntry) {
+void ReleaseMemoryFromBox(mem_box* box, mem_entry* memEntry) {
     memEntry->State = MemoryEntry_Released;
 }
 
-Memory_Box InitMemoryBox(Memory_Region* Region, u32 BoxSizeInBytes){
+mem_box InitMemoryBox(mem_region* Region, u32 BoxSizeInBytes){
     
-    Memory_Box Result = {};
+    mem_box Result = {};
     
     // NOTE(Dima): Memory initialization
     Result.Free = {};

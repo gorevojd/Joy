@@ -21,18 +21,18 @@ Software 3d renderer
 dima privet , kak dela? i tebia lybly
 */
 
-GLOBAL_VARIABLE Win_State win32;
-GLOBAL_VARIABLE Render_State* gRender;
-GLOBAL_VARIABLE b32 gRunning;
-GLOBAL_VARIABLE Input gInput;
-GLOBAL_VARIABLE Assets gAssets;
-GLOBAL_VARIABLE Gui_State gGui;
-GLOBAL_VARIABLE DSound_State gDSound;
+GLOBAL_VARIABLE mem_region gMem = {};
+GLOBAL_VARIABLE win_state GlobalWin32;
+GLOBAL_VARIABLE b32 GlobalRunning;
+GLOBAL_VARIABLE DSound_State GlobalDirectSound;
+GLOBAL_VARIABLE mem_region GlobalMem;
+GLOBAL_VARIABLE game_state* GlobalGame;
+
 #if JOY_USE_OPENGL
-GLOBAL_VARIABLE Gl_State gGL;
+GLOBAL_VARIABLE gl_state GlobalGL;
 #endif
 #if JOY_USE_DIRECTX
-GLOBAL_VARIABLE DirX_State gDirX;
+GLOBAL_VARIABLE DirX_State GlobalDirX;
 #endif
 
 Platform platform;
@@ -1189,8 +1189,8 @@ PLATFORM_WRITE_FILE(Win32WriteFile){
 PLATFORM_BEGIN_LIST_FILES_IN_DIR(Win32BeginListFilesInDir){
     Loaded_Strings Result = {};
     
-    ASSERT(win32.InListFilesBlock == 0);
-    win32.InListFilesBlock = 1;
+    ASSERT(GlobalWin32.InListFilesBlock == 0);
+    GlobalWin32.InListFilesBlock = 1;
     
     char NewDirPath[MAX_PATH];
     CopyStrings(NewDirPath, DirectoryPath);
@@ -1213,7 +1213,7 @@ PLATFORM_BEGIN_LIST_FILES_IN_DIR(Win32BeginListFilesInDir){
     char ActualFindString[MAX_PATH];
     ConcatStringsUnsafe(ActualFindString, NewDirPath, NewWildcard);
     
-    win32.LoadedStringsHolder.resize(0);
+    GlobalWin32.LoadedStringsHolder.resize(0);
     
     size_t MemNeeded = 0;
     
@@ -1223,28 +1223,28 @@ PLATFORM_BEGIN_LIST_FILES_IN_DIR(Win32BeginListFilesInDir){
         &FindData);
     
     if(FileHandle != INVALID_HANDLE_VALUE){
-        win32.LoadedStringsHolder.push_back(std::string(FindData.cFileName));
+        GlobalWin32.LoadedStringsHolder.push_back(std::string(FindData.cFileName));
         
         size_t Str1Size = lstrlenA(FindData.cFileName) + 1;
         MemNeeded += Str1Size;
         
         while(FindNextFileA(FileHandle, &FindData)){
-            win32.LoadedStringsHolder.push_back(std::string(FindData.cFileName));
+            GlobalWin32.LoadedStringsHolder.push_back(std::string(FindData.cFileName));
             
             size_t StrSize = lstrlenA(FindData.cFileName) + 1;
             MemNeeded += StrSize;
         }
         
-        MemNeeded += win32.LoadedStringsHolder.size() * sizeof(char*);
+        MemNeeded += GlobalWin32.LoadedStringsHolder.size() * sizeof(char*);
         
         Result.Strings = (char**)malloc(MemNeeded);
-        Result.Count = win32.LoadedStringsHolder.size();
+        Result.Count = GlobalWin32.LoadedStringsHolder.size();
         
         char* AtStr = (char*)Result.Strings + sizeof(char*) * Result.Count;
-        for(int i = 0; i < win32.LoadedStringsHolder.size(); i++){
+        for(int i = 0; i < GlobalWin32.LoadedStringsHolder.size(); i++){
             Result.Strings[i] = AtStr;
-            CopyStrings(Result.Strings[i], (char*)win32.LoadedStringsHolder[i].c_str());
-            AtStr += win32.LoadedStringsHolder[i].length() + 1;
+            CopyStrings(Result.Strings[i], (char*)GlobalWin32.LoadedStringsHolder[i].c_str());
+            AtStr += GlobalWin32.LoadedStringsHolder[i].length() + 1;
         }
         
         FindClose(FileHandle);
@@ -1257,8 +1257,8 @@ PLATFORM_BEGIN_LIST_FILES_IN_DIR(Win32BeginListFilesInDir){
 }
 
 PLATFORM_END_LIST_FILES_IN_DIR(Win32EndListFilesInDir){
-    ASSERT(win32.InListFilesBlock == 1);
-    win32.InListFilesBlock = 0;
+    ASSERT(GlobalWin32.InListFilesBlock == 1);
+    GlobalWin32.InListFilesBlock = 0;
     
     if(Strings->Strings){
         free(Strings->Strings);
@@ -1292,8 +1292,8 @@ PLATFORM_SHOW_ERROR(Win32ShowError){
 }
 
 PLATFORM_DEBUG_OUTPUT_STRING(Win32DebugOutputString){
-    win32.DebugOutputFunc(text);
-    win32.DebugOutputFunc("\n");
+    GlobalWin32.DebugOutputFunc(text);
+    GlobalWin32.DebugOutputFunc("\n");
 }
 
 PLATFORM_MEMALLOC(Win32MemAlloc){
@@ -1327,13 +1327,13 @@ PLATFORM_MEMALLOC(Win32MemAlloc){
     VirtualProtect(endGuardPage, pageSize, PAGE_NOACCESS, &oldProtectEnd);
     
     // NOTE(Dima): Inserting region to list
-    region->prev = &win32.memorySentinel;
-    BeginTicketMutex(&win32.memoryMutex);
-    region->next = win32.memorySentinel.next;
+    region->prev = &GlobalWin32.memorySentinel;
+    BeginTicketMutex(&GlobalWin32.memoryMutex);
+    region->next = GlobalWin32.memorySentinel.next;
     
     region->prev->next = region;
     region->next->prev = region;
-    EndTicketMutex(&win32.memoryMutex);
+    EndTicketMutex(&GlobalWin32.memoryMutex);
     
     // NOTE(Dima): Initializing region
     region->totalCommittedSize = (toAllocSize + pageSizeMask) & (~pageSizeMask);
@@ -1352,18 +1352,56 @@ PLATFORM_MEMFREE(Win32MemFree){
         Win_Memory_Region* region = (Win_Memory_Region*)actualToFree;
         
         // NOTE(Dima): Removing from list
-        BeginTicketMutex(&win32.memoryMutex);
+        BeginTicketMutex(&GlobalWin32.memoryMutex);
         region->next->prev = region->prev;
         region->prev->next = region->next;
-        EndTicketMutex(&win32.memoryMutex);
+        EndTicketMutex(&GlobalWin32.memoryMutex);
         
         VirtualFree(toFree, 0, MEM_RELEASE);
         
     }
 }
 
+RENDER_PLATFORM_SWAPBUFFERS(Win32OpenGLSwapBuffers){
+    SwapBuffers(GlobalWin32.glDC);
+}
+
+RENDER_PLATFORM_INIT(Win32OpenGLRenderInit){
+    GlobalWin32.glDC = GetDC(GlobalWin32.window);
+    GlobalWin32.renderCtx = Win32InitOpenGL(GlobalWin32.glDC);
+    
+#if JOY_USE_OPENGL
+    GlInit(&GlobalGL, Assets);
+#endif
+    
+#if JOY_USE_DIRECTX
+    DirXInit(&GlobalDirX, 
+             win32.window, 
+             win32.windowWidth,
+             win32.windowHeight);
+#endif
+}
+
+RENDER_PLATFORM_FREE(Win32OpenGLRenderFree){
+    //NOTE(dima): Cleanup
+    GlFree(&GlobalGL);
+    
+#if JOY_USE_DIRECTX
+    DirXFree(&GlobalDirX);
+#endif
+#if JOY_USE_OPENGL
+    Win32FreeOpenGL(GlobalWin32.renderCtx);
+#endif
+    
+    ReleaseDC(GlobalWin32.window, GlobalWin32.glDC);
+}
+
+RENDER_PLATFORM_RENDER(Win32OpenGLRender){
+    GlOutputRender(&GlobalGL, GlobalGame->Render);
+}
+
 INTERNAL_FUNCTION void
-Win32ToggleFullscreen(Win_State* win32)
+Win32ToggleFullscreen(win_state* win32)
 {
     DWORD style = GetWindowLong(win32->window, GWL_STYLE);
     if (style & WS_OVERLAPPEDWINDOW)
@@ -1400,7 +1438,7 @@ inline void Win32ProcessKey(KeyState* key, b32 isDown, int RepeatCount){
 }
 
 INTERNAL_FUNCTION void 
-Win32ProcessMessages(Input* input){
+Win32ProcessMessages(input_state* Input){
     MSG msg;
     while(PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)){
         switch(msg.message){
@@ -1518,17 +1556,17 @@ Win32ProcessMessages(Input* input){
                     if(isDown){
                         
                         if(altKeyWasDown && vKey == VK_F4){
-                            gRunning = 0;
+                            GlobalRunning = 0;
                         }
                         
                         if(altKeyWasDown && vKey == VK_RETURN){
-                            Win32ToggleFullscreen(&win32);
+                            Win32ToggleFullscreen(&GlobalWin32);
                         }
                     }
                 }
                 
                 if(keyType != 0xFFFFFFFF){
-                    Win32ProcessKey(&input->KeyStates[keyType], isDown, RepeatCount);
+                    Win32ProcessKey(&Input->KeyStates[keyType], isDown, RepeatCount);
                 }
                 
                 TranslateMessage(&msg);
@@ -1540,17 +1578,17 @@ Win32ProcessMessages(Input* input){
             }break;
             
             case WM_QUIT:{
-                gRunning = 0;
+                GlobalRunning = 0;
             }break;
             
             case WM_CLOSE:{
                 PostQuitMessage(0);
-                gRunning = 0;
+                GlobalRunning = 0;
             }break;
             
             case WM_DESTROY:{
                 PostQuitMessage(0);
-                gRunning = 0;
+                GlobalRunning = 0;
             }break;
             
             default:{
@@ -1562,30 +1600,30 @@ Win32ProcessMessages(Input* input){
 }
 
 INTERNAL_FUNCTION void
-Win32PreProcessInput(Input* input){
+Win32PreProcessInput(input_state* Input){
     // NOTE(Dima): Char input
-    input->FrameInput[0] = 0;
-    input->FrameInputLen = 0;
+    Input->FrameInput[0] = 0;
+    Input->FrameInputLen = 0;
     
     for(int keyIndex = 0; keyIndex < Key_Count; keyIndex++){
-        input->KeyStates[keyIndex].transitionHappened = 0;
-        input->KeyStates[keyIndex].RepeatCount = 0;
+        Input->KeyStates[keyIndex].transitionHappened = 0;
+        Input->KeyStates[keyIndex].RepeatCount = 0;
     }
 }
 
 INTERNAL_FUNCTION void
-Win32ProcessInput(Input* input)
+Win32ProcessInput(input_state* Input)
 {
     POINT point;
     BOOL getCursorPosRes = GetCursorPos(&point);
-    BOOL screenToClientRec = ScreenToClient(win32.window, &point);
+    BOOL screenToClientRec = ScreenToClient(GlobalWin32.window, &point);
     
     v2 MouseP = V2(point.x, point.y);
-    input->LastMouseP = input->MouseP;
-    input->MouseP = MouseP;
+    Input->LastMouseP = Input->MouseP;
+    Input->MouseP = MouseP;
     
     //NOTE(Dima): Processing mouse buttons
-    DWORD win32MouseKeyID[] = {
+    DWORD Win32MouseKeyID[] = {
         VK_LBUTTON,
         VK_MBUTTON,
         VK_RBUTTON,
@@ -1594,14 +1632,20 @@ Win32ProcessInput(Input* input)
     };
     
     for(u32 mouseKeyIndex = 0;
-        mouseKeyIndex < ARRAY_COUNT(win32MouseKeyID);
+        mouseKeyIndex < ARRAY_COUNT(Win32MouseKeyID);
         mouseKeyIndex++)
     {
-        input->KeyStates[MouseKey_Left + mouseKeyIndex].transitionHappened = 0;
-        SHORT winMouseKeyState = GetKeyState(win32MouseKeyID[mouseKeyIndex]);
+        Input->KeyStates[MouseKey_Left + mouseKeyIndex].transitionHappened = 0;
+        SHORT winMouseKeyState = GetKeyState(Win32MouseKeyID[mouseKeyIndex]);
         
-        Win32ProcessKey(&input->KeyStates[MouseKey_Left + mouseKeyIndex], winMouseKeyState & (1 << 15), 0);
+        Win32ProcessKey(&Input->KeyStates[MouseKey_Left + mouseKeyIndex], winMouseKeyState & (1 << 15), 0);
     }
+}
+
+INPUT_PLATFORM_PROCESS(Win32PlatformInputProcess){
+    Win32PreProcessInput(GlobalGame->Input);
+    Win32ProcessMessages(GlobalGame->Input);
+    Win32ProcessInput(GlobalGame->Input);
 }
 
 INTERNAL_FUNCTION u32 UTF8_Sequence_Size_For_UCS4(u32 u)
@@ -1742,7 +1786,6 @@ INTERNAL_FUNCTION void OutputDebugString_Capture()
 }
 #endif
 
-
 LRESULT CALLBACK
 Win32WindowProcessing(
 HWND Window,
@@ -1757,20 +1800,21 @@ LPARAM LParam)
         }break;
         
         case WM_CHAR:{
-            gInput.FrameInput[gInput.FrameInputLen++] = (char)WParam;
-            gInput.FrameInput[gInput.FrameInputLen] = 0;
+            input_state* Input = GlobalGame->Input;
+            Input->FrameInput[Input->FrameInputLen++] = (char)WParam;
+            Input->FrameInput[Input->FrameInputLen] = 0;
         }break;
         
         case WM_DESTROY:{
-            gRunning = 0;
+            GlobalRunning = 0;
         }break;
         
         case WM_QUIT:{
-            gRunning = 0;
+            GlobalRunning = 0;
         }break;
         
         case WM_CLOSE:{
-            gRunning = 0;
+            GlobalRunning = 0;
         }break;
         
         default:{
@@ -1779,6 +1823,70 @@ LPARAM LParam)
     }
     
     return(0);
+}
+
+INTERNAL_FUNCTION void Win32InitWindow(HINSTANCE Instance,
+                                       int WindowWidth, 
+                                       int WindowHeight)
+{
+    //WindowWidth = (WindowWidth + 3) & (~3);
+    
+    int WindowCreateW;
+    int WindowCreateH;
+    
+    WNDCLASSEXA wndClass = {};
+    wndClass.cbSize = sizeof(wndClass);
+    wndClass.lpszClassName = "MainWindowClassName";
+    wndClass.hInstance = Instance;
+    wndClass.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
+    wndClass.lpfnWndProc = Win32WindowProcessing;
+    
+    RegisterClassExA(&wndClass);
+    
+    RECT ClientRect;
+    ClientRect.left = 0;
+    ClientRect.top = 0;
+    ClientRect.right = WindowWidth;
+    ClientRect.bottom = WindowHeight;
+    BOOL WindowRectAdjusted = AdjustWindowRect(
+        &ClientRect, (WS_OVERLAPPEDWINDOW | WS_VISIBLE) & (~WS_OVERLAPPED), 0);
+    
+    if(WindowRectAdjusted){
+        WindowCreateW = ClientRect.right - ClientRect.left;
+        WindowCreateH = ClientRect.bottom - ClientRect.top;
+    }
+    else{
+        WindowCreateW = WindowWidth;
+        WindowCreateH = WindowHeight;
+    }
+    
+    GlobalWin32.window = CreateWindowA(
+        wndClass.lpszClassName,
+        "Joy",
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        WindowCreateW,
+        WindowCreateH,
+        0, 0, 
+        Instance, 
+        0);
+    
+    GlobalWin32.WindowWidth = WindowWidth;
+    GlobalWin32.WindowHeight = WindowHeight;
+    
+    void* winBmpMemory = PushSomeMem(&GlobalMem, WindowWidth * WindowHeight * 4, 64);
+    GlobalWin32.bitmap = AllocateBitmapInternal(WindowWidth, WindowHeight, winBmpMemory);
+    GlobalWin32.bmi = {};
+    BITMAPINFO* bmi = &GlobalWin32.bmi;
+    BITMAPINFOHEADER* bmiHeader = &bmi->bmiHeader;
+    bmiHeader->biSize=  sizeof(BITMAPINFOHEADER);
+    bmiHeader->biWidth = WindowWidth;
+    bmiHeader->biHeight = -WindowHeight;
+    bmiHeader->biPlanes = 1;
+    bmiHeader->biBitCount = 32;
+    bmiHeader->biCompression = BI_RGB;
+    bmiHeader->biSizeImage = 0;
+    
 }
 
 int APIENTRY WinMain(HINSTANCE hInstance,
@@ -1797,23 +1905,37 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     platform.MemAlloc = Win32MemAlloc;
     platform.MemFree = Win32MemFree;
     
-    QueryPerformanceFrequency(&win32.performanceFreqLI);
-    win32.oneOverPerformanceFreq = 1.0 / (double)win32.performanceFreqLI.QuadPart;
+    // TODO(Dima): Add array of count Renderer_Count and init all renderers
+    // TODO(Dima): Or leave if not supported
+    // NOTE(Dima): Init render API
+    render_platform_api RenderPlatformAPI = {};
+    RenderPlatformAPI.RendererType = Renderer_OpenGL;
+    RenderPlatformAPI.SwapBuffers = Win32OpenGLSwapBuffers;
+    RenderPlatformAPI.Init = Win32OpenGLRenderInit;
+    RenderPlatformAPI.Free = Win32OpenGLRenderFree;
+    RenderPlatformAPI.Render = Win32OpenGLRender;
+    
+    // NOTE(Dima): Initializing platfor to game API
+    platform_to_game_api Platform2Game = {};
+    Platform2Game.RenderAPI = RenderPlatformAPI;
+    Platform2Game.ProcessInput = Win32PlatformInputProcess;
+    
+    // NOTE(Dima): Calculating perfomance frequency
+    QueryPerformanceFrequency(&GlobalWin32.PerformanceFreqLI);
+    GlobalWin32.OneOverPerformanceFreq = 1.0 / (double)GlobalWin32.PerformanceFreqLI.QuadPart;
     
     // NOTE(Dima): Initializing memory sentinel
-    win32.memorySentinel = {};
-    win32.memorySentinel.prev = &win32.memorySentinel;
-    win32.memorySentinel.next = &win32.memorySentinel;
-    
-    Memory_Region gMem = {};
+    GlobalWin32.memorySentinel = {};
+    GlobalWin32.memorySentinel.prev = &GlobalWin32.memorySentinel;
+    GlobalWin32.memorySentinel.next = &GlobalWin32.memorySentinel;
     
     // NOTE(Dima): Init win32 debug output log func
     if(IsDebuggerPresent()){
-        win32.DebugOutputFunc = OutputDebugStringA;
+        GlobalWin32.DebugOutputFunc = OutputDebugStringA;
     }
     else{
         //AllocConsole();
-        win32.DebugOutputFunc = Win32DebugOutputLog;
+        GlobalWin32.DebugOutputFunc = Win32DebugOutputLog;
         
         // redirect unbuffered STDOUT to the console
         intptr_t stdHandle = reinterpret_cast<intptr_t>(::GetStdHandle(STD_OUTPUT_HANDLE));
@@ -1836,255 +1958,58 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         *stderr = *file;
         setvbuf(stderr, NULL, _IONBF, 0);
         
-        //win32.DebugOutputFunc = OutputDebugStringA;
+        //GlobalWin32.DebugOutputFunc = OutputDebugStringA;
         //OutputDebugString_Capture();
     }
     
-    WNDCLASSEXA wndClass = {};
-    wndClass.cbSize = sizeof(wndClass);
-    wndClass.lpszClassName = "MainWindowClassName";
-    wndClass.hInstance = hInstance;
-    wndClass.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
-    wndClass.lpfnWndProc = Win32WindowProcessing;
+    int WindowWidth = 1366;
+    int WindowHeight = 768;
+    Win32InitWindow(hInstance, WindowWidth, WindowHeight);
     
-    RegisterClassExA(&wndClass);
+    GlobalGame = PushStruct(&GlobalMem, game_state);
+    GameInit(GlobalGame, Platform2Game);
     
-    int windowWidth = 1366;
-    windowWidth = (windowWidth + 3) & (~3);
-    int windowHeight = 768;
-    
-    int windowCreateW;
-    int windowCreateH;
-    
-    RECT ClientRect;
-    ClientRect.left = 0;
-    ClientRect.top = 0;
-    ClientRect.right = windowWidth;
-    ClientRect.bottom = windowHeight;
-    BOOL WindowRectAdjusted = AdjustWindowRect(
-        &ClientRect, (WS_OVERLAPPEDWINDOW | WS_VISIBLE) & (~WS_OVERLAPPED), 0);
-    
-    if(WindowRectAdjusted){
-        windowCreateW = ClientRect.right - ClientRect.left;
-        windowCreateH = ClientRect.bottom - ClientRect.top;
-    }
-    else{
-        windowCreateW = windowWidth;
-        windowCreateH = windowHeight;
-    }
-    
-    win32.window = CreateWindowA(
-        wndClass.lpszClassName,
-        "Joy",
-        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        windowCreateW,
-        windowCreateH,
-        0, 0, 
-        hInstance, 
-        0);
-    
-    win32.windowWidth = windowWidth;
-    win32.windowHeight = windowHeight;
-    
-    void* winBmpMemory = PushSomeMem(&gMem, windowWidth * windowHeight * 4, 64);
-    win32.bitmap = AllocateBitmapInternal(windowWidth, windowHeight, winBmpMemory);
-    win32.bmi = {};
-    BITMAPINFO* bmi = &win32.bmi;
-    BITMAPINFOHEADER* bmiHeader = &bmi->bmiHeader;
-    bmiHeader->biSize=  sizeof(BITMAPINFOHEADER);
-    bmiHeader->biWidth = windowWidth;
-    bmiHeader->biHeight = -windowHeight;
-    bmiHeader->biPlanes = 1;
-    bmiHeader->biBitCount = 32;
-    bmiHeader->biCompression = BI_RGB;
-    bmiHeader->biSizeImage = 0;
-    
-    HDC glDC = GetDC(win32.window);
-    win32.renderCtx = Win32InitOpenGL(glDC);
-    
-    // NOTE(Dima): Initializing engine systems
-    InitAssets(&gAssets, &gMem);
-    DSoundInit(&gDSound, win32.window);
-    Win32ClearSoundBuffer(&gDSound);
-    Win32FillSoundBufferWithSound(&gDSound, &gAssets.SineTest1);
-    Win32PlayDirectSoundBuffer(&gDSound);
-    
-#if JOY_USE_OPENGL
-    GlInit(&gGL, & gAssets);
-#endif
-    
-#if JOY_USE_DIRECTX
-    DirXInit(&gDirX, 
-             win32.window, 
-             win32.windowWidth,
-             win32.windowHeight);
-#endif
-    
-    Memory_Region memRender = {};
-    PushMemoryStruct(&memRender, Render_State, gRender, MemRegion);
-    
-    RenderInit(gRender);
-    Render_Stack* renderStack = RenderAddStack(gRender, "Main");
-    Render_Stack* guiStack = RenderAddStack(gRender, "GUI");
-    
-    InitGui(
-        &gGui, 
-        &gInput, 
-        &gAssets, 
-        &gMem, 
-        guiStack, 
-        windowWidth, 
-        windowHeight);
-    
-    float time = 0.0f;
-    float deltaTime = 0.016f;
+    DSoundInit(&GlobalDirectSound, GlobalWin32.window);
+    Win32ClearSoundBuffer(&GlobalDirectSound);
+    //Win32FillSoundBufferWithSound(&GlobalDirectSound, &gAssets.SineTest1);
+    Win32PlayDirectSoundBuffer(&GlobalDirectSound);
     
     //ShellExecuteA(NULL, "open", "http://www.microsoft.com", NULL, NULL, SW_SHOWNORMAL);
     
-    Bmp_Info* toShowArray = gAssets.fadeoutBmps;
-    int toShowCount = gAssets.fadeoutBmpsCount;
-    float toShowFadeoutTime = 1.5f;
-    float toShowTime = 5.0f;
-    int toShowIndex = 0;
-    int toShowNextIndex = (toShowIndex + 1) % toShowCount;
-    float timeSinceShow = 0.0f;
-    float toShowSpeed = 1.0f;
+    float Time = 0.0f;
+    float DeltaTime = 0.0f;
     
-    Loaded_Strings List1 = Win32BeginListFilesInDir("../Code/", "*.cpp");
-    Win32EndListFilesInDir(&List1);
-    Loaded_Strings List = Win32BeginListFilesInDir("../Code/", "*.h");
+    LARGE_INTEGER BeginClockLI;
+    QueryPerformanceCounter(&BeginClockLI);
     
-    gRunning = 1;
-    while(gRunning){
-        LARGE_INTEGER beginClockLI;
-        QueryPerformanceCounter(&beginClockLI);
+    GlobalRunning = 1;
+    while(GlobalRunning){
         
-        Win32PreProcessInput(&gInput);
-        Win32ProcessMessages(&gInput);
-        Win32ProcessInput(&gInput);
+        // NOTE(Dima): Processing time
+        LARGE_INTEGER LastFrameClockLI;
+        QueryPerformanceCounter(&LastFrameClockLI);
+        u64 ClocksElapsed4Frame = LastFrameClockLI.QuadPart - BeginClockLI.QuadPart;
+        BeginClockLI.QuadPart = LastFrameClockLI.QuadPart;
+        DeltaTime = (float)((double)ClocksElapsed4Frame * GlobalWin32.OneOverPerformanceFreq);
+        Time += DeltaTime;
         
-        rc2 ClipRect = RcMinMax(V2(0.0f, 0.0f), V2(windowWidth, windowHeight));
+        // NOTE(Dima): Setting Frame info to Pass to game
+        render_frame_info FrameInfo = {};
+        FrameInfo.Width = WindowWidth;
+        FrameInfo.Height = WindowHeight;
+        FrameInfo.SoftwareBuffer = &GlobalWin32.bitmap;
+        FrameInfo.dt = DeltaTime;
+        FrameInfo.RendererType = Renderer_OpenGL;
         
-        RenderBeginFrame(gRender);
-        
-        Render_Frame_Info frameInfo = {};
-        frameInfo.Width = windowWidth;
-        frameInfo.Height = windowHeight;
-        frameInfo.SoftwareBuffer = &win32.bitmap;
-        frameInfo.dt = deltaTime;
-        frameInfo.RendererType = Renderer_OpenGL;
-        RenderSetFrameInfo(gRender, frameInfo);
-        
-        PushClearColor(renderStack, V3(1.0f, 0.5f, 0.0f));
-        
-        Bmp_Info* toShow = toShowArray + toShowIndex;
-        Bmp_Info* toShowNext = toShowArray + toShowNextIndex;
-        
-        float toShowH = CalcScreenFitHeight(
-            toShow->Width, toShow->Height,
-            win32.windowWidth, win32.windowHeight);
-        float toShowNextH = CalcScreenFitHeight(
-            toShowNext->Width, toShowNext->Height,
-            win32.windowWidth, win32.windowHeight);
-        
-        float fadeoutAlpha = Clamp01((timeSinceShow - toShowTime) / toShowFadeoutTime);
-        
-        PushBitmap(
-            renderStack, 
-            toShow, 
-            V2(0.0f, 0.0f), 
-            toShowH, 
-            V4(1.0f, 1.0f, 1.0f, 1.0f));
-        
-        PushBitmap(
-            renderStack, 
-            toShowNext, 
-            V2(0.0f, 0.0f), 
-            toShowNextH, 
-            V4(1.0f, 1.0f, 1.0f, fadeoutAlpha));
-        
-        PushBitmap(renderStack,
-                   &gAssets.MainLargeAtlas.Bitmap,
-                   V2(100, 100),
-                   1000,
-                   V4(1.0f, 1.0f, 1.0f, 1.0f));
-        
-        
-        timeSinceShow += deltaTime * toShowSpeed;
-        if(timeSinceShow > toShowTime + toShowFadeoutTime){
-            toShowIndex = toShowNextIndex;
-            toShowNextIndex = (toShowIndex + 1) % toShowCount;
-            timeSinceShow = 0.0f;
-        }
-        
-#if 0        
-        PushGradient(renderStack, RcMinDim(V2(10, 10), V2(900, 300)), 
-                     ColorFromHex("#FF00FF"), ColorFromHex("#4b0082"),
-                     RenderEntryGradient_Horizontal);
-        PushGradient(renderStack, RcMinDim(V2(100, 400), V2(900, 300)), 
-                     ColorFromHex("#FF00FF"), ColorFromHex("#4b0082"), 
-                     RenderEntryGradient_Vertical);
-#endif
-        
-        
-#if 0
-        PushBitmap(renderStack, &gAssets.sunset, V2(100.0f, Sin(time * 1.0f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-        PushBitmap(renderStack, &gAssets.sunsetOrange, V2(200.0f, Sin(time * 1.1f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-        PushBitmap(renderStack, &gAssets.sunsetField, V2(300.0f, Sin(time * 1.2f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-        PushBitmap(renderStack, &gAssets.sunsetMountains, V2(400.0f, Sin(time * 1.3f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-        PushBitmap(renderStack, &gAssets.mountainsFuji, V2(500.0f, Sin(time * 1.4f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-        PushBitmap(renderStack, &gAssets.roadClouds, V2(600.0f, Sin(time * 1.5f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-        PushBitmap(renderStack, &gAssets.sunrise, V2(700.0f, Sin(time * 1.6f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-#endif
-        GuiFrameBegin(&gGui);
-        
-        GuiTest(&gGui, deltaTime);
-        
-#if 1
-        GuiBeginTree(&gGui, "String List");
-        char ListInfo[64];
-        stbsp_sprintf(ListInfo, "String list count: %d", List.Count);
-        GuiText(&gGui, ListInfo);
-        
-        for(int i = 0; i < List.Count; i++){
-            GuiText(&gGui, List.Strings[i]);
-        }
-        GuiEndTree(&gGui);
-#endif
-        
-        GuiFramePrepare4Render(&gGui);
-        GlOutputRender(&gGL, gRender);
-        GuiFrameEnd(&gGui);
-        RenderEndFrame(gRender);
-        
-        SwapBuffers(glDC);
-        
-        //gDirX.devCtx->ClearRenderTargetView(gDirX.backBuffer, D3DXCOLOR(0.0f, 0.2f, 0.4f, 1.0f));
-        
-        //gDirX.swapChain->Present(0, 0);
-        LARGE_INTEGER endClockLI;
-        QueryPerformanceCounter(&endClockLI);
-        u64 clocksElapsed = endClockLI.QuadPart - beginClockLI.QuadPart;
-        deltaTime = (float)((double)clocksElapsed * win32.oneOverPerformanceFreq);
-        time += deltaTime;
+        GameUpdate(GlobalGame, FrameInfo);
     }
     
-    //NOTE(dima): Cleanup
-    GlFree(&gGL);
+    GameFree(GlobalGame);
     
-    DSoundFree(&gDSound);
+    DSoundFree(&GlobalDirectSound);
     FreePlatformAPI(&platform);
     
-#if JOY_USE_DIRECTX
-    DirXFree(&gDirX);
-#endif
-#if JOY_USE_OPENGL
-    Win32FreeOpenGL(win32.renderCtx);
-#endif
-    
-    ReleaseDC(win32.window, glDC);
-    DestroyWindow(win32.window);
+    DestroyWindow(GlobalWin32.window);
     
     return (0);
 }

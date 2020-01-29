@@ -8,26 +8,25 @@
 
 // TODO(Dima): Add minimum block size param to allocation function
 
-struct Memory_Region{
-    Memory_Block block;
+struct mem_region{
+    Memory_Block Block;
+    
+    Memory_Block* Prev;
     
     int regionCount;
-    
-    u32 type;
 };
 
-
-enum Memory_Entry_State{
+enum memory_entry_state{
     MemoryEntry_Released,
     MemoryEntry_Used,
 };
 
-struct Memory_Entry{
-    Memory_Entry* NextAlloc;
-    Memory_Entry* PrevAlloc;
+struct mem_entry{
+    mem_entry* NextAlloc;
+    mem_entry* PrevAlloc;
     
-    Memory_Entry* Next;
-    Memory_Entry* Prev;
+    mem_entry* Next;
+    mem_entry* Prev;
     
     
     void* Data;
@@ -36,32 +35,32 @@ struct Memory_Entry{
     u32 State;
 };
 
-struct Memory_Box{
-    Memory_Entry Use;
-    Memory_Entry Free;
+struct mem_box{
+    mem_entry Use;
+    mem_entry Free;
     
-    Memory_Entry* First;
+    mem_entry* First;
     
-    Memory_Region* Region;
+    mem_region* Region;
 };
 
 #define MINIMUM_MEMORY_REGION_SIZE Mibibytes(1)
-inline void* PushSomeMem(Memory_Region* region, size_t size, size_t align = 8){
-    size_t beforeAlign = (size_t)region->block.Base + region->block.Used;
+inline void* PushSomeMem(mem_region* region, size_t size, size_t align = 8){
+    size_t beforeAlign = (size_t)region->Block.Base + region->Block.Used;
     size_t alignedPos = (beforeAlign + align - 1) & (~(align - 1));
     size_t advancedByAlign = alignedPos - beforeAlign;
     
     size_t toAllocateSize = advancedByAlign + size;
-    size_t newUsedCount = region->block.Used + toAllocateSize;
+    size_t newUsedCount = region->Block.Used + toAllocateSize;
     
     void* result = 0;
     
-    if((newUsedCount > region->block.Total) || (region->block.Base == 0))
+    if((newUsedCount > region->Block.Total) || (region->Block.Base == 0))
     {
         // NOTE(Dima): Platform is guaranteed to allocate aligned mem
         // NOTE(Dima): so here i allocate only Size but not ToAllocateSize
         
-        size_t sizeWithPrevBlock = size + sizeof(Memory_Region);
+        size_t sizeWithPrevBlock = size + sizeof(mem_region);
         size_t toAllocateWithPrevBlock;
         if(sizeWithPrevBlock > MINIMUM_MEMORY_REGION_SIZE){
             toAllocateWithPrevBlock = sizeWithPrevBlock;
@@ -72,48 +71,56 @@ inline void* PushSomeMem(Memory_Region* region, size_t size, size_t align = 8){
         
         void* newBase = platform.MemAlloc(toAllocateWithPrevBlock);
         size_t newUsed = size;
-        size_t newTotal = toAllocateWithPrevBlock - sizeof(Memory_Region);
+        size_t newTotal = toAllocateWithPrevBlock - sizeof(mem_region);
         
         if(region->regionCount == 0){
-            // NOTE(Dima): This is the first block so it means it
+            // NOTE(Dima): This is the first Block so it means it
             // NOTE(Dima): has not old region
         }
         else{
-            Memory_Region* OldRegion = (Memory_Region*)((u8*)newBase + newTotal);
-            OldRegion->block.Base = region->block.Base;
-            OldRegion->block.Used = region->block.Used;
-            OldRegion->block.Total = region->block.Total;
-            OldRegion->type = region->type;
+            mem_region* OldRegion = (mem_region*)((u8*)newBase + newTotal);
+            OldRegion->Block.Base = region->Block.Base;
+            OldRegion->Block.Used = region->Block.Used;
+            OldRegion->Block.Total = region->Block.Total;
         }
         
         region->regionCount++;
-        region->block.Base = newBase;
-        region->block.Used = newUsed;
-        region->block.Total = newTotal;
+        region->Block.Base = newBase;
+        region->Block.Used = newUsed;
+        region->Block.Total = newTotal;
         
-        result = region->block.Base;
+        result = region->Block.Base;
     }
     else{
-        Assert(newUsedCount <= region->block.Total);
+        Assert(newUsedCount <= region->Block.Total);
         
         result = (void*)alignedPos;
-        region->block.Used = newUsedCount;
+        region->Block.Used = newUsedCount;
     }
     
     return(result);
 }
 
-inline void FreeMemoryRegion(Memory_Region* region){
-    while(region->regionCount > 1){
-        Memory_Region* old = (Memory_Region*)((u8*)region->block.Base + region->block.Total);
+inline void FreeMemoryRegion(mem_region* region){
+    while(region->regionCount > 0){
+        mem_region* Old = (mem_region*)((u8*)region->Block.Base + region->Block.Total);
+        
+        platform.MemFree(region->Block.Base);
+        
+        region->Block.Base = Old->Block.Base;
+        region->Block.Used = Old->Block.Used;
+        region->Block.Total = Old->Block.Total;
+        
+        --region->regionCount;
     }
+    
+    ASSERT(region->regionCount == 0);
 }
 
 #define PushMemoryStruct(region, type, name, region_member_name) \
 {\
-    type* asd = (type*)PushSomeMem(region, sizeof(type));\
-    asd->##region_member_name = region;\
-    name = asd;\
+    name = PushStruct(region, type);\
+    name->##region_member_name = region;\
 }
 
 #define PushSize(region, size) PushSomeMem(region, size)
@@ -122,8 +129,8 @@ inline void FreeMemoryRegion(Memory_Region* region){
 #define PushString(region, text) (char*)PushSomeMem(region, strlen(text) + 1)
 #define PushStringSize(region, text, textlen) (char*)PushSomeMem(region, (textlen) + 1)
 
-Memory_Box InitMemoryBox(Memory_Region* Region, u32 BoxSizeInBytes);
-Memory_Entry* AllocateMemoryFromBox(Memory_Box* box, u32 RequestMemorySize);
-void ReleaseMemoryFromBox(Memory_Box* box, Memory_Entry* memEntry);
+mem_box InitMemoryBox(mem_region* Region, u32 BoxSizeInBytes);
+mem_entry* AllocateMemoryFromBox(mem_box* box, u32 RequestMemorySize);
+void ReleaseMemoryFromBox(mem_box* box, mem_entry* memEntry);
 
 #endif

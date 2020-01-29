@@ -160,6 +160,9 @@ struct Platform_File_Handle{
     u32 Flags;
 };
 
+#define PLATFORM_PROCESS_INPUT(name) void name(struct input_state* Input)
+typedef PLATFORM_PROCESS_INPUT(platform_process_input);
+
 struct Platform{
     Platform_Read_File* ReadFile;
     Platform_Write_File* WriteFile;
@@ -179,6 +182,8 @@ struct Platform{
     
     Platform_Add_Entry* AddEntry;
     Platform_Wait_For_Completion* WaitForCompletion;
+    
+    platform_process_input* ProcessInput;
 };
 
 /* Extern variables definition */

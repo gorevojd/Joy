@@ -610,7 +610,7 @@ enum ColorTableType {
 // TODO(Dima): ZII memory region here
 // TODO(Dima): Organize like hash table nearby
 struct Color_State{
-	Memory_Region* colorsMem;
+	mem_region* colorsMem;
     Color_Slot colorTable[Color_Count];
 };
 
@@ -621,6 +621,6 @@ inline v4 GetColor(Color_State* colorState, u32 colorIndex) {
 }
 
 //NOTE(dima): Function prototypes
-void InitColorsState(Color_State* state, Memory_Region* colorsMemory);
+void InitColorsState(Color_State* state, mem_region* colorsMemory);
 
 #endif
