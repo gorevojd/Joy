@@ -5,8 +5,13 @@
 #include "joy_gui.h"
 #include "joy_render.h"
 
+struct test_game_mode_state{
+    
+};
+
 // NOTE(Dima): TEST GAME MODE
 GAME_MODE_UPDATE(TestUpdate){
+    GAME_GET_MODE_STATE(test_game_mode_state, State);
     
     render_stack* Stack = RenderFindStack(Game->Render, "Main");
     
@@ -15,15 +20,18 @@ GAME_MODE_UPDATE(TestUpdate){
     GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
     
 #if 0    
-    if(!Initialized){
-        
-        Loaded_Strings List1 = Win32BeginListFilesInDir("../Code/", "*.cpp");
-        Win32EndListFilesInDir(&List1);
-        Loaded_Strings List = Win32BeginListFilesInDir("../Code/", "*.h");
-    }
-    
-    rc2 ClipRect = RcMinMax(V2(0.0f, 0.0f), V2(windowWidth, windowHeight));
-    
+    GuiGridBegin(Gui);
+    GuiGridRowBegin(Gui);
+    GuiGridTile(Gui, "Tile1");
+    GuiGridTile(Gui, "Tile2");
+    GuiGridTile(Gui, "Tile3");
+    GuiGridRowEnd(Gui);
+    GuiGridRowBegin(Gui, 1.5f);
+    GuiGridTile(Gui, "Tile4");
+    GuiGridTile(Gui, "Tile5");
+    GuiGridRowEnd(Gui);
+    GuiGridEnd(Gui);
+#endif
     
 #if 0        
     PushGradient(renderStack, RcMinDim(V2(10, 10), V2(900, 300)), 
@@ -43,19 +51,6 @@ GAME_MODE_UPDATE(TestUpdate){
     PushBitmap(renderStack, &gAssets.mountainsFuji, V2(500.0f, Sin(time * 1.4f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
     PushBitmap(renderStack, &gAssets.roadClouds, V2(600.0f, Sin(time * 1.5f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
     PushBitmap(renderStack, &gAssets.sunrise, V2(700.0f, Sin(time * 1.6f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-#endif
-    
-#if 1
-    GuiBeginTree(&gGui, "String List");
-    char ListInfo[64];
-    stbsp_sprintf(ListInfo, "String list count: %d", List.Count);
-    GuiText(&gGui, ListInfo);
-    
-    for(int i = 0; i < List.Count; i++){
-        GuiText(&gGui, List.Strings[i]);
-    }
-    GuiEndTree(&gGui);
-#endif
 #endif
     
 }
@@ -78,7 +73,7 @@ struct image_swapper_state{
 
 // NOTE(Dima): Changing pictures GAME MODE
 GAME_MODE_UPDATE(ChangingPicturesUpdate){
-    image_swapper_state* State = (image_swapper_state*)Mode->ModeState;
+    GAME_GET_MODE_STATE(image_swapper_state, State);
     
     Bmp_Info* ToShowArray = Game->Assets->fadeoutBmps;
     int ToShowCount = Game->Assets->fadeoutBmpsCount;
@@ -86,11 +81,6 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     render_stack* Stack = RenderFindStack(Game->Render, "Main");
     
     PushClearColor(Stack, V3(1.0f, 0.5f, 0.0f));
-    
-    if(!State){
-        State = PushStruct(&Mode->Memory, image_swapper_state);
-        Mode->ModeState = State;
-    }
     
     if(!State->Initialized){
         State->FadeoutTime = 1.5f;

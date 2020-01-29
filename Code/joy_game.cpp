@@ -73,7 +73,7 @@ void GameInit(game_state* Game, platform_to_game_api Platform2GameAPI){
     DescribeGameMode(Game, "Changing pictures", ChangingPicturesUpdate, 0),
     DescribeGameMode(Game, "Test", TestUpdate, 0),
     
-    SetGameMode(Game, "Changing pictures");
+    SetGameMode(Game, "Test");
     
     // NOTE(Dima): Setting other things of game
     Game->ProcessInput = Platform2GameAPI.ProcessInput;
