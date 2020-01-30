@@ -1336,7 +1336,7 @@ inline rc2 GrowRectByScaledValue(rc2 A, v2 Value, float Scale){
 }
 
 inline rc2 GrowRectByPixels(rc2 A, int PixelsCount){
-    rc2 res;
+    rc2 res = A;
     res.min -= V2(PixelsCount, PixelsCount);
     res.max += V2(PixelsCount, PixelsCount);
     return(res);

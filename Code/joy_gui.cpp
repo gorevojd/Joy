@@ -181,6 +181,12 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(gui_state* Gui,
         *cur = found;
         
         result = found;
+        
+        // NOTE(Dima): Incrementing temp counts for row column elements
+        if(result->parent){
+            ++result->parent->TmpCount;
+        }
+        result->TmpCount = 0;
     }
     
     return(result);
@@ -221,6 +227,7 @@ INTERNAL_FUNCTION void GuiEndElement(gui_state* Gui, u32 type)
 {
     ASSERT(Gui->curElement->type == type);
     
+    Gui->curElement->TmpCount = 0;
     Gui->curElement = Gui->curElement->parent;
 }
 
@@ -392,6 +399,7 @@ assets* Assets)
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     Gui->mainFont = &Assets->inconsolataBold;
+    Gui->TileFont = &Assets->MollyJackFont;
     Gui->CheckboxMark = &Assets->CheckboxMark;
     Gui->fontScale = 1.0f;
     
@@ -468,8 +476,8 @@ assets* Assets)
     Gui->colors[GuiColor_ButtonForeground] = GUI_GETCOLOR_COLSYS(Color_White);
     Gui->colors[GuiColor_ButtonForegroundHot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
     Gui->colors[GuiColor_ButtonForegroundDisabled] = Gui->colors[GuiColor_ButtonForeground] * 0.75f;
-    Gui->colors[GuiColor_ButtonGrad1] = ColorFromHex("#FD6a02");
-    Gui->colors[GuiColor_ButtonGrad2] = ColorFromHex("#883000");
+    Gui->colors[GuiColor_ButtonGrad1] = ColorFromHex("#ffe000");
+    Gui->colors[GuiColor_ButtonGrad2] = ColorFromHex("#799f0c");
     
     Gui->windowAlpha = 0.85f;
     Gui->colors[GuiColor_WindowBackground] = V4(0.0f, 0.0f, 0.0f, Gui->windowAlpha);
@@ -1209,6 +1217,7 @@ void GuiEndColumn(gui_state* Gui){
 enum Push_But_Type{
     PushBut_Empty,
     PushBut_Color,
+    PushBut_Grad,
     PushBut_Outline,
     PushBut_DefaultBack,
     PushBut_DefaultGrad,
@@ -1216,7 +1225,11 @@ enum Push_But_Type{
     PushBut_AlphaBlack,
 };
 
-INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui, rc2 rect, u32 type = PushBut_DefaultGrad, v4 color = V4(0.0f, 0.0f, 0.0f, 1.0f)){
+INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui, 
+                                  rc2 rect, 
+                                  u32 type = PushBut_DefaultGrad, v4 color = V4(0.0f, 0.0f, 0.0f, 1.0f),
+                                  v4 color2 = V4(0.0f, 0.0f, 0.0f, 1.0f))
+{
     
     switch(type){
         case PushBut_Empty:{
@@ -1225,6 +1238,12 @@ INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui, rc2 rect, u32 type = PushBut_D
         
         case PushBut_Color:{
             PushRect(Gui->Stack, rect, color);
+        }break;
+        
+        case PushBut_Grad:{
+            PushGradient(Gui->Stack, rect, 
+                         color, color2, 
+                         RenderEntryGradient_Vertical);
         }break;
         
         case PushBut_AlphaBlack:{
@@ -1913,6 +1932,204 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
     GuiEndElement(Gui, GuiElement_Item);
 }
 
+void GuiGridHubBegin(gui_state* Gui){
+    
+}
+
+void GuiGridHubEnd(gui_state* Gui){
+    
+}
+
+
+INTERNAL_FUNCTION inline rc2 GuiGetGridRect(float WeightForThis, Gui_Element* Parent){
+    gui_grid_item* Item = &Parent->data.GridItem;
+    
+    if(Item->LastSumWeightInChildren < 0.0001f){
+        Item->LastSumWeightInChildren = 3.0f;
+    }
+    
+    float ThisAreaPercentage = WeightForThis / Item->LastSumWeightInChildren;
+    float ThisStartPercentage = Item->SumWeightInChildren / Item->LastSumWeightInChildren;
+    
+    v2 ParentDim = GetRectDim(Item->InternalRect);
+    
+    rc2 Result = {};
+    if(Item->Type == GuiGridItem_Row){
+        float StartX = Item->InternalRect.min.x + ParentDim.x * ThisStartPercentage;
+        float StartY = Item->InternalRect.min.y;
+        
+        v2 Dim = V2(ParentDim.x * ThisAreaPercentage, ParentDim.y);
+        Result = RcMinDim(V2(StartX, StartY), Dim);
+    }
+    else if((Item->Type == GuiGridItem_Column) ||
+            (Item->Type == GuiGridItem_Item))
+    {
+        float StartX = Item->InternalRect.min.x;
+        float StartY = Item->InternalRect.min.y + ParentDim.y * ThisStartPercentage;
+        
+        v2 Dim = V2(ParentDim.x, ParentDim.y * ThisAreaPercentage);
+        Result = RcMinDim(V2(StartX, StartY), Dim);
+    }
+    else{
+        // TODO(Dima): ?????
+    }
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION gui_grid_item* GuiGridItemInit(gui_state* Gui, 
+                                                 Gui_Element* elem, 
+                                                 u32 GridItemType, 
+                                                 float Weight, 
+                                                 b32 IsGrid)
+{
+    gui_grid_item* Item = &elem->data.GridItem;
+    if(IsGrid){
+        Item->InternalRect = RcMinDim(V2(0.0f, 0.0f), 
+                                      V2(Gui->FrameInfo.Width,
+                                         Gui->FrameInfo.Height));
+    }
+    else{
+        Item->InternalRect = GuiGetGridRect(Weight, elem->parent);
+        Item->Rect = GrowRectByPixels(Item->InternalRect, -10);
+        
+        gui_grid_item* ParentItem = &elem->parent->data.GridItem;
+        
+        ParentItem->SumWeightInChildren += Weight;
+    }
+    
+    Item->Type = GridItemType;
+    Item->SumWeightInChildren = 0.0f;
+    
+    if(!Item->IsInit){
+        Item->TimeSinceNotHot = 9999.0f;
+        
+        Item->IsInit = JOY_TRUE;
+    }
+    
+    return(Item);
+}
+
+void GuiGridBegin(gui_state* Gui, char* Name){
+    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, JOY_TRUE);
+    
+    gui_grid_item* Item = GuiGridItemInit(Gui,
+                                          elem,
+                                          GuiGridItem_Column,
+                                          0.0f,
+                                          JOY_TRUE);
+}
+
+void GuiGridEnd(gui_state* Gui){
+    gui_grid_item* Item = &Gui->curElement->data.GridItem;
+    Item->LastSumWeightInChildren = Item->SumWeightInChildren;
+    Item->SumWeightInChildren = 0;
+    GuiEndElement(Gui, GuiElement_GridItem);
+}
+
+void GuiGridBeginRow(gui_state* Gui, float Weight = 1.0f){
+    char Name[64];
+    stbsp_sprintf(Name, "Row: %d", Gui->curElement->TmpCount);
+    
+    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, JOY_TRUE);
+    
+    gui_grid_item* Item = GuiGridItemInit(Gui,
+                                          elem,
+                                          GuiGridItem_Row,
+                                          Weight,
+                                          JOY_FALSE);
+}
+
+void GuiGridBeginColumn(gui_state* Gui, float Weight = 1.0f){
+    char Name[64];
+    stbsp_sprintf(Name, "Column: %d", Gui->curElement->TmpCount);
+    
+    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, JOY_TRUE);
+    
+    gui_grid_item* Item = GuiGridItemInit(Gui,
+                                          elem,
+                                          GuiGridItem_Column,
+                                          Weight,
+                                          JOY_FALSE);
+}
+
+void GuiGridEndRowOrColumn(gui_state* Gui){
+    
+    gui_grid_item* Item = &Gui->curElement->data.GridItem;
+    Item->LastSumWeightInChildren = Item->SumWeightInChildren;
+    Item->SumWeightInChildren = 0;
+    
+    GuiEndElement(Gui, GuiElement_GridItem);
+}
+
+b32 GuiGridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
+    b32 Result = 0;
+    
+    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, JOY_TRUE);
+    gui_grid_item* Item = GuiGridItemInit(Gui,
+                                          elem,
+                                          GuiGridItem_Item,
+                                          Weight,
+                                          JOY_FALSE);
+    
+    if(GuiElementOpenedInTree(elem)){
+        v4 TileColor = GUI_GETCOLOR_COLSYS(ColorExt_gray53);
+        
+        Gui_Empty_Interaction Interaction(elem);
+        
+        rc2 WorkRect = Item->Rect;
+        
+        v4 NotActiveColor1 = GUI_GETCOLOR_COLSYS(ColorExt_gray53);
+        v4 NotActiveColor2 = GUI_GETCOLOR_COLSYS(ColorExt_gray60);
+        
+        v4 ActiveColor1 = GUI_GETCOLOR_COLSYS(ColorExt_BlueViolet);
+        v4 ActiveColor2 = GUI_GETCOLOR_COLSYS(ColorExt_VioletRed);
+        
+        v4 Color1;
+        v4 Color2;
+        
+        if(MouseInRect(Gui->Input, WorkRect)){
+            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
+            Color1 = ActiveColor1;
+            Color2 = ActiveColor2;
+            
+            if(KeyWentDown(Gui->Input, MouseKey_Left)){
+                GuiSetActive(Gui, &Interaction);
+                GuiReleaseInteraction(Gui, &Interaction);
+                
+                Result = JOY_TRUE;
+            }
+            
+            Item->TimeSinceNotHot = 0;
+        }
+        else{
+            GuiSetHot(Gui, Interaction.ID, JOY_FALSE);
+            float Time4Fadeout = 0.3f;
+            
+            float t = Item->TimeSinceNotHot / Time4Fadeout;
+            t = Clamp01(t);
+            
+            Color1 = Lerp(ActiveColor1, NotActiveColor1, t);
+            Color2 = Lerp(ActiveColor2, NotActiveColor2, t);
+            
+            Item->TimeSinceNotHot += Gui->FrameInfo.DeltaTime;
+        }
+        
+        v4 OutlineColor = GUI_GETCOLOR_COLSYS(Color_Black);
+        GuiPushBut(Gui, WorkRect, PushBut_Grad, Color1, Color2);
+        GuiPushBut(Gui, WorkRect, PushBut_Outline, OutlineColor); 
+        PrintTextCenteredInRectInternal(Gui->TileFont, 
+                                        Gui->Stack, 
+                                        Name, 
+                                        WorkRect, 
+                                        2.0f);
+    }
+    
+    GuiEndElement(Gui, GuiElement_GridItem);
+    
+    return(Result);
+}
+
 void GuiTest(gui_state* Gui, float deltaTime){
     
     render_stack* renderStack = Gui->Stack;
@@ -1927,6 +2144,28 @@ void GuiTest(gui_state* Gui, float deltaTime){
     stbsp_sprintf(StackInfo, "EntryCount: %d; BytesUsed: %d;", 
                   lastFrameEntryCount, 
                   lastFrameBytesUsed);
+    
+#if 1    
+    GuiGridBegin(Gui, "Grid1");
+    GuiGridBeginRow(Gui);
+    if(GuiGridTile(Gui, "Tile1", 1.0f)){
+        
+    }
+    
+    if(GuiGridTile(Gui, "Tile2", 2.0f)){
+        
+    }
+    
+    if(GuiGridTile(Gui, "Tile3", 3.0f)){
+        
+    }
+    GuiGridEndRowOrColumn(Gui);
+    GuiGridBeginRow(Gui, 1.5f);
+    GuiGridTile(Gui, "Tile4");
+    GuiGridTile(Gui, "Tile5");
+    GuiGridEndRowOrColumn(Gui);
+    GuiGridEnd(Gui);
+#endif
     
     GuiBeginPage(Gui, "Page1");
     GuiEndPage(Gui);

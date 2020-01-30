@@ -48,47 +48,47 @@ PLATFORM_FREE_FILE_MEMORY(PlatformFreeFileMemory) {
 
 PLATFORM_ADD_ENTRY(PlatformAddEntry){
 #if PLATFORM_USE_STD_MUTEX
-    queue->addMutexSTD.lock();
+    queue->AddMutexSTD.lock();
 #else
-    BeginTicketMutex(&queue->addMutex);
+    BeginTicketMutex(&queue->AddMutex);
 #endif
     
-    uint32_t oldAddIndex = queue->addIndex.load(std::memory_order_relaxed);
+    uint32_t oldAddIndex = queue->AddIndex.load(std::memory_order_relaxed);
     std::atomic_thread_fence(std::memory_order_acquire);
     
-    uint32_t newAddIndex = (oldAddIndex + 1) % queue->jobsCount;
+    uint32_t newAddIndex = (oldAddIndex + 1) % queue->JobsCount;
     // NOTE(Dima): We should not overlap
-    Assert(newAddIndex != queue->doIndex.load(std::memory_order_acquire));
+    Assert(newAddIndex != queue->DoIndex.load(std::memory_order_acquire));
     
-    PlatformJob* job = &queue->jobs[oldAddIndex];
-    job->callback = callback;
-    job->data = data;
+    platform_job* job = &queue->Jobs[oldAddIndex];
+    job->Callback = callback;
+    job->Data = data;
     
     std::atomic_thread_fence(std::memory_order_release);
-    queue->addIndex.store(newAddIndex, std::memory_order_relaxed);
-    queue->started.fetch_add(1);
+    queue->AddIndex.store(newAddIndex, std::memory_order_relaxed);
+    queue->Started.fetch_add(1);
     
-    queue->conditionVariable.notify_all();
+    queue->ConditionVariable.notify_all();
 #if PLATFORM_USE_STD_MUTEX
-    queue->addMutexSTD.unlock();
+    queue->AddMutexSTD.unlock();
 #else
     EndTicketMutex(&queue->AddMutex);
 #endif
 }
 
-InternalFunction b32 PlatformDoWorkerWork(Platform_Job_Queue* queue){
+InternalFunction b32 PlatformDoWorkerWork(platform_job_queue* queue){
     b32 res = 0;
     
-    std::uint32_t d = queue->doIndex.load();
+    std::uint32_t d = queue->DoIndex.load();
     
-    if(d != queue->addIndex.load(std::memory_order_acquire)){
-        std::uint32_t newD = (d + 1) % queue->jobsCount;
-        if(queue->doIndex.compare_exchange_weak(d, newD)){
-            PlatformJob* job = &queue->jobs[d];
+    if(d != queue->AddIndex.load(std::memory_order_acquire)){
+        std::uint32_t newD = (d + 1) % queue->JobsCount;
+        if(queue->DoIndex.compare_exchange_weak(d, newD)){
+            platform_job* job = &queue->Jobs[d];
             
-            job->callback(job->data);
+            job->Callback(job->Data);
             
-            queue->finished.fetch_add(1);
+            queue->Finished.fetch_add(1);
         }
         else{
             // NOTE(Dima): Value has not been changed because of spuorious failure
@@ -101,51 +101,51 @@ InternalFunction b32 PlatformDoWorkerWork(Platform_Job_Queue* queue){
     return(res);
 }
 
-InternalFunction void PlatformWorkerThread(Platform_Job_Queue* queue){
+InternalFunction void PlatformWorkerThread(platform_job_queue* queue){
     for(;;){
         if(PlatformDoWorkerWork(queue)){
-            std::unique_lock<std::mutex> uniqueLock(queue->conditionVariableMutex);
-            queue->conditionVariable.wait(uniqueLock);
+            std::unique_lock<std::mutex> UniqueLock(queue->ConditionVariableMutex);
+            queue->ConditionVariable.wait(UniqueLock);
         }
     }
 }
 
 PLATFORM_WAIT_FOR_COMPLETION(PlatformWaitForCompletion){
-    while(queue->started.load() != queue->finished.load())
+    while(queue->Started.load() != queue->Finished.load())
     {
         PlatformDoWorkerWork(queue);
     }
     
     std::atomic_thread_fence(std::memory_order_release);
-    queue->started.store(0, std::memory_order_relaxed);
-    queue->finished.store(0, std::memory_order_relaxed);
+    queue->Started.store(0, std::memory_order_relaxed);
+    queue->Finished.store(0, std::memory_order_relaxed);
 }
 
-static void InitJobQueue(Platform_Job_Queue* queue, int jobsCount, int threadCount){
-    queue->addIndex.store(0, std::memory_order_relaxed);
-    queue->doIndex.store(0, std::memory_order_relaxed);
+static void InitJobQueue(platform_job_queue* queue, int jobsCount, int threadCount){
+    queue->AddIndex.store(0, std::memory_order_relaxed);
+    queue->DoIndex.store(0, std::memory_order_relaxed);
     
-    queue->started.store(0, std::memory_order_relaxed);
-    queue->finished.store(0, std::memory_order_relaxed);
+    queue->Started.store(0, std::memory_order_relaxed);
+    queue->Finished.store(0, std::memory_order_relaxed);
     
-    queue->jobs = (PlatformJob*)malloc(jobsCount * sizeof(PlatformJob));
-    queue->jobsCount = jobsCount;
+    queue->Jobs = (platform_job*)malloc(jobsCount * sizeof(platform_job));
+    queue->JobsCount = jobsCount;
     
     for(int jobIndex = 0; jobIndex < jobsCount; jobIndex++){
-        PlatformJob* job = queue->jobs + jobIndex;
+        platform_job* job = queue->Jobs + jobIndex;
         
-        job->callback = 0;
-        job->data = 0;
+        job->Callback = 0;
+        job->Data = 0;
     }
     
-    queue->threads.reserve(threadCount);
+    queue->Threads.reserve(threadCount);
     for(int threadIndex = 0;
         threadIndex < threadCount;
         threadIndex++)
     {
 #if 1
-        queue->threads.push_back(std::thread(PlatformWorkerThread, queue));
-        queue->threads[threadIndex].detach();
+        queue->Threads.push_back(std::thread(PlatformWorkerThread, queue));
+        queue->Threads[threadIndex].detach();
 #else
         std::thread newThread(PlatformWorkerThread, queue);
         newThread.detach();
@@ -153,12 +153,12 @@ static void InitJobQueue(Platform_Job_Queue* queue, int jobsCount, int threadCou
     }
 }
 
-static void FreeJobQueue(Platform_Job_Queue* queue){
-    if(queue->jobs){
-        free(queue->jobs);
+static void FreeJobQueue(platform_job_queue* queue){
+    if(queue->Jobs){
+        free(queue->Jobs);
     }
-    queue->jobs = 0;
-    queue->threads.clear();
+    queue->Jobs = 0;
+    queue->Threads.clear();
 }
 
 void InitDefaultPlatformAPI(Platform* api){

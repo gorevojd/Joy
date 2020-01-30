@@ -1191,7 +1191,7 @@ PLATFORM_CALLBACK(RenderQueueRGBA2BGRAWork){
 }
 
 #define TILES_COUNT 32
-void RenderMultithreaded(Platform_Job_Queue* queue, render_stack* stack, Bmp_Info* buf) {
+void RenderMultithreaded(platform_job_queue* queue, render_stack* stack, Bmp_Info* buf) {
     
 #if 0
     rc2 clipRect;
@@ -1277,7 +1277,7 @@ void RenderMultithreaded(Platform_Job_Queue* queue, render_stack* stack, Bmp_Inf
 #endif
 }
 
-void RenderMultithreadedRGBA2BGRA(Platform_Job_Queue* queue, Bmp_Info* buf) {
+void RenderMultithreadedRGBA2BGRA(platform_job_queue* queue, Bmp_Info* buf) {
     
     Render_Queue_rgba2bgra_Work works[TILES_COUNT];
     

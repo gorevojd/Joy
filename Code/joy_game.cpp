@@ -73,7 +73,7 @@ void GameInit(game_state* Game, platform_to_game_api Platform2GameAPI){
     DescribeGameMode(Game, "Changing pictures", ChangingPicturesUpdate, 0),
     DescribeGameMode(Game, "Test", TestUpdate, 0),
     
-    SetGameMode(Game, "Test");
+    SetGameMode(Game, "Changing pictures");
     
     // NOTE(Dima): Setting other things of game
     Game->ProcessInput = Platform2GameAPI.ProcessInput;
@@ -92,6 +92,7 @@ void GameUpdate(game_state* Game, render_frame_info FrameInfo){
     GuiFrameInfo.Input = Game->Input;
     GuiFrameInfo.Width = FrameInfo.Width;
     GuiFrameInfo.Height = FrameInfo.Height;
+    GuiFrameInfo.DeltaTime = FrameInfo.dt;
     
     // NOTE(Dima): Init gui for frame
     GuiFrameBegin(Game->Gui, GuiFrameInfo);

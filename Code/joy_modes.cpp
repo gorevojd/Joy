@@ -19,20 +19,6 @@ GAME_MODE_UPDATE(TestUpdate){
     
     GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
     
-#if 0    
-    GuiGridBegin(Gui);
-    GuiGridRowBegin(Gui);
-    GuiGridTile(Gui, "Tile1");
-    GuiGridTile(Gui, "Tile2");
-    GuiGridTile(Gui, "Tile3");
-    GuiGridRowEnd(Gui);
-    GuiGridRowBegin(Gui, 1.5f);
-    GuiGridTile(Gui, "Tile4");
-    GuiGridTile(Gui, "Tile5");
-    GuiGridRowEnd(Gui);
-    GuiGridEnd(Gui);
-#endif
-    
 #if 0        
     PushGradient(renderStack, RcMinDim(V2(10, 10), V2(900, 300)), 
                  ColorFromHex("#FF00FF"), ColorFromHex("#4b0082"),
@@ -122,12 +108,6 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
         toShowNextH, 
         V4(1.0f, 1.0f, 1.0f, fadeoutAlpha));
     
-    PushBitmap(Stack,
-               &Game->Assets->MainLargeAtlas.Bitmap,
-               V2(100, 100),
-               1000,
-               V4(1.0f, 1.0f, 1.0f, 1.0f));
-    
     State->TimeSinceShow += Game->Render->FrameInfo.dt * State->ShowSpeed;
     if(State->TimeSinceShow > State->ShowTime + State->FadeoutTime){
         State->ShowIndex = State->ShowNextIndex;
@@ -135,8 +115,14 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
         State->TimeSinceShow = 0.0f;
     }
     
-    
     GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
+    
+    PushBitmap(Stack,
+               &Game->Assets->MainLargeAtlas.Bitmap,
+               V2(100, 100),
+               1000,
+               V4(1.0f, 1.0f, 1.0f, 1.0f));
+    
 }
 
 // NOTE(Dima): TITLE GAME MODE

@@ -393,9 +393,12 @@ float* GaussianBox)
 				v4 FromColor = UnpackRGBA(*FromPix);
                 
 				v4 resColor = FromColor;
-				if (resColor.a > 0.05f) {
-                    resColor.a = 1.0f;
+				if (resColor.a < 0.15f) {
+                    resColor.a = 0.0f;
 				}
+                else{
+                    resColor.a = 1.0f;
+                }
                 
 				*ToPix = PackRGBA(resColor);
 			}

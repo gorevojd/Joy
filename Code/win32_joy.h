@@ -196,7 +196,7 @@ struct win_state{
     Bmp_Info bitmap;
     BITMAPINFO bmi;
     
-    TicketMutex memoryMutex;
+    ticket_mutex memoryMutex;
     Win_Memory_Region memorySentinel;
     
     win32_debug_output* DebugOutputFunc;

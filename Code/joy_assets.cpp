@@ -144,11 +144,13 @@ void InitAssets(assets* Assets){
 #else
     Assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, 0);
 #endif
+    Assets->MollyJackFont = LoadFont("../Data/Fonts/MollyJack.otf", 30.0f, LoadFont_BakeBlur);
     
-    Assets->pfdin = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 18.0f, 0);
+    Assets->pfdin = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 18.0f, LoadFont_BakeBlur);
     
     AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->liberationMono);
     AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->lilitaOne);
     AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->inconsolataBold);
     AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->pfdin);
+    AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->MollyJackFont);
 }

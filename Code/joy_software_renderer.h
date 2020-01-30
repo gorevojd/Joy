@@ -60,7 +60,7 @@ v2 dim,
 v4 modulationColor01,
 rc2 clipRect);
 
-void RenderMultithreaded(Platform_Job_Queue* queue, render_stack* stack, Bmp_Info* buffer);
-void RenderMultithreadedRGBA2BGRA(Platform_Job_Queue* queue, Bmp_Info* buffer);
+void RenderMultithreaded(platform_job_queue* queue, render_stack* stack, Bmp_Info* buffer);
+void RenderMultithreadedRGBA2BGRA(platform_job_queue* queue, Bmp_Info* buffer);
 
 #endif

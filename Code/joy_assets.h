@@ -58,6 +58,7 @@ struct assets{
     Font_Info lilitaOne;
     Font_Info inconsolataBold;
     Font_Info pfdin;
+    Font_Info MollyJackFont;
 };
 
 void InitAssets(assets* Assets);

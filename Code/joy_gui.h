@@ -142,6 +142,22 @@ struct Gui_Page{
     Gui_Page* Prev;
 };
 
+enum gui_grid_item_type{
+    GuiGridItem_Row,
+    GuiGridItem_Column,
+    GuiGridItem_Item,
+};
+
+struct gui_grid_item{
+    rc2 InternalRect;
+    rc2 Rect;
+    u32 Type;
+    float SumWeightInChildren;
+    float LastSumWeightInChildren;
+    float TimeSinceNotHot;
+    b32 IsInit;
+};
+
 enum Gui_Element_Type{
     GuiElement_None,
     GuiElement_Root,
@@ -152,6 +168,7 @@ enum Gui_Element_Type{
     GuiElement_RowColumn,
     GuiElement_RadioGroup,
     GuiElement_Layout,
+    GuiElement_GridItem,
 };
 
 struct Gui_Element{
@@ -179,6 +196,8 @@ struct Gui_Element{
             struct {
                 v2 OffsetInAnchor;
             } Anchor;
+            
+            gui_grid_item GridItem;
         };
         
         // NOTE(Dima): is initialized (b32)
@@ -186,6 +205,7 @@ struct Gui_Element{
     }data;
     
     b32 opened;
+    int TmpCount;
     
     Gui_Element* parentInTree;
     
@@ -242,10 +262,12 @@ struct gui_frame_info{
     input_state* Input;
     int Width;
     int Height;
+    float DeltaTime;
 };
 
 struct gui_state{
     Font_Info* mainFont;
+    Font_Info* TileFont;
     float fontScale;
     
     gui_frame_info FrameInfo;

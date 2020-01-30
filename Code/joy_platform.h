@@ -57,19 +57,19 @@ struct Platform_Read_File_Result{
     u64 dataSize;
 };
 
-struct TicketMutex{
+struct ticket_mutex{
     std::atomic_uint64_t acquire;
     std::atomic_uint64_t release;
 };
 
-inline void BeginTicketMutex(TicketMutex* mutex){
+inline void BeginTicketMutex(ticket_mutex* mutex){
     uint64_t before = mutex->acquire.fetch_add(1);
     while(before != mutex->release.load(std::memory_order::memory_order_acquire)){
         _mm_pause();
     }
 }
 
-inline void EndTicketMutex(TicketMutex* Mutex){
+inline void EndTicketMutex(ticket_mutex* Mutex){
     Mutex->release.fetch_add(1, std::memory_order::memory_order_release);
 }
 
@@ -100,28 +100,28 @@ typedef PLATFORM_DEBUG_OUTPUT_STRING(Platform_Debug_Output_String);
 #define PLATFORM_CALLBACK(name) void name(void* data)
 typedef PLATFORM_CALLBACK(Platform_Callback);
 
-struct PlatformJob{
-    Platform_Callback* callback;
-    void* data;
+struct platform_job{
+    Platform_Callback* Callback;
+    void* Data;
 };
 
-struct Platform_Job_Queue{
-    TicketMutex addMutex;
-    std::mutex addMutexSTD;
+struct platform_job_queue{
+    ticket_mutex AddMutex;
+    std::mutex AddMutexSTD;
     
-    std::atomic_uint32_t addIndex;
-    std::atomic_uint32_t doIndex;
+    std::atomic_uint32_t AddIndex;
+    std::atomic_uint32_t DoIndex;
     
-    std::atomic_uint64_t started;
-    std::atomic_uint64_t finished;
+    std::atomic_uint64_t Started;
+    std::atomic_uint64_t Finished;
     
-    PlatformJob* jobs;
-    int jobsCount;
+    platform_job* Jobs;
+    int JobsCount;
     
-    std::mutex conditionVariableMutex;
-    std::condition_variable conditionVariable;
+    std::mutex ConditionVariableMutex;
+    std::condition_variable ConditionVariable;
     
-    std::vector<std::thread> threads;
+    std::vector<std::thread> Threads;
 };
 
 #define PLATFORM_MEMALLOC(name) void* name(mi size)
@@ -130,11 +130,11 @@ typedef PLATFORM_MEMALLOC(Platform_Memalloc);
 #define PLATFORM_MEMFREE(name) void name(void* toFree)
 typedef PLATFORM_MEMFREE(Platform_Memfree);
 
-#define PLATFORM_ADD_ENTRY(name) void name(Platform_Job_Queue* queue, Platform_Callback* callback, void* data)
+#define PLATFORM_ADD_ENTRY(name) void name(platform_job_queue* queue, Platform_Callback* callback, void* data)
 typedef PLATFORM_ADD_ENTRY(Platform_Add_Entry);
 PLATFORM_ADD_ENTRY(PlatformAddEntry);
 
-#define PLATFORM_WAIT_FOR_COMPLETION(name) void name(Platform_Job_Queue* queue)
+#define PLATFORM_WAIT_FOR_COMPLETION(name) void name(platform_job_queue* queue)
 typedef PLATFORM_WAIT_FOR_COMPLETION(Platform_Wait_For_Completion);
 PLATFORM_WAIT_FOR_COMPLETION(PlatformWaitForCompletion);
 
@@ -171,8 +171,8 @@ struct Platform{
     Platform_Show_Error* ShowError;
     Platform_Debug_Output_String* OutputString;
     
-    Platform_Job_Queue highPriorityQueue;
-    Platform_Job_Queue lowPriorityQueue;
+    platform_job_queue highPriorityQueue;
+    platform_job_queue lowPriorityQueue;
     
     Platform_Memalloc* MemAlloc;
     Platform_Memfree* MemFree;
