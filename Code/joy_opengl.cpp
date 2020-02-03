@@ -503,6 +503,68 @@ void GlOutputCommands(gl_state* GL, render_stack* Stack){
             }break;
             
             case RenderEntry_Mesh:{
+                RENDER_GET_ENTRY(RenderEntryMesh);
+                
+#if 0                
+                if(!entry->Mesh->Handle){
+                    GLuint VAO, VBO, EBO;
+                    
+                    Mesh_Info* Mesh = entry->Mesh;
+                    
+                    glGenVertexArrays(1, &VAO);
+                    glGenBuffers(1, &VBO);
+                    glGenBuffers(1, &EBO);
+                    
+                    u32 SizeOfVertexStruct = sizeof(Vertex_Info);
+                    size_t Stride = sizeof(VertexInfo);
+                    if(Mesh->MeshType == Mesh_Skinned){
+                        SizeOfVertexStruct = sizeof(Vertex_Skinned_Info);
+                        Stride = sizeof(Vertex_Skinned_Info);
+                    }
+                    
+                    glBindVertexArray(VAO);
+                    GlBindBufferAndFill(GL_ARRAY_BUFFER,
+                                        GL_STATIC_DRAW,
+                                        Mesh->Vertices,
+                                        Mesh->VerticesCount * SizeOfVertexStruct,
+                                        VBO);
+                    
+                    GlBindBufferAndFill(GL_ELEMENT_ARRAY_BUFFER,
+                                        GL_STATIC_DRAW,
+                                        Mesh->Indices,
+                                        Mesh->IndicesCount * sizeof(u32),
+                                        EBO);
+                    
+                    
+                    
+                    if(GlArrayIsValid(GL->SimpleShader.PAttrLoc)){
+                        glEnableVertexAttribArray(GL->SimpleShader.PAttrLoc);
+                        glVertexAttribPointer(GL->SimpleShader.PAttrLoc,
+                                              );
+                    }
+                    
+                    if(GlArrayIsValid(GL->SimpleShader.UVAttrLoc)){
+                        glEnableVertexAttribArray(Gl->SimpleShader.UVAttrLoc);
+                        glVertexAttribPointer();
+                    }
+                    
+                    if(GlArrayIsValid(GL->SimpleShader.NAttrLoc)){
+                        glEnableVertexAttribArray(GL->SimpleShader.NAttrLoc);
+                        glVertexAttribPointer();
+                    }
+                    
+                    if(GlArrayIsValid(GL->SimpleShader.TAttrLoc)){
+                        glEnableVertexAttribArray(GL->SimpleShader.TAttrLoc);
+                        glVertexAttribPointer();
+                    }
+                    
+                    if(GlArrayIsValid(GL->SimpleShader.CAttrLoc)){
+                        glEnableVertexAttribArray(GL->SimpleShader.CAttrLoc);
+                        glVertexAttribPointer();
+                    }
+                }
+#endif
+                
                 
             }break;
         }

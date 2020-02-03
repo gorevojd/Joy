@@ -93,7 +93,9 @@ struct RenderEntryInAtlasBmp{
 };
 
 struct RenderEntryMesh{
+    v3 P;
     
+    Mesh_Info* Mesh;
 };
 #pragma pack(pop)
 

@@ -144,7 +144,7 @@ void InitAssets(assets* Assets){
 #else
     Assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, 0);
 #endif
-    Assets->MollyJackFont = LoadFont("../Data/Fonts/MollyJack.otf", 30.0f, LoadFont_BakeBlur);
+    Assets->MollyJackFont = LoadFont("../Data/Fonts/MollyJack.otf", 40.0f, LoadFont_BakeBlur);
     
     Assets->pfdin = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 18.0f, LoadFont_BakeBlur);
     

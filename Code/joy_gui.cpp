@@ -2122,7 +2122,7 @@ b32 GuiGridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
                                         Gui->Stack, 
                                         Name, 
                                         WorkRect, 
-                                        2.0f);
+                                        1.6f);
     }
     
     GuiEndElement(Gui, GuiElement_GridItem);
@@ -2145,7 +2145,7 @@ void GuiTest(gui_state* Gui, float deltaTime){
                   lastFrameEntryCount, 
                   lastFrameBytesUsed);
     
-#if 1    
+#if 0 
     GuiGridBegin(Gui, "Grid1");
     GuiGridBeginRow(Gui);
     if(GuiGridTile(Gui, "Tile1", 1.0f)){
