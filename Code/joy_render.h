@@ -6,6 +6,20 @@
 
 #define RENDER_DEFAULT_STACK_SIZE Megabytes(1)
 
+struct render_pass{
+    render_stack* Stacks[16];
+    int StacksCount;
+    
+    m44 Projection;
+    m44 View;
+    m44 ViewProjection;
+    
+    int FramebufferWidth;
+    int FramebufferHeight;
+    
+    v4 FrustumPlanes[6];
+};
+
 struct render_gui_geom_vertex{
     float Data[8];
 };
@@ -81,6 +95,9 @@ struct render_state{
     render_stack Stacks[16];
     int StacksCount;
     
+    render_pass Passes[16];
+    int PassCount;
+    
     b32 FrameInfoIsSet;
     render_frame_info FrameInfo;
     
@@ -88,6 +105,20 @@ struct render_state{
     
     render_gui_geom GuiGeom;
 };
+
+inline render_pass* BeginRenderPass(render_state* Render){
+    ASSERT(Render->PassCount < ARRAY_COUNT(Render->Passes));
+    
+    render_pass* Result = &Render->Passes[Render->PassCount++];
+    
+    return(Result);
+}
+
+inline void AddStackToRenderPass(render_pass* Pass, render_stack* Stack){
+    ASSERT(Pass->StacksCount < ARRAY_COUNT(Pass->Stacks));
+    
+    Pass->Stacks[Pass->StacksCount++] = Stack;
+}
 
 inline render_gui_geom* GetGuiGeom(render_stack* Stack){
     render_gui_geom* Result = &Stack->Render->GuiGeom;
@@ -282,13 +313,13 @@ inline void PushGuiGeom_InnerOutline(render_gui_geom* Geom, rc2 rect, int pixelW
 
 
 inline void PushClearColor(render_stack* Stack, v3 color){
-    RenderEntryClearColor* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_ClearColor, RenderEntryClearColor);;
+    render_entry_clear_color* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_ClearColor, render_entry_clear_color);;
     
     entry->clearColor01 = color;
 }
 
 inline void PushBitmap(render_stack* Stack, Bmp_Info* bitmap, v2 p, float height, v4 multColor){
-    RenderEntryBitmap* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Bitmap, RenderEntryBitmap);
+    render_entry_bitmap* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Bitmap, render_entry_bitmap);
     
     entry->Bitmap = bitmap;
     entry->P = p;
@@ -303,7 +334,7 @@ inline void PushGradient(render_stack* Stack,
                          u32 gradType)
 {
     if(Stack->IsSoftwareRenderer){
-        RenderEntryGradient* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Gradient, RenderEntryGradient);
+        render_entry_gradient* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Gradient, render_entry_gradient);
         
         entry->rc = rc;
         entry->color1 = color1;
@@ -330,7 +361,7 @@ rc2 rect,
 v4 multColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
     if(Stack->IsSoftwareRenderer){
-        RenderEntryRect* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Rect, RenderEntryRect);
+        render_entry_rect* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Rect, render_entry_rect);
         
         rect = RectNormalizeSubpixel(rect);
         
@@ -386,7 +417,7 @@ inline void PushGlyph(render_stack* Stack,
                       v4 ModColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
     if(Stack->IsSoftwareRenderer){
-        RenderEntryBitmap* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Bitmap, RenderEntryBitmap);
+        render_entry_bitmap* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Bitmap, render_entry_bitmap);
         
         entry->P = P;
         entry->PixelHeight = Dim.y;
@@ -398,6 +429,17 @@ inline void PushGlyph(render_stack* Stack,
     }
 }
 
+inline void PushMesh(render_stack* Stack,
+                     mesh_info* Mesh,
+                     v3 P,
+                     quat R,
+                     v3 S)
+{
+    render_entry_mesh* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Mesh, render_entry_mesh);
+    
+    entry->Mesh = Mesh;
+    entry->Transform = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
+}
 
 // NOTE(Dima): RENDERER API
 inline void RenderSetFrameInfo(render_state* Render, render_frame_info FrameInfo){
@@ -417,5 +459,9 @@ render_stack* RenderFindAddStack(render_state* Render, char* Name);
 
 void RenderBeginFrame(render_state* Render);
 void RenderEndFrame(render_state* Render);
+
+void RenderPassSetCamera(render_pass* Pass, m44 Projection, m44 View, 
+                         int FramebufferWidth,
+                         int FramebufferHeight);
 
 #endif

@@ -130,9 +130,22 @@ enum Mesh_Type{
     Mesh_Skinned,
 };
 
-struct Mesh_Info{
-    size_t Handle;
+enum mesh_handles_types{
+    MeshHandle_None,
+    MeshHandle_VertexArray,
+    MeshHandle_Buffer,
+};
+
+#define MESH_HANDLES_COUNT 8
+struct mesh_handles{
+    size_t Handles[MESH_HANDLES_COUNT];
+    int HandlesTypes[MESH_HANDLES_COUNT];
+    int Count;
     
+    b32 Allocated;
+};
+
+struct mesh_info{
     u32* Indices;
     int IndicesCount;
     
@@ -140,6 +153,8 @@ struct Mesh_Info{
     int VerticesCount;
     
     u32 MeshType;
+    
+    mesh_handles Handles;
 };
 
 #define FONT_INFO_MAX_GLYPH_COUNT 256

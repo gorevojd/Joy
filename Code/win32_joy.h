@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <Windows.h>
 #include <dsound.h>
+#include <xinput.h>
 
 #include "joy_types.h"
 #include "joy_math.h"
@@ -189,6 +190,7 @@ struct win_state{
     b32 InListFilesBlock;
     
     WINDOWPLACEMENT windowPlacement;
+    XINPUT_STATE ControllerStates[XUSER_MAX_COUNT];
     
     HDC glDC;
     HGLRC renderCtx;

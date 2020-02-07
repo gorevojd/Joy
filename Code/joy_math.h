@@ -308,6 +308,16 @@ inline v3 V3(float x, float y, float z) {
 	return(res);
 }
 
+inline v3 V3(float Value){
+    v3 Res;
+    
+    Res.x = Value;
+    Res.y = Value;
+    Res.z = Value;
+    
+    return(Res);
+}
+
 inline v4 V4(float Value) {
 	v4 res;
 	res.x = Value;
@@ -595,6 +605,19 @@ inline v4 Mul(v4 V, m44 M) {
     return(res);
 }
 
+inline void Mul(float Res[3], float A[3], float B[9]){
+    Res[0] = A[0] * B[0] + A[1] * B[3] + A[2] * B[6];
+    Res[1] = A[0] * B[1] + A[1] * B[4] + A[2] * B[7];
+    Res[2] = A[0] * B[2] + A[1] * B[5] + A[2] * B[8];
+}
+
+inline v3 Mul(v3 A, m33 B){
+    float TmpRes[3];
+    v3 Res;
+    Mul(Res.e, A.e, B.e);
+    
+    return(Res);
+}
 
 /*Divide operations*/
 inline v2 Div(v2 A, float S) {
@@ -726,6 +749,13 @@ inline quat operator/(quat A, float S) { return Div(A, S); }
 inline quat operator*(quat A, quat B) { return(Mul(A, B)); }
 
 /*Matrix operator overloading*/
+
+inline v3 operator*(v3 A, m33 B){
+    v3 Res = Mul(A, B);
+    
+    return(Res);
+}
+
 inline v4 operator*(v4 A, m44 B){
     v4 res = Mul(A, B);
     
@@ -819,7 +849,7 @@ inline m44 TranslationMatrix(v3 Translation){
 }
 
 inline m44 InverseTranslationMatrix(v3 Translation){
-    m44 Result = {};
+    m44 Result = Identity();
     
 	Result.e[12] = -Translation.x;
 	Result.e[13] = -Translation.y;
@@ -860,6 +890,18 @@ inline m44 Transpose(m44 M) {
 	return(Result);
 }
 
+inline m33 Transpose(m33 M){
+    m33 Result = {};
+    
+	for (int RowIndex = 0; RowIndex < 3; RowIndex++) {
+		for (int ColumtIndex = 0; ColumtIndex < 3; ColumtIndex++) {
+			Result.e[ColumtIndex * 3 + RowIndex] = M.e[RowIndex * 3 + ColumtIndex];
+		}
+	}
+    
+    return(Result);
+}
+
 inline m44 PerspectiveProjection(int Width, int Height, float Far, float Near)
 {
 	m44 Result = {};
@@ -877,6 +919,23 @@ inline m44 PerspectiveProjection(int Width, int Height, float Far, float Near)
 	Result.e[11] = -1.0f;
     
 	return(Result);
+}
+
+inline m44 PerspectiveProjectionScreen(int Width, int Height, float Far, float Near){
+    m44 Result = {};
+    
+    float MinusOneOverFarMinusNear = -1.0f / (Far - Near);
+	Result.e[0] = 2.0f * Near / (float)Width;
+	Result.e[5] = 2.0f * Near / (float)Height;
+	Result.e[8] = 1.0f;
+	Result.e[9] = 1.0f;
+	Result.e[10] = (Far + Near) * MinusOneOverFarMinusNear;
+	Result.e[11] = -1.0f;
+	Result.e[12] = 1.0f;
+	Result.e[13] = 1.0f;
+	Result.e[14] = (2.0f * Far * Near) * MinusOneOverFarMinusNear;
+    
+    return(Result);
 }
 
 inline m44 OrthographicProjection(int Width, int Height) {
@@ -927,7 +986,7 @@ inline m44 LookAt(v3 Pos, v3 TargetPos, v3 WorldUp) {
 }
 
 /*Conversions*/
-inline m44 MatrixFromrows(v4 R1, v4 R2, v4 R3, v4 R4){
+inline m44 MatrixFromRows(v4 R1, v4 R2, v4 R3, v4 R4){
     m44 res = {};
     
     res.rows[0] = R1;
@@ -948,7 +1007,7 @@ inline m33 MatrixFromRows(v3 R1, v3 R2, v3 R3){
     return(res);
 }
 
-inline m33 QuatToM33(quat Q){
+inline m33 Quat2M33(quat Q){
     m33 res = {};
     
     float x2 = Q.x * Q.x;
@@ -963,21 +1022,21 @@ inline m33 QuatToM33(quat Q){
     float xw = Q.x * Q.w;
     
     res.e[0] = 1.0f - 2.0f * (y2 + z2);
-    res.e[1] = 2.0f * (xy + zw);
-    res.e[2] = 2.0f * (xz - yw);
+    res.e[1] = 2.0f * (xy - zw);
+    res.e[2] = 2.0f * (xz + yw);
     
-    res.e[3] = 2.0f * (xy - zw);
+    res.e[3] = 2.0f * (xy + zw);
     res.e[4] = 1.0f - 2.0f * (x2 + z2);
-    res.e[5] = 2.0f * (yz + xw);
+    res.e[5] = 2.0f * (yz - xw);
     
-    res.e[6] = 2.0f * (xz + yw);
-    res.e[7] = 2.0f * (yz - xw);
+    res.e[6] = 2.0f * (xz - yw);
+    res.e[7] = 2.0f * (yz + xw);
     res.e[8] = 1.0f - 2.0f * (x2 + y2);
     
     return(res);
 }
 
-inline m44 QuatToM44(quat Q){
+inline m44 Quat2M44(quat Q){
     m44 res = {};
     
     float x2 = Q.x * Q.x;
@@ -992,17 +1051,17 @@ inline m44 QuatToM44(quat Q){
     float xw = Q.x * Q.w;
     
     res.e[0] = 1.0f - 2.0f * (y2 + z2);
-    res.e[1] = 2.0f * (xy + zw);
-    res.e[2] = 2.0f * (xz - yw);
+    res.e[1] = 2.0f * (xy - zw);
+    res.e[2] = 2.0f * (xz + yw);
     res.e[3] = 0.0f;
     
-    res.e[4] = 2.0f * (xy - zw);
+    res.e[4] = 2.0f * (xy + zw);
     res.e[5] = 1.0f - 2.0f * (x2 + z2);
-    res.e[6] = 2.0f * (yz + xw);
+    res.e[6] = 2.0f * (yz - xw);
     res.e[7] = 0.0f;
     
-    res.e[8] = 2.0f * (xz + yw);
-    res.e[9] = 2.0f * (yz - xw);
+    res.e[8] = 2.0f * (xz - yw);
+    res.e[9] = 2.0f * (yz + xw);
     res.e[10] = 1.0f - 2.0f * (x2 + y2);
     res.e[11] = 0.0f;
     
@@ -1012,6 +1071,10 @@ inline m44 QuatToM44(quat Q){
     res.e[15] = 1.0f;
     
     return(res);
+}
+
+inline m44 RotationMatrix(quat Q){
+    return(Quat2M44(Q));
 }
 
 inline v3 GetQuatLeft(quat Q){

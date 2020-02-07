@@ -1,6 +1,66 @@
 #include "joy_render.h"
 #include "joy_software_renderer.h"
 
+void RenderPassSetCamera(render_pass* Pass, m44 Projection, m44 View, 
+                         int FramebufferWidth,
+                         int FramebufferHeight)
+{
+    m44 PVM  = View * Projection;
+    
+    Pass->Projection = Projection;
+    Pass->View = View;
+    Pass->ViewProjection = PVM;
+    
+    Pass->FramebufferWidth = FramebufferWidth;
+    Pass->FramebufferHeight = FramebufferHeight;
+    
+    v4 *FrustumPlanes = Pass->FrustumPlanes;
+    
+    //NOTE(dima): Left plane
+	FrustumPlanes[0].A = PVM.e[3] + PVM.e[0];
+	FrustumPlanes[0].B = PVM.e[7] + PVM.e[4];
+	FrustumPlanes[0].C = PVM.e[11] + PVM.e[8];
+	FrustumPlanes[0].D = PVM.e[15] + PVM.e[12];
+    
+	//NOTE(dima): Right plane
+	FrustumPlanes[1].A = PVM.e[3] - PVM.e[0];
+	FrustumPlanes[1].B = PVM.e[7] - PVM.e[4];
+	FrustumPlanes[1].C = PVM.e[11] - PVM.e[8];
+	FrustumPlanes[1].D = PVM.e[15] - PVM.e[12];
+    
+	//NOTE(dima): Bottom plane
+	FrustumPlanes[2].A = PVM.e[3] + PVM.e[1];
+	FrustumPlanes[2].B = PVM.e[7] + PVM.e[5];
+	FrustumPlanes[2].C = PVM.e[11] + PVM.e[9];
+	FrustumPlanes[2].D = PVM.e[15] + PVM.e[13];
+    
+	//NOTE(dima): Top plane
+	FrustumPlanes[3].A = PVM.e[3] - PVM.e[1];
+	FrustumPlanes[3].B = PVM.e[7] - PVM.e[5];
+	FrustumPlanes[3].C = PVM.e[11] - PVM.e[9];
+	FrustumPlanes[3].D = PVM.e[15] - PVM.e[13];
+    
+	//NOTE(dima): Near plane
+	FrustumPlanes[4].A = PVM.e[3] + PVM.e[2];
+	FrustumPlanes[4].B = PVM.e[7] + PVM.e[6];
+	FrustumPlanes[4].C = PVM.e[11] + PVM.e[10];
+	FrustumPlanes[4].D = PVM.e[15] + PVM.e[14];
+    
+	//NOTE(dima): Far plane
+	FrustumPlanes[5].A = PVM.e[3] - PVM.e[2];
+	FrustumPlanes[5].B = PVM.e[7] - PVM.e[6];
+	FrustumPlanes[5].C = PVM.e[11] - PVM.e[10];
+	FrustumPlanes[5].D = PVM.e[15] - PVM.e[14];
+    
+    // NOTE(Dima): Normalizing planes
+	for (int PlaneIndex = 0;
+         PlaneIndex < 6;
+         PlaneIndex++)
+	{
+		FrustumPlanes[PlaneIndex] = NormalizePlane(FrustumPlanes[PlaneIndex]);
+	}
+}
+
 INTERNAL_FUNCTION void InitRenderStack(render_stack* stack, 
                                        render_state* render,
                                        char* Name, 
@@ -145,4 +205,15 @@ void RenderEndFrame(render_state* render){
         
         RenderStackEndFrame(ToInitStack);
     }
+    
+    for(int PassIndex = 0;
+        PassIndex < render->PassCount;
+        PassIndex++)
+    {
+        render_pass* Pass = &render->Passes[PassIndex];
+        
+        *Pass = {};
+    }
+    
+    render->PassCount = 0;
 }

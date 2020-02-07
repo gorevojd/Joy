@@ -1094,13 +1094,13 @@ void SoftwareRenderStackToOutput(render_stack* stack, Bmp_Info* buf, rc2 clipRec
         
         switch(header->type){
             case RenderEntry_ClearColor:{
-                RENDER_GET_ENTRY(RenderEntryClearColor);
+                RENDER_GET_ENTRY(render_entry_clear_color);
                 
                 RenderClearSSE(buf, entry->clearColor01, clipRect);
             }break;
             
             case RenderEntry_Gradient:{
-                RENDER_GET_ENTRY(RenderEntryGradient);
+                RENDER_GET_ENTRY(render_entry_gradient);
                 
                 if(entry->gradType == RenderEntryGradient_Horizontal){
                     RenderGradientHorzSSE(buf, 
@@ -1122,7 +1122,7 @@ void SoftwareRenderStackToOutput(render_stack* stack, Bmp_Info* buf, rc2 clipRec
             }break;
             
             case RenderEntry_Rect:{
-                RENDER_GET_ENTRY(RenderEntryRect);
+                RENDER_GET_ENTRY(render_entry_rect);
                 
 #if 1
                 RenderRectSSE(buf,
@@ -1140,7 +1140,7 @@ void SoftwareRenderStackToOutput(render_stack* stack, Bmp_Info* buf, rc2 clipRec
             }break;
             
             case RenderEntry_Bitmap:{
-                RENDER_GET_ENTRY(RenderEntryBitmap);
+                RENDER_GET_ENTRY(render_entry_bitmap);
                 
 #if 1
                 RenderBitmapSSE(buf, 
@@ -1317,5 +1317,4 @@ void RenderMultithreadedRGBA2BGRA(platform_job_queue* queue, Bmp_Info* buf) {
     
     PlatformWaitForCompletion(queue);
 #endif
-    
 }

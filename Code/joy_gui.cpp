@@ -1827,13 +1827,13 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
             
             if(KeyIsDown(Gui->Input, Key_Left)){
                 if(KeyIsDown(Gui->Input, Key_Control)){
-                    for(int i = 0; i < Gui->Input->KeyStates[Key_Left].RepeatCount; i++){
+                    for(int i = 0; i < Gui->Input->Keyboard.KeyStates[Key_Left].RepeatCount; i++){
                         int FoundIndex = FindSkipPrev(Buf, *CaretP);
                         *CaretP = FoundIndex;
                     }
                 }
                 else{
-                    for(int i = 0; i < Gui->Input->KeyStates[Key_Left].RepeatCount; i++){
+                    for(int i = 0; i < Gui->Input->Keyboard.KeyStates[Key_Left].RepeatCount; i++){
                         *CaretP = *CaretP - 1;
                     }
                 }
@@ -1841,13 +1841,13 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
             
             if(KeyIsDown(Gui->Input, Key_Right)){
                 if(KeyIsDown(Gui->Input, Key_Control)){
-                    for(int i = 0; i < Gui->Input->KeyStates[Key_Right].RepeatCount; i++){
+                    for(int i = 0; i < Gui->Input->Keyboard.KeyStates[Key_Right].RepeatCount; i++){
                         int FoundIndex = FindSkipNext(Buf, *CaretP);
                         *CaretP = FoundIndex;
                     }
                 }
                 else{
-                    for(int i = 0; i < Gui->Input->KeyStates[Key_Right].RepeatCount; i++){
+                    for(int i = 0; i < Gui->Input->Keyboard.KeyStates[Key_Right].RepeatCount; i++){
                         *CaretP = *CaretP + 1;
                     }
                 }
@@ -1855,12 +1855,12 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
             
             if(KeyIsDown(Gui->Input, Key_Backspace)){
                 if(KeyIsDown(Gui->Input, Key_Control)){
-                    for(int i = 0; i < Gui->Input->KeyStates[Key_Backspace].RepeatCount; i++){
+                    for(int i = 0; i < Gui->Input->Keyboard.KeyStates[Key_Backspace].RepeatCount; i++){
                         *CaretP += EraseToNonLetterPrev(Buf, *CaretP);
                     }
                 }
                 else{
-                    for(int i = 0; i < Gui->Input->KeyStates[Key_Backspace].RepeatCount; i++){
+                    for(int i = 0; i < Gui->Input->Keyboard.KeyStates[Key_Backspace].RepeatCount; i++){
                         *CaretP += ErasePrevCharFromString(Buf, *CaretP);
                     }
                 }
@@ -1869,12 +1869,12 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
             
             if(KeyIsDown(Gui->Input, Key_Delete)){
                 if(KeyIsDown(Gui->Input, Key_Control)){
-                    for(int i = 0; i < Gui->Input->KeyStates[Key_Backspace].RepeatCount; i++){
+                    for(int i = 0; i < Gui->Input->Keyboard.KeyStates[Key_Backspace].RepeatCount; i++){
                         //f***CaretP += EraseToNonLetterNext(Buf, *CaretP);
                     }
                 }
                 else{
-                    for(int i = 0; i < Gui->Input->KeyStates[Key_Backspace].RepeatCount; i++){
+                    for(int i = 0; i < Gui->Input->Keyboard.KeyStates[Key_Backspace].RepeatCount; i++){
                         *CaretP += EraseNextCharFromString(Buf, *CaretP);
                     }
                 }
@@ -1917,7 +1917,7 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
         
 #if 1
         stbsp_sprintf(DebugBuf, "CaretP: %d; LeftRC: %d", *CaretP, 
-                      Gui->Input->KeyStates[Key_Left].RepeatCount);
+                      Gui->Input->Keyboard.KeyStates[Key_Left].RepeatCount);
         rc2 NameRc = PrintText(Gui, DebugBuf, nameStart, GUI_GETCOLOR(GuiColor_Text));
 #else
         rc2 NameRc = PrintText(Gui, name, nameStart, GUI_GETCOLOR(GuiColor_Text));

@@ -47,6 +47,7 @@ void GameInit(game_state* Game, platform_to_game_api Platform2GameAPI){
     // NOTE(Dima): Input
     Game->InputMemory = {};
     PushMemoryStruct(&Game->InputMemory, input_state, Game->Input, Region);
+    InitInput(Game->Input);
     
     // NOTE(Dima): Assets
     Game->AssetMemory = {};
@@ -59,6 +60,7 @@ void GameInit(game_state* Game, platform_to_game_api Platform2GameAPI){
     RenderInit(Game->Render, Platform2GameAPI.RenderAPI);
     RenderAddStack(Game->Render, "Main");
     RenderAddStack(Game->Render, "GUI");
+    RenderAddStack(Game->Render, "Meshes");
     // NOTE(Dima): Init platform render stuff
     Game->Render->Init(Game->Assets);
     
@@ -73,7 +75,7 @@ void GameInit(game_state* Game, platform_to_game_api Platform2GameAPI){
     DescribeGameMode(Game, "Changing pictures", ChangingPicturesUpdate, 0),
     DescribeGameMode(Game, "Test", TestUpdate, 0),
     
-    SetGameMode(Game, "Changing pictures");
+    SetGameMode(Game, "Test");
     
     // NOTE(Dima): Setting other things of game
     Game->ProcessInput = Platform2GameAPI.ProcessInput;

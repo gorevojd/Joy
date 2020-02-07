@@ -189,7 +189,4 @@ struct Platform{
 /* Extern variables definition */
 extern Platform platform;
 
-void InitDefaultPlatformAPI(Platform* api);
-void FreePlatformAPI(Platform* api);
-
 #endif

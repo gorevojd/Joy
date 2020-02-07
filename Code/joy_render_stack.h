@@ -36,11 +36,11 @@ struct render_stack{
 
 #define RENDER_ENTRY_MEMORY_ALIGN 4
 #pragma pack(push, RENDER_ENTRY_MEMORY_ALIGN)
-struct RenderEntryClearColor{
+struct render_entry_clear_color{
     v3 clearColor01;
 };
 
-struct RenderEntryBitmap{
+struct render_entry_bitmap{
     Bmp_Info* Bitmap;
     v2 P;
     float PixelHeight;
@@ -52,20 +52,20 @@ enum RenderEntryGradientType{
     RenderEntryGradient_Vertical,
 };
 
-struct RenderEntryGradient{
+struct render_entry_gradient{
     rc2 rc;
     v3 color1;
     v3 color2;
     u32 gradType;
 };
 
-struct RenderEntryRect{
+struct render_entry_rect{
     v4 modulationColor01;
     v2 p;
     v2 dim;
 };
 
-struct RenderEntryGlyph{
+struct render_entry_glyph{
     v2 P;
     v2 Dim;
     
@@ -77,12 +77,7 @@ struct RenderEntryGlyph{
     v4 ModColor;
 };
 
-struct RenderEntryTextureBind{
-    Bmp_Info* Bitmap;
-    int Unit;
-};
-
-struct RenderEntryInAtlasBmp{
+struct render_entry_in_atlas_bmp{
     v2 P;
     v2 Dim;
     
@@ -92,10 +87,10 @@ struct RenderEntryInAtlasBmp{
     v4 ModulationColor;
 };
 
-struct RenderEntryMesh{
-    v3 P;
+struct render_entry_mesh{
+    mesh_info* Mesh;
     
-    Mesh_Info* Mesh;
+    m44 Transform;
 };
 #pragma pack(pop)
 
@@ -115,7 +110,6 @@ inline void* RenderPushMem(render_stack* stack, mi size, mi align = 8){
     stack->MemBlock.Used= newUsedCount;
     
     return(result);
-    
 }
 
 inline void* RenderPushEntryToStack(render_stack* stack, u32 sizeOfType, u32 typeEnum) {

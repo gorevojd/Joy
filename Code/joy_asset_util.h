@@ -34,7 +34,7 @@ Loaded_Strings LoadStringListFromFile(char* filePath);
 void FreeStringList(Loaded_Strings* list);
 
 // NOTE(Dima): Mesh helpers
-Mesh_Info MakeMesh(
+mesh_info MakeMesh(
 std::vector<v3>& Positions,
 std::vector<v2>& TexCoords,
 std::vector<v3>& Normals,
@@ -43,10 +43,10 @@ std::vector<v3>& Colors,
 std::vector<u32> Indices,
 b32 CalculateNormals,
 b32 CalculateTangents);
-Mesh_Info MakePlane();
-Mesh_Info MakeCube();
-Mesh_Info MakeSphere(int Segments, int Rings);
-Mesh_Info MakeCylynder(float Height, float Radius, int SidesCount) ;
+mesh_info MakePlane();
+mesh_info MakeCube();
+mesh_info MakeSphere(int Segments, int Rings);
+mesh_info MakeCylynder(float Height, float Radius, int SidesCount) ;
 
 Sound_Info MakeSound(const std::vector<i16>& Samples,
                      int SamplesPerSec);

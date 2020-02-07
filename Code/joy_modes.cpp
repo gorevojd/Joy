@@ -4,41 +4,103 @@
 #include "joy_asset_types.h"
 #include "joy_gui.h"
 #include "joy_render.h"
+#include "joy_camera.h"
+
+#define STB_SPRINTF_STATIC
+#define STB_SPRINTF_IMPLEMENTATION
+#include "stb_sprintf.h"
 
 struct test_game_mode_state{
     
+    game_camera Camera;
+    float CameraSpeed;
+    float MouseSencitivity;
+    
+    b32 Initialized;
 };
 
 // NOTE(Dima): TEST GAME MODE
 GAME_MODE_UPDATE(TestUpdate){
     GAME_GET_MODE_STATE(test_game_mode_state, State);
     
+    
+    if(!State->Initialized){
+        
+        State->Camera = {};
+        State->CameraSpeed = 5.0f;
+        State->MouseSencitivity = 0.25f;
+        
+        State->Initialized = JOY_TRUE;
+    }
+    
+    float DeltaTime = Game->Render->FrameInfo.dt;
+    
+    // NOTE(Dima): Processing camera
+    game_camera* Camera = &State->Camera;
+    
+    v3 MoveVector = {};
+    
+    if(ButIsDownOnController(Game->Input, 0, Button_Left))
+    {
+        MoveVector.x += 1.0f;
+    }
+    
+    if(ButIsDownOnController(Game->Input, 0, Button_Right))
+    {
+        MoveVector.x += -1.0f;
+    }
+    
+    if(ButIsDownOnController(Game->Input, 0, Button_Up))
+    {
+        MoveVector.z += 1.0f;
+    }
+    
+    if(ButIsDownOnController(Game->Input, 0, Button_Down))
+    {
+        MoveVector.z += -1.0f;
+    }
+    
+    UpdateCameraRotation(Camera, 
+                         Game->Input->MouseDeltaP.y * State->MouseSencitivity, 
+                         Game->Input->MouseDeltaP.x * State->MouseSencitivity,
+                         0.0f);
+    
+    MoveVector = NOZ(MoveVector);
+    MoveVector = -MoveVector;
+    
+    m33 CamTransform = (Quat2M33(Camera->Rotation));
+    
+    Camera->P += MoveVector * CamTransform * State->CameraSpeed * DeltaTime;
+    
+    m44 CameraTransform = GetCameraMatrix(Camera);
+    
+    render_pass* Pass = BeginRenderPass(Game->Render);
     render_stack* Stack = RenderFindStack(Game->Render, "Main");
+    AddStackToRenderPass(Pass, Stack);
+    
+    int Width = Game->Render->FrameInfo.Width;
+    int Height = Game->Render->FrameInfo.Height;
+    
+    RenderPassSetCamera(Pass, 
+                        PerspectiveProjection(Width, Height, 1000.0f, 0.01f),
+                        CameraTransform,
+                        Width,
+                        Height);
     
     PushClearColor(Stack, V3(1.0f, 0.5f, 0.0f));
     
+    char CameraInfo[256];
+    stbsp_sprintf(CameraInfo, "P(x%.3f; y%.3f; z%.3f)", 
+                  Camera->P.x, 
+                  Camera->P.y,
+                  Camera->P.z);
+    
     GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
+    GuiText(Game->Gui, CameraInfo);
     
-#if 0        
-    PushGradient(renderStack, RcMinDim(V2(10, 10), V2(900, 300)), 
-                 ColorFromHex("#FF00FF"), ColorFromHex("#4b0082"),
-                 RenderEntryGradient_Horizontal);
-    PushGradient(renderStack, RcMinDim(V2(100, 400), V2(900, 300)), 
-                 ColorFromHex("#FF00FF"), ColorFromHex("#4b0082"), 
-                 RenderEntryGradient_Vertical);
-#endif
-    
-    
-#if 0
-    PushBitmap(renderStack, &gAssets.sunset, V2(100.0f, Sin(time * 1.0f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-    PushBitmap(renderStack, &gAssets.sunsetOrange, V2(200.0f, Sin(time * 1.1f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-    PushBitmap(renderStack, &gAssets.sunsetField, V2(300.0f, Sin(time * 1.2f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-    PushBitmap(renderStack, &gAssets.sunsetMountains, V2(400.0f, Sin(time * 1.3f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-    PushBitmap(renderStack, &gAssets.mountainsFuji, V2(500.0f, Sin(time * 1.4f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-    PushBitmap(renderStack, &gAssets.roadClouds, V2(600.0f, Sin(time * 1.5f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-    PushBitmap(renderStack, &gAssets.sunrise, V2(700.0f, Sin(time * 1.6f) * 250.0f + 320.0f), 300.0f, V4(1.0f, 1.0f, 1.0f, 1.0f));
-#endif
-    
+    PushMesh(Stack, &Game->Assets->Cube, V3(5.0f, 1.0f, 0.0f), QuatI(), V3(1.0f));
+    PushMesh(Stack, &Game->Assets->Cube, V3(0.0f, 1.0f, 0.0f), QuatI(), V3(1.0f));
+    PushMesh(Stack, &Game->Assets->Plane, V3(0.0f, -1.0f, 0.0f), QuatI(), V3(100.0f));
 }
 
 // NOTE(Dima): MAIN MENU GAME MODE
@@ -64,7 +126,9 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     Bmp_Info* ToShowArray = Game->Assets->fadeoutBmps;
     int ToShowCount = Game->Assets->fadeoutBmpsCount;
     
+    render_pass* Pass = BeginRenderPass(Game->Render);
     render_stack* Stack = RenderFindStack(Game->Render, "Main");
+    AddStackToRenderPass(Pass, Stack);
     
     PushClearColor(Stack, V3(1.0f, 0.5f, 0.0f));
     

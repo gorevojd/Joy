@@ -130,10 +130,10 @@ void InitAssets(assets* Assets){
     Assets->SineTest2 = MakeSineSound(std::vector<int>{256, 128, 430}, 44100 * 4, 44100);
     
     // NOTE(Dima): Meshes
-    Assets->cube = MakeCube();
-    Assets->plane = MakePlane();
-    Assets->sphere = MakeSphere(20, 12);
-    Assets->cylynder = MakeCylynder(2.0f, 0.5f, 16);
+    Assets->Cube = MakeCube();
+    Assets->Plane = MakePlane();
+    Assets->Sphere = MakeSphere(20, 12);
+    Assets->Cylynder = MakeCylynder(2.0f, 0.5f, 16);
     
     // NOTE(Dima): Fonts
     Assets->liberationMono = LoadFont("../Data/Fonts/LiberationMono-Regular.ttf", 18.0f, LoadFont_BakeShadow);

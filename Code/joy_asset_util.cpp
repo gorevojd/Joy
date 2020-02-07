@@ -548,7 +548,7 @@ Font_Info LoadFont(char* FilePath, float height, u32 Flags){
     return(res);
 }
 
-Mesh_Info MakeMesh(
+mesh_info MakeMesh(
 std::vector<v3>& Positions,
 std::vector<v2>& TexCoords,
 std::vector<v3>& Normals,
@@ -558,11 +558,10 @@ std::vector<u32> Indices,
 b32 CalculateNormals,
 b32 CalculateTangents)
 {
-	Mesh_Info Result = {};
+	mesh_info Result = {};
     
     u32 VerticesCount = Positions.size();
     
-	Result.Handle = 0;
 	Result.IndicesCount = Indices.size();
 	Result.Indices = (u32*)malloc(Indices.size() * sizeof(u32));
 	for (int IndexIndex = 0;
@@ -668,8 +667,8 @@ b32 CalculateTangents)
     return(Result);
 }
 
-Mesh_Info MakePlane(){
-    Mesh_Info Result = {};
+mesh_info MakePlane(){
+    mesh_info Result = {};
     
     std::vector<v3> Positions;
     std::vector<v2> TexCoords;
@@ -812,8 +811,8 @@ void PushSide(std::vector<v3>& Positions,
     
 }
 
-Mesh_Info MakeCube(){
-    Mesh_Info Result = {};
+mesh_info MakeCube(){
+    mesh_info Result = {};
     
     std::vector<v3> Positions;
     std::vector<v2> TexCoords;
@@ -851,7 +850,7 @@ Mesh_Info MakeCube(){
     // NOTE(Dima): Pushing back
     PushSide(Positions, TexCoords,
              Normals, Colors, Indices,
-             4, 5, 7, 6,
+             5, 4, 7, 6,
              Back, &VertAt);
     
     // NOTE(Dima): Pushing left
@@ -878,8 +877,8 @@ Mesh_Info MakeCube(){
     return(Result);
 }
 
-Mesh_Info MakeSphere(int Segments, int Rings) {
-    Mesh_Info Result = {};
+mesh_info MakeSphere(int Segments, int Rings) {
+    mesh_info Result = {};
     
     float Radius = 0.5f;
     
@@ -1035,8 +1034,8 @@ Mesh_Info MakeSphere(int Segments, int Rings) {
     return(Result);
 }
 
-Mesh_Info MakeCylynder(float Height, float Radius, int SidesCount) {
-    Mesh_Info Result = {};
+mesh_info MakeCylynder(float Height, float Radius, int SidesCount) {
+    mesh_info Result = {};
     
     SidesCount = Max(3, SidesCount);
     

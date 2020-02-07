@@ -1,33 +1,30 @@
 #include "joy_camera.h"
 
 // NOTE(Dima): 
-m44 UpdateCameraRotation(Game_Camera* camera,
-                         float dPitch,
-                         float dYaw,
-                         float dRoll)
+void UpdateCameraRotation(game_camera* camera,
+                          float dPitch,
+                          float dYaw,
+                          float dRoll)
 {
-    Euler_Angles camAngles = Quat2Euler(camera->Rotation);
-    
     float LockEdge = 89.0f * JOY_DEG2RAD;
     
-    camAngles.Pitch += dPitch;
-    camAngles.Yaw += dYaw;
-    camAngles.Roll += dRoll;
+    camera->Angles.Pitch += dPitch * JOY_DEG2RAD;
+    camera->Angles.Yaw += dYaw * JOY_DEG2RAD;
+    camera->Angles.Roll += dRoll * JOY_DEG2RAD;
     
-    camAngles.Pitch = Clamp(camAngles.Pitch, -LockEdge, LockEdge);
+    camera->Angles.Pitch = Clamp(camera->Angles.Pitch, -LockEdge, LockEdge);
     
-    camera->Rotation = Normalize(Euler2Quat(camAngles));
+    v3 Front;
+    Front.x = Sin(camera->Angles.Yaw) * Cos(camera->Angles.Pitch);
+    Front.y = Sin(camera->Angles.Pitch);
+    Front.z = Cos(camera->Angles.Yaw) * Cos(camera->Angles.Pitch);
+    Front = NOZ(Front);
     
-    m44 Result = QuatToM44(camera->Rotation);
-    return(Result);
+    camera->Rotation = QuatLookAt(Front, V3(0.0f, 1.0f, 0.0f));
 }
 
-m44 GetCameraMatrix(Game_Camera* camera){
-#if 0
-    m44 Result = LookAt(camera->P, GetQuatFront(camera->Rotation), V3(0.0f, 1.0f, 0.0f));
-#else
-    m44 Result = InverseTranslationMatrix(camera->P) * Transpose(QuatToM44(camera->Rotation));
-#endif
+m44 GetCameraMatrix(game_camera* camera){
+    m44 Result = InverseTranslationMatrix(camera->P) * Transpose(Quat2M44(camera->Rotation));
     
     return(Result);
 }

@@ -15,6 +15,8 @@
 //#define GLGETP(index) gl->Programs[index]
 //#define GLGETPID(shader) gl->Programs[(shader).ProgramIndex].ID
 
+#define GLGETOFFSET(index) (GLvoid*)((index) * sizeof(GLfloat))
+
 inline b32 GlArrayIsValid(GLint Arr){
     b32 Result = 1;
     
@@ -141,6 +143,5 @@ struct gl_state{
 void GlInit(gl_state* gl, assets* Assets);
 void GlFree(gl_state* gl);
 void GlOutputRender(gl_state* GL, render_state* Render);
-void GlOutputCommands(gl_state* gl, render_stack* Stack);
 
 #endif

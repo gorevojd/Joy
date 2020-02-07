@@ -4,8 +4,6 @@
 #include "joy_dirx.h"
 #endif
 
-#include <dsound.h>
-
 #define STB_SPRINTF_STATIC
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
@@ -27,6 +25,10 @@ GLOBAL_VARIABLE b32 GlobalRunning;
 GLOBAL_VARIABLE DSound_State GlobalDirectSound;
 GLOBAL_VARIABLE mem_region GlobalMem;
 GLOBAL_VARIABLE game_state* GlobalGame;
+
+GLOBAL_VARIABLE float Time = 0.0f;
+GLOBAL_VARIABLE float DeltaTime = 0.0f;
+
 
 #if JOY_USE_OPENGL
 GLOBAL_VARIABLE gl_state GlobalGL;
@@ -1113,6 +1115,122 @@ void Win32FreeOpenGL(HGLRC renderCtx){
     wglDeleteContext(renderCtx);
 }
 
+
+PLATFORM_ADD_ENTRY(PlatformAddEntry){
+#if PLATFORM_USE_STD_MUTEX
+    queue->AddMutexSTD.lock();
+#else
+    BeginTicketMutex(&queue->AddMutex);
+#endif
+    
+    uint32_t oldAddIndex = queue->AddIndex.load(std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_acquire);
+    
+    uint32_t newAddIndex = (oldAddIndex + 1) % queue->JobsCount;
+    // NOTE(Dima): We should not overlap
+    Assert(newAddIndex != queue->DoIndex.load(std::memory_order_acquire));
+    
+    platform_job* job = &queue->Jobs[oldAddIndex];
+    job->Callback = callback;
+    job->Data = data;
+    
+    std::atomic_thread_fence(std::memory_order_release);
+    queue->AddIndex.store(newAddIndex, std::memory_order_relaxed);
+    queue->Started.fetch_add(1);
+    
+    queue->ConditionVariable.notify_all();
+#if PLATFORM_USE_STD_MUTEX
+    queue->AddMutexSTD.unlock();
+#else
+    EndTicketMutex(&queue->AddMutex);
+#endif
+}
+
+INTERNAL_FUNCTION b32 PlatformDoWorkerWork(platform_job_queue* queue){
+    b32 res = 0;
+    
+    std::uint32_t d = queue->DoIndex.load();
+    
+    if(d != queue->AddIndex.load(std::memory_order_acquire)){
+        std::uint32_t newD = (d + 1) % queue->JobsCount;
+        if(queue->DoIndex.compare_exchange_weak(d, newD)){
+            platform_job* job = &queue->Jobs[d];
+            
+            job->Callback(job->Data);
+            
+            queue->Finished.fetch_add(1);
+        }
+        else{
+            // NOTE(Dima): Value has not been changed because of spuorious failure
+        }
+    }
+    else{
+        res = 1;
+    }
+    
+    return(res);
+}
+
+INTERNAL_FUNCTION void PlatformWorkerThread(platform_job_queue* queue){
+    for(;;){
+        if(PlatformDoWorkerWork(queue)){
+            std::unique_lock<std::mutex> UniqueLock(queue->ConditionVariableMutex);
+            queue->ConditionVariable.wait(UniqueLock);
+        }
+    }
+}
+
+PLATFORM_WAIT_FOR_COMPLETION(PlatformWaitForCompletion){
+    while(queue->Started.load() != queue->Finished.load())
+    {
+        PlatformDoWorkerWork(queue);
+    }
+    
+    std::atomic_thread_fence(std::memory_order_release);
+    queue->Started.store(0, std::memory_order_relaxed);
+    queue->Finished.store(0, std::memory_order_relaxed);
+}
+
+INTERNAL_FUNCTION void InitJobQueue(platform_job_queue* queue, int jobsCount, int threadCount){
+    queue->AddIndex.store(0, std::memory_order_relaxed);
+    queue->DoIndex.store(0, std::memory_order_relaxed);
+    
+    queue->Started.store(0, std::memory_order_relaxed);
+    queue->Finished.store(0, std::memory_order_relaxed);
+    
+    queue->Jobs = (platform_job*)malloc(jobsCount * sizeof(platform_job));
+    queue->JobsCount = jobsCount;
+    
+    for(int jobIndex = 0; jobIndex < jobsCount; jobIndex++){
+        platform_job* job = queue->Jobs + jobIndex;
+        
+        job->Callback = 0;
+        job->Data = 0;
+    }
+    
+    queue->Threads.reserve(threadCount);
+    for(int threadIndex = 0;
+        threadIndex < threadCount;
+        threadIndex++)
+    {
+#if 1
+        queue->Threads.push_back(std::thread(PlatformWorkerThread, queue));
+        queue->Threads[threadIndex].detach();
+#else
+        std::thread newThread(PlatformWorkerThread, queue);
+        newThread.detach();
+#endif
+    }
+}
+
+INTERNAL_FUNCTION void FreeJobQueue(platform_job_queue* queue){
+    if(queue->Jobs){
+        free(queue->Jobs);
+    }
+    queue->Jobs = 0;
+    queue->Threads.clear();
+}
+
 PLATFORM_FREE_FILE_MEMORY(Win32FreeFileMemory){
     if (fileReadResult->data != 0){
         VirtualFree(fileReadResult->data, 0, MEM_RELEASE);
@@ -1428,11 +1546,11 @@ Win32ToggleFullscreen(win_state* win32)
     }
 }
 
-inline void Win32ProcessKey(KeyState* key, b32 isDown, int RepeatCount){
-    if(key->endedDown != isDown){
-        key->endedDown = isDown;
+inline void Win32ProcessKey(key_state* key, b32 isDown, int RepeatCount){
+    if(key->EndedDown != isDown){
+        key->EndedDown = isDown;
         
-        key->transitionHappened = 1;
+        key->TransitionHappened = 1;
     }
     key->RepeatCount = RepeatCount;
 }
@@ -1566,7 +1684,7 @@ Win32ProcessMessages(input_state* Input){
                 }
                 
                 if(keyType != 0xFFFFFFFF){
-                    Win32ProcessKey(&Input->KeyStates[keyType], isDown, RepeatCount);
+                    Win32ProcessKey(&Input->Keyboard.KeyStates[keyType], isDown, RepeatCount);
                 }
                 
                 TranslateMessage(&msg);
@@ -1606,21 +1724,213 @@ Win32PreProcessInput(input_state* Input){
     Input->FrameInputLen = 0;
     
     for(int keyIndex = 0; keyIndex < Key_Count; keyIndex++){
-        Input->KeyStates[keyIndex].transitionHappened = 0;
-        Input->KeyStates[keyIndex].RepeatCount = 0;
+        Input->Keyboard.KeyStates[keyIndex].TransitionHappened = 0;
+        Input->Keyboard.KeyStates[keyIndex].RepeatCount = 0;
+    }
+}
+
+INTERNAL_FUNCTION inline rc2 Win32RectToJoy(RECT Rect){
+    rc2 Result = {};
+    
+    Result.min.x = Rect.left;
+    Result.min.y = Rect.top;
+    Result.max.x = Rect.right;
+    Result.max.y = Rect.bottom;
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION void Win32XInputProcessStick(gamepad_stick* Stick, 
+                                               XINPUT_GAMEPAD* XPad,
+                                               int Deadzone)
+{
+    float LX = XPad->sThumbLX;
+    float LY = XPad->sThumbLY;
+    v2 Unnorm = V2(LX, LY);
+    
+    float Mag = Magnitude(Unnorm);
+    
+    v2 Norm = V2(LX / Mag, LY / Mag);
+    
+    float NormalizedMagnitude = 0.0f;
+    
+    if(Mag > Deadzone){
+        // NOTE(Dima): Clip
+        Mag = Min(Mag, 32767);
+        
+        // NOTE(Dima): Adjusting magnitude to the input of the deadzone
+        Mag -= Deadzone;
+        
+        Stick->Magnitude = Mag / (32767 - Deadzone);
+        Stick->Direction = Norm;
+    }
+    else {
+        Stick->Magnitude = 0.0f;
+        Stick->Direction = V2(0.0f, 0.0f);
     }
 }
 
 INTERNAL_FUNCTION void
 Win32ProcessInput(input_state* Input)
 {
+    // NOTE(Dima): Getting mouse posititons
     POINT point;
-    BOOL getCursorPosRes = GetCursorPos(&point);
-    BOOL screenToClientRec = ScreenToClient(GlobalWin32.window, &point);
+    GetCursorPos(&point);
+    v2 MouseInScreenP = V2(point.x, point.y);
     
+    // NOTE(Dima): Getting current mouse P in-window
+    ScreenToClient(GlobalWin32.window, &point);
+    v2 CurMouseP = V2(point.x, point.y);
+    
+    v2 MouseActualDelta = {};
+    if(Input->NotFirstFrame){
+        MouseActualDelta = CurMouseP - Input->MouseP;
+    }
+    else{
+        Input->NotFirstFrame = JOY_TRUE;
+    }
+    
+    // NOTE(Dima): Processing capturing mouse
+    Input->CapturingMouse = JOY_TRUE;
+    
+    if(Input->CapturingMouse){
+        HMONITOR MonitorHandle = MonitorFromWindow(
+            GlobalWin32.window, 
+            MONITOR_DEFAULTTOPRIMARY);
+        MONITORINFO MonitorInfo;
+        MonitorInfo.cbSize = sizeof(MONITORINFO);
+        GetMonitorInfoA(MonitorHandle, &MonitorInfo);
+        
+        rc2 MonitorRect = Win32RectToJoy(MonitorInfo.rcWork);
+        v2 MonitorDim = GetRectDim(MonitorRect);
+        
+        float OverlapBorderWidth = 3.0f;
+        
+        rc2 MouseCanMoveRect = GrowRectByPixels(MonitorRect, -OverlapBorderWidth);
+        
+        v2 ChangedP = MouseInScreenP;
+        
+        if(ChangedP.x < MouseCanMoveRect.min.x){
+            ChangedP.x = MouseCanMoveRect.max.x;
+        }
+        if(ChangedP.y < MouseCanMoveRect.min.y){
+            ChangedP.y = MouseCanMoveRect.max.y;
+        }
+        if(ChangedP.x > MouseCanMoveRect.max.x){
+            ChangedP.x = MouseCanMoveRect.min.x;
+        }
+        if(ChangedP.y > MouseCanMoveRect.max.y){
+            ChangedP.y = MouseCanMoveRect.min.y;
+        }
+        
+        point.x = ChangedP.x;
+        point.y = ChangedP.y;
+        SetCursorPos(point.x, point.y);
+    }
+    
+    ScreenToClient(GlobalWin32.window, &point);
     v2 MouseP = V2(point.x, point.y);
-    Input->LastMouseP = Input->MouseP;
+    
+    
     Input->MouseP = MouseP;
+    Input->MouseDeltaPActual = MouseActualDelta;
+    Input->MouseDeltaP = Input->MouseDeltaPActual;
+    Input->MouseDeltaP.y = -Input->MouseDeltaP.y;
+    Input->MouseDeltaP = -Input->MouseDeltaP;
+    
+    // NOTE(Dima): Processing gamepads
+    for(int ControllerIndex = 0;
+        ControllerIndex < XUSER_MAX_COUNT;
+        ControllerIndex++)
+    {
+        ASSERT(ControllerIndex < ARRAY_COUNT(Input->GamepadControllers));
+        gamepad_controller* Controller = &Input->GamepadControllers[ControllerIndex];
+        
+        XINPUT_STATE State;
+        DWORD GetControlRes = XInputGetState(ControllerIndex,
+                                             &State);
+        
+        if(GetControlRes == ERROR_SUCCESS){
+            // NOTE(Dima): Controller is connected
+            XINPUT_GAMEPAD* XPad = &State.Gamepad;
+            Controller->IsConnected = JOY_TRUE;
+            
+            // NOTE(Dima): Battery info getting
+            XINPUT_BATTERY_INFORMATION BatteryInfo;
+            DWORD GetBatteryRes = XInputGetBatteryInformation(
+                ControllerIndex,
+                BATTERY_DEVTYPE_GAMEPAD,
+                &BatteryInfo);
+            
+            if(GetBatteryRes == ERROR_SUCCESS){
+                switch(BatteryInfo.BatteryLevel){
+                    case BATTERY_LEVEL_EMPTY:{
+                        Controller->BatteryCharge = GamepadBattery_Empty;
+                    }break;
+                    
+                    case BATTERY_LEVEL_LOW:{
+                        Controller->BatteryCharge = GamepadBattery_Low;
+                    }break;
+                    
+                    case BATTERY_LEVEL_MEDIUM:{
+                        Controller->BatteryCharge = GamepadBattery_Medium;
+                    }break;
+                    
+                    case BATTERY_LEVEL_FULL:{
+                        Controller->BatteryCharge = GamepadBattery_Full;
+                    }break;
+                    
+                    default:{
+                        Controller->BatteryCharge = GamepadBattery_Empty;
+                    }break;
+                }
+            }
+            
+            // NOTE(Dima): Processing sticks
+            Win32XInputProcessStick(&Controller->LeftStick, XPad,
+                                    XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
+            Win32XInputProcessStick(&Controller->RightStick, XPad,
+                                    XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
+            
+            
+            
+#define XINPUT_BUTDOWN(xinputbut) XPad->wButtons & xinputbut
+            // NOTE(Dima): Processing buttons
+            DWORD XInputButtons[] = {
+                XINPUT_GAMEPAD_DPAD_UP,
+                XINPUT_GAMEPAD_DPAD_DOWN,
+                XINPUT_GAMEPAD_DPAD_LEFT,
+                XINPUT_GAMEPAD_DPAD_RIGHT,
+                XINPUT_GAMEPAD_START,
+                XINPUT_GAMEPAD_BACK,
+                XINPUT_GAMEPAD_LEFT_THUMB,
+                XINPUT_GAMEPAD_RIGHT_THUMB,
+                XINPUT_GAMEPAD_LEFT_SHOULDER,
+                XINPUT_GAMEPAD_RIGHT_SHOULDER,
+                XINPUT_GAMEPAD_A,
+                XINPUT_GAMEPAD_B,
+                XINPUT_GAMEPAD_X,
+                XINPUT_GAMEPAD_Y,
+            };
+            
+            ASSERT(ARRAY_COUNT(XInputButtons) == GamepadKey_Count);
+            
+            for(int ButtonIndex = 0; 
+                ButtonIndex < GamepadKey_Count;
+                ButtonIndex++)
+            {
+                key_state* Key = &Controller->Keys[ButtonIndex].Key;
+                
+                b32 IsDown = XPad->wButtons & XInputButtons[ButtonIndex];
+                
+                Win32ProcessKey(Key, IsDown, 0);
+            }
+        }
+        else {
+            // NOTE(Dima): Controller is not connected
+            Controller->IsConnected = JOY_FALSE;
+        }
+    }
     
     //NOTE(Dima): Processing mouse buttons
     DWORD Win32MouseKeyID[] = {
@@ -1635,10 +1945,48 @@ Win32ProcessInput(input_state* Input)
         mouseKeyIndex < ARRAY_COUNT(Win32MouseKeyID);
         mouseKeyIndex++)
     {
-        Input->KeyStates[MouseKey_Left + mouseKeyIndex].transitionHappened = 0;
+        Input->Keyboard.KeyStates[MouseKey_Left + mouseKeyIndex].TransitionHappened = 0;
         SHORT winMouseKeyState = GetKeyState(Win32MouseKeyID[mouseKeyIndex]);
         
-        Win32ProcessKey(&Input->KeyStates[MouseKey_Left + mouseKeyIndex], winMouseKeyState & (1 << 15), 0);
+        Win32ProcessKey(&Input->Keyboard.KeyStates[MouseKey_Left + mouseKeyIndex], winMouseKeyState & (1 << 15), 0);
+    }
+    
+    // NOTE(Dima): Processing input structure buttons and controllers
+    for(int ControllerIndex = 0; 
+        ControllerIndex < MAX_CONTROLLER_COUNT;
+        ControllerIndex++)
+    {
+        input_controller* Cont = &Input->Controllers[ControllerIndex];
+        
+        for(int ButIndex = 0; ButIndex < Button_Count; ButIndex++){
+            button_state* But = &Cont->Buttons[ButIndex];
+            
+            for(int ButKeyIndex = 0; 
+                ButKeyIndex < But->KeyCount; 
+                ButKeyIndex++)
+            {
+                key_state* CorrespondingKey = &Input->Keyboard.KeyStates[But->Keys[ButKeyIndex]];
+                
+                if(CorrespondingKey->TransitionHappened){
+                    But->ActiveKeyIndex = ButKeyIndex;
+                    
+                    break;
+                }
+            }
+            
+            if(But->KeyCount){
+                
+                key_state* ActiveKey = &Input->Keyboard.KeyStates[But->Keys[But->ActiveKeyIndex]];
+                
+                But->EndedDown = ActiveKey->EndedDown;
+                But->TransitionHappened = ActiveKey->TransitionHappened;
+                But->InTransitionTime += DeltaTime;
+                
+                if(But->TransitionHappened){
+                    But->InTransitionTime = 0.0f;
+                }
+            }
+        }
     }
 }
 
@@ -1895,8 +2243,12 @@ int APIENTRY WinMain(HINSTANCE hInstance,
                      int       nCmdShow)
 {
     // NOTE(Dima): Initializing platform API
-    InitDefaultPlatformAPI(&platform);
     
+    InitJobQueue(&platform.highPriorityQueue, 2048, 8);
+    InitJobQueue(&platform.lowPriorityQueue, 2048, 2);
+    
+    platform.AddEntry = PlatformAddEntry;
+    platform.WaitForCompletion = PlatformWaitForCompletion;
     platform.ReadFile = Win32ReadFile;
     platform.WriteFile = Win32WriteFile;
     platform.FreeFileMemory = Win32FreeFileMemory;
@@ -1969,15 +2321,21 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     GlobalGame = PushStruct(&GlobalMem, game_state);
     GameInit(GlobalGame, Platform2Game);
     
+    // NOTE(Dima): Xinput Init
+    for(int ControllerIndex = 0;
+        ControllerIndex < XUSER_MAX_COUNT;
+        ControllerIndex++)
+    {
+        ZeroMemory(&GlobalWin32.ControllerStates[ControllerIndex], sizeof(XINPUT_STATE));
+    }
+    
+    // NOTE(Dima): DSound init
     DSoundInit(&GlobalDirectSound, GlobalWin32.window);
     Win32ClearSoundBuffer(&GlobalDirectSound);
     //Win32FillSoundBufferWithSound(&GlobalDirectSound, &gAssets.SineTest1);
     Win32PlayDirectSoundBuffer(&GlobalDirectSound);
     
     //ShellExecuteA(NULL, "open", "http://www.microsoft.com", NULL, NULL, SW_SHOWNORMAL);
-    
-    float Time = 0.0f;
-    float DeltaTime = 0.0f;
     
     LARGE_INTEGER BeginClockLI;
     QueryPerformanceCounter(&BeginClockLI);
@@ -2007,9 +2365,11 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     GameFree(GlobalGame);
     
     DSoundFree(&GlobalDirectSound);
-    FreePlatformAPI(&platform);
     
     DestroyWindow(GlobalWin32.window);
+    
+    FreeJobQueue(&platform.highPriorityQueue);
+    FreeJobQueue(&platform.lowPriorityQueue);
     
     return (0);
 }

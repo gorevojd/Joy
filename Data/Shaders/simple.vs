@@ -22,5 +22,10 @@ void main(){
     vec4 ViewP = WorldP * View;
     vec4 ProjectedP = ViewP * Projection;
     
+    VsOut.WorldP = WorldP.xyz;
+    VsOut.WorldN = normalize(N * transpose(inverse(mat3(Model))));
+    VsOut.C = C;
+    VsOut.UV = UV;
+    
     gl_Position = ProjectedP;
 }

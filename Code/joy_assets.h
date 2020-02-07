@@ -49,10 +49,10 @@ struct assets{
     Sound_Info SineTest1;
     Sound_Info SineTest2;
     
-    Mesh_Info cube;
-    Mesh_Info plane;
-    Mesh_Info sphere;
-    Mesh_Info cylynder;
+    mesh_info Cube;
+    mesh_info Plane;
+    mesh_info Sphere;
+    mesh_info Cylynder;
     
     Font_Info liberationMono;
     Font_Info lilitaOne;

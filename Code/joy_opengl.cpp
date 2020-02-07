@@ -214,6 +214,25 @@ GlLoadGuiGeomShader(gl_state* GL, char* PathV, char* PathF){
     return(Result);
 }
 
+INTERNAL_FUNCTION inline void GlBindBufferAndFill(GLenum Target, GLenum Usage,
+                                                  void* Data, size_t DataSize,
+                                                  GLuint BufferName)
+{
+    GLint CurrentBufSize;
+    glGetBufferParameteriv(Target, 
+                           GL_BUFFER_SIZE,
+                           &CurrentBufSize);
+    
+    glBindBuffer(Target, BufferName);
+    if(DataSize > CurrentBufSize){
+        // NOTE(Dima): Reallocating or initializing at the first time
+        glBufferData(Target, DataSize, Data, Usage);
+    }
+    else{
+        glBufferSubData(Target, 0, DataSize, Data);
+    }
+}
+
 INTERNAL_FUNCTION GLuint GlAllocateTexture(Bmp_Info* bmp){
     GLuint GenerateTex;
     glGenTextures(1, &GenerateTex);
@@ -239,6 +258,126 @@ INTERNAL_FUNCTION GLuint GlAllocateTexture(Bmp_Info* bmp){
     bmp->Handle = GenerateTex;
     
     return(GenerateTex);
+}
+
+INTERNAL_FUNCTION inline void GlAddMeshHandle(mesh_handles* Handles, u32 HandleType, size_t Handle)
+{
+    ASSERT(Handles->Count < ARRAY_COUNT(Handles->Handles));
+    
+    int TargetIndex = Handles->Count++;
+    
+    Handles->Handles[TargetIndex] = Handle;
+    Handles->HandlesTypes[TargetIndex] = HandleType;
+}
+
+INTERNAL_FUNCTION inline void GlFreeMeshHandles(mesh_handles* Handles){
+    if(Handles->Allocated){
+        for(int i = Handles->Count - 1;
+            i >= 0;
+            i--)
+        {
+            switch(Handles->HandlesTypes[i]){
+                case MeshHandle_VertexArray:{
+                    GLuint Arr = Handles->Handles[i];
+                    glDeleteVertexArrays(1, &Arr);
+                }break;
+                
+                case MeshHandle_Buffer:{
+                    GLuint Buf = Handles->Handles[i];
+                    glDeleteBuffers(1, &Buf);
+                }break;
+                
+                default:{
+                    INVALID_CODE_PATH;
+                }break;
+            }
+            
+            Handles->Handles[i] = 0;
+        }
+    }
+    
+    Handles->Allocated = JOY_FALSE;
+}
+
+INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
+    mesh_handles* Result = &Mesh->Handles;
+    
+    if(!Mesh->Handles.Allocated){
+        *Result = {};
+        
+        GLuint VAO, VBO, EBO;
+        
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
+        glGenBuffers(1, &EBO);
+        
+        u32 SizeOfVertexStruct = sizeof(Vertex_Info);
+        size_t Stride = sizeof(Vertex_Info);
+        if(Mesh->MeshType == Mesh_Skinned){
+            SizeOfVertexStruct = sizeof(Vertex_Skinned_Info);
+            Stride = sizeof(Vertex_Skinned_Info);
+        }
+        
+        glBindVertexArray(VAO);
+        GlBindBufferAndFill(GL_ARRAY_BUFFER,
+                            GL_STATIC_DRAW,
+                            Mesh->Vertices,
+                            Mesh->VerticesCount * SizeOfVertexStruct,
+                            VBO);
+        
+        GlBindBufferAndFill(GL_ELEMENT_ARRAY_BUFFER,
+                            GL_STATIC_DRAW,
+                            Mesh->Indices,
+                            Mesh->IndicesCount * sizeof(u32),
+                            EBO);
+        
+        
+        if(GlArrayIsValid(GL->SimpleShader.PAttrLoc)){
+            glEnableVertexAttribArray(GL->SimpleShader.PAttrLoc);
+            glVertexAttribPointer(GL->SimpleShader.PAttrLoc,
+                                  3, GL_FLOAT, GL_FALSE,
+                                  Stride, GLGETOFFSET(0));
+        }
+        
+        if(GlArrayIsValid(GL->SimpleShader.UVAttrLoc)){
+            glEnableVertexAttribArray(GL->SimpleShader.UVAttrLoc);
+            glVertexAttribPointer(GL->SimpleShader.UVAttrLoc,
+                                  2, GL_FLOAT, GL_FALSE,
+                                  Stride, GLGETOFFSET(3));
+        }
+        
+        if(GlArrayIsValid(GL->SimpleShader.NAttrLoc)){
+            glEnableVertexAttribArray(GL->SimpleShader.NAttrLoc);
+            glVertexAttribPointer(GL->SimpleShader.NAttrLoc,
+                                  3, GL_FLOAT, GL_FALSE,
+                                  Stride, GLGETOFFSET(5));
+        }
+        
+        if(GlArrayIsValid(GL->SimpleShader.TAttrLoc)){
+            glEnableVertexAttribArray(GL->SimpleShader.TAttrLoc);
+            glVertexAttribPointer(GL->SimpleShader.TAttrLoc,
+                                  3, GL_FLOAT, GL_FALSE,
+                                  Stride,GLGETOFFSET(8));
+        }
+        
+        if(GlArrayIsValid(GL->SimpleShader.CAttrLoc)){
+            glEnableVertexAttribArray(GL->SimpleShader.CAttrLoc);
+            glVertexAttribPointer(GL->SimpleShader.CAttrLoc,
+                                  3, GL_FLOAT, GL_FALSE,
+                                  Stride, GLGETOFFSET(11));
+        }
+        
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+        
+        GlAddMeshHandle(Result, MeshHandle_VertexArray, VAO);
+        GlAddMeshHandle(Result, MeshHandle_Buffer, VBO);
+        GlAddMeshHandle(Result, MeshHandle_Buffer, EBO);
+        
+        Result->Allocated = JOY_TRUE;
+    }
+    
+    return(Result);
 }
 
 void GlInit(gl_state* GL, assets* Assets){
@@ -385,25 +524,6 @@ INTERNAL_FUNCTION void GlRenderGuiRect(gl_state* GL,
 }
 
 
-INTERNAL_FUNCTION inline void GlBindBufferAndFill(GLenum Target, GLenum Usage,
-                                                  void* Data, size_t DataSize,
-                                                  GLuint BufferName)
-{
-    GLint CurrentBufSize;
-    glGetBufferParameteriv(Target, 
-                           GL_BUFFER_SIZE,
-                           &CurrentBufSize);
-    
-    glBindBuffer(Target, BufferName);
-    if(DataSize > CurrentBufSize){
-        // NOTE(Dima): Reallocating or initializing at the first time
-        glBufferData(Target, DataSize, Data, Usage);
-    }
-    else{
-        glBufferSubData(Target, 0, DataSize, Data);
-    }
-}
-
 INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, Bmp_Info* bmp){
     
     // NOTE(Dima): Blit texture load
@@ -411,15 +531,15 @@ INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, Bmp_Info* bmp){
     glGenTextures(1, &BlitTex);
     glBindTexture(GL_TEXTURE_2D, BlitTex);
     glTexImage2D(
-		GL_TEXTURE_2D,
-		0,
-		GL_RGBA,
-		bmp->Width,
-		bmp->Height,
-		0,
-		GL_RGBA,
-		GL_UNSIGNED_BYTE,
-		bmp->Pixels);
+        GL_TEXTURE_2D,
+        0,
+        GL_RGBA,
+        bmp->Width,
+        bmp->Height,
+        0,
+        GL_RGBA,
+        GL_UNSIGNED_BYTE,
+        bmp->Pixels);
     
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -444,7 +564,7 @@ INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, Bmp_Info* bmp){
     glDeleteTextures(1, &BlitTex);
 }
 
-void GlOutputCommands(gl_state* GL, render_stack* Stack){
+void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
     u8* at = (u8*)Stack->MemBlock.Base;
     u8* StackEnd = (u8*)Stack->MemBlock.Base + Stack->MemBlock.Used;
     
@@ -455,7 +575,7 @@ void GlOutputCommands(gl_state* GL, render_stack* Stack){
         
         switch(Header->type){
             case RenderEntry_ClearColor:{
-                RENDER_GET_ENTRY(RenderEntryClearColor);
+                RENDER_GET_ENTRY(render_entry_clear_color);
                 
                 glClearColor(entry->clearColor01.r,
                              entry->clearColor01.g,
@@ -465,7 +585,7 @@ void GlOutputCommands(gl_state* GL, render_stack* Stack){
             }break;
             
             case RenderEntry_Bitmap:{
-                RENDER_GET_ENTRY(RenderEntryBitmap);
+                RENDER_GET_ENTRY(render_entry_bitmap);
                 
                 if(!entry->Bitmap->Handle){
                     GlAllocateTexture(entry->Bitmap);
@@ -490,11 +610,9 @@ void GlOutputCommands(gl_state* GL, render_stack* Stack){
                     Min.x, Min.y, 0.0f, 0.0f, r, g, b, a,
                 };
                 
-#if 1                
                 GlRenderGuiRect(GL, GL->GuiOrtho.e, JOY_TRUE, 
                                 entry->Bitmap->Handle,
                                 RectArr, sizeof(RectArr));
-#endif
                 
             }break;
             
@@ -503,73 +621,46 @@ void GlOutputCommands(gl_state* GL, render_stack* Stack){
             }break;
             
             case RenderEntry_Mesh:{
-                RENDER_GET_ENTRY(RenderEntryMesh);
+                RENDER_GET_ENTRY(render_entry_mesh);
+                mesh_info* Mesh = entry->Mesh;
                 
-#if 0                
-                if(!entry->Mesh->Handle){
-                    GLuint VAO, VBO, EBO;
+                GlAllocateMesh(GL, Mesh);
+                
+                glEnable(GL_DEPTH_TEST);
+                
+                switch(Mesh->MeshType){
+                    case Mesh_Simple:{
+                        GL->SimpleShader.Use();
+                        
+                        GL->SimpleShader.SetM44(GL->SimpleShader.ModelLoc,
+                                                entry->Transform.e);
+                        GL->SimpleShader.SetM44(GL->SimpleShader.ViewLoc,
+                                                Pass->View.e);
+                        GL->SimpleShader.SetM44(GL->SimpleShader.ProjectionLoc,
+                                                Pass->Projection.e);
+                        
+                        glBindVertexArray(Mesh->Handles.Handles[0]);
+                        glDrawElements(GL_TRIANGLES, Mesh->IndicesCount, GL_UNSIGNED_INT, 0);
+                        
+                    }break;
                     
-                    Mesh_Info* Mesh = entry->Mesh;
-                    
-                    glGenVertexArrays(1, &VAO);
-                    glGenBuffers(1, &VBO);
-                    glGenBuffers(1, &EBO);
-                    
-                    u32 SizeOfVertexStruct = sizeof(Vertex_Info);
-                    size_t Stride = sizeof(VertexInfo);
-                    if(Mesh->MeshType == Mesh_Skinned){
-                        SizeOfVertexStruct = sizeof(Vertex_Skinned_Info);
-                        Stride = sizeof(Vertex_Skinned_Info);
-                    }
-                    
-                    glBindVertexArray(VAO);
-                    GlBindBufferAndFill(GL_ARRAY_BUFFER,
-                                        GL_STATIC_DRAW,
-                                        Mesh->Vertices,
-                                        Mesh->VerticesCount * SizeOfVertexStruct,
-                                        VBO);
-                    
-                    GlBindBufferAndFill(GL_ELEMENT_ARRAY_BUFFER,
-                                        GL_STATIC_DRAW,
-                                        Mesh->Indices,
-                                        Mesh->IndicesCount * sizeof(u32),
-                                        EBO);
-                    
-                    
-                    
-                    if(GlArrayIsValid(GL->SimpleShader.PAttrLoc)){
-                        glEnableVertexAttribArray(GL->SimpleShader.PAttrLoc);
-                        glVertexAttribPointer(GL->SimpleShader.PAttrLoc,
-                                              );
-                    }
-                    
-                    if(GlArrayIsValid(GL->SimpleShader.UVAttrLoc)){
-                        glEnableVertexAttribArray(Gl->SimpleShader.UVAttrLoc);
-                        glVertexAttribPointer();
-                    }
-                    
-                    if(GlArrayIsValid(GL->SimpleShader.NAttrLoc)){
-                        glEnableVertexAttribArray(GL->SimpleShader.NAttrLoc);
-                        glVertexAttribPointer();
-                    }
-                    
-                    if(GlArrayIsValid(GL->SimpleShader.TAttrLoc)){
-                        glEnableVertexAttribArray(GL->SimpleShader.TAttrLoc);
-                        glVertexAttribPointer();
-                    }
-                    
-                    if(GlArrayIsValid(GL->SimpleShader.CAttrLoc)){
-                        glEnableVertexAttribArray(GL->SimpleShader.CAttrLoc);
-                        glVertexAttribPointer();
-                    }
+                    case Mesh_Skinned:{
+                        
+                    }break;
                 }
-#endif
                 
+                glDisable(GL_DEPTH_TEST);
                 
             }break;
         }
         
         at += Header->dataSize;
+    }
+}
+
+void GlOutputPass(gl_state* GL, render_pass* Pass){
+    for(int i = 0; i < Pass->StacksCount; i++){
+        GlOutputStack(GL, Pass, Pass->Stacks[i]);
     }
 }
 
@@ -617,7 +708,9 @@ void GlOutputRender(gl_state* GL, render_state* Render){
         }
     }
     else if (Render->RendererType == Renderer_OpenGL){
-        GlOutputCommands(GL, &Render->Stacks[0]);
+        for(int i = 0; i < Render->PassCount; i++){
+            GlOutputPass(GL, &Render->Passes[i]);
+        }
         
         glBindVertexArray(GL->GuiGeomVAO);
         GlBindBufferAndFill(GL_ARRAY_BUFFER,
