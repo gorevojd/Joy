@@ -13,6 +13,7 @@
 struct test_game_mode_state{
     
     game_camera Camera;
+    
     float CameraSpeed;
     float MouseSencitivity;
     
@@ -69,8 +70,22 @@ GAME_MODE_UPDATE(TestUpdate){
     MoveVector = -MoveVector;
     
     m33 CamTransform = (Quat2M33(Camera->Rotation));
+    v3 AccVector = MoveVector * CamTransform;
     
-    Camera->P += MoveVector * CamTransform * State->CameraSpeed * DeltaTime;
+    float CamSpeed = State->CameraSpeed;
+    
+    if(KeyIsDown(Game->Input, Key_Shift)){
+        CamSpeed *= 8.0f;
+    }
+    
+#if 0    
+    MoveVector = Camera->dP * DeltaTime + AccVector * DeltaTime * DeltaTime * 0.5f;
+    Camera->dP = (Camera->dP + AccVector * DeltaTime) * (1.0f - 5.0f * DeltaTime);
+#else
+    MoveVector = AccVector * DeltaTime;
+#endif
+    
+    Camera->P += MoveVector * CamSpeed;
     
     m44 CameraTransform = GetCameraMatrix(Camera);
     
@@ -98,11 +113,21 @@ GAME_MODE_UPDATE(TestUpdate){
     GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
     GuiText(Game->Gui, CameraInfo);
     
-    PushMesh(Stack, &Game->Assets->Cube, V3(5.0f, 1.0f, 0.0f), QuatI(), V3(1.0f));
-    PushMesh(Stack, &Game->Assets->Cube, V3(0.0f, 1.0f, 0.0f), QuatI(), V3(1.0f));
-    PushMesh(Stack, &Game->Assets->Cylynder, V3(-10.0f, 1.0f, 0.0f), QuatI(), V3(2.0f));
-    PushMesh(Stack, &Game->Assets->Sphere, V3(0.0f, 1.0f, 5.0f), QuatI(), V3(1.0f));
-    PushMesh(Stack, &Game->Assets->Plane, V3(0.0f, -1.0f, 0.0f), QuatI(), V3(100.0f));
+    PushMesh(Stack, &Game->Assets->Cube, 
+             V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
+             QuatI(), V3(1.0f));
+    PushMesh(Stack, &Game->Assets->Cube, 
+             V3(0.0f, 1.0f + Sin(Game->Input->Time * 3.0f) * 0.5f, 0.0f), 
+             QuatI(), V3(1.0f));
+    PushMesh(Stack, &Game->Assets->Cylynder, 
+             V3(-10.0f, 1.0f, 0.0f), 
+             Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), V3(2.0f));
+    PushMesh(Stack, &Game->Assets->Sphere, 
+             V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
+             QuatI(), V3(1.0f));
+    PushMesh(Stack, &Game->Assets->Plane, 
+             V3(0.0f, -1.0f, 0.0f), 
+             QuatI(), V3(100.0f));
     
 }
 

@@ -1774,23 +1774,59 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
     {
         GuiPreAdvance(Gui, layout);
         
-        rc2 textRc = GetTextRect(Gui, 
-                                 "                ", 
-                                 layout->At);
-        textRc = GetTxtElemRect(Gui, layout, textRc, V2(4.0f, 4.0f));
-        GuiPushBut(Gui, textRc, PushBut_Color, V4(0.05f, 0.05f, 0.1f, 1.0f));
+        rc2 SlideRc = GetTextRect(Gui, 
+                                  "                ", 
+                                  layout->At);
+        SlideRc = GetTxtElemRect(Gui, layout, SlideRc, V2(4.0f, 4.0f));
+        GuiPushBut(Gui, SlideRc, PushBut_Color, V4(0.05f, 0.05f, 0.1f, 1.0f));
+        
+        float SlideRcWidth = GetRectWidth(SlideRc);
         
         char Buf[32];
-        stbsp_sprintf(Buf, "%.3f", *Value);
-        v4 textC = GUI_GETCOLOR(GuiColor_ButtonForeground);
-        PrintTextCenteredInRect(Gui, Buf, textRc, 1.0f, textC);
         
-        float NameStartY = GetCenteredTextOffsetY(Gui->mainFont, textRc, Gui->fontScale);
-        v2 NameStart = V2(textRc.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f, NameStartY);
+        Gui_Empty_Interaction Interaction(elem);
+        
+        if(MouseInRect(Gui->Input, SlideRc)){
+            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
+            
+            if(KeyWentDown(Gui->Input, MouseKey_Left)){
+                GuiSetActive(Gui, &Interaction);
+            }
+        }
+        
+        if(GuiIsActive(Gui, &Interaction)){
+            float MousePercentage = Clamp01((Gui->Input->MouseP.x - SlideRc.min.x) / SlideRcWidth);
+            *Value = Min + (Max - Min) * MousePercentage;
+            
+            
+            if(KeyWentUp(Gui->Input, MouseKey_Left)){
+                GuiReleaseInteraction(Gui, &Interaction);
+            }
+        }
+        
+        if(Value){
+            float ValuePercentage = (*Value - Min) / (Max - Min);
+            
+            rc2 FillRc;
+            FillRc.min = SlideRc.min;
+            FillRc.max = V2(SlideRc.min.x + SlideRcWidth * ValuePercentage, SlideRc.max.y);
+            
+            GuiPushBut(Gui, FillRc, PushBut_Color, V4(1.0f, 0.3f, 0.1f, 1.0f));
+            
+            stbsp_sprintf(Buf, "%.3f", *Value);
+        }
+        else{
+            stbsp_sprintf(Buf, "ERR");
+        }
+        v4 textC = GUI_GETCOLOR(GuiColor_ButtonForeground);
+        PrintTextCenteredInRect(Gui, Buf, SlideRc, 1.0f, textC);
+        
+        float NameStartY = GetCenteredTextOffsetY(Gui->mainFont, SlideRc, Gui->fontScale);
+        v2 NameStart = V2(SlideRc.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f, NameStartY);
         
         rc2 NameRc = PrintText(Gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
         
-        rc2 AdvanceRect = GetBoundingRect(NameRc, textRc);
+        rc2 AdvanceRect = GetBoundingRect(NameRc, SlideRc);
         GuiPostAdvance(Gui, layout, AdvanceRect);
     }
     

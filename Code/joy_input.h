@@ -247,6 +247,9 @@ struct input_state{
     
     char FrameInput[32];
     int FrameInputLen;
+    
+    float Time;
+    float DeltaTime;
 };
 
 

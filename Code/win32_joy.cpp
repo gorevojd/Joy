@@ -1775,6 +1775,9 @@ INTERNAL_FUNCTION void Win32XInputProcessStick(gamepad_stick* Stick,
 INTERNAL_FUNCTION void
 Win32ProcessInput(input_state* Input)
 {
+    Input->Time = Time;
+    Input->DeltaTime = DeltaTime;
+    
     // NOTE(Dima): Getting mouse posititons
     POINT point;
     GetCursorPos(&point);

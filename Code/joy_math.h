@@ -372,11 +372,13 @@ inline quat Quat(float x, float y, float z, float w){
 inline quat Quat(v3 Axis, float Angle){
 	quat res;
     
-	float S = Sin(Angle);
+    float HalfAngle = Angle * 0.5f;
+    
+	float S = Sin(HalfAngle);
 	res.x = Axis.x * S;
 	res.y = Axis.y * S;
 	res.z = Axis.z * S;
-	res.w = Angle * Cos(Angle);
+	res.w = Cos(HalfAngle);
     
 	return(res);
 }
