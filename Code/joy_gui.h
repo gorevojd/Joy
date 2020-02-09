@@ -160,11 +160,12 @@ struct gui_grid_item{
 
 enum Gui_Element_Type{
     GuiElement_None,
+    
     GuiElement_Root,
     GuiElement_Page,
     GuiElement_ChildrenSentinel,
-    GuiElement_TreeLink,
     GuiElement_Item,
+    GuiElement_TempItem,
     GuiElement_RowColumn,
     GuiElement_RadioGroup,
     GuiElement_Layout,
@@ -300,6 +301,7 @@ struct gui_state{
     Gui_Window* tempWindow1;
     Gui_Window* tempWindow2;
     
+    int TotalAllocatedGuiElements;
     Gui_Element freeSentinel;
     Gui_Element useSentinel;
     

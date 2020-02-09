@@ -5,10 +5,6 @@ struct transform{
     v3 P;
     quat R;
     v3 S;
-    
-    transform(){
-        this->P = P;
-    }
 };
 
 inline transform Transform(v3 P, quat R, v3 S){

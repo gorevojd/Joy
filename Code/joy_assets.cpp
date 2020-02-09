@@ -88,7 +88,7 @@ void InitAssets(assets* Assets){
     
     // NOTE(Dima): images
     Loaded_Strings bmpStrs = LoadStringListFromFile("../Data/Images/ToLoadImages.txt");
-    Assets->fadeoutBmps = (Bmp_Info*)platform.MemAlloc(sizeof(Bmp_Info) * bmpStrs.Count);
+    Assets->fadeoutBmps = (Bmp_Info*)malloc(sizeof(Bmp_Info) * bmpStrs.Count);
     Assets->fadeoutBmpsCount = bmpStrs.Count;
     for(int i = 0; i < bmpStrs.Count; i++){
         char tmpBuf[256];

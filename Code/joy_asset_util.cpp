@@ -889,9 +889,12 @@ mesh_info MakeSphere(int Segments, int Rings) {
     int VerticesCount = (Segments * 3) * 2 + (Segments * (Rings - 2)) * 4;
     int IndicesCount = (Segments * 3) * 2 + (Segments * (Rings - 2)) * 6;
     
+    v3 Color = V3(1.0f);
+    
     std::vector<v3> Positions;
     std::vector<v2> TexCoords;
     std::vector<v3> Normals;
+    std::vector<v3> Colors;
     std::vector<u32> Indices;
     
     float AngleVert = JOY_PI / (float)Rings;
@@ -960,6 +963,10 @@ mesh_info MakeSphere(int Segments, int Rings) {
                 Normals.push_back(NC0);
                 Normals.push_back(NC1);
                 
+                Colors.push_back(Color);
+                Colors.push_back(Color);
+                Colors.push_back(Color);
+                
                 Indices.push_back(VertexAt);
                 Indices.push_back(VertexAt + 1);
                 Indices.push_back(VertexAt + 2);
@@ -980,6 +987,10 @@ mesh_info MakeSphere(int Segments, int Rings) {
                 Normals.push_back(NP1);
                 Normals.push_back(NP0);
                 Normals.push_back(NC1);
+                
+                Colors.push_back(Color);
+                Colors.push_back(Color);
+                Colors.push_back(Color);
                 
                 Indices.push_back(VertexAt);
                 Indices.push_back(VertexAt + 1);
@@ -1004,6 +1015,11 @@ mesh_info MakeSphere(int Segments, int Rings) {
                 Normals.push_back(NC0);
                 Normals.push_back(NC1);
                 
+                Colors.push_back(Color);
+                Colors.push_back(Color);
+                Colors.push_back(Color);
+                Colors.push_back(Color);
+                
                 Indices.push_back(VertexAt);
                 Indices.push_back(VertexAt + 1);
                 Indices.push_back(VertexAt + 2);
@@ -1026,7 +1042,7 @@ mesh_info MakeSphere(int Segments, int Rings) {
                       TexCoords, 
                       Normals, 
                       std::vector<v3>(), 
-                      std::vector<v3>(),
+                      Colors,
                       Indices,
                       JOY_FALSE, 
                       JOY_TRUE);
@@ -1051,6 +1067,9 @@ mesh_info MakeCylynder(float Height, float Radius, int SidesCount) {
     std::vector<v2> TexCoords;
     std::vector<v3> Normals;
     std::vector<u32> Indices;
+    std::vector<v3> Colors;
+    
+    v3 Color = V3(1.0f);
     
     //NOTE(dima): Building top triangle fans
     float TopY = Height * 0.5f;
@@ -1094,6 +1113,10 @@ mesh_info MakeCylynder(float Height, float Radius, int SidesCount) {
         Normals.push_back(Normal);
         Normals.push_back(Normal);
         Normals.push_back(Normal);
+        
+        Colors.push_back(Color);
+        Colors.push_back(Color);
+        Colors.push_back(Color);
         
         // NOTE(Dima): Pushing indices
         Indices.push_back(VertexAt);
@@ -1145,6 +1168,11 @@ mesh_info MakeCylynder(float Height, float Radius, int SidesCount) {
         Normals.push_back(Normal);
         Normals.push_back(Normal);
         Normals.push_back(Normal);
+        
+        Colors.push_back(Color);
+        Colors.push_back(Color);
+        Colors.push_back(Color);
+        
         
         // NOTE(Dima): Pushing indices
         Indices.push_back(VertexAt);
@@ -1210,6 +1238,11 @@ mesh_info MakeCylynder(float Height, float Radius, int SidesCount) {
         Normals.push_back(Normal);
         Normals.push_back(Normal);
         
+        Colors.push_back(Color);
+        Colors.push_back(Color);
+        Colors.push_back(Color);
+        Colors.push_back(Color);
+        
         // NOTE(Dima): Pushing indices
         Indices.push_back(VertexAt);
         Indices.push_back(VertexAt + 1);
@@ -1226,7 +1259,7 @@ mesh_info MakeCylynder(float Height, float Radius, int SidesCount) {
                       TexCoords, 
                       Normals, 
                       std::vector<v3>(), 
-                      std::vector<v3>(),
+                      Colors,
                       Indices,
                       JOY_FALSE, 
                       JOY_TRUE);

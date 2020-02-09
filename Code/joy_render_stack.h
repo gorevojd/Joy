@@ -30,7 +30,7 @@ struct render_stack{
     struct render_state* Render;
     Asset_Atlas* CurAtlas;
     
-    Memory_Block MemBlock;
+    mem_block MemBlock;
     int EntryCount;
 };
 

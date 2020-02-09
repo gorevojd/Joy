@@ -100,7 +100,10 @@ GAME_MODE_UPDATE(TestUpdate){
     
     PushMesh(Stack, &Game->Assets->Cube, V3(5.0f, 1.0f, 0.0f), QuatI(), V3(1.0f));
     PushMesh(Stack, &Game->Assets->Cube, V3(0.0f, 1.0f, 0.0f), QuatI(), V3(1.0f));
+    PushMesh(Stack, &Game->Assets->Cylynder, V3(-10.0f, 1.0f, 0.0f), QuatI(), V3(2.0f));
+    PushMesh(Stack, &Game->Assets->Sphere, V3(0.0f, 1.0f, 5.0f), QuatI(), V3(1.0f));
     PushMesh(Stack, &Game->Assets->Plane, V3(0.0f, -1.0f, 0.0f), QuatI(), V3(100.0f));
+    
 }
 
 // NOTE(Dima): MAIN MENU GAME MODE

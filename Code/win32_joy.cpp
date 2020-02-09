@@ -1418,65 +1418,67 @@ PLATFORM_MEMALLOC(Win32MemAlloc){
     
     // NOTE(Dima): I'll allocate 1 extra page to hold info
     // NOTE(Dima): about allocation & win32_memory_block structure
-    const mi pageSize = 4096;
-    const mi pageSizeMask = 4095;
-    mi toAllocSize = size + pageSize;
+    const mi PageSize = 4096;
+    const mi PageSizeMask = 4095;
+    // NOTE(Dima): 1 extra info page && 2 guard pages
+    mi ToAllocSize = Size + PageSize + PageSize * 2;
     
-    // NOTE(Dima): Always put guards at the beginning and at the end
-    // NOTE(Dima): For begin&end guard pages
-    toAllocSize += 2 * pageSize;
-    
-    void* allocatedMemory = VirtualAlloc(0, toAllocSize, 
+    void* AllocatedMemory = VirtualAlloc(0, ToAllocSize, 
                                          MEM_COMMIT | MEM_RESERVE, 
                                          PAGE_READWRITE);
-    Assert(allocatedMemory);
+    Assert(AllocatedMemory);
     
-    Win_Memory_Region* region = (Win_Memory_Region*)allocatedMemory;
+    Win_Memory_Region* Region = (Win_Memory_Region*)AllocatedMemory;
     
+    void* BeginGuardPage = (u8*)Region + PageSize;
+    DWORD OldProtectBegin;
+    VirtualProtect(BeginGuardPage, PageSize, PAGE_NOACCESS, &OldProtectBegin);
     
-    void* beginGuardPage = (u8*)region + pageSize;
-    DWORD oldProtectBegin;
-    VirtualProtect(beginGuardPage, pageSize, PAGE_NOACCESS, &oldProtectBegin);
+    void* BlockBase = (u8*)BeginGuardPage + PageSize;
     
-    void* result = (u8*)beginGuardPage + pageSize;
-    
-    void* endGuardPage = (u8*)result + ((size + pageSizeMask) & (~(pageSizeMask)));
-    DWORD oldProtectEnd;
-    VirtualProtect(endGuardPage, pageSize, PAGE_NOACCESS, &oldProtectEnd);
+    void* EndGuardPage = (u8*)BlockBase + ((Size + PageSizeMask) & (~(PageSizeMask)));
+    DWORD OldProtectEnd;
+    VirtualProtect(EndGuardPage, PageSize, PAGE_NOACCESS, &OldProtectEnd);
     
     // NOTE(Dima): Inserting region to list
-    region->prev = &GlobalWin32.memorySentinel;
+    Region->Prev = &GlobalWin32.memorySentinel;
     BeginTicketMutex(&GlobalWin32.memoryMutex);
-    region->next = GlobalWin32.memorySentinel.next;
+    Region->Next = GlobalWin32.memorySentinel.Next;
     
-    region->prev->next = region;
-    region->next->prev = region;
+    Region->Prev->Next = Region;
+    Region->Next->Prev = Region;
     EndTicketMutex(&GlobalWin32.memoryMutex);
     
     // NOTE(Dima): Initializing region
-    region->totalCommittedSize = (toAllocSize + pageSizeMask) & (~pageSizeMask);
-    region->size = size;
-    region->baseAddress = result;
-    region->baseAddressOfAllocationBlock = allocatedMemory;
+    Region->TotalCommittedSize = (ToAllocSize + PageSizeMask) & (~PageSizeMask);
     
-    return(result);
+    mem_block* Result = (mem_block*)Region;
+    Result->Base = BlockBase;
+    Result->Used = 0;
+    Result->Total = Size;
+    
+    return(Result);
 }
 
 PLATFORM_MEMFREE(Win32MemFree){
-    if(toFree){
-        const mi pageSize = 4096;
-        void* actualToFree = (void*)((u8*)toFree - 2 * pageSize);
+    if(ToFree){
+        const mi PageSize = 4096;
         
-        Win_Memory_Region* region = (Win_Memory_Region*)actualToFree;
+        Win_Memory_Region* Region = (Win_Memory_Region*)ToFree;
         
         // NOTE(Dima): Removing from list
         BeginTicketMutex(&GlobalWin32.memoryMutex);
-        region->next->prev = region->prev;
-        region->prev->next = region->next;
+        Region->Next->Prev = Region->Prev;
+        Region->Prev->Next = Region->Next;
         EndTicketMutex(&GlobalWin32.memoryMutex);
         
-        VirtualFree(toFree, 0, MEM_RELEASE);
-        
+        VirtualFree(ToFree, 0, MEM_RELEASE);
+    }
+}
+
+PLATFORM_MEMZERO(Win32MemZero){
+    if(ToZero){
+        ZeroMemory(ToZero->Base, ToZero->Total);
     }
 }
 
@@ -2243,7 +2245,6 @@ int APIENTRY WinMain(HINSTANCE hInstance,
                      int       nCmdShow)
 {
     // NOTE(Dima): Initializing platform API
-    
     InitJobQueue(&platform.highPriorityQueue, 2048, 8);
     InitJobQueue(&platform.lowPriorityQueue, 2048, 2);
     
@@ -2256,6 +2257,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     platform.OutputString = Win32DebugOutputString;
     platform.MemAlloc = Win32MemAlloc;
     platform.MemFree = Win32MemFree;
+    platform.MemZero = Win32MemZero;
     
     // TODO(Dima): Add array of count Renderer_Count and init all renderers
     // TODO(Dima): Or leave if not supported
@@ -2278,8 +2280,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     
     // NOTE(Dima): Initializing memory sentinel
     GlobalWin32.memorySentinel = {};
-    GlobalWin32.memorySentinel.prev = &GlobalWin32.memorySentinel;
-    GlobalWin32.memorySentinel.next = &GlobalWin32.memorySentinel;
+    GlobalWin32.memorySentinel.Prev = &GlobalWin32.memorySentinel;
+    GlobalWin32.memorySentinel.Next = &GlobalWin32.memorySentinel;
     
     // NOTE(Dima): Init win32 debug output log func
     if(IsDebuggerPresent()){
@@ -2336,6 +2338,13 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     Win32PlayDirectSoundBuffer(&GlobalDirectSound);
     
     //ShellExecuteA(NULL, "open", "http://www.microsoft.com", NULL, NULL, SW_SHOWNORMAL);
+    
+    mem_region Test = {};
+    PushSomeMem(&Test, Megabytes(1));
+    PushSomeMem(&Test, Megabytes(2));
+    FreeNoDealloc(&Test);
+    PushSomeMem(&Test, Megabytes(1));
+    PushSomeMem(&Test, Megabytes(2));
     
     LARGE_INTEGER BeginClockLI;
     QueryPerformanceCounter(&BeginClockLI);

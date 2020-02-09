@@ -124,11 +124,14 @@ struct platform_job_queue{
     std::vector<std::thread> Threads;
 };
 
-#define PLATFORM_MEMALLOC(name) void* name(mi size)
-typedef PLATFORM_MEMALLOC(Platform_Memalloc);
+#define PLATFORM_MEMALLOC(name) mem_block* name(mi Size)
+typedef PLATFORM_MEMALLOC(platform_memalloc);
 
-#define PLATFORM_MEMFREE(name) void name(void* toFree)
-typedef PLATFORM_MEMFREE(Platform_Memfree);
+#define PLATFORM_MEMFREE(name) void name(mem_block* ToFree)
+typedef PLATFORM_MEMFREE(platform_memfree);
+
+#define PLATFORM_MEMZERO(name) void name(mem_block* ToZero)
+typedef PLATFORM_MEMZERO(platform_memzero);
 
 #define PLATFORM_ADD_ENTRY(name) void name(platform_job_queue* queue, Platform_Callback* callback, void* data)
 typedef PLATFORM_ADD_ENTRY(Platform_Add_Entry);
@@ -174,8 +177,9 @@ struct Platform{
     platform_job_queue highPriorityQueue;
     platform_job_queue lowPriorityQueue;
     
-    Platform_Memalloc* MemAlloc;
-    Platform_Memfree* MemFree;
+    platform_memalloc* MemAlloc;
+    platform_memfree* MemFree;
+    platform_memzero* MemZero;
     
     Platform_Begin_List_Files_In_Dir* BeginListFilesInDir;
     Platform_End_List_Files_In_Dir* EndListFilesInDir;

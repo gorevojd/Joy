@@ -163,19 +163,13 @@ struct DSound_State{
 };
 
 struct Win_Memory_Region{
-    // NOTE(Dima): Size of memory that we can actually use
-    mi size;
-    // NOTE(Dima): Total commited size
-    mi totalCommittedSize;
-    // NOTE(Dima): This is base address of the memory that we can
-    // NOTE(Dima): actually use
-    void* baseAddress;
-    // NOTE(Dima): Allocation block is total block with guard pages
-    // NOTE(Dima): at begin and end, and additional info page
-    void* baseAddressOfAllocationBlock;
+    mem_block Block;
     
-    Win_Memory_Region* next;
-    Win_Memory_Region* prev;
+    // NOTE(Dima): Total commited size
+    mi TotalCommittedSize;
+    
+    Win_Memory_Region* Next;
+    Win_Memory_Region* Prev;
 };
 
 #define WIN32_DEBUG_OUTPUT(name) void name(const char* Str)

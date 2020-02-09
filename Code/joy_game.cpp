@@ -119,8 +119,8 @@ void GameFree(game_state* Game){
     Game->Render->Free();
     
     // NOTE(Dima): Freing all the memories :)
-    FreeMemoryRegion(&Game->GuiMemory);
-    FreeMemoryRegion(&Game->InputMemory);
-    FreeMemoryRegion(&Game->RenderMemory);
-    FreeMemoryRegion(&Game->AssetMemory);
+    Free(&Game->GuiMemory);
+    Free(&Game->InputMemory);
+    Free(&Game->RenderMemory);
+    Free(&Game->AssetMemory);
 }

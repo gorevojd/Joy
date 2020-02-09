@@ -51,16 +51,23 @@ inline void GuiDeallocateWindow(gui_state* Gui, Gui_Window* todo){
     todo->PrevAlloc->NextAlloc = todo;
 }
 
-INTERNAL_FUNCTION void GuiDeallocateElement(gui_state* Gui, Gui_Element* elem)
+INTERNAL_FUNCTION inline void GuiRemoveElementFromList(Gui_Element* Elem){
+    Elem->Next->Prev = Elem->Prev;
+    Elem->Prev->Next = Elem->Next;
+}
+
+INTERNAL_FUNCTION inline void GuiDeallocateElement(gui_state* Gui, Gui_Element* elem)
 {
-    elem->Next->Prev = elem->Prev;
-    elem->Prev->Next = elem->Next;
+    // NOTE(Dima): Remove from Use list
+    elem->NextAlloc->PrevAlloc = elem->PrevAlloc;
+    elem->PrevAlloc->NextAlloc = elem->NextAlloc;
     
-    elem->Next = Gui->freeSentinel.Next;
-    elem->Prev = &Gui->freeSentinel;
+    // NOTE(Dima): Insert to Free list
+    elem->NextAlloc = Gui->freeSentinel.NextAlloc;
+    elem->PrevAlloc = &Gui->freeSentinel;
     
-    elem->Next->Prev = elem;
-    elem->Prev->Next = elem;
+    elem->NextAlloc->PrevAlloc = elem;
+    elem->PrevAlloc->NextAlloc = elem;
 }
 
 INTERNAL_FUNCTION Gui_Element* GuiAllocateElement(
@@ -79,7 +86,7 @@ gui_state* Gui)
             index < count;
             index++)
         {
-            Gui_Element* elem = elemPoolArray + index;
+            Gui_Element* elem = &elemPoolArray[index];
             
             elem->PrevAlloc = Gui->freeSentinel.PrevAlloc;
             elem->NextAlloc = &Gui->freeSentinel;
@@ -87,15 +94,17 @@ gui_state* Gui)
             elem->PrevAlloc->NextAlloc = elem;
             elem->NextAlloc->PrevAlloc = elem;
         }
+        
+        Gui->TotalAllocatedGuiElements += count;
     }
     
     result = Gui->freeSentinel.NextAlloc;
     
-    // NOTE(Dima): Deallocating from free list
+    // NOTE(Dima): Deallocating from Free list
     result->NextAlloc->PrevAlloc = result->PrevAlloc;
     result->PrevAlloc->NextAlloc = result->NextAlloc;
     
-    // NOTE(Dima): Allocating in use list
+    // NOTE(Dima): Allocating in Use list
     result->NextAlloc = &Gui->useSentinel;
     result->PrevAlloc = Gui->useSentinel.PrevAlloc;
     
@@ -146,11 +155,6 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(gui_state* Gui,
             found->Next->Prev = found;
             found->Prev->Next = found;
             
-            // NOTE(Dima): Incrementing parent childCount
-            if(found->parent){
-                found->parent->childCount++;
-            }
-            
             found->id = id;
             CopyStrings(found->name, sizeof(found->name), name);
             
@@ -161,16 +165,24 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(gui_state* Gui,
             found->data = {};
             
             // NOTE(Dima): Initializing children sentinel
-            found->childCount = 0;
-            found->childSentinel = GuiAllocateElement(Gui);
-            Gui_Element* fcs = found->childSentinel;
-            fcs->parent = found;
-            fcs->childSentinel = 0;
-            fcs->Next = fcs;
-            fcs->Prev = fcs;
-            CopyStrings(fcs->name, "ChildrenSentinel");
-            fcs->id = StringHashFNV(fcs->name);
-            fcs->type = GuiElement_ChildrenSentinel;
+            if(type == GuiElement_ChildrenSentinel ||
+               type == GuiElement_TempItem ||
+               type == GuiElement_None)
+            {
+                found->childSentinel = 0;
+            }
+            else{
+                found->childSentinel = GuiAllocateElement(Gui);
+                Gui_Element* fcs = found->childSentinel;
+                fcs->Next = fcs;
+                fcs->Prev = fcs;
+                fcs->parent = found;
+                fcs->childSentinel = 0;
+                CopyStrings(fcs->name, "ChildrenSentinel");
+                fcs->id = StringHashFNV(fcs->name);
+                fcs->type = GuiElement_ChildrenSentinel;
+            }
+            
             
             // NOTE(Dima): Initializing opened
             found->opened = initOpened;
@@ -181,6 +193,12 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(gui_state* Gui,
         *cur = found;
         
         result = found;
+        
+        // NOTE(Dima): Incrementing parent childCount
+        if(found->parent){
+            found->parent->childCount++;
+        }
+        found->childCount = 0;
         
         // NOTE(Dima): Incrementing temp counts for row column elements
         if(result->parent){
@@ -227,8 +245,19 @@ INTERNAL_FUNCTION void GuiEndElement(gui_state* Gui, u32 type)
 {
     ASSERT(Gui->curElement->type == type);
     
-    Gui->curElement->TmpCount = 0;
-    Gui->curElement = Gui->curElement->parent;
+    Gui_Element* TmpParent = Gui->curElement->parent;
+    int TmpCount = Gui->curElement->TmpCount;
+    
+    if(type == GuiElement_ChildrenSentinel ||
+       type == GuiElement_TempItem ||
+       type == GuiElement_None)
+    {
+        GuiRemoveElementFromList(Gui->curElement);
+        GuiDeallocateElement(Gui, Gui->curElement);
+    }
+    
+    Gui->curElement->TmpCount = TmpCount;
+    Gui->curElement = TmpParent;
 }
 
 INTERNAL_FUNCTION void GuiFreeElement(gui_state* Gui,
@@ -347,7 +376,6 @@ INTERNAL_FUNCTION void GuiInitRoot(gui_state* Gui, Gui_Element** root){
     CopyStrings(rcs->name, "RootChildrenSentinel");
     rcs->id = StringHashFNV(rcs->name);
     rcs->type = GuiElement_ChildrenSentinel;
-    
 }
 
 void GuiBeginPage(gui_state* Gui, char* name){
@@ -450,6 +478,8 @@ assets* Assets)
     GuiAddWindowToList(Gui->tempWindow1, &Gui->windowLeafSentinel);
     
     // NOTE(Dima): Initializing elements sentinel
+    Gui->TotalAllocatedGuiElements = 0;
+    
     Gui->freeSentinel.NextAlloc = &Gui->freeSentinel;
     Gui->freeSentinel.PrevAlloc = &Gui->freeSentinel;
     
@@ -1435,7 +1465,7 @@ void GuiEndTree(gui_state* Gui){
 }
 
 void GuiText(gui_state* Gui, char* text){
-    Gui_Element* elem = GuiBeginElement(Gui, text, GuiElement_Item, JOY_TRUE);
+    Gui_Element* elem = GuiBeginElement(Gui, text, GuiElement_TempItem, JOY_TRUE);
     Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
@@ -1447,7 +1477,7 @@ void GuiText(gui_state* Gui, char* text){
         
         GuiPostAdvance(Gui, layout, textRc);
     }
-    GuiEndElement(Gui, GuiElement_Item);
+    GuiEndElement(Gui, GuiElement_TempItem);
 }
 
 b32 GuiButton(gui_state* Gui, char* buttonName){
@@ -2189,6 +2219,11 @@ void GuiTest(gui_state* Gui, float deltaTime){
     GuiText(Gui, StackInfo);
     GuiText(Gui, "I love Kate");
     GuiText(Gui, "I wish joy and happiness for everyone");
+    char GuiTmpText[64];
+    stbsp_sprintf(GuiTmpText, 
+                  "Total GUI allocated elements %d", 
+                  Gui->TotalAllocatedGuiElements);
+    GuiText(Gui, GuiTmpText);
     
     GuiEndTree(Gui);
     

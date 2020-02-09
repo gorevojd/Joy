@@ -34,20 +34,24 @@ struct Loaded_Strings{
     int Count;
 };
 
-struct Memory_Block{
+
+struct mem_block{
     void* Base;
     size_t Used;
     size_t Total;
+    
+    mem_block* Old;
+    mem_block* Next;
 };
 
-inline void InitMemoryBlock(Memory_Block* block, void* Base, mi Size){
+inline void InitMemoryBlock(mem_block* block, void* Base, mi Size){
     block->Base = Base;
     block->Used = 0;
     block->Total = Size;
 }
 
-inline Memory_Block InitMemoryBlock(void* Base, mi Size){
-    Memory_Block block;
+inline mem_block InitMemoryBlock(void* Base, mi Size){
+    mem_block block;
     
     block.Base = Base;
     block.Used = 0;
