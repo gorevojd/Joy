@@ -60,8 +60,21 @@ inline mem_block InitMemoryBlock(void* Base, mi Size){
     return(block);
 }
 
-inline int SafeTruncateToInt(float Value){
+inline int SafeTruncateToUInt(float Value){
     int Result = (int)(Value + 0.5f);
+    
+    return(Result);
+}
+
+inline int SafeTruncateToInt(float Value){
+    int Result;
+    
+    if(Value > 0.0f){
+        Result = (int)(Value + 0.5f);
+    }
+    else{
+        Result = (int)(Value - 0.5f);
+    }
     
     return(Result);
 }

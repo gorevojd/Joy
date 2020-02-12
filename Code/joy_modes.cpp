@@ -39,26 +39,10 @@ GAME_MODE_UPDATE(TestUpdate){
     // NOTE(Dima): Processing camera
     game_camera* Camera = &State->Camera;
     
-    v3 MoveVector = {};
+    float CamSpeed = State->CameraSpeed;
     
-    if(ButIsDownOnController(Game->Input, 0, Button_Left))
-    {
-        MoveVector.x += 1.0f;
-    }
-    
-    if(ButIsDownOnController(Game->Input, 0, Button_Right))
-    {
-        MoveVector.x += -1.0f;
-    }
-    
-    if(ButIsDownOnController(Game->Input, 0, Button_Up))
-    {
-        MoveVector.z += 1.0f;
-    }
-    
-    if(ButIsDownOnController(Game->Input, 0, Button_Down))
-    {
-        MoveVector.z += -1.0f;
+    if(KeyIsDown(Game->Input, Key_Shift)){
+        CamSpeed *= 8.0f;
     }
     
     UpdateCameraRotation(Camera, 
@@ -66,26 +50,20 @@ GAME_MODE_UPDATE(TestUpdate){
                          Game->Input->MouseDeltaP.x * State->MouseSencitivity,
                          0.0f);
     
-    MoveVector = NOZ(MoveVector);
-    MoveVector = -MoveVector;
+    v3 MoveVector = GetMoveVector(Game->Input, -1);
     
     m33 CamTransform = (Quat2M33(Camera->Rotation));
-    v3 AccVector = MoveVector * CamTransform;
+    v3 AccVector = MoveVector * CamTransform * CamSpeed;
     
-    float CamSpeed = State->CameraSpeed;
-    
-    if(KeyIsDown(Game->Input, Key_Shift)){
-        CamSpeed *= 8.0f;
+    if(SqMagnitude(MoveVector) > 0.001f){
+        MoveVector = AccVector * DeltaTime;
     }
+    else{
+        MoveVector = Camera->dP * DeltaTime;
+    }
+    Camera->dP = (Camera->dP + AccVector * DeltaTime) * (1.0f - 3.0f * DeltaTime);
     
-#if 0    
-    MoveVector = Camera->dP * DeltaTime + AccVector * DeltaTime * DeltaTime * 0.5f;
-    Camera->dP = (Camera->dP + AccVector * DeltaTime) * (1.0f - 5.0f * DeltaTime);
-#else
-    MoveVector = AccVector * DeltaTime;
-#endif
-    
-    Camera->P += MoveVector * CamSpeed;
+    Camera->P += MoveVector;
     
     m44 CameraTransform = GetCameraMatrix(Camera);
     
@@ -112,6 +90,14 @@ GAME_MODE_UPDATE(TestUpdate){
     
     GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
     GuiText(Game->Gui, CameraInfo);
+    
+    if(ButIsDown(Game->Input, Button_Left)){
+        GuiText(Game->Gui, "Left");
+    }
+    
+    if(ButIsDown(Game->Input, Button_Right)){
+        GuiText(Game->Gui, "Right");
+    }
     
     PushMesh(Stack, &Game->Assets->Cube, 
              V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 

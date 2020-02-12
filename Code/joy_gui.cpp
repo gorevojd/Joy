@@ -429,6 +429,7 @@ assets* Assets)
     Gui->mainFont = &Assets->inconsolataBold;
     Gui->TileFont = &Assets->MollyJackFont;
     Gui->CheckboxMark = &Assets->CheckboxMark;
+    Gui->ChamomileIcon = &Assets->ChamomileIcon;
     Gui->fontScale = 1.0f;
     
     // NOTE(Dima): Init layouts
@@ -819,7 +820,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
         
         GuiAnchor(Gui, "Anchor1", 
                   layout->Start + layout->Dim,
-                  V2(10, 10),
+                  V2(20, 20),
                   JOY_TRUE,
                   JOY_TRUE,
                   &layout->Start,
@@ -827,7 +828,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
         
         GuiAnchor(Gui, "Anchor2", 
                   layout->Start,
-                  V2(10, 10),
+                  V2(20, 20),
                   JOY_FALSE,
                   JOY_TRUE,
                   &layout->Start,
@@ -1765,7 +1766,7 @@ void GuiEndRadioGroup(gui_state* Gui) {
     GuiEndElement(Gui, GuiElement_RadioGroup);
 }
 
-void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Name){
+void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 Style){
     Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, JOY_TRUE);
     Gui_Layout* layout = GetParentLayout(Gui);
     
@@ -1781,6 +1782,97 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
         GuiPushBut(Gui, SlideRc, PushBut_Color, V4(0.05f, 0.05f, 0.1f, 1.0f));
         
         float SlideRcWidth = GetRectWidth(SlideRc);
+        float SlideRcHeight = GetRectHeight(SlideRc);
+        
+        char Buf[32];
+        
+        Gui_Empty_Interaction Interaction(elem);
+        
+        
+        if(MouseInRect(Gui->Input, SlideRc)){
+            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
+            
+            if(KeyWentDown(Gui->Input, MouseKey_Left)){
+                GuiSetActive(Gui, &Interaction);
+            }
+        }
+        
+        if(GuiIsActive(Gui, &Interaction)){
+            float MousePercentage = Clamp01((Gui->Input->MouseP.x - SlideRc.min.x) / SlideRcWidth);
+            
+            float FloatedValue = Min + (float)((Max - Min) * MousePercentage);
+            
+            int NewValue = SafeTruncateToInt(FloatedValue);
+            
+            *Value = NewValue;
+            
+            if(KeyWentUp(Gui->Input, MouseKey_Left)){
+                GuiReleaseInteraction(Gui, &Interaction);
+            }
+        }
+        
+        if(Value){
+            float ValuePercentage = (float)(*Value - Min) / (float)(Max - Min);
+            
+            if(Style == GuiSlider_Progress){
+                rc2 FillRc;
+                FillRc.min = SlideRc.min;
+                FillRc.max = V2(SlideRc.min.x + SlideRcWidth * ValuePercentage, SlideRc.max.y);
+                
+                GuiPushBut(Gui, FillRc, PushBut_Color, V4(1.0f, 0.3f, 0.1f, 1.0f));
+            }
+            else if(Style == GuiSlider_Index){
+                float HotRectCenterX = SlideRc.min.x + SlideRcWidth * ValuePercentage;
+                float HotRectDimX = SlideRcHeight;
+                
+                rc2 HotRect = RcMinDim(V2(HotRectCenterX - HotRectDimX * 0.5f, SlideRc.min.y), 
+                                       V2(HotRectDimX, HotRectDimX));
+                
+                PushGlyph(Gui->Stack,
+                          HotRect.min, 
+                          GetRectDim(HotRect),
+                          Gui->ChamomileIcon,
+                          Gui->ChamomileIcon->MinUV,
+                          Gui->ChamomileIcon->MaxUV,
+                          V4(1.0f, 1.0f, 1.0f, 1.0f));
+            }
+            
+            
+            stbsp_sprintf(Buf, "%d", *Value);
+        }
+        
+        v4 textC = GUI_GETCOLOR(GuiColor_ButtonForeground);
+        PrintTextCenteredInRect(Gui, Buf, SlideRc, 1.0f, textC);
+        
+        float NameStartY = GetCenteredTextOffsetY(Gui->mainFont, SlideRc, Gui->fontScale);
+        v2 NameStart = V2(SlideRc.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f, NameStartY);
+        
+        rc2 NameRc = PrintText(Gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
+        
+        rc2 AdvanceRect = GetBoundingRect(NameRc, SlideRc);
+        GuiPostAdvance(Gui, layout, AdvanceRect);
+    }
+    
+    GuiEndElement(Gui, GuiElement_Item);
+}
+
+void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Name, u32 Style){
+    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, JOY_TRUE);
+    Gui_Layout* layout = GetParentLayout(Gui);
+    
+    if(GuiElementOpenedInTree(elem) && 
+       PotentiallyVisibleSmall(layout))
+    {
+        GuiPreAdvance(Gui, layout);
+        
+        rc2 SlideRc = GetTextRect(Gui, 
+                                  "                ", 
+                                  layout->At);
+        SlideRc = GetTxtElemRect(Gui, layout, SlideRc, V2(4.0f, 4.0f));
+        GuiPushBut(Gui, SlideRc, PushBut_Color, V4(0.05f, 0.05f, 0.1f, 1.0f));
+        
+        float SlideRcWidth = GetRectWidth(SlideRc);
+        float SlideRcHeight = GetRectHeight(SlideRc);
         
         char Buf[32];
         
@@ -1807,11 +1899,29 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
         if(Value){
             float ValuePercentage = (*Value - Min) / (Max - Min);
             
-            rc2 FillRc;
-            FillRc.min = SlideRc.min;
-            FillRc.max = V2(SlideRc.min.x + SlideRcWidth * ValuePercentage, SlideRc.max.y);
+            if(Style == GuiSlider_Progress){
+                rc2 FillRc;
+                FillRc.min = SlideRc.min;
+                FillRc.max = V2(SlideRc.min.x + SlideRcWidth * ValuePercentage, SlideRc.max.y);
+                
+                GuiPushBut(Gui, FillRc, PushBut_Color, V4(1.0f, 0.3f, 0.1f, 1.0f));
+            }
+            else if(Style == GuiSlider_Index){
+                float HotRectCenterX = SlideRc.min.x + SlideRcWidth * ValuePercentage;
+                float HotRectDimX = SlideRcHeight;
+                
+                rc2 HotRect = RcMinDim(V2(HotRectCenterX - HotRectDimX * 0.5f, SlideRc.min.y), 
+                                       V2(HotRectDimX, HotRectDimX));
+                
+                PushGlyph(Gui->Stack,
+                          HotRect.min, 
+                          GetRectDim(HotRect),
+                          Gui->ChamomileIcon,
+                          Gui->ChamomileIcon->MinUV,
+                          Gui->ChamomileIcon->MaxUV,
+                          V4(1.0f, 1.0f, 1.0f, 1.0f));
+            }
             
-            GuiPushBut(Gui, FillRc, PushBut_Color, V4(1.0f, 0.3f, 0.1f, 1.0f));
             
             stbsp_sprintf(Buf, "%.3f", *Value);
         }
@@ -2268,7 +2378,11 @@ void GuiTest(gui_state* Gui, float deltaTime){
     static char InputTextBuf[256];
     GuiInputText(Gui, "Input Text", InputTextBuf, 256);
     static float TestFloat4Slider;
-    GuiSliderFloat(Gui, &TestFloat4Slider, -5.0f, 10.0f, "FloatSlider");
+    static int TestInt4Slider;
+    GuiSliderFloat(Gui, &TestFloat4Slider, -5.0f, 10.0f, "FloatSlider1", GuiSlider_Index);
+    GuiSliderFloat(Gui, &TestFloat4Slider, -5.0f, 10.0f, "FloatSlider2", GuiSlider_Progress);
+    GuiSliderInt(Gui, &TestInt4Slider, -4, 7, "IntSlider1", GuiSlider_Index);
+    GuiSliderInt(Gui, &TestInt4Slider, -4, 7, "IntSlider2", GuiSlider_Progress);
     GuiBeginTree(Gui, "AddClearButtons");
     LOCAL_AS_GLOBAL int RectCount = 0;
     GuiBeginRow(Gui);

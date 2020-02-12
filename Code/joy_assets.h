@@ -45,6 +45,7 @@ struct assets{
     Bmp_Info PlusPng;
     Bmp_Info StopPng;
     Bmp_Info PowerPng;
+    Bmp_Info ChamomileIcon;
     
     Sound_Info SineTest1;
     Sound_Info SineTest2;

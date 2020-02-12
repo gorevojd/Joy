@@ -4,6 +4,7 @@
 #include "joy_types.h"
 #include "joy_math.h"
 #include "joy_memory.h"
+#include "joy_strings.h"
 
 #define INPUT_PLATFORM_PROCESS(name) void name()
 typedef INPUT_PLATFORM_PROCESS(input_platform_process);
@@ -137,8 +138,12 @@ enum gamepad_key_type{
     GamepadKey_Back,
     GamepadKey_LeftThumb,
     GamepadKey_RightThumb,
+    
     GamepadKey_LeftShoulder,
     GamepadKey_RightShoulder,
+    
+    GamepadKey_LeftTrigger,
+    GamepadKey_RightTrigger,
     
     GamepadKey_A,
     GamepadKey_B,
@@ -150,6 +155,8 @@ enum gamepad_key_type{
 
 struct gamepad_key{
     key_state Key;
+    
+    char Name[32];
 };
 
 struct gamepad_stick{
@@ -198,7 +205,6 @@ struct button_state{
 #define MAX_KEYS_PER_BUTTON 4
     int Keys[MAX_KEYS_PER_BUTTON];
     int KeyCount;
-    int ActiveKeyIndex;
     
     // NOTE(Dima): You can use it to watch how much time the key was pressed or released
     float InTransitionTime;
@@ -220,6 +226,8 @@ struct input_controller{
     };
     
     u32 ControllerSource;
+    
+    u32 GamepadIndex;
 };
 
 #define MOUSE_KEY_COUNT (Key_Count - MouseKey_Left)
@@ -229,7 +237,9 @@ struct input_state{
     mem_region* Region;
     
     keyboard_controller Keyboard;
-    gamepad_controller GamepadControllers[4];
+    
+#define MAX_GAMEPAD_COUNT 4
+    gamepad_controller GamepadControllers[MAX_GAMEPAD_COUNT];
     
 #define MAX_CONTROLLER_COUNT 4
     input_controller Controllers[MAX_CONTROLLER_COUNT];
@@ -252,48 +262,12 @@ struct input_state{
     float DeltaTime;
 };
 
-
-inline void AddKeyToButtonOnController(input_state* Input, int ControllerIndex, 
-                                       u32 Button, u32 Key)
-{
-    input_controller* Cont = &Input->Controllers[ControllerIndex];
-    ASSERT(MAX_KEYS_PER_BUTTON > Cont->Buttons[Button].KeyCount);
+inline gamepad_controller* GetGamepad(input_state* Input, u32 GamepadIndex){
+    gamepad_controller* Pad = &Input->GamepadControllers[GamepadIndex];
     
-    Cont->Buttons[Button].Keys[Cont->Buttons[Button].KeyCount++] = Key;
+    return(Pad);
 }
 
-inline void InitInput(input_state* Input)
-{
-    for(int ControllerIndex = 0; 
-        ControllerIndex < MAX_CONTROLLER_COUNT;
-        ControllerIndex++)
-    {
-        Input->Controllers[ControllerIndex].ControllerSource = InputcontrollerSource_None;
-    }
-    
-    Input->Controllers[0].ControllerSource = InputControllerSource_Keyboard;
-    Input->Controllers[1].ControllerSource = InputControllerSource_Keyboard;
-    
-    Input->Controllers[2].ControllerSource = InputControllerSource_Gamepad;
-    Input->Controllers[3].ControllerSource = InputControllerSource_Gamepad;
-    Input->Controllers[4].ControllerSource = InputControllerSource_Gamepad;
-    Input->Controllers[5].ControllerSource = InputControllerSource_Gamepad;
-    
-    AddKeyToButtonOnController(Input, 0, Button_Left, Key_A);
-    AddKeyToButtonOnController(Input, 0, Button_Right, Key_D);
-    AddKeyToButtonOnController(Input, 0, Button_Up, Key_W);
-    AddKeyToButtonOnController(Input, 0, Button_Down, Key_S);
-    AddKeyToButtonOnController(Input, 0, Button_Jump, Key_Space);
-    AddKeyToButtonOnController(Input, 0, Button_Reload, Key_R);
-    AddKeyToButtonOnController(Input, 0, Button_Interact, Key_F);
-    
-    // TODO(Dima): Add some others for this controller
-    AddKeyToButtonOnController(Input, 1, Button_Left, Key_Left);
-    AddKeyToButtonOnController(Input, 1, Button_Right, Key_Right);
-    AddKeyToButtonOnController(Input, 1, Button_Up, Key_Up);
-    AddKeyToButtonOnController(Input, 1, Button_Down, Key_Down);
-    AddKeyToButtonOnController(Input, 1, Button_Interact, Key_Return);
-}
 
 inline b32 KeyIsDown(input_state* input, u32 keyType){
     b32 res = input->Keyboard.KeyStates[keyType].EndedDown;
@@ -311,6 +285,37 @@ inline b32 KeyWentDown(input_state* input, u32 keyType){
 
 inline b32 KeyWentUp(input_state* input, u32 keyType){
     key_state* Key = &input->Keyboard.KeyStates[keyType];
+    
+    b32 res = !Key->EndedDown && Key->TransitionHappened;
+    
+    return(res);
+}
+
+// NOTE(Dima): Button gamepad events
+inline b32 KeyIsDownOnPad(input_state* Input, int PadIndex, u32 PadKey){
+    gamepad_controller* Pad = GetGamepad(Input, PadIndex);
+    
+    key_state* Key = &Pad->Keys[PadKey].Key;
+    
+    b32 res = Key->EndedDown;
+    
+    return(res);
+}
+
+inline b32 KeyWentDownOnPad(input_state* Input, int PadIndex, u32 PadKey){
+    gamepad_controller* Pad = GetGamepad(Input, PadIndex);
+    
+    key_state* Key = &Pad->Keys[PadKey].Key;
+    
+    b32 res = Key->EndedDown && Key->TransitionHappened;
+    
+    return(res);
+}
+
+inline b32 KeyWentUpOnPad(input_state* Input, int PadIndex, u32 PadKey){
+    gamepad_controller* Pad = GetGamepad(Input, PadIndex);
+    
+    key_state* Key = &Pad->Keys[PadKey].Key;
     
     b32 res = !Key->EndedDown && Key->TransitionHappened;
     
@@ -445,5 +450,8 @@ inline b32 MouseRightWentDownInRect(input_state* input, rc2 rect) {
     
     return(res);
 }
+
+void InitInput(input_state* Input);
+v3 GetMoveVector(input_state* Input, int ControllerIndex);
 
 #endif

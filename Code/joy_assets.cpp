@@ -116,6 +116,7 @@ void InitAssets(assets* Assets){
     Assets->PlusPng = LoadBMP("../Data/Icons/plus.png");
     Assets->StopPng = LoadBMP("../Data/Icons/stop.png");
     Assets->PowerPng = LoadBMP("../Data/Icons/power.png");
+    Assets->ChamomileIcon = LoadBMP("../Data/Icons/chamomile.png");
     
     AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->CheckboxMark);
     AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->Folder);
@@ -124,6 +125,7 @@ void InitAssets(assets* Assets){
     AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->PlusPng);
     AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->StopPng);
     AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->PowerPng);
+    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->ChamomileIcon);
     
     // NOTE(Dima): Sounds
     Assets->SineTest1 = MakeSineSound256(44100 * 4, 44100);

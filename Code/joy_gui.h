@@ -311,6 +311,7 @@ struct gui_state{
     
     Asset_Atlas* atlas;
     Bmp_Info* CheckboxMark;
+    Bmp_Info* ChamomileIcon;
     
     Color_State colorState;
     v4 colors[GuiColor_Count];
@@ -685,7 +686,25 @@ void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId);
 void GuiEndRadioGroup(gui_state* Gui);
 
 void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize);
-void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Name);
+
+enum gui_slider_style{
+    GuiSlider_Index,
+    GuiSlider_Progress,
+};
+
+void GuiSliderInt(gui_state* Gui, 
+                  int* Value, 
+                  int Min, 
+                  int Max, 
+                  char* Name, 
+                  u32 Style = 0);
+
+void GuiSliderFloat(gui_state* Gui, 
+                    float* Value, 
+                    float Min, 
+                    float Max, 
+                    char* Name, 
+                    u32 Style = 0);
 
 void GuiTest(gui_state* Gui, float deltaTime);
 

@@ -1548,9 +1548,12 @@ Win32ToggleFullscreen(win_state* win32)
     }
 }
 
-inline void Win32ProcessKey(key_state* key, b32 isDown, int RepeatCount){
-    if(key->EndedDown != isDown){
-        key->EndedDown = isDown;
+inline void Win32ProcessKey(key_state* key, b32 IsDown, int RepeatCount){
+    
+    b32 ActualIsDown = IsDown != 0;
+    
+    if(key->EndedDown != ActualIsDown){
+        key->EndedDown = ActualIsDown;
         
         key->TransitionHappened = 1;
     }
@@ -1729,6 +1732,20 @@ Win32PreProcessInput(input_state* Input){
         Input->Keyboard.KeyStates[keyIndex].TransitionHappened = 0;
         Input->Keyboard.KeyStates[keyIndex].RepeatCount = 0;
     }
+    
+#if 0    
+    for(int PadIndex = 0; PadIndex < MAX_GAMEPAD_COUNT; PadIndex++){
+        gamepad_controller* Pad = &Input->GamepadControllers[PadIndex];
+        
+        for(int KeyIndex = 0; KeyIndex < GamepadKey_Count; KeyIndex++){
+            key_state* Key = &Pad->Keys[KeyIndex].Key;
+            
+            Key->TransitionHappened = 0;
+            Key->RepeatCount = 0;
+        }
+    }
+#endif
+    
 }
 
 INTERNAL_FUNCTION inline rc2 Win32RectToJoy(RECT Rect){
@@ -1743,11 +1760,9 @@ INTERNAL_FUNCTION inline rc2 Win32RectToJoy(RECT Rect){
 }
 
 INTERNAL_FUNCTION void Win32XInputProcessStick(gamepad_stick* Stick, 
-                                               XINPUT_GAMEPAD* XPad,
+                                               float LX, float LY,
                                                int Deadzone)
 {
-    float LX = XPad->sThumbLX;
-    float LY = XPad->sThumbLY;
     v2 Unnorm = V2(LX, LY);
     
     float Mag = Magnitude(Unnorm);
@@ -1892,43 +1907,42 @@ Win32ProcessInput(input_state* Input)
             }
             
             // NOTE(Dima): Processing sticks
-            Win32XInputProcessStick(&Controller->LeftStick, XPad,
+            Win32XInputProcessStick(&Controller->LeftStick, 
+                                    XPad->sThumbLX, XPad->sThumbLY,
                                     XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
-            Win32XInputProcessStick(&Controller->RightStick, XPad,
+            Win32XInputProcessStick(&Controller->RightStick, 
+                                    XPad->sThumbRX, XPad->sThumbRY,
                                     XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
             
-            
-            
-#define XINPUT_BUTDOWN(xinputbut) XPad->wButtons & xinputbut
-            // NOTE(Dima): Processing buttons
-            DWORD XInputButtons[] = {
-                XINPUT_GAMEPAD_DPAD_UP,
-                XINPUT_GAMEPAD_DPAD_DOWN,
-                XINPUT_GAMEPAD_DPAD_LEFT,
-                XINPUT_GAMEPAD_DPAD_RIGHT,
-                XINPUT_GAMEPAD_START,
-                XINPUT_GAMEPAD_BACK,
-                XINPUT_GAMEPAD_LEFT_THUMB,
-                XINPUT_GAMEPAD_RIGHT_THUMB,
-                XINPUT_GAMEPAD_LEFT_SHOULDER,
-                XINPUT_GAMEPAD_RIGHT_SHOULDER,
-                XINPUT_GAMEPAD_A,
-                XINPUT_GAMEPAD_B,
-                XINPUT_GAMEPAD_X,
-                XINPUT_GAMEPAD_Y,
-            };
-            
-            ASSERT(ARRAY_COUNT(XInputButtons) == GamepadKey_Count);
-            
-            for(int ButtonIndex = 0; 
-                ButtonIndex < GamepadKey_Count;
-                ButtonIndex++)
-            {
-                key_state* Key = &Controller->Keys[ButtonIndex].Key;
+            XINPUT_KEYSTROKE Keystroke;
+            while(XInputGetKeystroke(ControllerIndex, 0, &Keystroke) != ERROR_EMPTY){
+                int KeyToProcess = -1;
                 
-                b32 IsDown = XPad->wButtons & XInputButtons[ButtonIndex];
+                switch(Keystroke.VirtualKey){
+                    case VK_PAD_A:{KeyToProcess = GamepadKey_A;}break;
+                    case VK_PAD_B:{KeyToProcess = GamepadKey_B;}break;
+                    case VK_PAD_X:{KeyToProcess = GamepadKey_X;}break;
+                    case VK_PAD_Y:{KeyToProcess = GamepadKey_Y;}break;
+                    case VK_PAD_RSHOULDER:{KeyToProcess = GamepadKey_RightShoulder;}break;
+                    case VK_PAD_LSHOULDER:{KeyToProcess = GamepadKey_LeftShoulder;}break;
+                    case VK_PAD_LTRIGGER:{KeyToProcess = GamepadKey_LeftTrigger;}break;
+                    case VK_PAD_RTRIGGER:{KeyToProcess = GamepadKey_RightTrigger;}break;
+                    case VK_PAD_DPAD_UP:{KeyToProcess = GamepadKey_DpadUp;}break;
+                    case VK_PAD_DPAD_DOWN:{KeyToProcess = GamepadKey_DpadDown;}break;
+                    case VK_PAD_DPAD_LEFT:{KeyToProcess = GamepadKey_DpadLeft;}break;
+                    case VK_PAD_DPAD_RIGHT:{KeyToProcess = GamepadKey_DpadRight;}break;
+                    case VK_PAD_START:{KeyToProcess = GamepadKey_Start;}break;
+                    case VK_PAD_BACK:{KeyToProcess = GamepadKey_Back;}break;
+                    case VK_PAD_LTHUMB_PRESS:{KeyToProcess = GamepadKey_LeftThumb;}break;
+                    case VK_PAD_RTHUMB_PRESS:{KeyToProcess = GamepadKey_RightThumb;}break;
+                }
                 
-                Win32ProcessKey(Key, IsDown, 0);
+                b32 IsDown = (Keystroke.Flags & (XINPUT_KEYSTROKE_KEYDOWN | 
+                                                 XINPUT_KEYSTROKE_REPEAT)) != 0;
+                
+                if(KeyToProcess != -1){
+                    Win32ProcessKey(&Controller->Keys[KeyToProcess].Key, IsDown, 0);
+                }
             }
         }
         else {
@@ -1966,22 +1980,40 @@ Win32ProcessInput(input_state* Input)
         for(int ButIndex = 0; ButIndex < Button_Count; ButIndex++){
             button_state* But = &Cont->Buttons[ButIndex];
             
+            key_state* ActiveKey = 0;
+            
             for(int ButKeyIndex = 0; 
                 ButKeyIndex < But->KeyCount; 
                 ButKeyIndex++)
             {
-                key_state* CorrespondingKey = &Input->Keyboard.KeyStates[But->Keys[ButKeyIndex]];
+                key_state* CorrespondingKey = 0;
                 
-                if(CorrespondingKey->TransitionHappened){
-                    But->ActiveKeyIndex = ButKeyIndex;
+                u32 KeyIndex = But->Keys[ButKeyIndex];
+                
+                switch(Cont->ControllerSource){
+                    case InputControllerSource_Keyboard:{
+                        CorrespondingKey = &Input->Keyboard.KeyStates[KeyIndex];
+                    }break;
+                    case InputControllerSource_Gamepad:{
+                        CorrespondingKey =
+                            &Input->GamepadControllers[Cont->GamepadIndex].Keys[KeyIndex].Key;
+                    }break;
+                }
+                
+                if(CorrespondingKey){
+                    if(!ActiveKey){
+                        ActiveKey = CorrespondingKey;
+                    }
                     
-                    break;
+                    if(CorrespondingKey->TransitionHappened){
+                        ActiveKey = CorrespondingKey;
+                        
+                        break;
+                    }
                 }
             }
             
-            if(But->KeyCount){
-                
-                key_state* ActiveKey = &Input->Keyboard.KeyStates[But->Keys[But->ActiveKeyIndex]];
+            if(But->KeyCount && ActiveKey){
                 
                 But->EndedDown = ActiveKey->EndedDown;
                 But->TransitionHappened = ActiveKey->TransitionHappened;
