@@ -502,13 +502,13 @@ assets* Assets)
     Gui->colors[GuiColor_Hot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
     Gui->colors[GuiColor_Active] = GUI_GETCOLOR_COLSYS(Color_Red);
     
-    Gui->colors[GuiColor_ButtonBackground] = GUI_COLORHEX("#337733");
+    Gui->colors[GuiColor_ButtonBackground] = GUI_GETCOLOR_COLSYS(Color_PrettyBlue);
     Gui->colors[GuiColor_ButtonBackgroundHot] = GUI_GETCOLOR_COLSYS(Color_Cyan);
     Gui->colors[GuiColor_ButtonForeground] = GUI_GETCOLOR_COLSYS(Color_White);
     Gui->colors[GuiColor_ButtonForegroundHot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
     Gui->colors[GuiColor_ButtonForegroundDisabled] = Gui->colors[GuiColor_ButtonForeground] * 0.75f;
-    Gui->colors[GuiColor_ButtonGrad1] = ColorFromHex("#ffe000");
-    Gui->colors[GuiColor_ButtonGrad2] = ColorFromHex("#799f0c");
+    Gui->colors[GuiColor_ButtonGrad1] = GUI_GETCOLOR_COLSYS(Color_PrettyBlue);
+    Gui->colors[GuiColor_ButtonGrad2] = GUI_GETCOLOR_COLSYS(Color_Blue);
     
     Gui->windowAlpha = 0.85f;
     Gui->colors[GuiColor_WindowBackground] = V4(0.0f, 0.0f, 0.0f, Gui->windowAlpha);
