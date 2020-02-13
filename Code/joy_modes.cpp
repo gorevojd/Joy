@@ -45,9 +45,12 @@ GAME_MODE_UPDATE(TestUpdate){
         CamSpeed *= 8.0f;
     }
     
+    float DeltaMouseX = GetMoveAxis(Game->Input, MoveAxis_MouseX) * State->MouseSencitivity;
+    float DeltaMouseY = GetMoveAxis(Game->Input, MoveAxis_MouseY) * State->MouseSencitivity;
+    
     UpdateCameraRotation(Camera, 
-                         Game->Input->MouseDeltaP.y * State->MouseSencitivity, 
-                         Game->Input->MouseDeltaP.x * State->MouseSencitivity,
+                         DeltaMouseY, 
+                         DeltaMouseX,
                          0.0f);
     
     v3 MoveVector = GetMoveVector(Game->Input, -1);
@@ -90,6 +93,16 @@ GAME_MODE_UPDATE(TestUpdate){
     
     GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
     GuiText(Game->Gui, CameraInfo);
+    
+    char MouseInfo[256];
+    stbsp_sprintf(MouseInfo,
+                  "Delta mouse X: %.2f", 
+                  DeltaMouseX);
+    GuiText(Game->Gui, MouseInfo);
+    stbsp_sprintf(MouseInfo, 
+                  "Delta mouse Y: %.2f",
+                  DeltaMouseY);
+    GuiText(Game->Gui, MouseInfo);
     
     if(ButIsDown(Game->Input, Button_Left)){
         GuiText(Game->Gui, "Left");

@@ -1997,7 +1997,8 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
             
             char TmpBuf[256];
             *CaretP += 
-                InsertStringToString(Buf, TmpBuf, BufSize, 
+                InsertStringToString(Buf, BufSize,
+                                     TmpBuf, 256,
                                      *CaretP, 
                                      FrameInputProcessed);
             
@@ -2046,7 +2047,7 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
             if(KeyIsDown(Gui->Input, Key_Delete)){
                 if(KeyIsDown(Gui->Input, Key_Control)){
                     for(int i = 0; i < Gui->Input->Keyboard.KeyStates[Key_Backspace].RepeatCount; i++){
-                        //f***CaretP += EraseToNonLetterNext(Buf, *CaretP);
+                        //CaretP += EraseToNonLetterNext(Buf, *CaretP);
                     }
                 }
                 else{

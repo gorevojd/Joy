@@ -9,6 +9,14 @@
 #define INPUT_PLATFORM_PROCESS(name) void name()
 typedef INPUT_PLATFORM_PROCESS(input_platform_process);
 
+enum move_axis_type{
+    MoveAxis_Horizontal,
+    MoveAxis_Vertical,
+    
+    MoveAxis_MouseX,
+    MoveAxis_MouseY,
+};
+
 enum KeyType{
     KeyMouse_Left,
     KeyMouse_Right,
@@ -195,6 +203,11 @@ enum button_type{
     Button_OK,
     Button_Back,
     
+    Button_MouseLeft,
+    Button_MouseRight,
+    Button_MouseUp,
+    Button_MouseDown,
+    
     Button_Count,
 };
 
@@ -237,6 +250,10 @@ struct input_state{
     mem_region* Region;
     
     keyboard_controller Keyboard;
+    
+    float LeftStickMultiplier;
+    float RightStickMultiplier;
+    float KeyboardMouseMultiplier;
     
 #define MAX_GAMEPAD_COUNT 4
     gamepad_controller GamepadControllers[MAX_GAMEPAD_COUNT];
@@ -453,5 +470,8 @@ inline b32 MouseRightWentDownInRect(input_state* input, rc2 rect) {
 
 void InitInput(input_state* Input);
 v3 GetMoveVector(input_state* Input, int ControllerIndex);
+
+float GetMoveAxisOnController(input_state* Input, int ControllerIndex, u32 Axis);
+float GetMoveAxis(input_state* Input, u32 Axis);
 
 #endif

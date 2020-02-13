@@ -28,9 +28,205 @@ INTERNAL_FUNCTION inline void MapGamepadOnInputController(input_state* Input, in
     _AddKeyToButOnCont(Cont, Button_Right, GamepadKey_DpadRight);
 }
 
+INTERNAL_FUNCTION inline float GetMoveValueFromButtons(input_state* Input, 
+                                                       int ControllerIndex, 
+                                                       u32 Axis, 
+                                                       b32* OutGot)
+{
+    b32 InternalGot = 0;
+    
+    float Result = 0.0f;
+    
+    float MoveValue = 0.0f;
+    if(Axis == MoveAxis_Horizontal){
+        if(ButIsDownOnController(Input, ControllerIndex, Button_Left))
+        {
+            MoveValue += 1.0f;
+            InternalGot = JOY_TRUE;
+        }
+        
+        if(ButIsDownOnController(Input, ControllerIndex, Button_Right))
+        {
+            MoveValue += -1.0f;
+            InternalGot = JOY_TRUE;
+        }
+    }
+    else if(Axis == MoveAxis_Vertical){
+        if(ButIsDownOnController(Input, ControllerIndex, Button_Up))
+        {
+            MoveValue += 1.0f;
+            InternalGot = JOY_TRUE;
+        }
+        
+        if(ButIsDownOnController(Input, ControllerIndex, Button_Down))
+        {
+            MoveValue += -1.0f;
+            InternalGot = JOY_TRUE;
+        }
+        
+    }
+    else if(Axis == MoveAxis_MouseX){
+        if(ButIsDownOnController(Input, ControllerIndex, Button_MouseLeft))
+        {
+            MoveValue += 1.0f;
+            InternalGot = JOY_TRUE;
+        }
+        
+        if(ButIsDownOnController(Input, ControllerIndex, Button_MouseRight))
+        {
+            MoveValue += -1.0f;
+            InternalGot = JOY_TRUE;
+        }
+    }
+    else if(Axis == MoveAxis_MouseY){
+        if(ButIsDownOnController(Input, ControllerIndex, Button_MouseUp))
+        {
+            MoveValue += 1.0f;
+            InternalGot = JOY_TRUE;
+        }
+        
+        if(ButIsDownOnController(Input, ControllerIndex, Button_MouseDown))
+        {
+            MoveValue += -1.0f;
+            InternalGot = JOY_TRUE;
+        }
+    }
+    
+    if(OutGot){
+        *OutGot = InternalGot;
+    }
+    Result = MoveValue;
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline float _GetMoveAxisOnController(input_state* Input, input_controller* Cont, int ControllerIndex, u32 Axis, b32* OutIfGot)
+{
+    float Result = 0.0f;
+    
+    b32 Got = JOY_FALSE;
+    
+    if(!Cont){
+        Cont = &Input->Controllers[ControllerIndex];
+    }
+    
+    if(Axis == MoveAxis_Horizontal ||
+       Axis == MoveAxis_Vertical)
+    {
+        switch(Cont->ControllerSource){
+            case InputControllerSource_Gamepad:{
+                gamepad_stick* PadStick = &Input->GamepadControllers[Cont->GamepadIndex].LeftStick;
+                
+                if(Axis == MoveAxis_Horizontal){
+                    Result = -PadStick->Direction.x * PadStick->Magnitude * Input->LeftStickMultiplier;
+                }
+                else if(Axis == MoveAxis_Vertical){
+                    Result = PadStick->Direction.y * PadStick->Magnitude * Input->LeftStickMultiplier;
+                }
+                
+                b32 InternalGot = JOY_FALSE;
+                float MoveValue = GetMoveValueFromButtons(Input, 
+                                                          ControllerIndex, 
+                                                          Axis, 
+                                                          &InternalGot);
+                if(InternalGot){
+                    Result = MoveValue;
+                }
+                
+                Got = JOY_TRUE;
+            }break;
+            
+            case InputControllerSource_Keyboard:{
+                float MoveValue = GetMoveValueFromButtons(Input, ControllerIndex, Axis, &Got);
+                
+                if(Got){
+                    Result = MoveValue;
+                }
+            }break;
+        }
+    }
+    else if ((Axis == MoveAxis_MouseX) ||
+             (Axis == MoveAxis_MouseY))
+    {
+        switch(Cont->ControllerSource){
+            case InputControllerSource_Gamepad:{
+                gamepad_stick* PadStick = &Input->GamepadControllers[Cont->GamepadIndex].RightStick;
+                
+                if(PadStick->Magnitude > 0.0f){
+                    if(Axis == MoveAxis_MouseX){
+                        Result = -PadStick->Direction.x * PadStick->Magnitude * Input->RightStickMultiplier;
+                    }
+                    else if(Axis == MoveAxis_MouseY){
+                        Result = -PadStick->Direction.y * PadStick->Magnitude * Input->RightStickMultiplier;
+                    }
+                    
+                    Got = JOY_TRUE;
+                }
+                
+            }break;
+            
+            case InputControllerSource_Keyboard:{
+                
+                if((Axis == MoveAxis_MouseX) && (Abs(Input->MouseDeltaP.x) > 0.0f)){
+                    Result = Input->MouseDeltaP.x;
+                    
+                    Got = JOY_TRUE;
+                }
+                else if((Axis == MoveAxis_MouseY) && (Abs(Input->MouseDeltaP.y) > 0.0f)){
+                    Result = Input->MouseDeltaP.y;
+                    
+                    Got = JOY_TRUE;
+                }
+                
+                b32 InternalGot = JOY_FALSE;
+                float ButMove = GetMoveValueFromButtons(Input, ControllerIndex, Axis, &InternalGot);
+                
+                if(InternalGot){
+                    Result += -ButMove * Input->KeyboardMouseMultiplier;
+                    Got = JOY_TRUE;
+                }
+            }break;
+        }
+    }
+    
+    if(OutIfGot){
+        *OutIfGot = Got;
+    }
+    
+    return(Result);
+}
+
+float GetMoveAxisOnController(input_state* Input, int ControllerIndex, u32 Axis){
+    input_controller* Cont = &Input->Controllers[ControllerIndex];
+    
+    float Result = _GetMoveAxisOnController(Input, Cont, ControllerIndex, Axis, 0);
+    
+    return(Result);
+}
+
+float GetMoveAxis(input_state* Input, u32 Axis){
+    float Result = 0.0f;
+    
+    for(int ControllerIndex = 0; ControllerIndex < MAX_CONTROLLER_COUNT; ControllerIndex++){
+        input_controller* Cont = &Input->Controllers[ControllerIndex];
+        
+        b32 Got = JOY_FALSE;
+        float MoveValue = _GetMoveAxisOnController(Input, Cont, ControllerIndex, Axis, &Got);
+        if(Got){
+            Result = MoveValue;
+            break;
+        }
+    }
+    
+    return(Result);
+}
 
 void InitInput(input_state* Input)
 {
+    Input->LeftStickMultiplier = 1.0f;
+    Input->RightStickMultiplier = 1.0f;
+    Input->KeyboardMouseMultiplier = 1.0f;
+    
     for(int ControllerIndex = 0; 
         ControllerIndex < MAX_CONTROLLER_COUNT;
         ControllerIndex++)
@@ -54,6 +250,8 @@ void InitInput(input_state* Input)
         CopyStrings(Pad->Keys[GamepadKey_RightThumb].Name, "RightThumb");
         CopyStrings(Pad->Keys[GamepadKey_LeftShoulder].Name, "LeftShoulder");
         CopyStrings(Pad->Keys[GamepadKey_RightShoulder].Name, "RightShoulder");
+        CopyStrings(Pad->Keys[GamepadKey_LeftTrigger].Name, "LeftTrigger");
+        CopyStrings(Pad->Keys[GamepadKey_RightTrigger].Name, "RightTrigger");
         CopyStrings(Pad->Keys[GamepadKey_A].Name, "A");
         CopyStrings(Pad->Keys[GamepadKey_B].Name, "B");
         CopyStrings(Pad->Keys[GamepadKey_X].Name, "X");
@@ -75,6 +273,10 @@ void InitInput(input_state* Input)
     AddKeyToButtonOnController(Input, 0, Button_Jump, Key_Space);
     AddKeyToButtonOnController(Input, 0, Button_Reload, Key_R);
     AddKeyToButtonOnController(Input, 0, Button_Interact, Key_F);
+    AddKeyToButtonOnController(Input, 1, Button_MouseLeft, Key_Left);
+    AddKeyToButtonOnController(Input, 1, Button_MouseRight, Key_Right);
+    AddKeyToButtonOnController(Input, 1, Button_MouseUp, Key_Up);
+    AddKeyToButtonOnController(Input, 1, Button_MouseDown, Key_Down);
     
     // TODO(Dima): Add some others for this controller
     AddKeyToButtonOnController(Input, 1, Button_Left, Key_Left);
@@ -84,83 +286,36 @@ void InitInput(input_state* Input)
     AddKeyToButtonOnController(Input, 1, Button_Interact, Key_Return);
 }
 
-
 // NOTE(Dima): If ControllerIndex passed as -1 then all controllers info collected
 v3 GetMoveVector(input_state* Input, int ControllerIndex){
     v3 MoveVector = {};
     
     input_controller* Cont = 0;
     
-    if(ControllerIndex >= 0){
+    if((ControllerIndex >= 0) && 
+       (ControllerIndex < MAX_CONTROLLER_COUNT))
+    {
         Cont = &Input->Controllers[ControllerIndex];
     }
     
     if(Cont){
-        if(Cont->ControllerSource == InputControllerSource_Gamepad){
-            gamepad_stick* PadStick = &Input->GamepadControllers[Cont->GamepadIndex].LeftStick;
-            v2 Stick = PadStick->Direction * PadStick->Magnitude;
-            
-            MoveVector = V3(-Stick.x, 0.0f, Stick.y);
-        }
-        else if(Cont->ControllerSource == InputControllerSource_Keyboard){
-            if(ButIsDownOnController(Input, ControllerIndex, Button_Left))
-            {
-                MoveVector.x += 1.0f;
-            }
-            
-            if(ButIsDownOnController(Input, ControllerIndex, Button_Right))
-            {
-                MoveVector.x += -1.0f;
-            }
-            
-            if(ButIsDownOnController(Input, ControllerIndex, Button_Up))
-            {
-                MoveVector.z += 1.0f;
-            }
-            
-            if(ButIsDownOnController(Input, ControllerIndex, Button_Down))
-            {
-                MoveVector.z += -1.0f;
-            }
-        }
+        float Horizontal = GetMoveAxisOnController(
+            Input, 
+            ControllerIndex, 
+            MoveAxis_Horizontal);
+        float Vertical = GetMoveAxisOnController(
+            Input, 
+            ControllerIndex, 
+            MoveAxis_Vertical);
+        
+        MoveVector = V3(Horizontal, 0.0f, Vertical);
     }
     else{
-        v2 SumStickMove = {};
-        for(int ContIndex = 0; ContIndex < MAX_CONTROLLER_COUNT; ContIndex++){
-            
-            input_controller* Cont = &Input->Controllers[ContIndex];
-            
-            if(Cont->ControllerSource == InputControllerSource_Gamepad){
-                
-                gamepad_controller* Pad = GetGamepad(Input, Cont->GamepadIndex);
-                
-                SumStickMove += Pad->LeftStick.Direction;
-            }
-        }
         
-        SumStickMove = NOZ(SumStickMove);
+        float Horizontal = GetMoveAxis(Input, MoveAxis_Horizontal);
+        float Vertical = GetMoveAxis(Input, MoveAxis_Vertical);
         
-        MoveVector = V3(-SumStickMove.x, 0.0f, SumStickMove.y);
-        
-        if(ButIsDown(Input, Button_Left))
-        {
-            MoveVector.x += 1.0f;
-        }
-        
-        if(ButIsDown(Input, Button_Right))
-        {
-            MoveVector.x += -1.0f;
-        }
-        
-        if(ButIsDown(Input, Button_Up))
-        {
-            MoveVector.z += 1.0f;
-        }
-        
-        if(ButIsDown(Input, Button_Down))
-        {
-            MoveVector.z += -1.0f;
-        }
+        MoveVector = V3(Horizontal, 0.0f, Vertical);
     }
     
     MoveVector = NOZ(MoveVector);

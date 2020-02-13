@@ -253,8 +253,10 @@ inline void IntegerToString(int Value, char* String) {
 NOTE(Dima): Tmp must be the same size as Dst
 This function returns the advance for the caret
 */
-inline int InsertStringToString(char* Dst, char* Tmp, 
+inline int InsertStringToString(char* Dst, 
                                 int DstMaxSize, 
+                                char* Tmp, 
+                                int TmpMaxSize,
                                 int CaretPos, char* Src)
 {
     int DstLen = StringLength(Dst);
@@ -266,10 +268,12 @@ inline int InsertStringToString(char* Dst, char* Tmp,
     char* SecondPart = Dst + CaretPos;
     int SecondPartLen = DstLen - CaretPos;
     
-    CopyStrings(Tmp, SecondPart);
-    
     // NOTE(Dima): If we can insert
     if(DstLen + SrcLen < (DstMaxSize - 1)){
+        
+        ASSERT(TmpMaxSize > SecondPartLen);
+        CopyStrings(Tmp, SecondPart);
+        
         // NOTE(Dima): Copy from source after first part
         CopyStrings(Dst + FirstPartLen, Src);
         
@@ -455,7 +459,7 @@ inline int EraseToNonLetterPrev(char* Dst, int CaretP){
         int DstLen = StringLength(Dst);
         
         int i = 0;
-        for(i; i < DstLen - Diff; i++){
+        for(i; i < Diff; i++){
             Dst[CaretP - Diff + i] = Dst[CaretP + i];
         }
         Dst[CaretP - Diff + i] = 0;

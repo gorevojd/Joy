@@ -1104,7 +1104,7 @@ HGLRC Win32InitOpenGL(HDC realDC){
     BOOL MakeCurrentResult = wglMakeCurrent(realDC, resCtx);
     Assert(MakeCurrentResult);
     
-    wglSwapIntervalEXT(0);
+    wglSwapIntervalEXT(1);
     
     Win32GetOpenglFunctions();
     
