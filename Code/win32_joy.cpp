@@ -8,6 +8,8 @@
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
 
+#include "joy_profiler_interface.h"
+
 /*
 TODO(Dima):
 Assets:
@@ -19,6 +21,7 @@ Software 3d renderer
 dima privet , kak dela? i tebia lybly
 */
 
+
 GLOBAL_VARIABLE mem_region gMem = {};
 GLOBAL_VARIABLE win_state GlobalWin32;
 GLOBAL_VARIABLE b32 GlobalRunning;
@@ -29,6 +32,9 @@ GLOBAL_VARIABLE game_state* GlobalGame;
 GLOBAL_VARIABLE float Time = 0.0f;
 GLOBAL_VARIABLE float DeltaTime = 0.0f;
 
+#if PROF_ENABLED
+prof_record_table* GlobalRecordTable;
+#endif
 
 #if JOY_USE_OPENGL
 GLOBAL_VARIABLE gl_state GlobalGL;
@@ -1104,7 +1110,7 @@ HGLRC Win32InitOpenGL(HDC realDC){
     BOOL MakeCurrentResult = wglMakeCurrent(realDC, resCtx);
     Assert(MakeCurrentResult);
     
-    wglSwapIntervalEXT(1);
+    wglSwapIntervalEXT(0);
     
     Win32GetOpenglFunctions();
     
@@ -1855,7 +1861,7 @@ Win32ProcessInput(input_state* Input)
     Input->MouseP = MouseP;
     Input->MouseDeltaPActual = MouseActualDelta;
     Input->MouseDeltaP = Input->MouseDeltaPActual;
-    Input->MouseDeltaP.y = -Input->MouseDeltaP.y;
+    //Input->MouseDeltaP.y = -Input->MouseDeltaP.y;
     Input->MouseDeltaP = -Input->MouseDeltaP;
     
     // NOTE(Dima): Processing gamepads
@@ -2294,6 +2300,29 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     platform.MemFree = Win32MemFree;
     platform.MemZero = Win32MemZero;
     
+    // NOTE(Dima): Initializing memory sentinel
+    GlobalWin32.memorySentinel = {};
+    GlobalWin32.memorySentinel.Prev = &GlobalWin32.memorySentinel;
+    GlobalWin32.memorySentinel.Next = &GlobalWin32.memorySentinel;
+    
+#if PROF_ENABLED
+    // NOTE(Dima): Initializing global record table if needed
+    mem_region ProfTableMem = {};
+	GlobalRecordTable = PushStruct(&ProfTableMem, prof_record_table);
+    
+	//NOTE(dima): Initializing of debug layer global record table
+	ProfSetRecording(1);
+	ProfSetLogRecording(1);
+    
+	for (int ProfLogIndex = 0;
+         ProfLogIndex < PROF_LOGS_COUNT;
+         ProfLogIndex++)
+	{
+		GlobalRecordTable->LogsInited[ProfLogIndex] = 0;
+		GlobalRecordTable->LogsTypes[ProfLogIndex] = 0;
+	}
+#endif
+    
     // TODO(Dima): Add array of count Renderer_Count and init all renderers
     // TODO(Dima): Or leave if not supported
     // NOTE(Dima): Init render API
@@ -2312,11 +2341,6 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     // NOTE(Dima): Calculating perfomance frequency
     QueryPerformanceFrequency(&GlobalWin32.PerformanceFreqLI);
     GlobalWin32.OneOverPerformanceFreq = 1.0 / (double)GlobalWin32.PerformanceFreqLI.QuadPart;
-    
-    // NOTE(Dima): Initializing memory sentinel
-    GlobalWin32.memorySentinel = {};
-    GlobalWin32.memorySentinel.Prev = &GlobalWin32.memorySentinel;
-    GlobalWin32.memorySentinel.Next = &GlobalWin32.memorySentinel;
     
     // NOTE(Dima): Init win32 debug output log func
     if(IsDebuggerPresent()){

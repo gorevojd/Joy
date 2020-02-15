@@ -215,5 +215,8 @@ void RenderEndFrame(render_state* render){
         *Pass = {};
     }
     
+    // NOTE(Dima): Clearing all GUI chunks
+    render->GuiGeom.CurChunkIndex = 0;
+    
     render->PassCount = 0;
 }

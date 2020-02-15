@@ -29,6 +29,19 @@ enum render_gui_geom_type{
     RenderGuiGeom_Bmp,
 };
 
+#define DEFERRED_GUI_GEOMETRY_RENDERING 1
+
+#define MAX_CLIP_RECT_STACK_DEPTH 32
+#define MAX_GUI_CHUNKS 1024
+
+struct render_gui_chunk{
+    int BaseVertex;
+    int IndicesCount;
+    int StartIndicesCount;
+    
+    rc2 ClipRect;
+};
+
 struct render_gui_geom{
     render_gui_geom_vertex* Vertices;
     u32* Indices;
@@ -40,6 +53,12 @@ struct render_gui_geom{
     int MaxVerticesCount;
     int MaxIndicesCount;
     int MaxTriangleGeomTypesCount;
+    
+    rc2 ClipRectStack[MAX_CLIP_RECT_STACK_DEPTH];
+    int ClipRectStackIndex;
+    
+    render_gui_chunk Chunks[MAX_GUI_CHUNKS];
+    int CurChunkIndex;
 };
 
 struct render_frame_info{
@@ -439,6 +458,67 @@ inline void PushMesh(render_stack* Stack,
     
     entry->Mesh = Mesh;
     entry->Transform = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
+}
+
+inline void PushGuiChunk(render_stack* Stack, int ChunkIndex){
+    render_entry_gui_chunk* Entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_GuiChunk, render_entry_gui_chunk);
+    
+    Entry->ChunkIndex = ChunkIndex;
+}
+
+inline void BeginGuiChunk(render_stack* Stack, rc2 ClipRect){
+    render_gui_geom* Geom = &Stack->Render->GuiGeom;
+    
+    int CurIndex = Geom->CurChunkIndex;
+    render_gui_chunk* CurChunk = &Geom->Chunks[CurIndex];
+    
+    CurChunk->IndicesCount = Geom->IndicesCount - CurChunk->StartIndicesCount;
+    if(CurChunk->IndicesCount > 0){
+        PushGuiChunk(Stack, CurIndex);
+    }
+    
+    // NOTE(Dima): Advancing current chunk index
+    ASSERT(CurIndex + 1 < MAX_GUI_CHUNKS);
+    Geom->CurChunkIndex = CurIndex + 1;
+    
+    // NOTE(Dima): Setting new chunk
+    render_gui_chunk* NewChunk = &Geom->Chunks[Geom->CurChunkIndex];
+    NewChunk->IndicesCount = 0;
+    NewChunk->BaseVertex = Geom->VerticesCount;
+    NewChunk->ClipRect = ClipRect;
+    NewChunk->StartIndicesCount = Geom->IndicesCount;
+    
+    // NOTE(Dima): Adding new clip rect to stack
+    ++Geom->ClipRectStackIndex;
+    ASSERT(Geom->ClipRectStackIndex < MAX_CLIP_RECT_STACK_DEPTH);
+    Geom->ClipRectStack[Geom->ClipRectStackIndex] = ClipRect;
+}
+
+inline void EndGuiChunk(render_stack* Stack){
+    render_gui_geom* Geom = &Stack->Render->GuiGeom;
+    
+    int CurIndex = Geom->CurChunkIndex;
+    render_gui_chunk* CurChunk = &Geom->Chunks[CurIndex];
+    
+    CurChunk->IndicesCount = Geom->IndicesCount - CurChunk->StartIndicesCount;
+    if(CurChunk->IndicesCount > 0){
+        PushGuiChunk(Stack, CurIndex);
+    }
+    
+    // NOTE(Dima): Popping last value from ClipRect's stack
+    ASSERT(Geom->ClipRectStackIndex > 0);
+    --Geom->ClipRectStackIndex;
+    
+    // NOTE(Dima): Advancing current chunk index
+    ASSERT(CurIndex + 1 < MAX_GUI_CHUNKS);
+    Geom->CurChunkIndex = CurIndex + 1;
+    
+    // NOTE(Dima): Setting new chunk
+    render_gui_chunk* NewChunk = &Geom->Chunks[Geom->CurChunkIndex];
+    NewChunk->IndicesCount = 0;
+    NewChunk->BaseVertex = Geom->VerticesCount;
+    NewChunk->ClipRect = Geom->ClipRectStack[Geom->ClipRectStackIndex];
+    NewChunk->StartIndicesCount = Geom->IndicesCount;
 }
 
 // NOTE(Dima): RENDERER API

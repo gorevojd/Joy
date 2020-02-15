@@ -456,13 +456,12 @@ inline int EraseToNonLetterPrev(char* Dst, int CaretP){
     int Diff = CaretP - FoundIndex;
     
     if(Diff){
-        int DstLen = StringLength(Dst);
-        
-        int i = 0;
-        for(i; i < Diff; i++){
-            Dst[CaretP - Diff + i] = Dst[CaretP + i];
+        char *AtSrc = Dst + CaretP;
+        char *AtDst = Dst + CaretP - Diff;
+        while(*AtSrc){
+            *AtDst++ = *AtSrc++;
         }
-        Dst[CaretP - Diff + i] = 0;
+        *AtDst = 0;
     }
     
     return(-(Diff));

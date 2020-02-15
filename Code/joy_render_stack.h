@@ -15,6 +15,7 @@ enum render_entry_type{
     RenderEntry_Glyph,
     RenderEntry_Gradient,
     RenderEntry_GuiGeom,
+    RenderEntry_GuiChunk,
 };
 
 struct render_entry_header{
@@ -92,6 +93,11 @@ struct render_entry_mesh{
     
     m44 Transform;
 };
+
+struct render_entry_gui_chunk{
+    int ChunkIndex;
+};
+
 #pragma pack(pop)
 
 inline void* RenderPushMem(render_stack* stack, mi size, mi align = 8){

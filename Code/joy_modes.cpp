@@ -24,7 +24,6 @@ struct test_game_mode_state{
 GAME_MODE_UPDATE(TestUpdate){
     GAME_GET_MODE_STATE(test_game_mode_state, State);
     
-    
     if(!State->Initialized){
         
         State->Camera = {};
@@ -49,7 +48,7 @@ GAME_MODE_UPDATE(TestUpdate){
     float DeltaMouseY = GetMoveAxis(Game->Input, MoveAxis_MouseY) * State->MouseSencitivity;
     
     UpdateCameraRotation(Camera, 
-                         DeltaMouseY, 
+                         -DeltaMouseY, 
                          DeltaMouseX,
                          0.0f);
     

@@ -39,6 +39,8 @@ struct mem_box{
     mem_entry* First;
     
     mem_region* Region;
+    
+    mem_box* NextBox;
 };
 
 #define MINIMUM_MEMORY_REGION_SIZE Mibibytes(1)

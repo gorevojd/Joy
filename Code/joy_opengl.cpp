@@ -712,6 +712,8 @@ void GlOutputRender(gl_state* GL, render_state* Render){
             GlOutputPass(GL, &Render->Passes[i]);
         }
         
+        glEnable(GL_SCISSOR_TEST);
+        
         glBindVertexArray(GL->GuiGeomVAO);
         GlBindBufferAndFill(GL_ARRAY_BUFFER,
                             GL_DYNAMIC_DRAW,
@@ -749,9 +751,44 @@ void GlOutputRender(gl_state* GL, render_state* Render){
         glUniform1i(GL->GuiGeomShader.TriangleGeomTypesLoc, 1);
         
         glBindVertexArray(GL->GuiGeomVAO);
+        
+#if DEFERRED_GUI_GEOMETRY_RENDERING
+#if 1
+        for(int ChunkIndex = 0;
+            ChunkIndex < Render->GuiGeom.CurChunkIndex;
+            ChunkIndex++)
+        {
+            render_gui_chunk* CurChunk = &Render->GuiGeom.Chunks[ChunkIndex];
+            
+            if(CurChunk->IndicesCount){
+                
+                v2 ClipDim = GetRectDim(CurChunk->ClipRect);
+                rc2 ClipRect = BottomLeftToTopLeftRectange(CurChunk->ClipRect,
+                                                           Render->FrameInfo.Height);
+                
+                
+                glScissor(ClipRect.min.x,
+                          ClipRect.min.y,
+                          ClipDim.x,
+                          ClipDim.y);
+                
+                glDrawElementsBaseVertex(GL_TRIANGLES,
+                                         CurChunk->IndicesCount,
+                                         GL_UNSIGNED_INT,
+                                         0,
+                                         CurChunk->BaseVertex);
+            }
+        }
+#elif
         glDrawElements(GL_TRIANGLES, Render->GuiGeom.IndicesCount, GL_UNSIGNED_INT, 0);
+#endif
+#endif
+        
+        
         glBindVertexArray(0);
         
         glDeleteTextures(1, &TexBufTex);
+        
+        glDisable(GL_SCISSOR_TEST);
     }
 }

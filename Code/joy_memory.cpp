@@ -192,9 +192,9 @@ u32 RequestMemorySize)
             break;
         }
         
-        
         At = At->Next;
     }
+    
     
     if (Result) {
         Result->State = MemoryEntry_Used;
@@ -230,6 +230,8 @@ mem_box InitMemoryBox(mem_region* Region, u32 BoxSizeInBytes){
     Result.First->Prev = 0;
     Result.First->Data = PushSomeMem(Region, BoxSizeInBytes, 16);
     Result.First->DataSize = BoxSizeInBytes;
+    
+    Result.NextBox = 0;
     
     return(Result);
 }

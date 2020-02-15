@@ -1457,4 +1457,16 @@ float scrW, float scrH)
     return(Result);
 }
 
+inline rc2 BottomLeftToTopLeftRectange(rc2 Rect, float ScreenHeight)
+{
+    rc2 Result = {};
+    
+    Result.min.x = Rect.min.x;
+    Result.max.x = Rect.max.x;
+    Result.min.y = ScreenHeight - Rect.max.y;
+    Result.max.y = ScreenHeight - Rect.min.y;
+    
+    return(Result);
+}
+
 #endif

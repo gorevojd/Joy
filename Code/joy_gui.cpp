@@ -814,6 +814,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
     
     if(layoutType == GuiLayout_Window){
         
+        
         Gui_Empty_Interaction Interaction(layoutElem);
         
 #if 1    
@@ -837,6 +838,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
 #endif
         
         rc2 windowRc = RcMinDim(layout->Start, layout->Dim);
+        
         PushRect(Gui->Stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
         
         v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
@@ -888,6 +890,9 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
         
         // NOTE(Dima): Pushing inner outline
         PushRectOutline(Gui->Stack, windowRc, 2, outlineColor);
+        
+        // NOTE(Dima): Beginning GUI chunk
+        BeginGuiChunk(Gui->Stack, windowRc);
     }
 }
 
@@ -928,6 +933,10 @@ void GuiEndLayout(gui_state* Gui){
     Gui_Layout* lay = GetParentLayout(Gui);
     
     lay->At = lay->Start;
+    
+    if(lay->Type == GuiLayout_Window){
+        EndGuiChunk(Gui->Stack);
+    }
     
     GuiEndElement(Gui, GuiElement_Layout);
 }
@@ -1077,11 +1086,17 @@ void GuiFrameBegin(gui_state* Gui, gui_frame_info GuiFrameInfo){
     Gui->dimStackIndex = 0;
     Gui->inPushBlock = 0;
     
+    // NOTE(Dima): Beginning GUI chunk
+    BeginGuiChunk(GuiFrameInfo.Stack, 
+                  RcMinDim(V2(0.0f, 0.0f), 
+                           V2(GuiFrameInfo.Width, GuiFrameInfo.Height)));
+    
     // NOTE(Dima): Init root layout
     Gui_Element* layoutElem = GuiBeginElement(Gui, 
                                               Gui->rootLayout.Name, 
                                               GuiElement_Layout, 
                                               JOY_TRUE);
+    
     GuiInitLayout(Gui, &Gui->rootLayout, GuiLayout_Layout, layoutElem);
 }
 
@@ -1098,6 +1113,10 @@ void GuiFramePrepare4Render(gui_state* Gui){
         PrintText(Gui, ttip->text, ttip->at, GUI_GETCOLOR(GuiColor_Text), 1.0f);
     }
     Gui->tooltipIndex = 0;
+    
+    
+    // NOTE(Dima): End GUI chunk
+    EndGuiChunk(Gui->Stack);
 }
 
 
@@ -1957,7 +1976,7 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
         rc2 textRc = GetTextRect(Gui, 
                                  "                            ", 
                                  layout->At);
-        textRc = GetTxtElemRect(Gui, layout, textRc, V2(4.0f, 3.0f));
+        textRc = GetTxtElemRect(Gui, layout, textRc, V2(4.0f, 6.0f));
         GuiPushBut(Gui, textRc, PushBut_AlphaBlack);
         
         int* CaretP = &elem->data.InputText.CaretPos;
@@ -2081,12 +2100,13 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
         v2 PrintP = V2(PrintPX, PrintPY);
         v2 CaretPrintP = GetCaretPrintP(Gui, Buf, PrintP, *CaretP);
         
+        BeginGuiChunk(Gui->Stack, textRc);
         v4 CaretColor = V4(0.0f, 1.0f, 0.0f, 1.0f);
         PrintCaret(Gui, 
                    CaretPrintP,
                    CaretColor); 
         PrintText(Gui, Buf, PrintP, GUI_GETCOLOR(GuiColor_Text));
-        
+        EndGuiChunk(Gui->Stack);
         
         float nameStartY = GetCenteredTextOffsetY(Gui->mainFont, textRc, Gui->fontScale);
         v2 nameStart = V2(textRc.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f, nameStartY);

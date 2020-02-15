@@ -182,7 +182,7 @@ INTERNAL_FUNCTION inline float _GetMoveAxisOnController(input_state* Input, inpu
                 float ButMove = GetMoveValueFromButtons(Input, ControllerIndex, Axis, &InternalGot);
                 
                 if(InternalGot){
-                    Result += -ButMove * Input->KeyboardMouseMultiplier;
+                    Result += ButMove * Input->KeyboardMouseMultiplier;
                     Got = JOY_TRUE;
                 }
             }break;

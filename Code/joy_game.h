@@ -10,6 +10,7 @@
 #include "joy_assets.h"
 #include "joy_input.h"
 #include "joy_gui.h"
+#include "joy_profiler_interface.h"
 
 #include "joy_game_interface.h"
 
