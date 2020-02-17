@@ -89,6 +89,7 @@ struct Gui_Layout{
     v2 Start;
     v2 At;
     v2 Dim;
+    rc2 Rect;
     
     char Name[128];
     u32 ID;
@@ -351,6 +352,57 @@ struct gui_state{
 };
 
 
+inline Gui_Element* 
+GuiFindElementOfTypeUpInTree(Gui_Element* curElement, u32 elementType) {
+    Gui_Element* result = 0;
+    
+    Gui_Element* at = curElement;
+    while (at != 0) {
+        if (at->type == elementType) {
+            result = at;
+            break;
+        }
+        
+        at = at->parent;
+    }
+    
+    return(result);
+}
+
+
+inline Gui_Layout* GetParentLayout(gui_state* Gui){
+    Gui_Layout* res = 0;
+    
+    Gui_Element* layoutElem = GuiFindElementOfTypeUpInTree(
+        Gui->curElement, 
+        GuiElement_Layout);
+    
+    if(!layoutElem){
+        res = &Gui->rootLayout;
+    }
+    else{
+        res = layoutElem->data.Layout.ref;
+    }
+    
+    return(res);
+}
+
+inline rc2 GetParentLayoutClipRect(gui_state* Gui){
+    rc2 Result = GetParentLayout(Gui)->Rect;
+    
+    return(Result);
+}
+
+inline b32 MouseInInteractiveArea(gui_state* Gui, rc2 InteractRect){
+    b32 InRect = MouseInRect(Gui->Input, InteractRect);
+    b32 InClip = MouseInRect(Gui->Input, GetParentLayoutClipRect(Gui));
+    
+    b32 Result = InRect && InClip;
+    
+    return(Result);
+}
+
+
 inline b32 GuiIsHot(gui_state* Gui,
                     gui_interaction* interaction)
 {
@@ -366,8 +418,7 @@ inline void GuiSetHot(gui_state* Gui,
     ASSERT(Interaction);
     
     if(ToSet){
-        if((Gui->HotInteraction.ID == 0) &&
-           (Interaction->Context.Priority >= Gui->HotInteraction.Priority))
+        if(Interaction->Context.Priority >= Gui->HotInteraction.Priority)
         {
             Gui->HotInteraction = Interaction->Context;
         }
@@ -432,7 +483,7 @@ struct Gui_BoolInRect_Interaction : public gui_interaction{
         this->WasHotInInteraction = 0;
         this->WasActiveInInteraction = 0;
         
-        if(MouseInRect(Gui->Input, Rect)){
+        if(MouseInInteractiveArea(Gui, Rect)){
             GuiSetHot(Gui, this, JOY_TRUE);
             this->WasHotInInteraction = JOY_TRUE;
             
@@ -554,41 +605,6 @@ struct Gui_Move_Interaction : public gui_interaction{
 };
 
 
-
-inline Gui_Element* 
-GuiFindElementOfTypeUpInTree(Gui_Element* curElement, u32 elementType) {
-    Gui_Element* result = 0;
-    
-    Gui_Element* at = curElement;
-    while (at != 0) {
-        if (at->type == elementType) {
-            result = at;
-            break;
-        }
-        
-        at = at->parent;
-    }
-    
-    return(result);
-}
-
-
-inline Gui_Layout* GetParentLayout(gui_state* Gui){
-    Gui_Layout* res = 0;
-    
-    Gui_Element* layoutElem = GuiFindElementOfTypeUpInTree(
-        Gui->curElement, 
-        GuiElement_Layout);
-    
-    if(!layoutElem){
-        res = &Gui->rootLayout;
-    }
-    else{
-        res = layoutElem->data.Layout.ref;
-    }
-    
-    return(res);
-}
 
 inline void GuiPushDim(gui_state* Gui, v2 dim){
     ASSERT(Gui->dimStackIndex < ARRAY_COUNT(Gui->dimStack));

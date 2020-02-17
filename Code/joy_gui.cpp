@@ -783,6 +783,9 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
     if(!layoutElem->data.IsInit){
         layout->Start = V2(200.0f, 200.0f) * (Gui->layoutCount - 1);
         layout->At = layout->Start;
+        // NOTE(Dima): Layout dimension should be set anyways
+        // NOTE(Dima): because of interaction that account to them
+        layout->Dim = V2(Gui->Width, Gui->Height);
         
         switch(layoutType){
             case GuiLayout_Layout:{
@@ -797,15 +800,17 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
         layoutElem->data.IsInit = JOY_TRUE;
     }
     
+    // NOTE(Dima): Recalculate window rect always for clipping GUI interactions
+    layout->Rect = RcMinDim(layout->At, layout->Dim);
+    
     // NOTE(Dima): Initializing initial advance ctx
     layout->AdvanceRememberStack[0].type = GuiAdvanceType_Column;
     layout->AdvanceRememberStack[0].rememberValue = layout->Start.y;
     layout->AdvanceRememberStack[0].baseline = layout->Start.x;
     
     if(layoutType == GuiLayout_Window){
-        
-        
         Gui_Empty_Interaction Interaction(layoutElem);
+        Interaction.SetPriority(GUI_PRIORITY_SMALL);
         
 #if 1    
         
@@ -827,12 +832,12 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
         
 #endif
         
-        rc2 windowRc = RcMinDim(layout->Start, layout->Dim);
+        rc2 windowRc = layout->Rect;
         
         PushRect(Gui->Stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
         
         v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
-        if(MouseInRect(Gui->Input, windowRc)){
+        if(MouseInInteractiveArea(Gui, windowRc)){
             GuiSetHot(Gui, &Interaction, JOY_TRUE);
             if(GuiIsHot(Gui, &Interaction)){
                 outlineColor = GUI_GETCOLOR(GuiColor_Hot);
@@ -1452,7 +1457,7 @@ void GuiBeginTree(gui_state* Gui, char* name){
         Gui_Empty_Interaction Interaction(elem);
         Interaction.SetPriority(GUI_PRIORITY_AVG);
         
-        if(MouseInRect(Gui->Input, textRc)){
+        if(MouseInInteractiveArea(Gui, textRc)){
             GuiSetHot(Gui, &Interaction, JOY_TRUE);
             textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
@@ -1513,7 +1518,7 @@ b32 GuiButton(gui_state* Gui, char* buttonName){
         Gui_Empty_Interaction Interaction(elem);
         Interaction.SetPriority(GUI_PRIORITY_AVG);
         
-        if(MouseInRect(Gui->Input, textRc)){
+        if(MouseInInteractiveArea(Gui, textRc)){
             GuiSetHot(Gui, &Interaction, JOY_TRUE);
             textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
@@ -1730,7 +1735,6 @@ void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId) {
             isActive = 1;
         }
         
-        
         GuiPreAdvance(Gui, layout);
         
         // NOTE(Dima): Printing button and text
@@ -1750,7 +1754,7 @@ void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId) {
         
         Gui_Empty_Interaction Interaction(radioBut);
         Interaction.SetPriority(GUI_PRIORITY_AVG);
-        if (MouseInRect(Gui->Input, textRc)) {
+        if (MouseInInteractiveArea(Gui, textRc)) {
             GuiSetHot(Gui, &Interaction, JOY_TRUE);
             textC = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
@@ -1804,12 +1808,15 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
         Gui_Empty_Interaction Interaction(elem);
         Interaction.SetPriority(GUI_PRIORITY_AVG);
         
-        if(MouseInRect(Gui->Input, SlideRc)){
+        if(MouseInInteractiveArea(Gui, SlideRc)){
             GuiSetHot(Gui, &Interaction, JOY_TRUE);
             
             if(KeyWentDown(Gui->Input, MouseKey_Left)){
                 GuiSetActive(Gui, &Interaction);
             }
+        }
+        else{
+            GuiSetHot(Gui, &Interaction, JOY_FALSE);
         }
         
         if(GuiIsActive(Gui, &Interaction)){
@@ -1894,12 +1901,15 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
         Gui_Empty_Interaction Interaction(elem);
         Interaction.SetPriority(GUI_PRIORITY_AVG);
         
-        if(MouseInRect(Gui->Input, SlideRc)){
+        if(MouseInInteractiveArea(Gui, SlideRc)){
             GuiSetHot(Gui, &Interaction, JOY_TRUE);
             
             if(KeyWentDown(Gui->Input, MouseKey_Left)){
                 GuiSetActive(Gui, &Interaction);
             }
+        }
+        else{
+            GuiSetHot(Gui, &Interaction, JOY_FALSE);
         }
         
         if(GuiIsActive(Gui, &Interaction)){
@@ -1981,7 +1991,7 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
         Gui_Empty_Interaction Interaction(elem);
         Interaction.SetPriority(GUI_PRIORITY_AVG);
         
-        if(MouseInRect(Gui->Input, textRc)){
+        if(MouseInInteractiveArea(Gui, textRc)){
             GuiSetHot(Gui, &Interaction, JOY_TRUE);
             
             if(KeyWentDown(Gui->Input, MouseKey_Left)){
@@ -2285,7 +2295,7 @@ b32 GuiGridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
         Gui_Empty_Interaction Interaction(elem);
         Interaction.SetPriority(GUI_PRIORITY_AVG);
         
-        if(MouseInRect(Gui->Input, WorkRect)){
+        if(MouseInInteractiveArea(Gui, WorkRect)){
             GuiSetHot(Gui, &Interaction, JOY_TRUE);
             Color1 = ActiveColor1;
             Color2 = ActiveColor2;
@@ -2343,13 +2353,15 @@ void GuiTest(gui_state* Gui, float deltaTime){
                   lastFrameBytesUsed);
     
     char InterInfo[256];
-    stbsp_sprintf(InterInfo, "Hot Interaction ID: %u Name: %s", 
+    stbsp_sprintf(InterInfo, "Hot Interaction ID: %u Name: \"%s\" Priority: %u", 
                   Gui->HotInteraction.ID, 
-                  Gui->HotInteraction.Name);
+                  Gui->HotInteraction.Name,
+                  Gui->HotInteraction.Priority);
     GuiText(Gui, InterInfo);
-    stbsp_sprintf(InterInfo, "Active Interaction ID: %u Name: %s", 
+    stbsp_sprintf(InterInfo, "Active Interaction ID: %u Name: \"%s\" Priority: %u", 
                   Gui->ActiveInteraction.ID,
-                  Gui->ActiveInteraction.Name);
+                  Gui->ActiveInteraction.Name,
+                  Gui->ActiveInteraction.Priority);
     GuiText(Gui, InterInfo);
     
 #if 0 
