@@ -144,6 +144,8 @@ struct Gui_Page{
 };
 
 enum gui_grid_item_type{
+    GuiGridItem_GridHub,
+    GuiGridItem_Grid,
     GuiGridItem_Row,
     GuiGridItem_Column,
     GuiGridItem_Item,
@@ -153,9 +155,14 @@ struct gui_grid_item{
     rc2 InternalRect;
     rc2 Rect;
     u32 Type;
+    
     float SumWeightInChildren;
     float LastSumWeightInChildren;
     float TimeSinceNotHot;
+    
+    u32 ActiveID;
+    u32 NextActiveID;
+    
     b32 IsInit;
 };
 
@@ -170,6 +177,7 @@ enum Gui_Element_Type{
     GuiElement_RowColumn,
     GuiElement_RadioGroup,
     GuiElement_Layout,
+    
     GuiElement_GridItem,
 };
 
@@ -204,7 +212,7 @@ struct Gui_Element{
         
         // NOTE(Dima): is initialized (b32)
         b32 IsInit;
-    }data;
+    }Data;
     
     b32 opened;
     int TmpCount;
@@ -234,6 +242,7 @@ enum Gui_Interaction_Type{
     GuiInteraction_Resize,
     GuiInteraction_BoolInRect,
     GuiInteraction_Empty,
+    GuiInteraction_ChangeGrid,
 };
 
 enum gui_priority_type{
@@ -322,6 +331,8 @@ struct gui_state{
     Gui_Element* rootElement;
     Gui_Element* curElement;
     
+    Gui_Element* CurrentGridHub;
+    
     Gui_Window windowUseSentinel;
     Gui_Window windowFreeSentinel;
     Gui_Window windowSentinel4Returning;
@@ -381,7 +392,7 @@ inline Gui_Layout* GetParentLayout(gui_state* Gui){
         res = &Gui->rootLayout;
     }
     else{
-        res = layoutElem->data.Layout.ref;
+        res = layoutElem->Data.Layout.ref;
     }
     
     return(res);
@@ -467,6 +478,31 @@ struct Gui_Empty_Interaction : public gui_interaction{
     }
 };
 
+inline void GuiGoToGrid(gui_state* Gui, char* GridName){
+    Gui_Element* Parent = Gui->CurrentGridHub;
+    ASSERT(Parent);
+    // NOTE(Dima): Can call only when grid hub is current
+    ASSERT(Parent->Data.GridItem.Type == GuiGridItem_GridHub);
+    
+    u32 ID = StringHashFNV(GridName);
+    
+    b32 FoundWithName = JOY_FALSE;
+    Gui_Element* AtGrid = Parent->childSentinel->Next;
+    while(AtGrid != Parent->childSentinel){
+        
+        if(AtGrid->id == ID){
+            FoundWithName = JOY_TRUE;
+            break;
+        }
+        
+        AtGrid = AtGrid->Next;
+    }
+    
+    if(FoundWithName){
+        Parent->Data.GridItem.NextActiveID = ID;
+    }
+}
+
 struct Gui_BoolInRect_Interaction : public gui_interaction{
     b32* Value;
     rc2 Rect;
@@ -510,8 +546,8 @@ enum class Gui_Resize_Interaction_Type{
 
 struct Gui_Resize_Interaction : public gui_interaction{
     v2* DimensionPtr;
-	v2 Position;
-	v2 MinDim;
+    v2 Position;
+    v2 MinDim;
     Gui_Resize_Interaction_Type Type;
     
     Gui_Resize_Interaction(v2 Position, 

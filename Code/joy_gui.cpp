@@ -148,13 +148,6 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(gui_state* Gui,
         if(!found){
             found = GuiAllocateElement(Gui);
             
-            // NOTE(Dima): Inserting to list
-            found->Next = childSentinel->Next;
-            found->Prev = childSentinel;
-            
-            found->Next->Prev = found;
-            found->Prev->Next = found;
-            
             found->id = id;
             CopyStrings(found->name, sizeof(found->name), name);
             
@@ -162,7 +155,7 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(gui_state* Gui,
             found->type = type;
             
             // NOTE(Dima): freeing data
-            found->data = {};
+            found->Data = {};
             
             // NOTE(Dima): Initializing children sentinel
             if(type == GuiElement_ChildrenSentinel ||
@@ -183,9 +176,15 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(gui_state* Gui,
                 fcs->type = GuiElement_ChildrenSentinel;
             }
             
-            
             // NOTE(Dima): Initializing opened
             found->opened = initOpened;
+            
+            // NOTE(Dima): Inserting to list
+            found->Next = childSentinel->Next;
+            found->Prev = childSentinel;
+            
+            found->Next->Prev = found;
+            found->Prev->Next = found;
         }
         
         ASSERT(found->type == type);
@@ -410,7 +409,7 @@ void GuiBeginPage(gui_state* Gui, char* name){
                                             GuiElement_Page,
                                             JOY_TRUE);
     // NOTE(Dima): Init references
-    pageElem->data.Page.ref = foundPage;
+    pageElem->Data.Page.ref = foundPage;
     foundPage->elem = pageElem;
 }
 
@@ -770,7 +769,7 @@ inline void GuiSnapInWindowRect(gui_state* Gui, v2* P, v2* Dim, u32 SnapType){
 
 INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 layoutType, Gui_Element* layoutElem){
     // NOTE(Dima): initializing references
-    layoutElem->data.Layout.ref = layout;
+    layoutElem->Data.Layout.ref = layout;
     layout->Elem = layoutElem;
     
     v2 popDim;
@@ -780,7 +779,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
     
     // NOTE(Dima): Layout initializing
     layout->Type = layoutType;
-    if(!layoutElem->data.IsInit){
+    if(!layoutElem->Data.IsInit){
         layout->Start = V2(200.0f, 200.0f) * (Gui->layoutCount - 1);
         layout->At = layout->Start;
         // NOTE(Dima): Layout dimension should be set anyways
@@ -797,7 +796,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
             }break;
         }
         
-        layoutElem->data.IsInit = JOY_TRUE;
+        layoutElem->Data.IsInit = JOY_TRUE;
     }
     
     // NOTE(Dima): Recalculate window rect always for clipping GUI interactions
@@ -1368,13 +1367,13 @@ void GuiAnchor(gui_state* Gui,
         
         v2 MouseP = Gui->Input->MouseP;
         
-        if(!elem->data.IsInit){
+        if(!elem->Data.IsInit){
             
-            elem->data.Anchor.OffsetInAnchor = {};
+            elem->Data.Anchor.OffsetInAnchor = {};
             
-            elem->data.IsInit = JOY_TRUE;
+            elem->Data.IsInit = JOY_TRUE;
         }
-        v2* OffsetInAnchor = &elem->data.Anchor.OffsetInAnchor;
+        v2* OffsetInAnchor = &elem->Data.Anchor.OffsetInAnchor;
         
         gui_interaction* interaction = 0;
         if(Resize){
@@ -1695,11 +1694,11 @@ u32 defaultId)
                                            GuiElement_RadioGroup, 
                                            JOY_TRUE);
     
-    if (!element->data.IsInit) {
-        element->data.RadioGroup.activeId = defaultId;
-        element->data.RadioGroup.ref = ref;
+    if (!element->Data.IsInit) {
+        element->Data.RadioGroup.activeId = defaultId;
+        element->Data.RadioGroup.ref = ref;
         
-        element->data.IsInit = 1;
+        element->Data.IsInit = 1;
     }
 }
 
@@ -1731,7 +1730,7 @@ void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId) {
         PotentiallyVisibleSmall(layout)) 
     {
         b32 isActive = 0;
-        if (radioGroup->data.RadioGroup.activeId == uniqueId) {
+        if (radioGroup->Data.RadioGroup.activeId == uniqueId) {
             isActive = 1;
         }
         
@@ -1761,10 +1760,10 @@ void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId) {
             if (KeyWentDown(Gui->Input, MouseKey_Left)) {
                 GuiSetActive(Gui, &Interaction);
                 
-                if(radioGroup->data.RadioGroup.ref){
-                    *radioGroup->data.RadioGroup.ref = uniqueId;
+                if(radioGroup->Data.RadioGroup.ref){
+                    *radioGroup->Data.RadioGroup.ref = uniqueId;
                 }
-                radioGroup->data.RadioGroup.activeId = uniqueId;
+                radioGroup->Data.RadioGroup.activeId = uniqueId;
                 
                 GuiReleaseInteraction(Gui, &Interaction);
             }
@@ -1986,7 +1985,7 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
         textRc = GetTxtElemRect(Gui, layout, textRc, V2(4.0f, 6.0f));
         GuiPushBut(Gui, textRc, PushBut_AlphaBlack);
         
-        int* CaretP = &elem->data.InputText.CaretPos;
+        int* CaretP = &elem->Data.InputText.CaretPos;
         
         Gui_Empty_Interaction Interaction(elem);
         Interaction.SetPriority(GUI_PRIORITY_AVG);
@@ -2137,17 +2136,8 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
     GuiEndElement(Gui, GuiElement_Item);
 }
 
-void GuiGridHubBegin(gui_state* Gui){
-    
-}
-
-void GuiGridHubEnd(gui_state* Gui){
-    
-}
-
-
 INTERNAL_FUNCTION inline rc2 GuiGetGridRect(float WeightForThis, Gui_Element* Parent){
-    gui_grid_item* Item = &Parent->data.GridItem;
+    gui_grid_item* Item = &Parent->Data.GridItem;
     
     if(Item->LastSumWeightInChildren < 0.0001f){
         Item->LastSumWeightInChildren = 3.0f;
@@ -2167,7 +2157,8 @@ INTERNAL_FUNCTION inline rc2 GuiGetGridRect(float WeightForThis, Gui_Element* Pa
         Result = RcMinDim(V2(StartX, StartY), Dim);
     }
     else if((Item->Type == GuiGridItem_Column) ||
-            (Item->Type == GuiGridItem_Item))
+            (Item->Type == GuiGridItem_Item) ||
+            (Item->Type == GuiGridItem_Grid))
     {
         float StartX = Item->InternalRect.min.x;
         float StartY = Item->InternalRect.min.y + ParentDim.y * ThisStartPercentage;
@@ -2185,22 +2176,64 @@ INTERNAL_FUNCTION inline rc2 GuiGetGridRect(float WeightForThis, Gui_Element* Pa
 INTERNAL_FUNCTION gui_grid_item* GuiGridItemInit(gui_state* Gui, 
                                                  Gui_Element* elem, 
                                                  u32 GridItemType, 
-                                                 float Weight, 
-                                                 b32 IsGrid)
+                                                 float Weight)
 {
-    gui_grid_item* Item = &elem->data.GridItem;
-    if(IsGrid){
-        Item->InternalRect = RcMinDim(V2(0.0f, 0.0f), 
-                                      V2(Gui->FrameInfo.Width,
-                                         Gui->FrameInfo.Height));
-    }
-    else{
-        Item->InternalRect = GuiGetGridRect(Weight, elem->parent);
-        Item->Rect = GrowRectByPixels(Item->InternalRect, -10);
+    gui_grid_item* Item = &elem->Data.GridItem;
+    switch(GridItemType){
+        case GuiGridItem_GridHub:{
+            Gui_Element* Parent = Gui->CurrentGridHub;
+            ASSERT(Parent);
+            // NOTE(Dima): Can spawn Grids only in Gridhubs
+            ASSERT(Parent->Data.GridItem.Type == GuiGridItem_GridHub);
+            
+            gui_grid_item* HubItem = &Parent->Data.GridItem;
+            
+            if(HubItem->NextActiveID){
+                HubItem->ActiveID = HubItem->NextActiveID;
+                HubItem->NextActiveID = 0;
+            }
+            
+        }break;
         
-        gui_grid_item* ParentItem = &elem->parent->data.GridItem;
+        case GuiGridItem_Grid:{
+            Item->InternalRect = RcMinDim(V2(0.0f, 0.0f), 
+                                          V2(Gui->FrameInfo.Width,
+                                             Gui->FrameInfo.Height));
+            
+            Gui_Element* Parent = Gui->CurrentGridHub;
+            ASSERT(Parent);
+            // NOTE(Dima): Can spawn Grids only in Gridhubs
+            ASSERT(Parent->Data.GridItem.Type == GuiGridItem_GridHub);
+            
+            Gui_Element* AtGrid = Parent->childSentinel->Next;
+            
+            gui_grid_item* HubItem = &Parent->Data.GridItem;
+            
+            // NOTE(Dima): If first element in grid hub -> set it's to active
+            if(AtGrid->Prev == AtGrid->Next){
+                HubItem->ActiveID = StringHashFNV(elem->name);
+            }
+            
+            while(AtGrid != Parent->childSentinel){
+                if(AtGrid->id == HubItem->ActiveID){
+                    AtGrid->opened = JOY_TRUE;
+                }
+                else{
+                    AtGrid->opened = JOY_FALSE;
+                }
+                
+                AtGrid = AtGrid->Next;
+            }
+        }break;
         
-        ParentItem->SumWeightInChildren += Weight;
+        default:{
+            Item->InternalRect = GuiGetGridRect(Weight, elem->parent);
+            Item->Rect = GrowRectByPixels(Item->InternalRect, -10);
+            
+            gui_grid_item* ParentItem = &elem->parent->Data.GridItem;
+            
+            ParentItem->SumWeightInChildren += Weight;
+        }break;
     }
     
     Item->Type = GridItemType;
@@ -2215,18 +2248,41 @@ INTERNAL_FUNCTION gui_grid_item* GuiGridItemInit(gui_state* Gui,
     return(Item);
 }
 
+void GuiGridHubBegin(gui_state* Gui){
+    char name[64];
+    stbsp_sprintf(name, "GridHub: %d", Gui->curElement->childCount);
+    
+    Gui_Element* Elem = GuiBeginElement(Gui, name, 
+                                        GuiElement_GridItem, 
+                                        JOY_TRUE);
+    
+    ASSERT(Gui->CurrentGridHub == 0);
+    Gui->CurrentGridHub = Elem;
+    
+    gui_grid_item* Item = GuiGridItemInit(Gui,
+                                          Elem,
+                                          GuiGridItem_GridHub,
+                                          0.0f);
+}
+
+void GuiGridHubEnd(gui_state* Gui){
+    ASSERT(Gui->CurrentGridHub);
+    Gui->CurrentGridHub = 0;
+    
+    GuiEndElement(Gui, GuiElement_GridItem);
+}
+
 void GuiGridBegin(gui_state* Gui, char* Name){
     Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, JOY_TRUE);
     
     gui_grid_item* Item = GuiGridItemInit(Gui,
                                           elem,
-                                          GuiGridItem_Column,
-                                          0.0f,
-                                          JOY_TRUE);
+                                          GuiGridItem_Grid,
+                                          0.0f);
 }
 
 void GuiGridEnd(gui_state* Gui){
-    gui_grid_item* Item = &Gui->curElement->data.GridItem;
+    gui_grid_item* Item = &Gui->curElement->Data.GridItem;
     Item->LastSumWeightInChildren = Item->SumWeightInChildren;
     Item->SumWeightInChildren = 0;
     GuiEndElement(Gui, GuiElement_GridItem);
@@ -2241,8 +2297,7 @@ void GuiGridBeginRow(gui_state* Gui, float Weight = 1.0f){
     gui_grid_item* Item = GuiGridItemInit(Gui,
                                           elem,
                                           GuiGridItem_Row,
-                                          Weight,
-                                          JOY_FALSE);
+                                          Weight);
 }
 
 void GuiGridBeginColumn(gui_state* Gui, float Weight = 1.0f){
@@ -2254,15 +2309,29 @@ void GuiGridBeginColumn(gui_state* Gui, float Weight = 1.0f){
     gui_grid_item* Item = GuiGridItemInit(Gui,
                                           elem,
                                           GuiGridItem_Column,
-                                          Weight,
-                                          JOY_FALSE);
+                                          Weight);
 }
 
 void GuiGridEndRowOrColumn(gui_state* Gui){
     
-    gui_grid_item* Item = &Gui->curElement->data.GridItem;
+    gui_grid_item* Item = &Gui->curElement->Data.GridItem;
     Item->LastSumWeightInChildren = Item->SumWeightInChildren;
     Item->SumWeightInChildren = 0;
+    
+    GuiEndElement(Gui, GuiElement_GridItem);
+}
+
+void GuiGridTileEmpty(gui_state* Gui, float Weight = 1.0f){
+    b32 Result = 0;
+    
+    char Name[64];
+    stbsp_sprintf(Name, "EmptyTile: %d", Gui->curElement->TmpCount);
+    
+    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, JOY_TRUE);
+    gui_grid_item* Item = GuiGridItemInit(Gui,
+                                          elem,
+                                          GuiGridItem_Item,
+                                          Weight);
     
     GuiEndElement(Gui, GuiElement_GridItem);
 }
@@ -2274,12 +2343,10 @@ b32 GuiGridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
     gui_grid_item* Item = GuiGridItemInit(Gui,
                                           elem,
                                           GuiGridItem_Item,
-                                          Weight,
-                                          JOY_FALSE);
+                                          Weight);
     
     if(GuiElementOpenedInTree(elem)){
         v4 TileColor = GUI_GETCOLOR_COLSYS(ColorExt_gray53);
-        
         
         rc2 WorkRect = Item->Rect;
         
@@ -2365,10 +2432,11 @@ void GuiTest(gui_state* Gui, float deltaTime){
     GuiText(Gui, InterInfo);
     
 #if 0 
+    GuiGridHubBegin(Gui);
     GuiGridBegin(Gui, "Grid1");
     GuiGridBeginRow(Gui);
     if(GuiGridTile(Gui, "Tile1", 1.0f)){
-        
+        GuiGoToGrid(Gui, "Grid2");
     }
     
     if(GuiGridTile(Gui, "Tile2", 2.0f)){
@@ -2379,11 +2447,35 @@ void GuiTest(gui_state* Gui, float deltaTime){
         
     }
     GuiGridEndRowOrColumn(Gui);
+    
+    GuiGridTileEmpty(Gui, 3.0f);
+    
     GuiGridBeginRow(Gui, 1.5f);
     GuiGridTile(Gui, "Tile4");
     GuiGridTile(Gui, "Tile5");
     GuiGridEndRowOrColumn(Gui);
     GuiGridEnd(Gui);
+    
+    GuiGridBegin(Gui, "Grid2");
+    GuiGridBeginRow(Gui);
+    if(GuiGridTile(Gui, "First", 3.0f)){
+        GuiGoToGrid(Gui, "Grid1");
+    }
+    
+    if(GuiGridTile(Gui, "Second", 2.0f)){
+        
+    }
+    
+    if(GuiGridTile(Gui, "Third", 3.0f)){
+        
+    }
+    GuiGridEndRowOrColumn(Gui);
+    GuiGridBeginRow(Gui, 0.5f);
+    GuiGridTile(Gui, "4");
+    GuiGridTile(Gui, "5");
+    GuiGridEndRowOrColumn(Gui);
+    GuiGridEnd(Gui);
+    GuiGridHubEnd(Gui);
 #endif
     
     GuiBeginPage(Gui, "Page1");
