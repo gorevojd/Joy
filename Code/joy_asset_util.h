@@ -22,14 +22,14 @@ Data_Buffer ReadFileToDataBuffer(char* fileName);
 void FreeDataBuffer(Data_Buffer* dataBuffer);
 
 //NOTE(Dima): Bitmap utility functions
-Bmp_Info AllocateBitmapInternal(u32 width, u32 height, void* pixelsData);
-Bmp_Info AllocateBitmap(u32 width, u32 height);
-void DeallocateBitmap(Bmp_Info* buffer);
-void CopyBitmapData(Bmp_Info* dst, Bmp_Info* src);
+bmp_info AllocateBitmapInternal(u32 width, u32 height, void* pixelsData);
+bmp_info AllocateBitmap(u32 width, u32 height);
+void DeallocateBitmap(bmp_info* buffer);
+void CopyBitmapData(bmp_info* dst, bmp_info* src);
 
 // NOTE(Dima): Functions for loading stuff
-Bmp_Info LoadBMP(char* filePath);
-Font_Info LoadFont(char* filePath, float height, u32 flags = 0);
+bmp_info LoadBMP(char* filePath);
+font_info LoadFont(char* filePath, float height, u32 flags = 0);
 Loaded_Strings LoadStringListFromFile(char* filePath);
 void FreeStringList(Loaded_Strings* list);
 
@@ -48,11 +48,11 @@ mesh_info MakeCube();
 mesh_info MakeSphere(int Segments, int Rings);
 mesh_info MakeCylynder(float Height, float Radius, int SidesCount) ;
 
-Sound_Info MakeSound(const std::vector<i16>& Samples,
+sound_info MakeSound(const std::vector<i16>& Samples,
                      int SamplesPerSec);
-Sound_Info MakeSineSound(const std::vector<int>& Frequencies, 
+sound_info MakeSineSound(const std::vector<int>& Frequencies, 
                          int SampleCount,
                          int SamplesPerSec);
-Sound_Info MakeSineSound256(int SampleCount, int SamplesPerSec);
+sound_info MakeSineSound256(int SampleCount, int SamplesPerSec);
 
 #endif

@@ -223,6 +223,8 @@ float GetMoveAxis(input_state* Input, u32 Axis){
 
 void InitInput(input_state* Input)
 {
+    Input->CapturingMouse = JOY_TRUE;
+    
     Input->LeftStickMultiplier = 1.0f;
     Input->RightStickMultiplier = 1.0f;
     Input->KeyboardMouseMultiplier = 1.0f;
@@ -284,6 +286,12 @@ void InitInput(input_state* Input)
     AddKeyToButtonOnController(Input, 1, Button_Up, Key_Up);
     AddKeyToButtonOnController(Input, 1, Button_Down, Key_Down);
     AddKeyToButtonOnController(Input, 1, Button_Interact, Key_Return);
+}
+
+void InputUpdate(input_state* Input){
+    if(KeyWentDown(Input, Key_Control)){
+        Input->CapturingMouse = !Input->CapturingMouse;
+    }
 }
 
 // NOTE(Dima): If ControllerIndex passed as -1 then all controllers info collected

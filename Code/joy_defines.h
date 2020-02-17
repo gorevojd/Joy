@@ -41,4 +41,6 @@
 #define JOY_TRUE 1
 #define JOY_FALSE 0
 
+#define JOY_INIT_SENTINELS_LINKS(name, next, prev) {name.##next = &name; name.##prev = &name;}
+
 #endif

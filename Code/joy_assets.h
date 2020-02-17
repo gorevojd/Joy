@@ -8,12 +8,52 @@
 #include "joy_platform.h"
 #include "joy_memory.h"
 
+enum asset_type{
+    AssetType_Bitmap,
+    AssetType_BitmapArray,
+    AssetType_Mesh,
+    AssetType_Sound,
+    AssetType_Font,
+    AssetType_Glyph,
+};
+
 struct asset{
     mem_entry* DataMemoryEntry;
     
+    u32 Type;
+    
+    asset* Next;
+    asset* Prev;
+    
     union{
-        
+        font_info Font;
+        bmp_info Bitmap;
+        bmp_array_info BmpArray;
+        mesh_info Mesh;
+        glyph_info Glyph;
+        sound_info Sound;
     };
+};
+
+enum asset_family{
+    AssetFamily_FadeoutBmps,
+    
+    AssetFamily_CheckboxMark,
+    AssetFamily_ChamomileIcon,
+    
+    AssetFamily_SineTest1,
+    AssetFamily_SineTest2,
+    
+    AssetFamily_Cube,
+    AssetFamily_Plane,
+    AssetFamily_Sphere,
+    AssetFamily_Cylynder,
+    
+    AssetFamily_LiberationMono,
+    AssetFamily_LilitaOne,
+    AssetFamily_Inconsolata,
+    AssetFamily_PFDIN,
+    AssetFamily_MollyJackFont,
 };
 
 // NOTE(dima): Bitmaps are stored in gamma-corrected premultiplied alpha format
@@ -26,40 +66,27 @@ struct assets{
     // NOTE(Dima): Assets
     Asset_Atlas MainLargeAtlas;
     
-    Bmp_Info sunset;
-    Bmp_Info sunsetOrange;
-    Bmp_Info sunsetField;
-    Bmp_Info sunsetMountains;
-    Bmp_Info sunsetPurple;
-    Bmp_Info sunrise;
-    Bmp_Info mountainsFuji;
-    Bmp_Info roadClouds;
+    asset SentinelAsset;
     
-    Bmp_Info* fadeoutBmps;
+    bmp_info* fadeoutBmps;
     int fadeoutBmpsCount;
     
-    Bmp_Info CheckboxMark;
-    Bmp_Info Folder;
-    Bmp_Info ClosePng;
-    Bmp_Info PlayPng;
-    Bmp_Info PlusPng;
-    Bmp_Info StopPng;
-    Bmp_Info PowerPng;
-    Bmp_Info ChamomileIcon;
+    bmp_info CheckboxMark;
+    bmp_info ChamomileIcon;
     
-    Sound_Info SineTest1;
-    Sound_Info SineTest2;
+    sound_info SineTest1;
+    sound_info SineTest2;
     
     mesh_info Cube;
     mesh_info Plane;
     mesh_info Sphere;
     mesh_info Cylynder;
     
-    Font_Info liberationMono;
-    Font_Info lilitaOne;
-    Font_Info inconsolataBold;
-    Font_Info pfdin;
-    Font_Info MollyJackFont;
+    font_info liberationMono;
+    font_info lilitaOne;
+    font_info inconsolataBold;
+    font_info pfdin;
+    font_info MollyJackFont;
 };
 
 void InitAssets(assets* Assets);

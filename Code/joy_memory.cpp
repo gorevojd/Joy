@@ -48,8 +48,8 @@ INTERNAL_FUNCTION inline mem_entry* AllocateMemoryEntry(mem_box* box) {
 	Result->NextAlloc->PrevAlloc = Result;
 	Result->PrevAlloc->NextAlloc = Result;
     
-	Result->Data = 0;
-	Result->DataSize = 0;
+	Result->_InternalData = 0;
+	Result->_InternalDataSize = 0;
 	Result->State = MemoryEntry_Released;
     
 	return(Result);
@@ -70,12 +70,44 @@ mem_entry* to)
 }
 
 
+INTERNAL_FUNCTION inline mem_entry* PopFromReleasedList(mem_entry* memEntry){
+    if(memEntry->PrevReleased){
+        memEntry->PrevReleased->NextReleased = memEntry->NextReleased;
+    }
+    
+    if(memEntry->NextReleased){
+        memEntry->NextReleased->PrevReleased = memEntry->PrevReleased;
+    }
+    
+    memEntry->PrevReleased = 0;
+    memEntry->NextReleased = 0;
+    
+    return(memEntry);
+}
+
+INTERNAL_FUNCTION inline mem_entry* PushToReleasedList(mem_box* Box, mem_entry* memEntry){
+    memEntry->PrevReleased = 0;
+    memEntry->NextReleased = Box->FirstReleased;
+    
+    if(memEntry->NextReleased){
+        memEntry->NextReleased->PrevReleased = memEntry;
+    }
+    
+    return(memEntry);
+}
+
+
+struct split_entries_result{
+    mem_entry* First;
+    mem_entry* Second;
+};
+
 /*
  NOTE(dima): This function splits memory entry into 
  2 parts and then returns first splited part with the
  requested memory size
 */
-INTERNAL_FUNCTION mem_entry* SplitMemoryEntry(
+INTERNAL_FUNCTION split_entries_result SplitMemoryEntry(
 mem_box* box,
 mem_entry* toSplit,
 u32 SplitOffset)
@@ -84,7 +116,7 @@ u32 SplitOffset)
   NOTE(dima): If equal then second block will be 0 bytes,
   so we dont need equal and the sign is <
  */
-	ASSERT(SplitOffset <= toSplit->DataSize);
+	ASSERT(SplitOffset <= toSplit->_InternalDataSize);
     
 	//NOTE(dima): allocating entries
 	mem_entry* NewEntry1 = AllocateMemoryEntry(box);
@@ -105,18 +137,22 @@ u32 SplitOffset)
 	}
     
 	//NOTE(dima): setting entries data
-	NewEntry1->DataSize = SplitOffset;
-	NewEntry1->Data = toSplit->Data;
+	NewEntry1->_InternalDataSize = SplitOffset;
+	NewEntry1->_InternalData = toSplit->_InternalData;
     
-	NewEntry2->DataSize = toSplit->DataSize - SplitOffset;
-	NewEntry2->Data = (void*)((u8*)toSplit->Data + SplitOffset);
+	NewEntry2->_InternalDataSize = toSplit->_InternalDataSize - SplitOffset;
+	NewEntry2->_InternalData = (void*)((u8*)toSplit->_InternalData + SplitOffset);
     
 	//NOTE(dima): Deallocating initial entry
 	DeallocateMemoryEntry(box, toSplit);
     
-	ASSERT(NewEntry1->DataSize + NewEntry2->DataSize == toSplit->DataSize);
+	ASSERT(NewEntry1->_InternalDataSize + NewEntry2->_InternalDataSize == toSplit->_InternalDataSize);
     
-	return(NewEntry1);
+    split_entries_result Result = {};
+    Result.First = NewEntry1;
+    Result.Second = NewEntry2;
+    
+	return(Result);
 }
 
 /*
@@ -133,7 +169,7 @@ mem_entry* Second)
     
 	First->Next = Second->Next;
     
-	First->DataSize = First->DataSize + Second->DataSize;
+	First->_InternalDataSize = First->_InternalDataSize + Second->_InternalDataSize;
     
 	DeallocateMemoryEntry(box, Second);
     
@@ -143,47 +179,57 @@ mem_entry* Second)
 
 mem_entry* AllocateMemoryFromBox(
 mem_box* box,
-u32 RequestMemorySize)
+u32 RequestMemorySize,
+u32 Align)
 {
 	mem_entry* Result = 0;
     
-	/*
-  NOTE(dima): Merge loop.
-  In this loop i walk through all allocated memory entries
-  and try to merge those that lie near each other
- */
-	int TempCounter = 0;
-	mem_entry* At = box->First;
+    // NOTE(Dima): We should do this to ensure if we actually can
+    // NOTE(Dima): hold new block with alignment
+    u32 RequestMemorySizeWithAlign = RequestMemorySize + Align;
+    
+    /*
+NOTE(dima): Merge loop.
+In this loop i walk through all allocated memory entries
+and try to merge those that lie near each other
+*/
+    int TempCounter = 0;
+	mem_entry* At = box->FirstReleased;
     
 	while (At) {
-		mem_entry* NextAt = At->Next;
+		mem_entry* NextAt = At->NextReleased;
         
-		if (At->State == MemoryEntry_Released) {
-            
-			while (NextAt) {
-				if (NextAt->State == MemoryEntry_Released) {
-					At = MergeMemoryEntries(box, At, NextAt);
-					NextAt = At->Next;
-				}
-				else {
-					break;
-				}
-			}
+        ASSERT(At->State == MemoryEntry_Released);
+        
+        while (NextAt) {
+            if (NextAt->State == MemoryEntry_Released) {
+                PopFromReleasedList(NextAt);
+                
+                At = MergeMemoryEntries(box, At, NextAt);
+                NextAt = At->Next;
+            }
+            else {
+                break;
+            }
 		}
         
 		TempCounter++;
 		At = NextAt;
 	}
     
+#if 0
 	//NOTE(dima): Find loop
 	At = box->First;
 	while (At) {
 		if (At->State == MemoryEntry_Released &&  
-			At->DataSize >= RequestMemorySize) 
+			At->_InternalDataSize >= RequestMemorySize) 
 		{
             // NOTE(Dima): Slit only when larger
-            if(At->DataSize > RequestMemorySize){
-                Result = SplitMemoryEntry(box, At, RequestMemorySize);
+            if(At->_InternalDataSize > RequestMemorySizeWithAlign){
+                split_entries_result SlitRes = SplitMemoryEntry(box, At, RequestMemorySizeWithAlign);
+                Result = SplitRes.First;
+                
+                PushToReleasedList(SplitRes.Second);
             }
             else{
                 Result = At;
@@ -194,12 +240,23 @@ u32 RequestMemorySize)
         
         At = At->Next;
     }
+#else
+    At = box->FirstReleased;
     
+    
+#endif
     
     if (Result) {
         Result->State = MemoryEntry_Used;
         
-        Assert(RequestMemorySize == Result->DataSize);
+        size_t BeforeAlign = (size_t)Result->_InternalData;
+        size_t AlignedPos = (BeforeAlign + Align - 1) & (~((size_t)Align - 1));
+        size_t AdvancedByAlign = AlignedPos - BeforeAlign;
+        
+        Result->ActualData = (void*)AlignedPos;
+        Result->ActualDataSize = AdvancedByAlign + RequestMemorySize;
+        
+        Assert(RequestMemorySize == Result->_InternalDataSize);
         Assert(Result->State == MemoryEntry_Used);
     }
     
@@ -207,7 +264,10 @@ u32 RequestMemorySize)
 }
 
 void ReleaseMemoryFromBox(mem_box* box, mem_entry* memEntry) {
+    
     memEntry->State = MemoryEntry_Released;
+    
+    PushToReleasedList(box, memEntry);
 }
 
 mem_box InitMemoryBox(mem_region* Region, u32 BoxSizeInBytes){
@@ -215,6 +275,7 @@ mem_box InitMemoryBox(mem_region* Region, u32 BoxSizeInBytes){
     mem_box Result = {};
     
     // NOTE(Dima): Memory initialization
+    
     Result.Free = {};
     Result.Free.Next = &Result.Free;
     Result.Free.Prev = &Result.Free;
@@ -228,8 +289,12 @@ mem_box InitMemoryBox(mem_region* Region, u32 BoxSizeInBytes){
     Result.First = AllocateMemoryEntry(&Result);
     Result.First->Next = 0;
     Result.First->Prev = 0;
-    Result.First->Data = PushSomeMem(Region, BoxSizeInBytes, 16);
-    Result.First->DataSize = BoxSizeInBytes;
+    Result.First->NextReleased = 0;
+    Result.First->PrevReleased = 0;
+    Result.First->_InternalData = PushSomeMem(Region, BoxSizeInBytes, 16);
+    Result.First->_InternalDataSize = BoxSizeInBytes;
+    Result.First->State = MemoryEntry_Released;
+    Result.FirstReleased = Result.First;
     
     Result.NextBox = 0;
     

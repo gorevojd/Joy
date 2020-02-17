@@ -42,7 +42,7 @@ struct render_entry_clear_color{
 };
 
 struct render_entry_bitmap{
-    Bmp_Info* Bitmap;
+    bmp_info* Bitmap;
     v2 P;
     float PixelHeight;
     v4 ModulationColor01;
@@ -73,7 +73,7 @@ struct render_entry_glyph{
     v2 MinUV;
     v2 MaxUV;
     
-    Bmp_Info* Bitmap;
+    bmp_info* Bitmap;
     
     v4 ModColor;
 };

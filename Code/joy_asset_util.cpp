@@ -120,8 +120,8 @@ void FreeStringList(Loaded_Strings* list){
     }
 }
 
-Bmp_Info AllocateBitmapInternal(u32 width, u32 height, void* pixelsData) {
-	Bmp_Info res = {};
+bmp_info AllocateBitmapInternal(u32 width, u32 height, void* pixelsData) {
+	bmp_info res = {};
     
 	res.Width = width;
 	res.Height = height;
@@ -134,18 +134,18 @@ Bmp_Info AllocateBitmapInternal(u32 width, u32 height, void* pixelsData) {
 	return(res);
 }
 
-Bmp_Info AllocateBitmap(u32 width, u32 height) {
+bmp_info AllocateBitmap(u32 width, u32 height) {
 	u32 BitmapDataSize = width * height * 4;
 	void* PixelsData = calloc(BitmapDataSize, 1);
     
 	memset(PixelsData, 0, BitmapDataSize);
     
-	Bmp_Info res = AllocateBitmapInternal(width, height, PixelsData);
+	bmp_info res = AllocateBitmapInternal(width, height, PixelsData);
     
 	return(res);
 }
 
-void CopyBitmapData(Bmp_Info* Dst, Bmp_Info* Src) {
+void CopyBitmapData(bmp_info* Dst, bmp_info* Src) {
 	Assert(Dst->Width == Src->Width);
 	Assert(Dst->Height == Src->Height);
     
@@ -158,15 +158,15 @@ void CopyBitmapData(Bmp_Info* Dst, Bmp_Info* Src) {
 	}
 }
 
-void DeallocateBitmap(Bmp_Info* Buffer) {
+void DeallocateBitmap(bmp_info* Buffer) {
 	if (Buffer->Pixels) {
 		free(Buffer->Pixels);
 	}
 }
 
 
-Bmp_Info LoadBMP(char* FilePath){
-    Bmp_Info res = {};
+bmp_info LoadBMP(char* FilePath){
+    bmp_info res = {};
     
     int width;
     int height;
@@ -263,7 +263,7 @@ Bmp_Info LoadBMP(char* FilePath){
 
 
 void LoadFontAddCodepoint(
-Font_Info* FontInfo, 
+font_info* FontInfo, 
 stbtt_fontinfo* STBFont,
 int Codepoint,
 int* AtlasWidth, 
@@ -274,7 +274,7 @@ int BlurRadius,
 float* GaussianBox)
 {
     int glyphIndex = FontInfo->GlyphCount++;
-    Glyph_Info* glyph = &FontInfo->Glyphs[glyphIndex];
+    glyph_info* glyph = &FontInfo->Glyphs[glyphIndex];
     
     FontInfo->Codepoint2Glyph[Codepoint] = glyphIndex;
     
@@ -334,7 +334,7 @@ float* GaussianBox)
     //NOTE(dima): Forming char bitmap
 	float OneOver255 = 1.0f / 255.0f;
     
-    Bmp_Info CharBitmap= AllocateBitmap(CharWidth, CharHeight);
+    bmp_info CharBitmap= AllocateBitmap(CharWidth, CharHeight);
 	
 	for (int j = 0; j < CharHeight; j++) {
 		for (int i = 0; i < CharWidth; i++) {
@@ -356,15 +356,15 @@ float* GaussianBox)
     
     //NOTE(dima): Render blur if needed
 	if (Flags & LoadFont_BakeBlur) {
-		Bmp_Info ToBlur = AllocateBitmap(
+		bmp_info ToBlur = AllocateBitmap(
             2 * CharBorder + CharWidth,
             2 * CharBorder + CharHeight);
         
-		Bmp_Info BlurredResult = AllocateBitmap(
+		bmp_info BlurredResult = AllocateBitmap(
             2 * CharBorder + CharWidth,
             2 * CharBorder + CharHeight);
         
-		Bmp_Info TempBitmap = AllocateBitmap(
+		bmp_info TempBitmap = AllocateBitmap(
             2 * CharBorder + CharWidth,
             2 * CharBorder + CharHeight);
         
@@ -474,8 +474,8 @@ float* GaussianBox)
     stbtt_FreeBitmap(Bitmap, 0);
 }
 
-Font_Info LoadFont(char* FilePath, float height, u32 Flags){
-    Font_Info res = {};
+font_info LoadFont(char* FilePath, float height, u32 Flags){
+    font_info res = {};
     
     stbtt_fontinfo STBFont;
     
@@ -1267,10 +1267,10 @@ mesh_info MakeCylynder(float Height, float Radius, int SidesCount) {
     return(Result);
 }
 
-Sound_Info MakeSound(const std::vector<i16>& Samples,
+sound_info MakeSound(const std::vector<i16>& Samples,
                      int SamplesPerSec)
 {
-    Sound_Info Result = {};
+    sound_info Result = {};
     
     Result.SamplesPerSec = SamplesPerSec;
     
@@ -1300,7 +1300,7 @@ Sound_Info MakeSound(const std::vector<i16>& Samples,
     return(Result);
 }
 
-Sound_Info MakeSineSound(const std::vector<int>& Frequencies, 
+sound_info MakeSineSound(const std::vector<int>& Frequencies, 
                          int SampleCount, 
                          int SamplesPerSec)
 {
@@ -1340,15 +1340,15 @@ Sound_Info MakeSineSound(const std::vector<int>& Frequencies,
         }
     }
     
-    Sound_Info Result = MakeSound(Samples, SamplesPerSec);
+    sound_info Result = MakeSound(Samples, SamplesPerSec);
     
     return(Result);
 }
 
-Sound_Info MakeSineSound256(int SampleCount, int SamplesPerSec){
+sound_info MakeSineSound256(int SampleCount, int SamplesPerSec){
     std::vector<int> Freq{256};
     
-    Sound_Info Result = MakeSineSound(Freq, SampleCount, SamplesPerSec);
+    sound_info Result = MakeSineSound(Freq, SampleCount, SamplesPerSec);
     
     return(Result);
 }

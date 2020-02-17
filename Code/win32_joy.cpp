@@ -240,7 +240,7 @@ Win32ClearSoundBuffer(DSound_State* ds)
 }
 
 INTERNAL_FUNCTION void 
-Win32FillSoundBufferWithSound(DSound_State* ds, Sound_Info* sound)
+Win32FillSoundBufferWithSound(DSound_State* ds, sound_info* sound)
 {
     void* region1;
     DWORD region1Size;
@@ -1677,6 +1677,7 @@ Win32ProcessMessages(input_state* Input){
                     case VK_VOLUME_MUTE: { keyType = Key_VolumeMute; }break;
                     case VK_VOLUME_UP: { keyType = Key_VolumeUp; }break;
                     case VK_VOLUME_DOWN: { keyType = Key_VolumeDown; }break;
+                    case VK_OEM_3:{keyType = Key_OEM3;}break;
                     default: {}break;
                 }
                 
@@ -1817,7 +1818,6 @@ Win32ProcessInput(input_state* Input)
     }
     
     // NOTE(Dima): Processing capturing mouse
-    Input->CapturingMouse = JOY_TRUE;
     
     if(Input->CapturingMouse){
         HMONITOR MonitorHandle = MonitorFromWindow(
@@ -1853,12 +1853,17 @@ Win32ProcessInput(input_state* Input)
         point.y = ChangedP.y;
         SetCursorPos(point.x, point.y);
     }
+    else{
+        point.x = MouseInScreenP.x;
+        point.y = MouseInScreenP.y;
+        SetCursorPos(point.x, point.y);
+    }
     
     ScreenToClient(GlobalWin32.window, &point);
     v2 MouseP = V2(point.x, point.y);
     
-    
     Input->MouseP = MouseP;
+    
     Input->MouseDeltaPActual = MouseActualDelta;
     Input->MouseDeltaP = Input->MouseDeltaPActual;
     //Input->MouseDeltaP.y = -Input->MouseDeltaP.y;

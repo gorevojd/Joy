@@ -84,6 +84,7 @@ void GameInit(game_state* Game, platform_to_game_api Platform2GameAPI){
 void GameUpdate(game_state* Game, render_frame_info FrameInfo){
     game_mode* CurMode = &Game->Modes[Game->CurrentModeIndex];
     
+    InputUpdate(Game->Input);
     Game->ProcessInput();
     
     RenderBeginFrame(Game->Render);

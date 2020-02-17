@@ -189,7 +189,7 @@ struct win_state{
     HDC glDC;
     HGLRC renderCtx;
     
-    Bmp_Info bitmap;
+    bmp_info bitmap;
     BITMAPINFO bmi;
     
     ticket_mutex memoryMutex;

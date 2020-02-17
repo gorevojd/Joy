@@ -3,11 +3,11 @@
 
 #include "joy_defines.h"
 #include "joy_platform.h"
+#include "joy_types.h"
 #include <stdint.h>
 #include <string.h>
 
 // TODO(Dima): Add minimum block size param to allocation function
-
 
 struct mem_region{
     mem_block* Block;
@@ -18,6 +18,18 @@ enum memory_entry_state{
     MemoryEntry_Used,
 };
 
+struct mem_entry_snapshot{
+    u32 DataSize;
+    
+    struct mem_entry* CorrespondingEntry;
+    
+    b32 operator>(mem_entry_snapshot& Entry){
+        b32 Result = this->DataSize > Entry.DataSize;
+        
+        return(Result);
+    }
+};
+
 struct mem_entry{
     mem_entry* NextAlloc;
     mem_entry* PrevAlloc;
@@ -25,20 +37,32 @@ struct mem_entry{
     mem_entry* Next;
     mem_entry* Prev;
     
+    mem_entry* NextReleased;
+    mem_entry* PrevReleased;
     
-    void* Data;
-    u32 DataSize;
+    // NOTE(Dima): This is internal stuff used to encounter to align
+    void* _InternalData;
+    u32 _InternalDataSize;
+    
+    // NOTE(Dima): This is actual data that user can use!
+    // NOTE(Dima): It's already initialized and aligned!
+    void* ActualData;
+    u32 ActualDataSize;
     
     u32 State;
+    
+    mem_entry_snapshot* Snapshot;
 };
 
 struct mem_box{
+    mem_region* Region;
     mem_entry Use;
     mem_entry Free;
     
     mem_entry* First;
+    mem_entry* FirstReleased;
     
-    mem_region* Region;
+    std::vector<mem_entry_snapshot> ReleasedSnapshots;
     
     mem_box* NextBox;
 };

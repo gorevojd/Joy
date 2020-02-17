@@ -47,10 +47,13 @@ GAME_MODE_UPDATE(TestUpdate){
     float DeltaMouseX = GetMoveAxis(Game->Input, MoveAxis_MouseX) * State->MouseSencitivity;
     float DeltaMouseY = GetMoveAxis(Game->Input, MoveAxis_MouseY) * State->MouseSencitivity;
     
-    UpdateCameraRotation(Camera, 
-                         -DeltaMouseY, 
-                         DeltaMouseX,
-                         0.0f);
+    if(Game->Input->CapturingMouse){
+        
+        UpdateCameraRotation(Camera, 
+                             -DeltaMouseY, 
+                             DeltaMouseX,
+                             0.0f);
+    }
     
     v3 MoveVector = GetMoveVector(Game->Input, -1);
     
@@ -149,7 +152,7 @@ struct image_swapper_state{
 GAME_MODE_UPDATE(ChangingPicturesUpdate){
     GAME_GET_MODE_STATE(image_swapper_state, State);
     
-    Bmp_Info* ToShowArray = Game->Assets->fadeoutBmps;
+    bmp_info* ToShowArray = Game->Assets->fadeoutBmps;
     int ToShowCount = Game->Assets->fadeoutBmpsCount;
     
     render_pass* Pass = BeginRenderPass(Game->Render);
@@ -169,8 +172,8 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
         State->Initialized = JOY_TRUE;
     }
     
-    Bmp_Info* toShow = ToShowArray + State->ShowIndex;
-    Bmp_Info* toShowNext = ToShowArray + State->ShowNextIndex;
+    bmp_info* toShow = ToShowArray + State->ShowIndex;
+    bmp_info* toShowNext = ToShowArray + State->ShowNextIndex;
     
     int Width = Game->Render->FrameInfo.Width;
     int Height = Game->Render->FrameInfo.Height;

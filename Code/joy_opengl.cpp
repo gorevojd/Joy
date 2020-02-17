@@ -233,7 +233,7 @@ INTERNAL_FUNCTION inline void GlBindBufferAndFill(GLenum Target, GLenum Usage,
     }
 }
 
-INTERNAL_FUNCTION GLuint GlAllocateTexture(Bmp_Info* bmp){
+INTERNAL_FUNCTION GLuint GlAllocateTexture(bmp_info* bmp){
     GLuint GenerateTex;
     glGenTextures(1, &GenerateTex);
     glBindTexture(GL_TEXTURE_2D, GenerateTex);
@@ -524,7 +524,7 @@ INTERNAL_FUNCTION void GlRenderGuiRect(gl_state* GL,
 }
 
 
-INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, Bmp_Info* bmp){
+INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, bmp_info* bmp){
     
     // NOTE(Dima): Blit texture load
     GLuint BlitTex;
@@ -698,7 +698,7 @@ void GlOutputRender(gl_state* GL, render_state* Render){
         if(Render->FrameInfoIsSet){
             ASSERT(Render->FrameInfoIsSet);
             
-            Bmp_Info* SoftBuf = Render->FrameInfo.SoftwareBuffer;
+            bmp_info* SoftBuf = Render->FrameInfo.SoftwareBuffer;
             if(SoftBuf){
                 GlShowDynamicBitmap(GL, SoftBuf);
             }

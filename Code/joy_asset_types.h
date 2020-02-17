@@ -5,7 +5,7 @@
 #include "joy_math.h"
 
 
-struct Bmp_Info{
+struct bmp_info{
     void* Pixels;
     int Width;
     int Height;
@@ -20,7 +20,7 @@ struct Bmp_Info{
     mi Handle;
 };
 
-struct Sound_Info{
+struct sound_info{
     // NOTE(Dima): Left and Right channels
     i16* Samples[2];
     
@@ -28,13 +28,13 @@ struct Sound_Info{
     int SamplesPerSec;
 };
 
-struct Glyph_Info{
+struct glyph_info{
     int Codepoint;
     
     int Width;
     int Height;
     
-    Bmp_Info Bitmap;
+    bmp_info Bitmap;
     
     /*Theese are offset from glyph origin to top-left of bitmap*/
 	float XOffset;
@@ -47,7 +47,7 @@ struct Glyph_Info{
 };
 
 struct Asset_Atlas{
-    Bmp_Info Bitmap;
+    bmp_info Bitmap;
     int AtX;
     int AtY;
     int Dim;
@@ -158,19 +158,23 @@ struct mesh_info{
 };
 
 #define FONT_INFO_MAX_GLYPH_COUNT 256
-struct Font_Info{
+struct font_info{
     float AscenderHeight;
 	float DescenderHeight;
 	float LineGap;
     
     float* KerningPairs;
     
-    Glyph_Info Glyphs[FONT_INFO_MAX_GLYPH_COUNT];
+    glyph_info Glyphs[FONT_INFO_MAX_GLYPH_COUNT];
     int GlyphCount;
     
     int Codepoint2Glyph[FONT_INFO_MAX_GLYPH_COUNT];
     
-    Bmp_Info AtlasImage;
+    bmp_info AtlasImage;
+};
+
+struct bmp_array_info{
+    
 };
 
 #endif

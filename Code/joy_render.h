@@ -68,7 +68,7 @@ struct render_frame_info{
     
     u32 RendererType;
     
-    Bmp_Info* SoftwareBuffer;
+    bmp_info* SoftwareBuffer;
 };
 
 #define RENDER_PLATFORM_SWAPBUFFERS(name) void name()
@@ -337,7 +337,7 @@ inline void PushClearColor(render_stack* Stack, v3 color){
     entry->clearColor01 = color;
 }
 
-inline void PushBitmap(render_stack* Stack, Bmp_Info* bitmap, v2 p, float height, v4 multColor){
+inline void PushBitmap(render_stack* Stack, bmp_info* bitmap, v2 p, float height, v4 multColor){
     render_entry_bitmap* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Bitmap, render_entry_bitmap);
     
     entry->Bitmap = bitmap;
@@ -431,7 +431,7 @@ inline void PushRectInnerOutline(render_stack* Stack, rc2 rect, int pixelWidth, 
 
 inline void PushGlyph(render_stack* Stack, 
                       v2 P, v2 Dim, 
-                      Bmp_Info* Bitmap, 
+                      bmp_info* Bitmap, 
                       v2 MinUV, v2 MaxUV,
                       v4 ModColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {

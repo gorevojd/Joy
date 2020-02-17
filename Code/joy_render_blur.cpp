@@ -64,8 +64,8 @@ void Calculate2DGaussianBox(float* Box, int Radius) {
 }
 
 static void BoxBlurApproximate(
-Bmp_Info* To,
-Bmp_Info* From,
+bmp_info* To,
+bmp_info* From,
 int BlurRadius)
 {
 	int BlurDiam = 1 + BlurRadius + BlurRadius;
@@ -113,8 +113,8 @@ int BlurRadius)
 	}
 }
 
-Bmp_Info BlurBitmapApproximateGaussian(
-Bmp_Info* BitmapToBlur,
+bmp_info BlurBitmapApproximateGaussian(
+bmp_info* BitmapToBlur,
 void* ResultBitmapMem,
 void* TempBitmapMem,
 int width, int height,
@@ -123,12 +123,12 @@ int BlurRadius)
 	Assert(width == BitmapToBlur->Width);
 	Assert(height == BitmapToBlur->Height);
     
-	Bmp_Info Result = AllocateBitmapInternal(
+	bmp_info Result = AllocateBitmapInternal(
 		BitmapToBlur->Width,
 		BitmapToBlur->Height,
 		ResultBitmapMem);
     
-	Bmp_Info TempBitmap = AllocateBitmapInternal(
+	bmp_info TempBitmap = AllocateBitmapInternal(
 		BitmapToBlur->Width,
 		BitmapToBlur->Height,
 		TempBitmapMem);
@@ -177,8 +177,8 @@ int BlurRadius)
 	return(Result);
 }
 
-Bmp_Info BlurBitmapExactGaussian(
-Bmp_Info* BitmapToBlur,
+bmp_info BlurBitmapExactGaussian(
+bmp_info* BitmapToBlur,
 void* ResultBitmapMem,
 int width, int height,
 int BlurRadius,
@@ -187,15 +187,15 @@ float* GaussianBox)
 	Assert(width == BitmapToBlur->Width);
 	Assert(height == BitmapToBlur->Height);
     
-	Bmp_Info Result = AllocateBitmapInternal(
+	bmp_info Result = AllocateBitmapInternal(
 		BitmapToBlur->Width,
 		BitmapToBlur->Height,
 		ResultBitmapMem);
     
 	int BlurDiam = 1 + BlurRadius + BlurRadius;
     
-	Bmp_Info* From = BitmapToBlur;
-	Bmp_Info* To = &Result;
+	bmp_info* From = BitmapToBlur;
+	bmp_info* To = &Result;
     
 	for (int Y = 0; Y < From->Height; Y++) {
 		for (int X = 0; X < From->Width; X++) {

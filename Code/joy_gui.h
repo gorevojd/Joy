@@ -19,19 +19,19 @@ It can have some children and parents elements. The tree of elements is a
 Gui_Page. It's done this way because of comfortability to group the elements
 */
 
-inline float GetBaseline(Font_Info* fontInfo, float scale = 1.0f){
+inline float GetBaseline(font_info* fontInfo, float scale = 1.0f){
     float res = (fontInfo->AscenderHeight + fontInfo->LineGap) * scale;
     
     return(res);
 }
 
-inline float GetLineAdvance(Font_Info* fontInfo, float scale = 1.0f){
+inline float GetLineAdvance(font_info* fontInfo, float scale = 1.0f){
     float res = (fontInfo->AscenderHeight + fontInfo->LineGap - fontInfo->DescenderHeight) * scale;
     
     return(res);
 }
 
-inline float GetScaledAscender(Font_Info* fontInfo, float scale = 1.0f){
+inline float GetScaledAscender(font_info* fontInfo, float scale = 1.0f){
     float res = fontInfo->AscenderHeight * scale;
     
     return(res);
@@ -235,10 +235,26 @@ enum Gui_Interaction_Type{
     GuiInteraction_Empty,
 };
 
-struct Gui_Interaction{
+enum gui_priority_type{
+    GUI_PRIORITY_SUPER_SMALL,
+    GUI_PRIORITY_SMALL,
+    GUI_PRIORITY_AVG,
+    GUI_PRIORITY_HIGH,
+    GUI_PRIORITY_SUPER_HIGH,
+    GUI_PRIORITY_SUPER_PUPER_HIGH,
+};
+
+struct gui_interaction_ctx{
     u32 ID;
+    char* Name;
+    u32 Priority;
+};
+
+struct gui_interaction{
     Gui_Element* Owner;
     u32 InteractionType;
+    
+    gui_interaction_ctx Context;
     
     union{
         v2 OffsetInAnchor;
@@ -247,12 +263,24 @@ struct Gui_Interaction{
     b32 WasHotInInteraction;
     b32 WasActiveInInteraction;
     
-    Gui_Interaction(u32 InteractionType, Gui_Element* Owner){
+    gui_interaction(u32 InteractionType, Gui_Element* Owner){
         this->InteractionType = InteractionType;
         this->Owner = Owner;
-        this->ID = Owner->id;
+        this->Context.ID = Owner->id;
+        this->Context.Name = Owner->name;
+        this->Context.Priority = GUI_PRIORITY_SMALL;
         this->WasHotInInteraction = 0;
         this->WasActiveInInteraction = 0;
+    }
+    
+    void SetPriority(u32 Priority){
+        this->Context.Priority = Priority;
+    }
+    
+    static gui_interaction_ctx NullInteraction(){
+        gui_interaction_ctx Result = {};
+        
+        return(Result);
     }
     
     virtual void Interact(struct gui_state* Gui) = 0;
@@ -267,8 +295,8 @@ struct gui_frame_info{
 };
 
 struct gui_state{
-    Font_Info* mainFont;
-    Font_Info* TileFont;
+    font_info* mainFont;
+    font_info* TileFont;
     float fontScale;
     
     gui_frame_info FrameInfo;
@@ -280,8 +308,8 @@ struct gui_state{
     
     mem_region* Mem;
     
-    u32 HotInteraction;
-    u32 ActiveInteraction;
+    gui_interaction_ctx HotInteraction;
+    gui_interaction_ctx ActiveInteraction;
     
     Gui_Page rootPage;
     Gui_Page* currentPage;
@@ -310,8 +338,8 @@ struct gui_state{
     int tooltipIndex;
     
     Asset_Atlas* atlas;
-    Bmp_Info* CheckboxMark;
-    Bmp_Info* ChamomileIcon;
+    bmp_info* CheckboxMark;
+    bmp_info* ChamomileIcon;
     
     Color_State colorState;
     v4 colors[GuiColor_Count];
@@ -324,52 +352,60 @@ struct gui_state{
 
 
 inline b32 GuiIsHot(gui_state* Gui,
-                    Gui_Interaction* interaction)
+                    gui_interaction* interaction)
 {
-    b32 Result = Gui->HotInteraction == interaction->ID;
+    b32 Result = Gui->HotInteraction.ID == interaction->Context.ID;
     
     return(Result);
 }
 
-inline void GuiSetHot(gui_state* Gui, u32 InteractionID, b32 ToSet){
+inline void GuiSetHot(gui_state* Gui, 
+                      gui_interaction* Interaction,
+                      b32 ToSet)
+{
+    ASSERT(Interaction);
+    
     if(ToSet){
-        
-        if(Gui->HotInteraction == 0){
-            Gui->HotInteraction = InteractionID;
+        if((Gui->HotInteraction.ID == 0) &&
+           (Interaction->Context.Priority >= Gui->HotInteraction.Priority))
+        {
+            Gui->HotInteraction = Interaction->Context;
         }
     }
     else{
-        if(Gui->HotInteraction == InteractionID){
-            Gui->HotInteraction = 0;
+        if(Gui->HotInteraction.ID == Interaction->Context.ID){
+            Gui->HotInteraction = gui_interaction::NullInteraction();
         }
     }
 }
 
 
-inline b32 GuiIsActive(gui_state* Gui, Gui_Interaction* interaction){
-    b32 Result = Gui->ActiveInteraction == interaction->ID;
+inline b32 GuiIsActive(gui_state* Gui, gui_interaction* interaction){
+    b32 Result = Gui->ActiveInteraction.ID == interaction->Context.ID;
     
     return(Result);
 }
 
-inline void GuiSetActive(gui_state* Gui, Gui_Interaction* interaction){
-    if(GuiIsHot(Gui, interaction)){
-        Gui->ActiveInteraction = interaction->ID;
-        GuiSetHot(Gui, interaction->ID, JOY_FALSE);
+inline void GuiSetActive(gui_state* Gui, gui_interaction* interaction){
+    if(GuiIsHot(Gui, interaction) && 
+       interaction->Context.Priority >= Gui->ActiveInteraction.Priority)
+    {
+        Gui->ActiveInteraction = interaction->Context;
+        GuiSetHot(Gui, interaction, JOY_FALSE);
     }
 }
 
-inline void GuiReleaseInteraction(gui_state* Gui, Gui_Interaction* interaction){
+inline void GuiReleaseInteraction(gui_state* Gui, gui_interaction* interaction){
     if(interaction){
         if(GuiIsActive(Gui, interaction)){
-            Gui->ActiveInteraction = 0;
+            Gui->ActiveInteraction = gui_interaction::NullInteraction();
         }
     }
 }
 
 
-struct Gui_Empty_Interaction : public Gui_Interaction{
-    Gui_Empty_Interaction(Gui_Element* Owner) : Gui_Interaction(GuiInteraction_Empty, Owner)
+struct Gui_Empty_Interaction : public gui_interaction{
+    Gui_Empty_Interaction(Gui_Element* Owner) : gui_interaction(GuiInteraction_Empty, Owner)
     {
         
     }
@@ -380,12 +416,12 @@ struct Gui_Empty_Interaction : public Gui_Interaction{
     }
 };
 
-struct Gui_BoolInRect_Interaction : public Gui_Interaction{
+struct Gui_BoolInRect_Interaction : public gui_interaction{
     b32* Value;
     rc2 Rect;
     
     Gui_BoolInRect_Interaction(b32* Value, rc2 Rect, Gui_Element* Owner) : 
-    Gui_Interaction(GuiInteraction_BoolInRect, Owner) 
+    gui_interaction(GuiInteraction_BoolInRect, Owner) 
     {
         this->Value = Value;
         this->Rect = Rect;
@@ -397,7 +433,7 @@ struct Gui_BoolInRect_Interaction : public Gui_Interaction{
         this->WasActiveInInteraction = 0;
         
         if(MouseInRect(Gui->Input, Rect)){
-            GuiSetHot(Gui, this->ID, JOY_TRUE);
+            GuiSetHot(Gui, this, JOY_TRUE);
             this->WasHotInInteraction = JOY_TRUE;
             
             if(KeyWentDown(Gui->FrameInfo.Input, MouseKey_Left)){
@@ -408,7 +444,7 @@ struct Gui_BoolInRect_Interaction : public Gui_Interaction{
             }
         }
         else{
-            GuiSetHot(Gui, this->ID, JOY_FALSE);
+            GuiSetHot(Gui, this, JOY_FALSE);
         }
     }
 };
@@ -421,7 +457,7 @@ enum class Gui_Resize_Interaction_Type{
     Vertical,
 };
 
-struct Gui_Resize_Interaction : public Gui_Interaction{
+struct Gui_Resize_Interaction : public gui_interaction{
     v2* DimensionPtr;
 	v2 Position;
 	v2 MinDim;
@@ -432,7 +468,7 @@ struct Gui_Resize_Interaction : public Gui_Interaction{
                            v2 MinDim,
                            Gui_Resize_Interaction_Type Type, 
                            Gui_Element* Owner) : 
-    Gui_Interaction(GuiInteraction_Resize, Owner)
+    gui_interaction(GuiInteraction_Resize, Owner)
     {
         this->DimensionPtr = Dimension;
         this->Type = Type;
@@ -491,14 +527,14 @@ enum class Gui_Move_Interaction_Type{
     Move,
 };
 
-struct Gui_Move_Interaction : public Gui_Interaction{
+struct Gui_Move_Interaction : public gui_interaction{
     v2* MovePosition;
     Gui_Move_Interaction_Type Type;
     
     Gui_Move_Interaction(v2* MovePosition, 
                          Gui_Move_Interaction_Type Type, 
                          Gui_Element* Owner) : 
-    Gui_Interaction(GuiInteraction_Move, Owner)
+    gui_interaction(GuiInteraction_Move, Owner)
     {
         this->Type = Type;
         this->OffsetInAnchor = V2(0.0f, 0.0f);
@@ -628,7 +664,7 @@ enum print_text_operation{
     PrintTextOp_GetSize,
 };
 
-rc2 PrintTextInternal(Font_Info* fontInfo, 
+rc2 PrintTextInternal(font_info* fontInfo, 
                       render_stack* Stack, 
                       char* text, 
                       v2 P, 
@@ -637,8 +673,8 @@ rc2 PrintTextInternal(Font_Info* fontInfo,
                       v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f), 
                       int CaretP = 0, 
                       v2* CaretPrintPOut = 0);
-v2 GetTextSizeInternal(Font_Info* fontInfo, char* text, float scale);
-rc2 PrintTextCenteredInRectInternal(Font_Info* fontInfo, render_stack* Stack, char* text, rc2 rect, float scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
+v2 GetTextSizeInternal(font_info* fontInfo, char* text, float scale);
+rc2 PrintTextCenteredInRectInternal(font_info* fontInfo, render_stack* Stack, char* text, rc2 rect, float scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
 
 v2 GetTextSize(gui_state* Gui, char* Text, float scale = 1.0f);
 rc2 GetTextRect(gui_state* Gui, char* Text, v2 p, float scale = 1.0f);

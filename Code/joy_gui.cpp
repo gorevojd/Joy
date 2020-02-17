@@ -435,8 +435,7 @@ assets* Assets)
     // NOTE(Dima): Init layouts
     Gui->layoutCount = 1;
     Gui->rootLayout = {};
-    Gui->rootLayout.Next = &Gui->rootLayout;
-    Gui->rootLayout.Prev = &Gui->rootLayout;
+    JOY_INIT_SENTINELS_LINKS(Gui->rootLayout, Next, Prev);
     CopyStrings(Gui->rootLayout.Name, "RootLayout");
     Gui->rootLayout.ID = StringHashFNV(Gui->rootLayout.Name);
     
@@ -451,27 +450,22 @@ assets* Assets)
     // NOTE(Dima): Init pages
     Gui->pageCount = 1;
     Gui->rootPage = {};
-    Gui->rootPage.Next = &Gui->rootPage;
-    Gui->rootPage.Prev = &Gui->rootPage;
+    JOY_INIT_SENTINELS_LINKS(Gui->rootPage, Next, Prev);
     CopyStrings(Gui->rootPage.name, "RootPage");
     Gui->rootPage.id = StringHashFNV(Gui->rootPage.name);
     
     // NOTE(Dima): Initializing of window free pool and sentinels
-    Gui->windowUseSentinel.NextAlloc = &Gui->windowUseSentinel;
-    Gui->windowUseSentinel.PrevAlloc = &Gui->windowUseSentinel;
-    Gui->windowFreeSentinel.NextAlloc = &Gui->windowFreeSentinel;
-    Gui->windowFreeSentinel.PrevAlloc = &Gui->windowFreeSentinel;
+    JOY_INIT_SENTINELS_LINKS(Gui->windowUseSentinel, NextAlloc, PrevAlloc);
+    JOY_INIT_SENTINELS_LINKS(Gui->windowFreeSentinel, NextAlloc, PrevAlloc);
     
     GuiGrowWindowFreePool(Gui, Gui->Mem, 128);
     
     // NOTE(Dima): Init window sentinel for returning windows
     // NOTE(Dima): as list when we allocate multiple of them.
-    Gui->windowSentinel4Returning.Next = &Gui->windowSentinel4Returning;
-    Gui->windowSentinel4Returning.Prev = &Gui->windowSentinel4Returning;
+    JOY_INIT_SENTINELS_LINKS(Gui->windowSentinel4Returning, Next, Prev);
     
     // NOTE(Dima): Init window leaf sentinel
-    Gui->windowLeafSentinel.Next = &Gui->windowLeafSentinel;
-    Gui->windowLeafSentinel.Prev = &Gui->windowLeafSentinel;
+    JOY_INIT_SENTINELS_LINKS(Gui->windowLeafSentinel, Next, Prev);
     
     Gui->tempWindow1 = GuiAllocateWindow(Gui);
     Gui->tempWindow1->rect = RcMinDim(V2(10, 10), V2(1000, 600));
@@ -480,12 +474,8 @@ assets* Assets)
     
     // NOTE(Dima): Initializing elements sentinel
     Gui->TotalAllocatedGuiElements = 0;
-    
-    Gui->freeSentinel.NextAlloc = &Gui->freeSentinel;
-    Gui->freeSentinel.PrevAlloc = &Gui->freeSentinel;
-    
-    Gui->useSentinel.NextAlloc = &Gui->useSentinel;
-    Gui->useSentinel.PrevAlloc = &Gui->useSentinel;
+    JOY_INIT_SENTINELS_LINKS(Gui->freeSentinel, NextAlloc, PrevAlloc);
+    JOY_INIT_SENTINELS_LINKS(Gui->useSentinel, NextAlloc, PrevAlloc);
     
     // NOTE(Dima): Initializing root element
     GuiInitRoot(Gui, &Gui->rootElement);
@@ -517,7 +507,7 @@ assets* Assets)
     Gui->colors[GuiColor_WindowBorderActive] = GUI_GETCOLOR_COLSYS(Color_Blue);
 }
 
-rc2 PrintTextInternal(Font_Info* font, render_stack* stack, char* text, v2 p, u32 textOp, float scale, v4 color, int CaretP, v2* CaretPrintPOut)
+rc2 PrintTextInternal(font_info* font, render_stack* stack, char* text, v2 p, u32 textOp, float scale, v4 color, int CaretP, v2* CaretPrintPOut)
 {
     rc2 txtRc;
     
@@ -536,7 +526,7 @@ rc2 PrintTextInternal(Font_Info* font, render_stack* stack, char* text, v2 p, u3
         if(*at >= ' ' && *at <= '~'){
             
             int glyphIndex = font->Codepoint2Glyph[*at];
-            Glyph_Info* glyph = &font->Glyphs[glyphIndex];
+            glyph_info* glyph = &font->Glyphs[glyphIndex];
             
             float bmpScale = glyph->Height * scale;
             
@@ -590,7 +580,7 @@ void PrintCaret(gui_state* Gui, v2 PrintP, v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f)
     PushRect(Gui->Stack, RcMinDim(CaretMin, CaretDim), Color);
 }
 
-v2 GetTextSizeInternal(Font_Info* font, char* Text, float scale){
+v2 GetTextSizeInternal(font_info* font, char* Text, float scale){
     rc2 TextRc = PrintTextInternal(
         font, 
         0, 
@@ -603,7 +593,7 @@ v2 GetTextSizeInternal(Font_Info* font, char* Text, float scale){
     return(result);
 }
 
-inline v2 GetCenteredTextOffset(Font_Info* font, float TextDimX, rc2 Rect, float scale = 1.0f){
+inline v2 GetCenteredTextOffset(font_info* font, float TextDimX, rc2 Rect, float scale = 1.0f){
     float LineDimY = GetLineAdvance(font, scale);
     float LineDelta = (font->AscenderHeight + font->LineGap) * scale - LineDimY * 0.5f;
     
@@ -613,13 +603,13 @@ inline v2 GetCenteredTextOffset(Font_Info* font, float TextDimX, rc2 Rect, float
     return(TargetP);
 }
 
-inline float GetCenteredTextOffsetY(Font_Info* font, rc2 rect, float scale = 1.0f){
+inline float GetCenteredTextOffsetY(font_info* font, rc2 rect, float scale = 1.0f){
     float result = GetCenteredTextOffset(font, 0.0f, rect, scale).y;
     
     return(result);
 }
 
-inline v2 GetCenteredTextOffset(Font_Info* font, char* Text, rc2 rect, float scale = 1.0f){
+inline v2 GetCenteredTextOffset(font_info* font, char* Text, rc2 rect, float scale = 1.0f){
     v2 TextDim = GetTextSizeInternal(font, Text, scale);
     
     v2 result = GetCenteredTextOffset(font, TextDim.x, rect, scale);
@@ -628,7 +618,7 @@ inline v2 GetCenteredTextOffset(Font_Info* font, char* Text, rc2 rect, float sca
 }
 
 rc2 PrintTextCenteredInRectInternal(
-Font_Info* font, 
+font_info* font, 
 render_stack* stack, 
 char* text, 
 rc2 rect, 
@@ -843,7 +833,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
         
         v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
         if(MouseInRect(Gui->Input, windowRc)){
-            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
+            GuiSetHot(Gui, &Interaction, JOY_TRUE);
             if(GuiIsHot(Gui, &Interaction)){
                 outlineColor = GUI_GETCOLOR(GuiColor_Hot);
             }
@@ -861,7 +851,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
                 GuiReleaseInteraction(Gui, &Interaction);
             }
             
-            GuiSetHot(Gui, Interaction.ID, JOY_FALSE);
+            GuiSetHot(Gui, &Interaction, JOY_FALSE);
         }
         
         if(GuiIsActive(Gui, &Interaction)){
@@ -1381,26 +1371,26 @@ void GuiAnchor(gui_state* Gui,
         }
         v2* OffsetInAnchor = &elem->data.Anchor.OffsetInAnchor;
         
-        Gui_Interaction* interaction = 0;
+        gui_interaction* interaction = 0;
         if(Resize){
             Gui_Resize_Interaction ResizeInteraction(*RectP,
                                                      RectDim,
                                                      V2(50, 50),
                                                      Gui_Resize_Interaction_Type::Default,
                                                      elem);
+            ResizeInteraction.SetPriority(GUI_PRIORITY_HIGH);
             interaction = &ResizeInteraction;
         }
         else{
             Gui_Move_Interaction MoveInteraction(RectP,
                                                  Gui_Move_Interaction_Type::Move,
                                                  elem);
-            
+            MoveInteraction.SetPriority(GUI_PRIORITY_HIGH);
             interaction = &MoveInteraction;
         }
         
-        
         if(MouseInRect(Gui->Input, WorkRect)){
-            GuiSetHot(Gui, interaction->ID, JOY_TRUE);
+            GuiSetHot(Gui, interaction, JOY_TRUE);
             
             if(KeyWentDown(Gui->Input, MouseKey_Left)){
                 GuiSetActive(Gui, interaction);
@@ -1409,7 +1399,7 @@ void GuiAnchor(gui_state* Gui,
             }
         }
         else{
-            GuiSetHot(Gui, interaction->ID, JOY_FALSE);
+            GuiSetHot(Gui, interaction, JOY_FALSE);
         }
         
         if(KeyWentUp(Gui->Input, MouseKey_Left)){
@@ -1460,9 +1450,10 @@ void GuiBeginTree(gui_state* Gui, char* name){
         }
         
         Gui_Empty_Interaction Interaction(elem);
+        Interaction.SetPriority(GUI_PRIORITY_AVG);
         
         if(MouseInRect(Gui->Input, textRc)){
-            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
+            GuiSetHot(Gui, &Interaction, JOY_TRUE);
             textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
             if(KeyWentDown(Gui->Input, MouseKey_Left)){
@@ -1473,7 +1464,7 @@ void GuiBeginTree(gui_state* Gui, char* name){
             }
         }
         else{
-            GuiSetHot(Gui, Interaction.ID, JOY_FALSE);
+            GuiSetHot(Gui, &Interaction, JOY_FALSE);
         }
         PrintText(Gui, name, layout->At, textColor);
         
@@ -1520,9 +1511,10 @@ b32 GuiButton(gui_state* Gui, char* buttonName){
         v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
         
         Gui_Empty_Interaction Interaction(elem);
+        Interaction.SetPriority(GUI_PRIORITY_AVG);
         
         if(MouseInRect(Gui->Input, textRc)){
-            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
+            GuiSetHot(Gui, &Interaction, JOY_TRUE);
             textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
             if(KeyWentDown(Gui->Input, MouseKey_Left)){
@@ -1532,7 +1524,7 @@ b32 GuiButton(gui_state* Gui, char* buttonName){
             }
         }
         else{
-            GuiSetHot(Gui, Interaction.ID, JOY_FALSE);
+            GuiSetHot(Gui, &Interaction, JOY_FALSE);
         }
         
         PrintTextCenteredInRect(Gui, buttonName, textRc, 1.0f, textColor);
@@ -1567,6 +1559,7 @@ void GuiBoolButton(gui_state* Gui, char* buttonName, b32* value){
             }
             
             Gui_BoolInRect_Interaction Interaction(value, textRc, elem);
+            Interaction.SetPriority(GUI_PRIORITY_AVG);
             Interaction.Interact(Gui);
             
             if(Interaction.WasHotInInteraction){
@@ -1616,6 +1609,7 @@ void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value){
             }
             
             Gui_BoolInRect_Interaction Interaction(value, butRc, elem);
+            Interaction.SetPriority(GUI_PRIORITY_AVG);
             Interaction.Interact(Gui);
             
             if(Interaction.WasHotInInteraction){
@@ -1653,6 +1647,7 @@ void GuiCheckbox(gui_state* Gui, char* name, b32* value){
         if(value){
             
             Gui_BoolInRect_Interaction Interaction(value, chkRect, elem);
+            Interaction.SetPriority(GUI_PRIORITY_AVG);
             Interaction.Interact(Gui);
             
             if(Interaction.WasHotInInteraction){
@@ -1754,8 +1749,9 @@ void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId) {
         }
         
         Gui_Empty_Interaction Interaction(radioBut);
+        Interaction.SetPriority(GUI_PRIORITY_AVG);
         if (MouseInRect(Gui->Input, textRc)) {
-            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
+            GuiSetHot(Gui, &Interaction, JOY_TRUE);
             textC = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
             if (KeyWentDown(Gui->Input, MouseKey_Left)) {
@@ -1770,7 +1766,7 @@ void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId) {
             }
         }
         else{
-            GuiSetHot(Gui, Interaction.ID, JOY_FALSE);
+            GuiSetHot(Gui, &Interaction, JOY_FALSE);
         }
         
         PrintTextCenteredInRect(Gui, name, textRc, 1.0f, textC);
@@ -1806,10 +1802,10 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
         char Buf[32];
         
         Gui_Empty_Interaction Interaction(elem);
-        
+        Interaction.SetPriority(GUI_PRIORITY_AVG);
         
         if(MouseInRect(Gui->Input, SlideRc)){
-            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
+            GuiSetHot(Gui, &Interaction, JOY_TRUE);
             
             if(KeyWentDown(Gui->Input, MouseKey_Left)){
                 GuiSetActive(Gui, &Interaction);
@@ -1896,9 +1892,10 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
         char Buf[32];
         
         Gui_Empty_Interaction Interaction(elem);
+        Interaction.SetPriority(GUI_PRIORITY_AVG);
         
         if(MouseInRect(Gui->Input, SlideRc)){
-            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
+            GuiSetHot(Gui, &Interaction, JOY_TRUE);
             
             if(KeyWentDown(Gui->Input, MouseKey_Left)){
                 GuiSetActive(Gui, &Interaction);
@@ -1982,9 +1979,10 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
         int* CaretP = &elem->data.InputText.CaretPos;
         
         Gui_Empty_Interaction Interaction(elem);
+        Interaction.SetPriority(GUI_PRIORITY_AVG);
         
         if(MouseInRect(Gui->Input, textRc)){
-            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
+            GuiSetHot(Gui, &Interaction, JOY_TRUE);
             
             if(KeyWentDown(Gui->Input, MouseKey_Left)){
                 GuiSetActive(Gui, &Interaction);
@@ -1997,7 +1995,7 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
                 GuiReleaseInteraction(Gui, &Interaction);
             }
             
-            GuiSetHot(Gui, Interaction.ID, JOY_FALSE);
+            GuiSetHot(Gui, &Interaction, JOY_FALSE);
         }
         
         if(GuiIsActive(Gui, &Interaction)){
@@ -2272,7 +2270,6 @@ b32 GuiGridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
     if(GuiElementOpenedInTree(elem)){
         v4 TileColor = GUI_GETCOLOR_COLSYS(ColorExt_gray53);
         
-        Gui_Empty_Interaction Interaction(elem);
         
         rc2 WorkRect = Item->Rect;
         
@@ -2285,8 +2282,11 @@ b32 GuiGridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
         v4 Color1;
         v4 Color2;
         
+        Gui_Empty_Interaction Interaction(elem);
+        Interaction.SetPriority(GUI_PRIORITY_AVG);
+        
         if(MouseInRect(Gui->Input, WorkRect)){
-            GuiSetHot(Gui, Interaction.ID, JOY_TRUE);
+            GuiSetHot(Gui, &Interaction, JOY_TRUE);
             Color1 = ActiveColor1;
             Color2 = ActiveColor2;
             
@@ -2300,7 +2300,7 @@ b32 GuiGridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
             Item->TimeSinceNotHot = 0;
         }
         else{
-            GuiSetHot(Gui, Interaction.ID, JOY_FALSE);
+            GuiSetHot(Gui, &Interaction, JOY_FALSE);
             float Time4Fadeout = 0.3f;
             
             float t = Item->TimeSinceNotHot / Time4Fadeout;
@@ -2341,6 +2341,16 @@ void GuiTest(gui_state* Gui, float deltaTime){
     stbsp_sprintf(StackInfo, "EntryCount: %d; BytesUsed: %d;", 
                   lastFrameEntryCount, 
                   lastFrameBytesUsed);
+    
+    char InterInfo[256];
+    stbsp_sprintf(InterInfo, "Hot Interaction ID: %u Name: %s", 
+                  Gui->HotInteraction.ID, 
+                  Gui->HotInteraction.Name);
+    GuiText(Gui, InterInfo);
+    stbsp_sprintf(InterInfo, "Active Interaction ID: %u Name: %s", 
+                  Gui->ActiveInteraction.ID,
+                  Gui->ActiveInteraction.Name);
+    GuiText(Gui, InterInfo);
     
 #if 0 
     GuiGridBegin(Gui, "Grid1");
@@ -2400,6 +2410,7 @@ void GuiTest(gui_state* Gui, float deltaTime){
     GuiInputText(Gui, "Input Text", InputTextBuf, 256);
     static float TestFloat4Slider;
     static int TestInt4Slider;
+    GuiSliderFloat(Gui, &Gui->fontScale, 0.5f, 1.5f, "Gui font scale", GuiSlider_Index);
     GuiSliderFloat(Gui, &TestFloat4Slider, -5.0f, 10.0f, "FloatSlider1", GuiSlider_Index);
     GuiSliderFloat(Gui, &TestFloat4Slider, -5.0f, 10.0f, "FloatSlider2", GuiSlider_Progress);
     GuiSliderInt(Gui, &TestInt4Slider, -4, 7, "IntSlider1", GuiSlider_Index);
@@ -2607,12 +2618,10 @@ void GuiTest(gui_state* Gui, float deltaTime){
     
     GuiBeginRow(Gui);
     GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiPushDimBegin(Gui, V2(100, 40));
     GuiRadioButton(Gui, "radio0", 0);
     GuiRadioButton(Gui, "radio1", 1);
     GuiRadioButton(Gui, "radio2", 2);
     GuiRadioButton(Gui, "radio3", 3);
-    GuiPushDimEnd(Gui);
     GuiEndRadioGroup(Gui);
     
     char radioTxt[32];

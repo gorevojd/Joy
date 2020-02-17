@@ -13,8 +13,8 @@
 
 
 void RenderOneBitmapIntoAnother(
-Bmp_Info* to, 
-Bmp_Info* what,
+bmp_info* to, 
+bmp_info* what,
 int startX,
 int startY,
 v4 modulationColor) 
@@ -65,7 +65,7 @@ v4 modulationColor)
 }
 
 
-void RenderRGBA2BGRA(Bmp_Info* buf, rc2 clipRect){
+void RenderRGBA2BGRA(bmp_info* buf, rc2 clipRect){
 	int MinX = 0;
 	int MaxX = buf->Width;
 	int MinY = 0;
@@ -95,7 +95,7 @@ void RenderRGBA2BGRA(Bmp_Info* buf, rc2 clipRect){
 }
 
 
-void RenderRGBA2BGRASSE(Bmp_Info* buf, rc2 clipRect) {
+void RenderRGBA2BGRASSE(bmp_info* buf, rc2 clipRect) {
 	
 	int MinX = 0;
 	int MaxX = buf->Width;
@@ -158,7 +158,7 @@ void RenderRGBA2BGRASSE(Bmp_Info* buf, rc2 clipRect) {
 }
 
 
-void RenderClear(Bmp_Info* buf, v3 Color, rc2 clipRect) {
+void RenderClear(bmp_info* buf, v3 Color, rc2 clipRect) {
 	v4 ResColor = V4(Color.x, Color.y, Color.z, 1.0f);
 	u32 OutColor = PackRGBA(ResColor);
     
@@ -182,7 +182,7 @@ void RenderClear(Bmp_Info* buf, v3 Color, rc2 clipRect) {
 }
 
 
-void RenderClearSSE(Bmp_Info* buf, v3 Color, rc2 clipRect) {
+void RenderClearSSE(bmp_info* buf, v3 Color, rc2 clipRect) {
 	v4 ResColor = V4(Color.x, Color.y, Color.z, 1.0f);
 	u32 OutColor = PackRGBA(ResColor);
     
@@ -245,7 +245,7 @@ void RenderClearSSE(Bmp_Info* buf, v3 Color, rc2 clipRect) {
 	}
 }
 
-void RenderGradientHorz(Bmp_Info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect){
+void RenderGradientHorz(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect){
 	
     v2 P = rect.min;
     v2 Dim = GetRectDim(rect);
@@ -299,7 +299,7 @@ void RenderGradientHorz(Bmp_Info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipR
 	}
 }
 
-void RenderGradientHorzSSE(Bmp_Info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect) {
+void RenderGradientHorzSSE(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect) {
     v2 P = rect.min;
     v2 Dim = GetRectDim(rect);
     
@@ -392,7 +392,7 @@ void RenderGradientHorzSSE(Bmp_Info* buf, rc2 rect, v3 color1, v3 Color2, rc2 cl
 }
 
 
-void RenderGradientVert(Bmp_Info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect){
+void RenderGradientVert(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect){
 	
     v2 P = rect.min;
     v2 Dim = GetRectDim(rect);
@@ -445,7 +445,7 @@ void RenderGradientVert(Bmp_Info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipR
 	}
 }
 
-void RenderGradientVertSSE(Bmp_Info* buf, rc2 rect, v3 color1, v3 color2, rc2 clipRect) {
+void RenderGradientVertSSE(bmp_info* buf, rc2 rect, v3 color1, v3 color2, rc2 clipRect) {
     v2 P = rect.min;
     v2 Dim = GetRectDim(rect);
     
@@ -539,8 +539,8 @@ void RenderGradientVertSSE(Bmp_Info* buf, rc2 rect, v3 color1, v3 color2, rc2 cl
 
 
 void RenderBitmapSSE(
-Bmp_Info* buf,
-Bmp_Info* bitmap,
+bmp_info* buf,
+bmp_info* bitmap,
 v2 P,
 float TargetBitmapPixelHeight,
 v4 modulationColor01,
@@ -772,8 +772,8 @@ rc2 clipRect)
 }
 
 void RenderBitmap(
-Bmp_Info* buf,
-Bmp_Info* bitmap,
+bmp_info* buf,
+bmp_info* bitmap,
 v2 P,
 float TargetBitmapPixelHeight,
 v4 modulationColor01, 
@@ -903,7 +903,7 @@ rc2 clipRect)
 }
 
 void RenderRect(
-Bmp_Info* buf,
+bmp_info* buf,
 v2 P,
 v2 Dim,
 v4 modulationColor01, 
@@ -962,7 +962,7 @@ rc2 clipRect)
 }
 
 void RenderRectSSE(
-Bmp_Info* buf,
+bmp_info* buf,
 v2 P,
 v2 Dim,
 v4 modulationColor01,
@@ -1083,7 +1083,7 @@ rc2 clipRect)
 	u32 PixelFillCount = (MaxY - MinY) * (MaxX - MinX);
 }
 
-void SoftwareRenderStackToOutput(render_stack* stack, Bmp_Info* buf, rc2 clipRect){
+void SoftwareRenderStackToOutput(render_stack* stack, bmp_info* buf, rc2 clipRect){
     u8* at = (u8*)stack->MemBlock.Base;
 	u8* stackEnd = (u8*)stack->MemBlock.Base + stack->MemBlock.Used;
     
@@ -1165,7 +1165,7 @@ void SoftwareRenderStackToOutput(render_stack* stack, Bmp_Info* buf, rc2 clipRec
 }
 
 struct Render_Queue_Work_Data{
-    Bmp_Info* buf;
+    bmp_info* buf;
     rc2 clipRect;
     render_stack* stack;
 };
@@ -1180,7 +1180,7 @@ PLATFORM_CALLBACK(RenderQueueWork){
 }
 
 struct Render_Queue_rgba2bgra_Work{
-    Bmp_Info* buf;
+    bmp_info* buf;
     rc2 clipRect;
 };
 
@@ -1191,7 +1191,7 @@ PLATFORM_CALLBACK(RenderQueueRGBA2BGRAWork){
 }
 
 #define TILES_COUNT 32
-void RenderMultithreaded(platform_job_queue* queue, render_stack* stack, Bmp_Info* buf) {
+void RenderMultithreaded(platform_job_queue* queue, render_stack* stack, bmp_info* buf) {
     
 #if 0
     rc2 clipRect;
@@ -1277,7 +1277,7 @@ void RenderMultithreaded(platform_job_queue* queue, render_stack* stack, Bmp_Inf
 #endif
 }
 
-void RenderMultithreadedRGBA2BGRA(platform_job_queue* queue, Bmp_Info* buf) {
+void RenderMultithreadedRGBA2BGRA(platform_job_queue* queue, bmp_info* buf) {
     
     Render_Queue_rgba2bgra_Work works[TILES_COUNT];
     

@@ -1,7 +1,7 @@
 #include "joy_sort.h"
 
-template<typename t> static void HeapifyAndExtract(t* Array, int Count, bool Descending) {
-	for (int i = Count / 2 - 1; i >= 0; i--) {
+template<typename t> void Heapify(t* Array, int Count, bool Descending){
+    for (int i = Count / 2 - 1; i >= 0; i--) {
 		int Left = i * 2 + 1;
 		int Right = i * 2 + 2;
 		int ToSwapIndex = i;
@@ -18,6 +18,11 @@ template<typename t> static void HeapifyAndExtract(t* Array, int Count, bool Des
 			std::swap<t>(Array[ToSwapIndex], Array[i]);
 		}
 	}
+}
+
+template<typename t> INTERNAL_FUNCTION 
+void HeapifyAndExtract(t* Array, int Count, bool Descending) {
+	Heapify(Array, Count, Descending);
     
 	std::swap<t>(Array[0], Array[Count - 1]);
 }

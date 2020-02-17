@@ -111,6 +111,8 @@ enum KeyType{
     Key_F11,
     Key_F12,
     
+    Key_OEM3, // NOTE(Dima): It's a ` or ~
+    
     Key_VolumeMute,
     Key_VolumeUp,
     Key_VolumeDown,
@@ -469,6 +471,8 @@ inline b32 MouseRightWentDownInRect(input_state* input, rc2 rect) {
 }
 
 void InitInput(input_state* Input);
+void InputUpdate(input_state* Input);
+
 v3 GetMoveVector(input_state* Input, int ControllerIndex);
 
 float GetMoveAxisOnController(input_state* Input, int ControllerIndex, u32 Axis);

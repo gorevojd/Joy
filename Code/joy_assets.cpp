@@ -11,7 +11,7 @@
 #include "stb_sprintf.h"
 
 INTERNAL_FUNCTION void AddBitmapToAtlas(Asset_Atlas* atlas, 
-                                        Bmp_Info* bmp)
+                                        bmp_info* bmp)
 {
     In_Atlas_Bitmap Result = {};
     
@@ -52,9 +52,9 @@ INTERNAL_FUNCTION void AddBitmapToAtlas(Asset_Atlas* atlas,
     atlas->MaxInRowHeight = Max(atlas->MaxInRowHeight, ActualHeight);
 }
 
-INTERNAL_FUNCTION void AddFontToAtlas(Asset_Atlas* atlas, Font_Info* font){
+INTERNAL_FUNCTION void AddFontToAtlas(Asset_Atlas* atlas, font_info* font){
     for(int i = 0; i < font->GlyphCount; i++){
-        Glyph_Info* glyph = &font->Glyphs[i];
+        glyph_info* glyph = &font->Glyphs[i];
         
         AddBitmapToAtlas(atlas, &glyph->Bitmap);
     }
@@ -86,9 +86,12 @@ void InitAssets(assets* Assets){
     // NOTE(Dima): Large atlas initialization
     Assets->MainLargeAtlas = InitAtlas(Assets->Region, 1024);
     
+    Assets->SentinelAsset = {};
+    JOY_INIT_SENTINELS_LINKS(Assets->SentinelAsset, Next, Prev);
+    
     // NOTE(Dima): images
     Loaded_Strings bmpStrs = LoadStringListFromFile("../Data/Images/ToLoadImages.txt");
-    Assets->fadeoutBmps = (Bmp_Info*)malloc(sizeof(Bmp_Info) * bmpStrs.Count);
+    Assets->fadeoutBmps = (bmp_info*)malloc(sizeof(bmp_info) * bmpStrs.Count);
     Assets->fadeoutBmpsCount = bmpStrs.Count;
     for(int i = 0; i < bmpStrs.Count; i++){
         char tmpBuf[256];
@@ -98,33 +101,11 @@ void InitAssets(assets* Assets){
     }
     FreeStringList(&bmpStrs);
     
-    // NOTE(Dima): Sunsets
-    Assets->sunset = LoadBMP("../Data/Images/sunset.jpg");
-    Assets->sunsetOrange = LoadBMP("../Data/Images/sunset_orange.jpg");
-    Assets->sunsetField = LoadBMP("../Data/Images/sunset_field.jpg");
-    Assets->roadClouds = LoadBMP("../Data/Images/road.jpg");
-    Assets->sunsetMountains = LoadBMP("../Data/Images/sunset_monts.jpg");
-    Assets->sunsetPurple = LoadBMP("../Data/Images/sunset_purple.jpg");
-    Assets->sunrise = LoadBMP("../Data/Images/sunrise.jpg");
-    Assets->mountainsFuji = LoadBMP("../Data/Images/mountains_fuji.jpg");
-    
     // NOTE(Dima): Icons
     Assets->CheckboxMark = LoadBMP("../Data/Icons/checkmark64.png");
-    Assets->Folder = LoadBMP("../Data/Icons/folder32.png");
-    Assets->ClosePng = LoadBMP("../Data/Icons/close.png");
-    Assets->PlayPng = LoadBMP("../Data/Icons/play.png");
-    Assets->PlusPng = LoadBMP("../Data/Icons/plus.png");
-    Assets->StopPng = LoadBMP("../Data/Icons/stop.png");
-    Assets->PowerPng = LoadBMP("../Data/Icons/power.png");
     Assets->ChamomileIcon = LoadBMP("../Data/Icons/chamomile.png");
     
     AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->CheckboxMark);
-    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->Folder);
-    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->ClosePng);
-    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->PlayPng);
-    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->PlusPng);
-    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->StopPng);
-    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->PowerPng);
     AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->ChamomileIcon);
     
     // NOTE(Dima): Sounds
