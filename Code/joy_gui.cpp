@@ -2478,21 +2478,6 @@ void GuiTest(gui_state* Gui, float deltaTime){
     GuiGridHubEnd(Gui);
 #endif
     
-    GuiBeginPage(Gui, "Page1");
-    GuiEndPage(Gui);
-    
-    GuiBeginPage(Gui, "Page2");
-    GuiEndPage(Gui);
-    
-    GuiBeginPage(Gui, "Animation");
-    GuiEndPage(Gui);
-    
-    GuiBeginPage(Gui, "Platform");
-    GuiEndPage(Gui);
-    
-    GuiBeginPage(Gui, "GUI");
-    GuiEndPage(Gui);
-    
     //GuiUpdateWindows(Gui);
     GuiBeginTree(Gui, "Some text");
     GuiText(Gui, "Hello world");
