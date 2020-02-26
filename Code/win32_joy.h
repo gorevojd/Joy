@@ -20,7 +20,7 @@
 #include "joy_platform.h"
 #include "joy_gui.h"
 #include "joy_render.h"
-#include "joy_game.h"
+#include "joy_game_mode.h"
 
 #define JOY_USE_OPENGL 1
 #define JOY_USE_DIRECTX 0

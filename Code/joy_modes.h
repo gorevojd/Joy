@@ -2,7 +2,7 @@
 #define JOY_MODES_H
 
 #include "joy_game_interface.h"
-#include "joy_game.h"
+#include "joy_game_mode.h"
 
 #define GAME_GET_MODE_STATE(state_type, state_var_name) \
 state_type* state_var_name = (state_type*)Mode->ModeState;\

@@ -1,5 +1,6 @@
 #include "joy_gui.h"
 #include "joy_defines.h"
+#include "joy_assets_render.h"
 
 #define STB_SPRINTF_IMPLEMENTATION
 #define STB_SPRINTF_STATIC
@@ -425,16 +426,27 @@ assets* Assets)
     // NOTE(Dima): memory region is already initialized
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
-    Gui->mainFont = &Assets->inconsolataBold;
-    Gui->TileFont = &Assets->MollyJackFont;
-    Gui->CheckboxMark = &Assets->CheckboxMark;
-    Gui->ChamomileIcon = &Assets->ChamomileIcon;
+    // NOTE(Dima): InitAssets
+    Gui->Assets = Assets;
+    
+    // NOTE(Dima): Getting IDs for needed assets
+    Gui->MainFontID = GetFirstInFamily(Assets, GameAsset_Inconsolata);
+    Gui->TileFontID = GetFirstInFamily(Assets, GameAsset_MollyJackFont);
+    Gui->CheckboxMarkID = GetFirstInFamily(Assets, GameAsset_CheckboxMark);
+    Gui->ChamomileID = GetFirstInFamily(Assets, GameAsset_ChamomileIcon);
+    
+    // NOTE(Dima): Getting needed assets from IDs
+    Gui->MainFont = GET_ASSET_PTR_MEMBER(GetAssetByID(Assets, Gui->MainFontID), 
+                                         font_info);
+    Gui->TileFont = GET_ASSET_PTR_MEMBER(GetAssetByID(Assets, Gui->TileFontID),
+                                         font_info);
+    
     Gui->fontScale = 1.0f;
     
     // NOTE(Dima): Init layouts
     Gui->layoutCount = 1;
     Gui->rootLayout = {};
-    JOY_INIT_SENTINELS_LINKS(Gui->rootLayout, Next, Prev);
+    DLIST_REFLECT_PTRS(Gui->rootLayout, Next, Prev);
     CopyStrings(Gui->rootLayout.Name, "RootLayout");
     Gui->rootLayout.ID = StringHashFNV(Gui->rootLayout.Name);
     
@@ -449,22 +461,22 @@ assets* Assets)
     // NOTE(Dima): Init pages
     Gui->pageCount = 1;
     Gui->rootPage = {};
-    JOY_INIT_SENTINELS_LINKS(Gui->rootPage, Next, Prev);
+    DLIST_REFLECT_PTRS(Gui->rootPage, Next, Prev);
     CopyStrings(Gui->rootPage.name, "RootPage");
     Gui->rootPage.id = StringHashFNV(Gui->rootPage.name);
     
     // NOTE(Dima): Initializing of window free pool and sentinels
-    JOY_INIT_SENTINELS_LINKS(Gui->windowUseSentinel, NextAlloc, PrevAlloc);
-    JOY_INIT_SENTINELS_LINKS(Gui->windowFreeSentinel, NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(Gui->windowUseSentinel, NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(Gui->windowFreeSentinel, NextAlloc, PrevAlloc);
     
     GuiGrowWindowFreePool(Gui, Gui->Mem, 128);
     
     // NOTE(Dima): Init window sentinel for returning windows
     // NOTE(Dima): as list when we allocate multiple of them.
-    JOY_INIT_SENTINELS_LINKS(Gui->windowSentinel4Returning, Next, Prev);
+    DLIST_REFLECT_PTRS(Gui->windowSentinel4Returning, Next, Prev);
     
     // NOTE(Dima): Init window leaf sentinel
-    JOY_INIT_SENTINELS_LINKS(Gui->windowLeafSentinel, Next, Prev);
+    DLIST_REFLECT_PTRS(Gui->windowLeafSentinel, Next, Prev);
     
     Gui->tempWindow1 = GuiAllocateWindow(Gui);
     Gui->tempWindow1->rect = RcMinDim(V2(10, 10), V2(1000, 600));
@@ -473,8 +485,8 @@ assets* Assets)
     
     // NOTE(Dima): Initializing elements sentinel
     Gui->TotalAllocatedGuiElements = 0;
-    JOY_INIT_SENTINELS_LINKS(Gui->freeSentinel, NextAlloc, PrevAlloc);
-    JOY_INIT_SENTINELS_LINKS(Gui->useSentinel, NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(Gui->freeSentinel, NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(Gui->useSentinel, NextAlloc, PrevAlloc);
     
     // NOTE(Dima): Initializing root element
     GuiInitRoot(Gui, &Gui->rootElement);
@@ -571,7 +583,7 @@ rc2 PrintTextInternal(font_info* font, render_stack* stack, char* text, v2 p, u3
 void PrintCaret(gui_state* Gui, v2 PrintP, v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f)){
     float bmpScale = GuiGetLineAdvance(Gui);
     
-    float CaretMinY = PrintP.y - GetScaledAscender(Gui->mainFont, Gui->fontScale);
+    float CaretMinY = PrintP.y - GetScaledAscender(Gui->MainFont, Gui->fontScale);
     float CaretMinX = PrintP.x;;
     
     v2 CaretMin = V2(CaretMinX, CaretMinY);
@@ -631,7 +643,7 @@ v4 color)
 }
 
 v2 GetTextSize(gui_state* Gui, char* text, float scale){
-    v2 result = GetTextSizeInternal(Gui->mainFont, 
+    v2 result = GetTextSizeInternal(Gui->MainFont, 
                                     text, 
                                     Gui->fontScale * scale);
     
@@ -640,7 +652,7 @@ v2 GetTextSize(gui_state* Gui, char* text, float scale){
 
 rc2 GetTextRect(gui_state* Gui, char* text, v2 p, float scale){
     rc2 TextRc = PrintTextInternal(
-        Gui->mainFont, 
+        Gui->MainFont, 
         Gui->Stack, 
         text, p, 
         PrintTextOp_GetSize, 
@@ -651,7 +663,7 @@ rc2 GetTextRect(gui_state* Gui, char* text, v2 p, float scale){
 
 rc2 PrintText(gui_state* Gui, char* text, v2 p, v4 color, float scale){
     rc2 TextRc = PrintTextInternal(
-        Gui->mainFont, 
+        Gui->MainFont, 
         Gui->Stack, 
         text, p, 
         PrintTextOp_Print, 
@@ -666,7 +678,7 @@ v2 GetCaretPrintP(gui_state* Gui, char* text, v2 p, int CaretP){
     v2 Result;
     
     rc2 TextRc = PrintTextInternal(
-        Gui->mainFont, 
+        Gui->MainFont, 
         Gui->Stack, 
         text, p, 
         PrintTextOp_Print, 
@@ -679,7 +691,7 @@ v2 GetCaretPrintP(gui_state* Gui, char* text, v2 p, int CaretP){
 
 
 rc2 PrintTextCenteredInRect(gui_state* Gui, char* text, rc2 rect, float scale, v4 color){
-    rc2 result = PrintTextCenteredInRectInternal(Gui->mainFont,
+    rc2 result = PrintTextCenteredInRectInternal(Gui->MainFont,
                                                  Gui->Stack,
                                                  text, 
                                                  rect,
@@ -935,6 +947,7 @@ void GuiEndLayout(gui_state* Gui){
     GuiEndElement(Gui, GuiElement_Layout);
 }
 
+#if 0
 INTERNAL_FUNCTION void GuiSplitWindow(gui_state* Gui, 
                                       Gui_Window* window, 
                                       int partsCount, 
@@ -1066,6 +1079,7 @@ void GuiBeginUpdateWindows(gui_state* Gui){
 void GuiEndUpdateWindows(gui_state* Gui){
     GuiUpdateWindows(Gui);
 }
+#endif
 
 void GuiFrameBegin(gui_state* Gui, gui_frame_info GuiFrameInfo){
     Gui->FrameInfo = GuiFrameInfo;
@@ -1136,8 +1150,8 @@ inline void GuiPostAdvance(gui_state* Gui, Gui_Layout* layout, rc2 ElementRect){
     
     float RememberValue = ctx->rememberValue;
     
-    float toX = ElementRect.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f;
-    float toY = ElementRect.max.y + GetLineAdvance(Gui->mainFont, Gui->fontScale) * 0.15f;
+    float toX = ElementRect.max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f;
+    float toY = ElementRect.max.y + GetLineAdvance(Gui->MainFont, Gui->fontScale) * 0.15f;
     
     if(rowStarted){
         layout->At.x = toX;
@@ -1594,8 +1608,8 @@ void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value){
         GuiPushBut(Gui, butRc);
         
         // NOTE(Dima): Button name text printing
-        float nameStartY = GetCenteredTextOffsetY(Gui->mainFont, butRc, Gui->fontScale);
-        v2 nameStart = V2(butRc.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f, nameStartY);
+        float nameStartY = GetCenteredTextOffsetY(Gui->MainFont, butRc, Gui->fontScale);
+        v2 nameStart = V2(butRc.max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, nameStartY);
         rc2 NameRc = PrintText(Gui, buttonName, nameStart, GUI_GETCOLOR(GuiColor_Text));
         
         // NOTE(Dima): Event processing
@@ -1640,9 +1654,9 @@ void GuiCheckbox(gui_state* Gui, char* name, b32* value){
         GuiPreAdvance(Gui, layout);
         
         // NOTE(Dima): Checkbox rendering
-        float chkSize = GetLineAdvance(Gui->mainFont, Gui->fontScale);
+        float chkSize = GetLineAdvance(Gui->MainFont, Gui->fontScale);
         rc2 chkRect;
-        chkRect.min = V2(layout->At.x, layout->At.y - GetScaledAscender(Gui->mainFont, Gui->fontScale));
+        chkRect.min = V2(layout->At.x, layout->At.y - GetScaledAscender(Gui->MainFont, Gui->fontScale));
         chkRect.max = chkRect.min + V2(chkSize, chkSize);
         chkRect = GetTxtElemRect(Gui, layout, chkRect, V2(2.0f, 2.0f));
         
@@ -1662,18 +1676,17 @@ void GuiCheckbox(gui_state* Gui, char* name, b32* value){
         GuiPushBut(Gui, chkRect);
         
         if(*value){
-            PushGlyph(Gui->Stack,
+            PushGlyph(Gui->Assets, 
+                      Gui->Stack,
                       chkRect.min, 
                       GetRectDim(chkRect),
-                      Gui->CheckboxMark,
-                      Gui->CheckboxMark->MinUV,
-                      Gui->CheckboxMark->MaxUV,
+                      Gui->CheckboxMarkID,
                       V4(1.0f, 1.0f, 1.0f, 1.0f));
         }
         
         // NOTE(Dima): Button name text printing
-        float nameStartY = GetCenteredTextOffsetY(Gui->mainFont, chkRect, Gui->fontScale);
-        v2 nameStart = V2(chkRect.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f, nameStartY);
+        float nameStartY = GetCenteredTextOffsetY(Gui->MainFont, chkRect, Gui->fontScale);
+        v2 nameStart = V2(chkRect.max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, nameStartY);
         rc2 nameRc = PrintText(Gui, name, nameStart, GUI_GETCOLOR(GuiColor_Text));
         
         rc2 advanceRect = GetBoundingRect(chkRect, nameRc);
@@ -1849,12 +1862,11 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
                 rc2 HotRect = RcMinDim(V2(HotRectCenterX - HotRectDimX * 0.5f, SlideRc.min.y), 
                                        V2(HotRectDimX, HotRectDimX));
                 
-                PushGlyph(Gui->Stack,
-                          HotRect.min, 
+                PushGlyph(Gui->Assets,
+                          Gui->Stack,
+                          HotRect.min,
                           GetRectDim(HotRect),
-                          Gui->ChamomileIcon,
-                          Gui->ChamomileIcon->MinUV,
-                          Gui->ChamomileIcon->MaxUV,
+                          Gui->ChamomileID,
                           V4(1.0f, 1.0f, 1.0f, 1.0f));
             }
             
@@ -1865,8 +1877,8 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
         v4 textC = GUI_GETCOLOR(GuiColor_ButtonForeground);
         PrintTextCenteredInRect(Gui, Buf, SlideRc, 1.0f, textC);
         
-        float NameStartY = GetCenteredTextOffsetY(Gui->mainFont, SlideRc, Gui->fontScale);
-        v2 NameStart = V2(SlideRc.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f, NameStartY);
+        float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, SlideRc, Gui->fontScale);
+        v2 NameStart = V2(SlideRc.max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, NameStartY);
         
         rc2 NameRc = PrintText(Gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
         
@@ -1938,12 +1950,11 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
                 rc2 HotRect = RcMinDim(V2(HotRectCenterX - HotRectDimX * 0.5f, SlideRc.min.y), 
                                        V2(HotRectDimX, HotRectDimX));
                 
-                PushGlyph(Gui->Stack,
-                          HotRect.min, 
+                PushGlyph(Gui->Assets,
+                          Gui->Stack,
+                          HotRect.min,
                           GetRectDim(HotRect),
-                          Gui->ChamomileIcon,
-                          Gui->ChamomileIcon->MinUV,
-                          Gui->ChamomileIcon->MaxUV,
+                          Gui->ChamomileID,
                           V4(1.0f, 1.0f, 1.0f, 1.0f));
             }
             
@@ -1956,8 +1967,8 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
         v4 textC = GUI_GETCOLOR(GuiColor_ButtonForeground);
         PrintTextCenteredInRect(Gui, Buf, SlideRc, 1.0f, textC);
         
-        float NameStartY = GetCenteredTextOffsetY(Gui->mainFont, SlideRc, Gui->fontScale);
-        v2 NameStart = V2(SlideRc.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f, NameStartY);
+        float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, SlideRc, Gui->fontScale);
+        v2 NameStart = V2(SlideRc.max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, NameStartY);
         
         rc2 NameRc = PrintText(Gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
         
@@ -2101,7 +2112,7 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
         else{
             PrintPX = textRc.max.x - BufTextSize.x;
         }
-        float PrintPY = GetCenteredTextOffsetY(Gui->mainFont,
+        float PrintPY = GetCenteredTextOffsetY(Gui->MainFont,
                                                textRc, 
                                                Gui->fontScale);
         v2 PrintP = V2(PrintPX, PrintPY);
@@ -2115,8 +2126,8 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
         PrintText(Gui, Buf, PrintP, GUI_GETCOLOR(GuiColor_Text));
         EndGuiChunk(Gui->Stack);
         
-        float nameStartY = GetCenteredTextOffsetY(Gui->mainFont, textRc, Gui->fontScale);
-        v2 nameStart = V2(textRc.max.x + GetScaledAscender(Gui->mainFont, Gui->fontScale) * 0.5f, nameStartY);
+        float nameStartY = GetCenteredTextOffsetY(Gui->MainFont, textRc, Gui->fontScale);
+        v2 nameStart = V2(textRc.max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, nameStartY);
         char DebugBuf[256];
         
 #if 1

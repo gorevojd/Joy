@@ -2,6 +2,8 @@
 #define JOY_STRINGS_H
 
 #include "joy_types.h"
+#include "joy_defines.h"
+#include <stdarg.h>
 
 inline b32 StringsAreEqual(char* A, char* B) {
 	b32 Result = false;
@@ -59,6 +61,24 @@ inline void ConcatStringsUnsafe(char* Dst, char* Src1, char* Src2) {
 	}
     
 	*To = 0;
+}
+
+inline void ConcatStringsUnsafe(char* Dst, int Count, ...){
+    va_list ap;
+    
+    char* To = Dst;
+	
+    va_start(ap, Count);
+    for(int i = 0; i < Count; i++){
+        char* At = va_arg(ap, char*);
+        
+        while(*At){
+            *To++ = *At++;
+        }
+    }
+    va_end(ap);
+    
+    *To = 0;
 }
 
 inline int StringLength(char* Text) {
@@ -328,9 +348,9 @@ inline b32 IsLetter(char C){
 }
 
 inline b32 IsUpper(char C){
-    b32 Result = JOY_FALSE;
+    b32 Result = 0;
     if(C >= 'A' && C <= 'Z'){
-        Result = JOY_TRUE;
+        Result = 1;
     }
     
     return(Result);

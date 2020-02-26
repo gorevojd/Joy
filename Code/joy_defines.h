@@ -41,6 +41,32 @@
 #define JOY_TRUE 1
 #define JOY_FALSE 0
 
-#define JOY_INIT_SENTINELS_LINKS(name, next, prev) {name.##next = &name; name.##prev = &name;}
+#define DLIST_REFLECT_PTRS(value, next, prev) {\
+    (value).##next = &(value); \
+    (value).##prev = &(value);}
+
+#define DLIST_FREE_IS_EMPTY(free_value, next) ((free_value).##next == &(free_value))
+
+#define DLIST_INSERT_AFTER_SENTINEL(entry_ptr, sent_value, next, prev) \
+{\
+    (entry_ptr)->##next = (sent_value).##next##; \
+    (entry_ptr)->##prev = &(sent_value); \
+    (entry_ptr)->##prev##->##next = (entry_ptr); \
+    (entry_ptr)->##next##->##prev = (entry_ptr);}
+
+#define DLIST_INSERT_AFTER(entry_ptr, after_ptr, next, prev) \
+{\
+    (entry_ptr)->##next = (after_ptr)->##next##; \
+    (entry_ptr)->##prev = (after_ptr); \
+    (entry_ptr)->##prev##->##next = (entry_ptr); \
+    (entry_ptr)->##next##->##prev = (entry_ptr);}
+
+
+#define DLIST_REMOVE_ENTRY(entry_ptr, next, prev) \
+{\
+    entry_ptr->##next##->##prev = entry_ptr->##prev##;\
+    entry_ptr->##prev##->##next = entry_ptr->##next##;}
+
+
 
 #endif

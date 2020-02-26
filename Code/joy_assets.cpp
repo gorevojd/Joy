@@ -73,9 +73,82 @@ INTERNAL_FUNCTION Asset_Atlas InitAtlas(mem_region* Region, int Dim){
     atlas.AtX = 0;
     atlas.AtY = 0;
     atlas.MaxInRowHeight = 0;
+    
     atlas.OneOverDim = 1.0f / (float)Dim;
     
     return(atlas);
+}
+
+u32 GetFirstInFamily(assets* Assets, u32 Family){
+    asset_family* Fam = &Assets->Families[Family];
+    
+    u32 Result = Fam->AssetID;
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline void FinalAssetLoading(assets* Assets, asset* Asset)
+{
+    switch(Asset->Type){
+        case AssetType_Font:{
+            AddFontToAtlas(&Assets->MainLargeAtlas,
+                           GET_ASSET_PTR_MEMBER(Asset, font_info));
+        }break;
+    }
+}
+
+inline asset* AllocateAsset(assets* Assets)
+{
+    asset_block* PrevBlock = &Assets->AssetBlocks[Assets->CurrentBlockIndex];
+    
+    int TargetInBlockIndex = PrevBlock->InBlockCount++;
+    
+    asset_block* CurBlock = PrevBlock;
+    
+    if(TargetInBlockIndex < MAX_ASSETS_IN_ASSET_BLOCK){
+        // NOTE(Dima): Nothing to do!
+    }
+    else{
+        TargetInBlockIndex = 0;
+        
+        ++Assets->CurrentBlockIndex;
+        ASSERT(Assets->CurrentBlockIndex < MAX_ASSET_BLOCKS_COUNT);
+        
+        CurBlock = &Assets->AssetBlocks[Assets->CurrentBlockIndex];
+        CurBlock->InBlockCount = 1;
+    }
+    
+    int AssetBlockIndex = Assets->CurrentBlockIndex;
+    
+    // NOTE(Dima): If block assets are not allocated yet
+    if(!CurBlock->BlockAssets){
+        // NOTE(Dima): Allocating
+        CurBlock->BlockAssets = PushArray(Assets->Region, asset, MAX_ASSETS_IN_ASSET_BLOCK);
+    }
+    
+    u32 ResultAssetID = 
+        (TargetInBlockIndex & 0xFFFF) | 
+        ((AssetBlockIndex & 0xFFFF) << 16);
+    
+    asset* Result = &CurBlock->BlockAssets[TargetInBlockIndex];
+    
+    Result->Type = AssetType_None;
+    Result->State = AssetState_Unloaded;
+    Result->DataMemoryEntry = 0;
+    Result->ID = ResultAssetID;
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION added_asset AddAsset(assets* Assets){
+    added_asset Result = {};
+    
+    asset* Asset = AllocateAsset(Assets);
+    
+    Result.Asset = Asset;
+    Result.ID = Asset->ID;
+    
+    return(Result);
 }
 
 void InitAssets(assets* Assets){
@@ -86,54 +159,71 @@ void InitAssets(assets* Assets){
     // NOTE(Dima): Large atlas initialization
     Assets->MainLargeAtlas = InitAtlas(Assets->Region, 1024);
     
-    Assets->SentinelAsset = {};
-    JOY_INIT_SENTINELS_LINKS(Assets->SentinelAsset, Next, Prev);
-    
-    // NOTE(Dima): images
-    Loaded_Strings bmpStrs = LoadStringListFromFile("../Data/Images/ToLoadImages.txt");
-    Assets->fadeoutBmps = (bmp_info*)malloc(sizeof(bmp_info) * bmpStrs.Count);
-    Assets->fadeoutBmpsCount = bmpStrs.Count;
-    for(int i = 0; i < bmpStrs.Count; i++){
-        char tmpBuf[256];
-        stbsp_sprintf(tmpBuf, "../Data/Images/%s", bmpStrs.Strings[i]);
+    // NOTE(Dima): Temp initialization of asset families
+    for(int FamIndex = 0;
+        FamIndex < GameAsset_Count;
+        FamIndex++)
+    {
+        asset_family* Fam = &Assets->Families[FamIndex];
         
-        Assets->fadeoutBmps[i] = LoadBMP(tmpBuf);
+        asset* AllocatedAsset = AllocateAsset(Assets);
+        
+        Fam->AssetID = AllocatedAsset->ID;
     }
-    FreeStringList(&bmpStrs);
     
-    // NOTE(Dima): Icons
-    Assets->CheckboxMark = LoadBMP("../Data/Icons/checkmark64.png");
-    Assets->ChamomileIcon = LoadBMP("../Data/Icons/chamomile.png");
+#define TEMP_INIT_FAM_ASSET(fam_id, data_type, value) \
+    {\
+        asset_family* Fam = &Assets->Families[fam_id];\
+        asset* Asset = GetAssetByID(Assets, Fam->AssetID);\
+        Asset->Type = AssetType_Type_##data_type;\
+        Asset->Data_##data_type = value;\
+        Asset->Ptr_##data_type = &Asset->Data_##data_type;\
+        FinalAssetLoading(Assets, Asset);}
     
-    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->CheckboxMark);
-    AddBitmapToAtlas(&Assets->MainLargeAtlas, &Assets->ChamomileIcon);
+#if 0
+    BeginAsset();
+    AddBitmap();
+    AddBitmap();
+    AddBitmap();
+    EndAsset();
     
-    // NOTE(Dima): Sounds
-    Assets->SineTest1 = MakeSineSound256(44100 * 4, 44100);
-    Assets->SineTest2 = MakeSineSound(std::vector<int>{256, 128, 430}, 44100 * 4, 44100);
+    BeginAsset(Assets, GameAsset_SineSound);
+    AddSound(Assets, );
+    AddSound(Assets, );
+    EndAsset(Assets);
     
-    // NOTE(Dima): Meshes
-    Assets->Cube = MakeCube();
-    Assets->Plane = MakePlane();
-    Assets->Sphere = MakeSphere(20, 12);
-    Assets->Cylynder = MakeCylynder(2.0f, 0.5f, 16);
+    BeginAsset(Assets, GameAsset_Sphere);
+    AddMesh(Assets, );
+    AddMesh(Assets, );
+    AddMesh(Assets, );
+    EndAsset(Assets);
     
-    // NOTE(Dima): Fonts
-    Assets->liberationMono = LoadFont("../Data/Fonts/LiberationMono-Regular.ttf", 18.0f, LoadFont_BakeShadow);
-    Assets->lilitaOne = LoadFont("../Data/Fonts/LilitaOne.ttf", 20.0f, LoadFont_BakeShadow);
-    
-#if 1
-    Assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, LoadFont_BakeBlur);
-#else
-    Assets->inconsolataBold = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, 0);
 #endif
-    Assets->MollyJackFont = LoadFont("../Data/Fonts/MollyJack.otf", 40.0f, LoadFont_BakeBlur);
     
-    Assets->pfdin = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 18.0f, LoadFont_BakeBlur);
-    
-    AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->liberationMono);
-    AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->lilitaOne);
-    AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->inconsolataBold);
-    AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->pfdin);
-    AddFontToAtlas(&Assets->MainLargeAtlas, &Assets->MollyJackFont);
+    TEMP_INIT_FAM_ASSET(GameAsset_CheckboxMark, 
+                        bmp_info,
+                        LoadBMP("../Data/Icons/checkmark64.png"));
+    TEMP_INIT_FAM_ASSET(GameAsset_ChamomileIcon, bmp_info, 
+                        LoadBMP("../Data/Icons/chamomile.png"));
+    TEMP_INIT_FAM_ASSET(GameAsset_SineTest, sound_info, 
+                        MakeSineSound256(44100 * 4, 44100));
+    TEMP_INIT_FAM_ASSET(GameAsset_SineTest, sound_info, 
+                        MakeSineSound(
+        std::vector<int>{256, 128, 430}, 
+        44100 * 4, 44100));
+    TEMP_INIT_FAM_ASSET(GameAsset_Cube, mesh_info, MakeCube());
+    TEMP_INIT_FAM_ASSET(GameAsset_Plane, mesh_info, MakePlane());
+    TEMP_INIT_FAM_ASSET(GameAsset_Sphere, mesh_info, MakeSphere(20, 12));
+    TEMP_INIT_FAM_ASSET(GameAsset_Cylynder, mesh_info,
+                        MakeCylynder(2.0f, 0.5f, 16));
+    TEMP_INIT_FAM_ASSET(GameAsset_LiberationMono, font_info, 
+                        LoadFont("../Data/Fonts/LiberationMono-Regular.ttf", 18.0f, LoadFont_BakeShadow));
+    TEMP_INIT_FAM_ASSET(GameAsset_LilitaOne, font_info, 
+                        LoadFont("../Data/Fonts/LilitaOne.ttf", 20.0f, LoadFont_BakeShadow));
+    TEMP_INIT_FAM_ASSET(GameAsset_Inconsolata, font_info, 
+                        LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, LoadFont_BakeBlur));
+    TEMP_INIT_FAM_ASSET(GameAsset_PFDIN, font_info, 
+                        LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 18.0f, LoadFont_BakeBlur));
+    TEMP_INIT_FAM_ASSET(GameAsset_MollyJackFont, font_info, 
+                        LoadFont("../Data/Fonts/MollyJack.otf", 40.0f, LoadFont_BakeBlur));
 }

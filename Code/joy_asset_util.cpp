@@ -18,31 +18,32 @@
 
 #include <intrin.h>
 
-Data_Buffer ReadFileToDataBuffer(char* fileName){
-	Data_Buffer res = {};
+data_buffer ReadFileToDataBuffer(char* FileName) {
+	data_buffer Result = {};
     
-	FILE* fp = fopen(fileName, "rb");
+	FILE* fp = fopen(FileName, "rb");
 	if (fp) {
 		fseek(fp, 0, 2);
-		u64 fileSize = ftell(fp);
+		u64 FileSize = ftell(fp);
 		fseek(fp, 0, 0);
         
-		res.size = fileSize + 1;
-		res.data = (u8*)calloc(fileSize + 1, 1);
+		Result.Size = FileSize;
+		Result.Data = (u8*)calloc(FileSize, 1);
         
-		fread(res.data, 1, fileSize, fp);
+		fread(Result.Data, 1, FileSize, fp);
         
 		fclose(fp);
 	}
     
-	return(res);
+	return(Result);
 }
 
-void FreeDataBuffer(Data_Buffer* dataBuffer){
-	if (dataBuffer->data) {
-		free(dataBuffer->data);
+void FreeDataBuffer(data_buffer* DataBuffer) {
+	if (DataBuffer->Data) {
+		free(DataBuffer->Data);
 	}
 }
+
 
 inline b32 IsWhitespaceNewlineOrEndline(char c){
     b32 res = (c == '\n' || 
@@ -56,16 +57,16 @@ inline b32 IsWhitespaceNewlineOrEndline(char c){
 Loaded_Strings LoadStringListFromFile(char* filePath){
     Loaded_Strings result = {};
     
-    Data_Buffer buf = ReadFileToDataBuffer(filePath);
+    data_buffer buf = ReadFileToDataBuffer(filePath);
     
     std::vector<std::string> strings;
     
-    char* at = (char*)buf.data;
+    char* at = (char*)buf.Data;
     
     char bufStr[256];
     int inLinePos = 0;
     
-    if(buf.size){
+    if(buf.Size){
         
         while(at && *at != 0){
             if(IsWhitespaceNewlineOrEndline(*at))
@@ -479,9 +480,9 @@ font_info LoadFont(char* FilePath, float height, u32 Flags){
     
     stbtt_fontinfo STBFont;
     
-    Data_Buffer TTFBuffer = ReadFileToDataBuffer(FilePath);
-    stbtt_InitFont(&STBFont, TTFBuffer.data, 
-                   stbtt_GetFontOffsetForIndex(TTFBuffer.data, 0));
+    data_buffer TTFBuffer = ReadFileToDataBuffer(FilePath);
+    stbtt_InitFont(&STBFont, TTFBuffer.Data, 
+                   stbtt_GetFontOffsetForIndex(TTFBuffer.Data, 0));
     
     float Scale = stbtt_ScaleForPixelHeight(&STBFont, height);
     
@@ -573,14 +574,14 @@ b32 CalculateTangents)
     
     Result.MeshType = Mesh_Simple;
 	Result.VerticesCount = VerticesCount;
-    size_t VertsSize = sizeof(Vertex_Info) * VerticesCount;
+    size_t VertsSize = sizeof(vertex_info) * VerticesCount;
 	Result.Vertices = malloc(VertsSize);
     memset(Result.Vertices, 0, VertsSize);
     
     ASSERT(Positions.size());
     ASSERT(TexCoords.size());
     
-    Vertex_Info* DstVerts = (Vertex_Info*)Result.Vertices;
+    vertex_info* DstVerts = (vertex_info*)Result.Vertices;
     
     for (int Index = 0;
          Index < Result.IndicesCount;

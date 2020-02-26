@@ -311,11 +311,11 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
         glGenBuffers(1, &VBO);
         glGenBuffers(1, &EBO);
         
-        u32 SizeOfVertexStruct = sizeof(Vertex_Info);
-        size_t Stride = sizeof(Vertex_Info);
+        u32 SizeOfVertexStruct = sizeof(vertex_info);
+        size_t Stride = sizeof(vertex_info);
         if(Mesh->MeshType == Mesh_Skinned){
-            SizeOfVertexStruct = sizeof(Vertex_Skinned_Info);
-            Stride = sizeof(Vertex_Skinned_Info);
+            SizeOfVertexStruct = sizeof(vertex_skinned_info);
+            Stride = sizeof(vertex_skinned_info);
         }
         
         glBindVertexArray(VAO);

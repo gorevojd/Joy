@@ -8,19 +8,11 @@
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
 
-#include "joy_profiler_interface.h"
-
 /*
-TODO(Dima):
-Assets:
-Bake blur
-
-Renderer:
-Software 3d renderer
-
 dima privet , kak dela? i tebia lybly
 */
 
+#include "joy_data_structures.h"
 
 GLOBAL_VARIABLE mem_region gMem = {};
 GLOBAL_VARIABLE win_state GlobalWin32;
@@ -32,8 +24,8 @@ GLOBAL_VARIABLE game_state* GlobalGame;
 GLOBAL_VARIABLE float Time = 0.0f;
 GLOBAL_VARIABLE float DeltaTime = 0.0f;
 
-#if PROF_ENABLED
-prof_record_table* GlobalRecordTable;
+#if DEBUG_ENABLED
+debug_record_table* GlobalRecordTable;
 #endif
 
 #if JOY_USE_OPENGL
@@ -2313,18 +2305,18 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 #if PROF_ENABLED
     // NOTE(Dima): Initializing global record table if needed
     mem_region ProfTableMem = {};
-	GlobalRecordTable = PushStruct(&ProfTableMem, prof_record_table);
+	GlobalRecordTable = PushStruct(&ProfTableMem, debug_record_table);
     
 	//NOTE(dima): Initializing of debug layer global record table
-	ProfSetRecording(1);
-	ProfSetLogRecording(1);
+	DebugSetRecording(1);
+	DebugSetLogRecording(1);
     
-	for (int ProfLogIndex = 0;
-         ProfLogIndex < PROF_LOGS_COUNT;
-         ProfLogIndex++)
+	for (int DebugLogIndex = 0;
+         DebugLogIndex < DEBUG_LOGS_COUNT;
+         DebugLogIndex++)
 	{
-		GlobalRecordTable->LogsInited[ProfLogIndex] = 0;
-		GlobalRecordTable->LogsTypes[ProfLogIndex] = 0;
+		GlobalRecordTable->LogsInited[DebugLogIndex] = 0;
+		GlobalRecordTable->LogsTypes[DebugLogIndex] = 0;
 	}
 #endif
     
@@ -2412,6 +2404,20 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     
     LARGE_INTEGER BeginClockLI;
     QueryPerformanceCounter(&BeginClockLI);
+    
+    mem_region ListMem = {};
+    dlist<int> IntList;
+    IntList.Init(&ListMem);
+    IntList.Push(5);
+    IntList.Push(4);
+    IntList.Push(1);
+    IntList.Push(2);
+    IntList.Clear();
+    IntList.Push(10);
+    IntList.Push(11);
+    IntList.Push(12);
+    IntList.Push(13);
+    
     
     GlobalRunning = 1;
     while(GlobalRunning){

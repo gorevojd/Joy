@@ -23,6 +23,7 @@ void UpdateCameraRotation(game_camera* camera,
     camera->Rotation = QuatLookAt(Front, V3(0.0f, 1.0f, 0.0f));
 }
 
+// NOTE(Dima): Look at matrix
 m44 GetCameraMatrix(game_camera* camera){
     m44 Result = InverseTranslationMatrix(camera->P) * Transpose(Quat2M44(camera->Rotation));
     

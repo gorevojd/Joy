@@ -1,0 +1,242 @@
+#ifndef JOY_ASSET_IDS_H
+#define JOY_ASSET_IDS_H
+
+#include "joy_types.h"
+
+enum asset_type{
+    AssetType_None,
+    
+    // NOTE(Dima): These are actual types
+    AssetType_Bitmap,
+    AssetType_BitmapArray,
+    AssetType_Mesh,
+    AssetType_Sound,
+    AssetType_Font,
+    AssetType_Glyph,
+    AssetType_Material,
+    AssetType_Model,
+    
+    // NOTE(Dima) These are fake types for fast access through macros
+    AssetType_Type_bmp_info = AssetType_Bitmap,
+    AssetType_Type_bmp_array_info = AssetType_BitmapArray,
+    AssetType_Type_mesh_info = AssetType_Mesh,
+    AssetType_Type_sound_info = AssetType_Sound,
+    AssetType_Type_font_info = AssetType_Font,
+    AssetType_Type_glyph_info = AssetType_Glyph,
+    AssetType_Type_asset_material = AssetType_Material,
+    AssetType_Type_asset_model = AssetType_Model,
+};
+
+enum asset_state{
+    AssetState_Unloaded,
+    AssetState_InProgress,
+    AssetState_Loaded,
+};
+
+#define ASSET_TYPED_ID(data_type) asset_id_##data_type
+
+typedef u32 ASSET_TYPED_ID(bmp_info);
+typedef u32 ASSET_TYPED_ID(bmp_array_info);
+typedef u32 ASSET_TYPED_ID(mesh_info);
+typedef u32 ASSET_TYPED_ID(sound_info);
+typedef u32 ASSET_TYPED_ID(font_info);
+typedef u32 ASSET_TYPED_ID(glyph_info);
+typedef u32 ASSET_TYPED_ID(material_info);
+typedef u32 ASSET_TYPED_ID(model_info);
+
+#define ASSET_VALUE_MEMBER(data_type) data_type Data_##data_type
+#define ASSET_PTR_MEMBER(data_type) data_type* Ptr_##data_type
+#define GET_ASSET_VALUE_MEMBER(asset, data_type) ((asset)->Data_##data_type)
+#define GET_ASSET_PTR_MEMBER(asset, data_type) ((asset)->Ptr_##data_type)
+
+
+struct asset_material{
+    ASSET_TYPED_ID(bmp_info) Diffuse;
+    ASSET_TYPED_ID(bmp_info) Specular;
+    ASSET_TYPED_ID(bmp_info) Normal;
+    ASSET_TYPED_ID(bmp_info) Emission;
+    
+    ASSET_TYPED_ID(bmp_info) Albedo;
+    ASSET_TYPED_ID(bmp_info) Roughness;
+    ASSET_TYPED_ID(bmp_info) Metallic;
+};
+
+struct asset_model{
+    ASSET_TYPED_ID(mesh_info) MeshID;
+    ASSET_TYPED_ID(material_info) MaterialID;
+};
+
+struct asset_bitmap{
+    u32 Width;
+    u32 Height;
+    
+    b32 BakeToAtlas;
+};
+
+struct asset_glyph{
+    ASSET_TYPED_ID(bmp_info) BitmapID;
+    
+    int Codepoint;
+    
+    u32 BitmapWidth;
+    u32 BitmapHeight;
+    
+    float XOffset;
+	float YOffset;
+	float Advance;
+	float LeftBearingX;
+};
+
+struct asset_font{
+    float AscenderHeight;
+	float DescenderHeight;
+	float LineGap;
+    
+    u32 FirstGlyphID;
+    int GlyphCount;
+    
+	u32 LineOffsetToMapping;
+    u32 LineOffsetToKerningPairs;
+};
+
+struct asset_mesh{
+    u32 MeshType;
+    u32 VertexTypeSize;
+    
+    u32 VerticesCount;
+    u32 IndicesCount;
+    
+    u32 LineOffsetToVertices;
+    u32 LineOffsetToIndices;
+};
+
+struct asset_sound{
+    int SampleCount;
+    int SamplesPerSec;
+};
+
+struct asset_tag_header{
+    u32 Type;
+    
+    union {
+        float Value_Float;
+        int Value_Int;
+    };
+};
+
+struct asset_header{
+    u32 AssetType;
+    
+    u32 LineDataOffset;
+    u32 LineFirstTagOffset;
+    u32 TagCount;
+    
+    u32 TotalDataSize;
+    u32 TotalTagsSize;
+    
+    u32 Pitch;
+    
+    union{
+        asset_model Model;
+        asset_material Material;
+        asset_bitmap Bitmap;
+        asset_glyph Glyph;
+        asset_mesh Mesh;
+        asset_font Font;
+        asset_sound Sound;
+    };
+};
+
+#define ASSET_GROUP_REGIONS_COUNT 8
+#define ASSET_FILE_VERSION_MAJOR 1
+#define ASSET_FILE_VERSION_MINOR 0
+
+inline u32 GetVersionInt(int Major, int Minor){
+    u32 Result = ((Major & 0xFFFF) << 16) | (Minor & 0xFFFF);
+    
+    return(Result);
+}
+
+inline u32 GetLineOffsetForData(){
+    return(sizeof(asset_header));
+}
+
+struct asset_file_group_region{
+    u32 FirstAssetIndex;
+    u32 AssetCount;
+};
+
+struct asset_file_group{
+    asset_file_group_region Regions[ASSET_GROUP_REGIONS_COUNT];
+    int Count;
+};
+
+struct asset_file_header{
+    u8 FileHeader[4];
+    
+    u32 Version;
+    
+    /*
+    NOTE(dima): I store asset groups count here
+    because later i will want to make sure that
+    the asset file that i load is actual and 
+    wont contain new assets group types that we dont't 
+    have in our game...
+    */
+    u32 GroupsCount;
+    
+    // NOTE(Dima): Not counting zero asset
+    u32 EffectiveAssetsCount;
+    
+    u32 GroupsByteOffset;
+    u32 LinesOffsetsByteOffset;
+    u32 AssetLinesByteOffset;
+};
+
+enum asset_tag_font_type_value{
+    AssetFontTypeTag_Regular,
+    AssetFontTypeTag_Bold,
+};
+
+enum asset_tag_type{
+    AssetTag_FontType,
+    AssetTag_LOD,
+    AssetTag_Counter,
+};
+
+struct asset_tag{
+    u32 Type;
+    
+    union{
+        float Value_Float;
+        int Value_Int;
+    };
+};
+
+enum asset_group_type{
+    GameAsset_FadeoutBmps,
+    
+    GameAsset_CheckboxMark,
+    GameAsset_ChamomileIcon,
+    
+    GameAsset_SineTest,
+    
+    GameAsset_Cube,
+    GameAsset_Plane,
+    GameAsset_Sphere,
+    GameAsset_Cylynder,
+    
+    GameAsset_LiberationMono,
+    GameAsset_LilitaOne,
+    GameAsset_Inconsolata,
+    GameAsset_PFDIN,
+    GameAsset_MollyJackFont,
+    
+    GameAsset_Type_Bitmap,
+    GameAsset_Type_Font,
+    GameAsset_Type_Glyph,
+    
+    GameAsset_Count,
+};
+
+#endif

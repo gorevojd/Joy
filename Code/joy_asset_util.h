@@ -7,9 +7,9 @@
 #include "joy_types.h"
 #include "joy_asset_types.h"
 
-struct Data_Buffer {
-	u8* data;
-	u64 size;
+struct data_buffer {
+	u8* Data;
+	u64 Size;
 };
 
 enum load_font_flags{
@@ -18,8 +18,8 @@ enum load_font_flags{
 };
 
 // NOTE(Dima): Data buffers utility functions
-Data_Buffer ReadFileToDataBuffer(char* fileName);
-void FreeDataBuffer(Data_Buffer* dataBuffer);
+data_buffer ReadFileToDataBuffer(char* fileName);
+void FreeDataBuffer(data_buffer* dataBuffer);
 
 //NOTE(Dima): Bitmap utility functions
 bmp_info AllocateBitmapInternal(u32 width, u32 height, void* pixelsData);

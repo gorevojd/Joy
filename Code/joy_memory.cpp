@@ -275,7 +275,6 @@ mem_box InitMemoryBox(mem_region* Region, u32 BoxSizeInBytes){
     mem_box Result = {};
     
     // NOTE(Dima): Memory initialization
-    
     Result.Free = {};
     Result.Free.Next = &Result.Free;
     Result.Free.Prev = &Result.Free;

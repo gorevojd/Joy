@@ -11,7 +11,13 @@
 
 struct mem_region{
     mem_block* Block;
+    
+    u32 GrowSize;
 };
+
+inline void RegionSetGrowSize(mem_region* Region, u32 GrowSize){
+    Region->GrowSize = GrowSize;
+}
 
 enum memory_entry_state{
     MemoryEntry_Released,
@@ -112,11 +118,17 @@ inline void* PushSomeMem(mem_region* Region, size_t Size, size_t Align = 8){
     if(NeedNewBlock){
         // NOTE(Dima): Calculate this if we need to allocate new block
         size_t NewBlockSize;
-        if(Size > MINIMUM_MEMORY_REGION_SIZE){
+        
+        u32 MinRegionSize = Region->GrowSize;
+        if(!MinRegionSize){
+            MinRegionSize = MINIMUM_MEMORY_REGION_SIZE;
+        }
+        
+        if(Size > MinRegionSize){
             NewBlockSize = Size;
         }
         else{
-            NewBlockSize = MINIMUM_MEMORY_REGION_SIZE;
+            NewBlockSize = MinRegionSize;
         }
         
         mem_block* NewBlock = platform.MemAlloc(NewBlockSize);

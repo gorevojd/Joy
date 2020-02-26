@@ -305,8 +305,16 @@ struct gui_frame_info{
 };
 
 struct gui_state{
-    font_info* mainFont;
+    assets* Assets;
+    
+    ASSET_TYPED_ID(font_info) MainFontID;
+    ASSET_TYPED_ID(font_info) TileFontID;
+    ASSET_TYPED_ID(bmp_info) CheckboxMarkID;
+    ASSET_TYPED_ID(bmp_info) ChamomileID;
+    
+    font_info* MainFont;
     font_info* TileFont;
+    
     float fontScale;
     
     gui_frame_info FrameInfo;
@@ -350,8 +358,6 @@ struct gui_state{
     int tooltipIndex;
     
     Asset_Atlas* atlas;
-    bmp_info* CheckboxMark;
-    bmp_info* ChamomileIcon;
     
     Color_State colorState;
     v4 colors[GuiColor_Count];
@@ -700,13 +706,13 @@ inline rc2 GetTxtElemRect(gui_state* Gui, Gui_Layout* lay, rc2 txtRc, v2 growSca
 }
 
 inline float GuiGetBaseline(gui_state* Gui, float scale = 1.0f){
-    float res = GetBaseline(Gui->mainFont, Gui->fontScale * scale);
+    float res = GetBaseline(Gui->MainFont, Gui->fontScale * scale);
     
     return(res);
 }
 
 inline float GuiGetLineAdvance(gui_state* Gui, float scale = 1.0f){
-    float res = GetLineAdvance(Gui->mainFont, Gui->fontScale * scale);
+    float res = GetLineAdvance(Gui->MainFont, Gui->fontScale * scale);
     
     return(res);
 }

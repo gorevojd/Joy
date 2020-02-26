@@ -5,6 +5,8 @@
 #include "joy_gui.h"
 #include "joy_render.h"
 #include "joy_camera.h"
+#include "joy_data_structures.h"
+#include "joy_assets_render.h"
 
 #define STB_SPRINTF_STATIC
 #define STB_SPRINTF_IMPLEMENTATION
@@ -114,19 +116,27 @@ GAME_MODE_UPDATE(TestUpdate){
         GuiText(Game->Gui, "Right");
     }
     
-    PushMesh(Stack, &Game->Assets->Cube, 
+    PushMesh(Game->Assets, Stack, 
+             GetFirstInFamily(Game->Assets, GameAsset_Cube),
              V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
              QuatI(), V3(1.0f));
-    PushMesh(Stack, &Game->Assets->Cube, 
+    
+    PushMesh(Game->Assets, Stack, 
+             GetFirstInFamily(Game->Assets, GameAsset_Cube),
              V3(0.0f, 1.0f + Sin(Game->Input->Time * 3.0f) * 0.5f, 0.0f), 
              QuatI(), V3(1.0f));
-    PushMesh(Stack, &Game->Assets->Cylynder, 
+    
+    PushMesh(Game->Assets, Stack, 
+             GetFirstInFamily(Game->Assets, GameAsset_Cylynder),
              V3(-10.0f, 1.0f, 0.0f), 
              Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), V3(2.0f));
-    PushMesh(Stack, &Game->Assets->Sphere, 
-             V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
+    
+    PushMesh(Game->Assets, Stack, 
+             GetFirstInFamily(Game->Assets, GameAsset_Sphere),V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
              QuatI(), V3(1.0f));
-    PushMesh(Stack, &Game->Assets->Plane, 
+    
+    PushMesh(Game->Assets, Stack, 
+             GetFirstInFamily(Game->Assets, GameAsset_Plane),
              V3(0.0f, -1.0f, 0.0f), 
              QuatI(), V3(100.0f));
     
@@ -152,6 +162,8 @@ struct image_swapper_state{
 GAME_MODE_UPDATE(ChangingPicturesUpdate){
     GAME_GET_MODE_STATE(image_swapper_state, State);
     
+    
+#if 0    
     bmp_info* ToShowArray = Game->Assets->fadeoutBmps;
     int ToShowCount = Game->Assets->fadeoutBmpsCount;
     
@@ -215,6 +227,7 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
                V2(100, 100),
                1000,
                V4(1.0f, 1.0f, 1.0f, 1.0f));
+#endif
     
 }
 

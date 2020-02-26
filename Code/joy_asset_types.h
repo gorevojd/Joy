@@ -4,7 +4,6 @@
 #include "joy_types.h"
 #include "joy_math.h"
 
-
 struct bmp_info{
     void* Pixels;
     int Width;
@@ -109,7 +108,7 @@ inline size_t GetComponentCount4VertLayout(u32 VertLayout){
 #endif
 
 
-struct Vertex_Info{
+struct vertex_info{
     v3 P;
     v2 UV;
     v3 N;
@@ -117,7 +116,7 @@ struct Vertex_Info{
     v3 C;
 };
 
-struct Vertex_Skinned_Info{
+struct vertex_skinned_info{
     v3 P;
     v2 UV;
     v3 N;
@@ -169,11 +168,13 @@ struct font_info{
     int GlyphCount;
     
     int Codepoint2Glyph[FONT_INFO_MAX_GLYPH_COUNT];
-    
-    bmp_info AtlasImage;
 };
 
-struct bmp_array_info{
+struct material_info{
+    
+};
+
+struct model_info{
     
 };
 
