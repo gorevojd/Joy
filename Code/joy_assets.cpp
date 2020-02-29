@@ -159,6 +159,8 @@ void InitAssets(assets* Assets){
     // NOTE(Dima): Large atlas initialization
     Assets->MainLargeAtlas = InitAtlas(Assets->Region, 1024);
     
+    
+    
     // NOTE(Dima): Temp initialization of asset families
     for(int FamIndex = 0;
         FamIndex < GameAsset_Count;
@@ -179,26 +181,6 @@ void InitAssets(assets* Assets){
         Asset->Data_##data_type = value;\
         Asset->Ptr_##data_type = &Asset->Data_##data_type;\
         FinalAssetLoading(Assets, Asset);}
-    
-#if 0
-    BeginAsset();
-    AddBitmap();
-    AddBitmap();
-    AddBitmap();
-    EndAsset();
-    
-    BeginAsset(Assets, GameAsset_SineSound);
-    AddSound(Assets, );
-    AddSound(Assets, );
-    EndAsset(Assets);
-    
-    BeginAsset(Assets, GameAsset_Sphere);
-    AddMesh(Assets, );
-    AddMesh(Assets, );
-    AddMesh(Assets, );
-    EndAsset(Assets);
-    
-#endif
     
     TEMP_INIT_FAM_ASSET(GameAsset_CheckboxMark, 
                         bmp_info,

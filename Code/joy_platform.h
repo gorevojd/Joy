@@ -147,6 +147,7 @@ typedef PLATFORM_BEGIN_LIST_FILES_IN_DIR(Platform_Begin_List_Files_In_Dir);
 #define PLATFORM_END_LIST_FILES_IN_DIR(name) void name(Loaded_Strings* Strings)
 typedef PLATFORM_END_LIST_FILES_IN_DIR(Platform_End_List_Files_In_Dir);
 
+
 enum Platform_File_Flags{
     File_Archive = 1,
     File_Compressed = 2,
@@ -157,11 +158,22 @@ enum Platform_File_Flags{
     File_System = 64,
 };
 
-struct Platform_File_Handle{
-    mi Handle;
+struct platform_file_desc{
+    char Name[256];
+    
+    u64 Size;
     
     u32 Flags;
 };
+
+
+#define PLATFORM_OPEN_FILES_BEGIN(name) void name(char* DirectoryPath, char* Wildcard)
+#define PLATFORM_OPEN_FILES_END(name) void name()
+#define PLATFORM_OPEN_NEXT_FILE(name) b32 name(platform_file_desc* OutFile)
+
+typedef PLATFORM_OPEN_FILES_BEGIN(platform_open_files_begin);
+typedef PLATFORM_OPEN_FILES_END(platform_open_files_end);
+typedef PLATFORM_OPEN_NEXT_FILE(platform_open_next_file);
 
 #define PLATFORM_PROCESS_INPUT(name) void name(struct input_state* Input)
 typedef PLATFORM_PROCESS_INPUT(platform_process_input);
@@ -180,6 +192,10 @@ struct Platform{
     platform_memalloc* MemAlloc;
     platform_memfree* MemFree;
     platform_memzero* MemZero;
+    
+    platform_open_files_begin* OpenFilesBegin;
+    platform_open_files_end* OpenFilesEnd;
+    platform_open_next_file* OpenNextFile;
     
     Platform_Begin_List_Files_In_Dir* BeginListFilesInDir;
     Platform_End_List_Files_In_Dir* EndListFilesInDir;

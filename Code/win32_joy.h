@@ -183,6 +183,11 @@ struct win_state{
     std::vector<std::string> LoadedStringsHolder;
     b32 InListFilesBlock;
     
+    b32 OpenFilesNextFound;
+    b32 InOpenFilesBlock;
+    WIN32_FIND_DATAA OpenFilesFindData;
+    HANDLE OpenFilesFindHandle;
+    
     WINDOWPLACEMENT windowPlacement;
     XINPUT_STATE ControllerStates[XUSER_MAX_COUNT];
     

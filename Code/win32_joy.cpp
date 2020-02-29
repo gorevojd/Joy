@@ -1480,6 +1480,99 @@ PLATFORM_MEMZERO(Win32MemZero){
     }
 }
 
+PLATFORM_OPEN_FILES_BEGIN(Win32OpenFilesBegin){
+    ASSERT(GlobalWin32.InOpenFilesBlock == 0);
+    GlobalWin32.InOpenFilesBlock = 1;
+    
+    char NewDirPath[MAX_PATH];
+    CopyStrings(NewDirPath, DirectoryPath);
+    ChangeAllChars(NewDirPath, '\\', '/');
+    int DirPathLen = StringLength(NewDirPath);
+    char* LastSymbol = &NewDirPath[DirPathLen];
+    if(*LastSymbol != '/'){
+        *LastSymbol++ = '/';
+    }
+    *LastSymbol = 0;
+    
+    char NewWildcard[16];
+    if(Wildcard){
+        CopyStrings(NewWildcard, Wildcard);
+    }
+    else{
+        CopyStrings(NewWildcard, "*");
+    }
+    
+    char ActualFindString[MAX_PATH];
+    ConcatStringsUnsafe(ActualFindString, NewDirPath, NewWildcard);
+    
+    size_t MemNeeded = 0;
+    
+    GlobalWin32.OpenFilesFindHandle =  FindFirstFileA(
+        ActualFindString,
+        &GlobalWin32.OpenFilesFindData);
+    
+    GlobalWin32.OpenFilesNextFound = GlobalWin32.OpenFilesFindHandle != INVALID_HANDLE_VALUE;
+}
+
+PLATFORM_OPEN_FILES_END(Win32OpenFilesEnd){
+    FindClose(GlobalWin32.OpenFilesFindHandle);
+    
+    ASSERT(GlobalWin32.InOpenFilesBlock == 1);
+    GlobalWin32.InOpenFilesBlock = 0;
+}
+
+PLATFORM_OPEN_NEXT_FILE(Win32OpenNextFile){
+    b32 Result = GlobalWin32.OpenFilesNextFound;
+    
+    if(Result){
+        
+        platform_file_desc ResultDesc = {};
+        WIN32_FIND_DATAA* FindData = &GlobalWin32.OpenFilesFindData;
+        
+        // NOTE(Dima): Copy file name
+        CopyStrings(ResultDesc.Name, FindData->cFileName);
+        
+        // NOTE(Dima): Getting size
+        ResultDesc.Size = (((u64)FindData->nFileSizeHigh) << 32) | (FindData->nFileSizeLow);
+        
+        // NOTE(Dima): Setting various flags
+        DWORD Attrs = FindData->dwFileAttributes;
+        u32 *Flags = &ResultDesc.Flags;
+        if(Attrs & FILE_ATTRIBUTE_ARCHIVE){
+            *Flags |= File_Archive;
+        }
+        
+        if(Attrs & FILE_ATTRIBUTE_COMPRESSED){
+            *Flags |= File_Compressed;
+        }
+        
+        if(Attrs & FILE_ATTRIBUTE_DIRECTORY){
+            *Flags |= File_Directory;
+        }
+        
+        if(Attrs & FILE_ATTRIBUTE_HIDDEN){
+            *Flags |= File_Hidden;
+        }
+        
+        if(Attrs & FILE_ATTRIBUTE_NORMAL){
+            *Flags |= File_Normal;
+        }
+        
+        if(Attrs & FILE_ATTRIBUTE_READONLY){
+            *Flags |= File_Readonly;
+        }
+        
+        if(Attrs & FILE_ATTRIBUTE_SYSTEM){
+            *Flags |= File_System;
+        }
+        
+        GlobalWin32.OpenFilesNextFound = FindNextFileA(GlobalWin32.OpenFilesFindHandle, 
+                                                       &GlobalWin32.OpenFilesFindData);
+    }
+    
+    return(Result);
+}
+
 RENDER_PLATFORM_SWAPBUFFERS(Win32OpenGLSwapBuffers){
     SwapBuffers(GlobalWin32.glDC);
 }
@@ -2296,6 +2389,9 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     platform.MemAlloc = Win32MemAlloc;
     platform.MemFree = Win32MemFree;
     platform.MemZero = Win32MemZero;
+    platform.OpenFilesBegin = Win32OpenFilesBegin;
+    platform.OpenFilesEnd = Win32OpenFilesEnd;
+    platform.OpenNextFile = Win32OpenNextFile;
     
     // NOTE(Dima): Initializing memory sentinel
     GlobalWin32.memorySentinel = {};
@@ -2305,19 +2401,19 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 #if PROF_ENABLED
     // NOTE(Dima): Initializing global record table if needed
     mem_region ProfTableMem = {};
-	GlobalRecordTable = PushStruct(&ProfTableMem, debug_record_table);
+    GlobalRecordTable = PushStruct(&ProfTableMem, debug_record_table);
     
-	//NOTE(dima): Initializing of debug layer global record table
-	DebugSetRecording(1);
-	DebugSetLogRecording(1);
+    //NOTE(dima): Initializing of debug layer global record table
+    DebugSetRecording(1);
+    DebugSetLogRecording(1);
     
-	for (int DebugLogIndex = 0;
+    for (int DebugLogIndex = 0;
          DebugLogIndex < DEBUG_LOGS_COUNT;
          DebugLogIndex++)
-	{
-		GlobalRecordTable->LogsInited[DebugLogIndex] = 0;
-		GlobalRecordTable->LogsTypes[DebugLogIndex] = 0;
-	}
+    {
+        GlobalRecordTable->LogsInited[DebugLogIndex] = 0;
+        GlobalRecordTable->LogsTypes[DebugLogIndex] = 0;
+    }
 #endif
     
     // TODO(Dima): Add array of count Renderer_Count and init all renderers
@@ -2404,20 +2500,6 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     
     LARGE_INTEGER BeginClockLI;
     QueryPerformanceCounter(&BeginClockLI);
-    
-    mem_region ListMem = {};
-    dlist<int> IntList;
-    IntList.Init(&ListMem);
-    IntList.Push(5);
-    IntList.Push(4);
-    IntList.Push(1);
-    IntList.Push(2);
-    IntList.Clear();
-    IntList.Push(10);
-    IntList.Push(11);
-    IntList.Push(12);
-    IntList.Push(13);
-    
     
     GlobalRunning = 1;
     while(GlobalRunning){

@@ -14,17 +14,34 @@
 
 #include "joy_data_structures.h"
 
-struct asset{
-    mem_entry* DataMemoryEntry;
+struct asset_file_source{
+    platform_file_desc FileDescription;
     
+    asset_file_source* Next;
+    asset_file_source* Prev;
+};
+
+struct asset{
     u32 ID;
     u32 Type;
     
     std::atomic_uint State;
     
+    // NOTE(Dima): Asset header
+    asset_header Header;
+    
+    // NOTE(Dima): File asset source
+    asset_file_source* FileSource;
+    u32 OffsetToData;
+    
+    // NOTE(Dima): Asset data memory entry
+    mem_entry* DataMemoryEntry;
+    
+    // NOTE(Dima): In list stuff
     asset* NextInFamily;
     asset* PrevInFamily;
     
+    // NOTE(Dima): Data
     union{
         ASSET_VALUE_MEMBER(font_info);
         ASSET_VALUE_MEMBER(bmp_info);
