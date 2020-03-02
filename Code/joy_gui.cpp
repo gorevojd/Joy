@@ -76,10 +76,7 @@ gui_state* Gui)
 {
     Gui_Element* result = 0;
     
-    if(Gui->freeSentinel.NextAlloc != &Gui->freeSentinel){
-        
-    }
-    else{
+    if(DLIST_FREE_IS_EMPTY(Gui->freeSentinel, NextAlloc)){
         const int count = 128;
         Gui_Element* elemPoolArray = PushArray(Gui->Mem, Gui_Element, count);
         
@@ -89,11 +86,7 @@ gui_state* Gui)
         {
             Gui_Element* elem = &elemPoolArray[index];
             
-            elem->PrevAlloc = Gui->freeSentinel.PrevAlloc;
-            elem->NextAlloc = &Gui->freeSentinel;
-            
-            elem->PrevAlloc->NextAlloc = elem;
-            elem->NextAlloc->PrevAlloc = elem;
+            DLIST_INSERT_BEFORE_SENTINEL(elem, Gui->freeSentinel, NextAlloc, PrevAlloc);
         }
         
         Gui->TotalAllocatedGuiElements += count;
@@ -102,15 +95,10 @@ gui_state* Gui)
     result = Gui->freeSentinel.NextAlloc;
     
     // NOTE(Dima): Deallocating from Free list
-    result->NextAlloc->PrevAlloc = result->PrevAlloc;
-    result->PrevAlloc->NextAlloc = result->NextAlloc;
+    DLIST_REMOVE_ENTRY(result, NextAlloc, PrevAlloc);
     
     // NOTE(Dima): Allocating in Use list
-    result->NextAlloc = &Gui->useSentinel;
-    result->PrevAlloc = Gui->useSentinel.PrevAlloc;
-    
-    result->NextAlloc->PrevAlloc = result;
-    result->PrevAlloc->NextAlloc = result;
+    DLIST_INSERT_BEFORE_SENTINEL(result, Gui->useSentinel, NextAlloc, PrevAlloc);
     
     return(result);
 }
@@ -430,10 +418,10 @@ assets* Assets)
     Gui->Assets = Assets;
     
     // NOTE(Dima): Getting IDs for needed assets
-    Gui->MainFontID = GetFirstInFamily(Assets, GameAsset_Inconsolata);
-    Gui->TileFontID = GetFirstInFamily(Assets, GameAsset_MollyJackFont);
-    Gui->CheckboxMarkID = GetFirstInFamily(Assets, GameAsset_CheckboxMark);
-    Gui->ChamomileID = GetFirstInFamily(Assets, GameAsset_ChamomileIcon);
+    Gui->MainFontID = GetFirst(Assets, GameAsset_Inconsolata);
+    Gui->TileFontID = GetFirst(Assets, GameAsset_MollyJackFont);
+    Gui->CheckboxMarkID = GetFirst(Assets, GameAsset_CheckboxMark);
+    Gui->ChamomileID = GetFirst(Assets, GameAsset_ChamomileIcon);
     
     // NOTE(Dima): Getting needed assets from IDs
     Gui->MainFont = GET_ASSET_PTR_MEMBER(GetAssetByID(Assets, Gui->MainFontID), 

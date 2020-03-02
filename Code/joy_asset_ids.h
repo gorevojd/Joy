@@ -97,6 +97,12 @@ struct asset_font{
     
 	u32 LineOffsetToMapping;
     u32 LineOffsetToKerningPairs;
+    
+    u32 DataOffsetToMapping;
+    u32 DataOffsetToKerning;
+    
+    u32 MappingSize;
+    u32 KerningSize;
 };
 
 struct asset_mesh{
@@ -115,6 +121,8 @@ struct asset_sound{
     int SamplesPerSec;
 };
 
+#define MAX_TAGS_PER_ASSET 4
+
 struct asset_tag_header{
     u32 Type;
     
@@ -125,11 +133,12 @@ struct asset_tag_header{
 };
 
 struct asset_header{
+    asset_tag_header Tags[MAX_TAGS_PER_ASSET];
+    u32 TagCount;
+    
     u32 AssetType;
     
     u32 LineDataOffset;
-    u32 LineFirstTagOffset;
-    u32 TagCount;
     
     u32 TotalDataSize;
     u32 TotalTagsSize;

@@ -54,6 +54,13 @@
     (entry_ptr)->##prev##->##next = (entry_ptr); \
     (entry_ptr)->##next##->##prev = (entry_ptr);}
 
+#define DLIST_INSERT_BEFORE_SENTINEL(entry_ptr, sent_value, next, prev) \
+{\
+    (entry_ptr)->##next = &(sent_value);\
+    (entry_ptr)->##prev = (sent_value).##prev##; \
+    (entry_ptr)->##prev##->##next = (entry_ptr); \
+    (entry_ptr)->##next##->##prev = (entry_ptr);}
+
 #define DLIST_INSERT_AFTER(entry_ptr, after_ptr, next, prev) \
 {\
     (entry_ptr)->##next = (after_ptr)->##next##; \

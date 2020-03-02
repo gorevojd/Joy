@@ -23,6 +23,7 @@ void FreeDataBuffer(data_buffer* dataBuffer);
 
 //NOTE(Dima): Bitmap utility functions
 bmp_info AllocateBitmapInternal(u32 width, u32 height, void* pixelsData);
+void AllocateBitmapInternal(bmp_info* Bmp, u32 Width, u32 Height, void* PixelsData);
 bmp_info AllocateBitmap(u32 width, u32 height);
 void DeallocateBitmap(bmp_info* buffer);
 void CopyBitmapData(bmp_info* dst, bmp_info* src);

@@ -4,7 +4,7 @@
 #include "joy_software_renderer.h"
 
 #include <vector>
-#include <string>
+#include <atomic>
 
 #define STB_SPRINTF_STATIC
 #define STB_SPRINTF_IMPLEMENTATION
@@ -79,10 +79,14 @@ INTERNAL_FUNCTION Asset_Atlas InitAtlas(mem_region* Region, int Dim){
     return(atlas);
 }
 
-u32 GetFirstInFamily(assets* Assets, u32 Family){
-    asset_family* Fam = &Assets->Families[Family];
+u32 GetFirst(assets* Assets, u32 Group){
+    asset_group* Grp = &Assets->Groups[Group];
     
-    u32 Result = Fam->AssetID;
+    u32 Result = 0;
+    
+    if(!DLIST_FREE_IS_EMPTY(Grp->Sentinel, Next)){
+        Result = Grp->Sentinel.Next->ID;
+    }
     
     return(Result);
 }
@@ -93,6 +97,108 @@ INTERNAL_FUNCTION inline void FinalAssetLoading(assets* Assets, asset* Asset)
         case AssetType_Font:{
             AddFontToAtlas(&Assets->MainLargeAtlas,
                            GET_ASSET_PTR_MEMBER(Asset, font_info));
+        }break;
+    }
+}
+
+inline asset_file_source* AllocateFileSource(assets* Assets){
+    if(DLIST_FREE_IS_EMPTY(Assets->FileSourceFree, Next)){
+        const int Count = 128;
+        asset_file_source* Pool = PushArray(Assets->Memory, asset_file_source, Count);
+        
+        for(int I = 0; I < Count; I++){
+            asset_file_source* Elem = &Pool[I];
+            
+            DLIST_INSERT_BEFORE_SENTINEL(Elem, Assets->FileSourceFree, Next, Prev);
+        }
+        
+    }
+    
+    asset_file_source* Result = Assets->FileSourceFree.Next;
+    
+    DLIST_REMOVE_ENTRY(Result, Next, Prev);
+    DLIST_INSERT_BEFORE_SENTINEL(Result, Assets->FileSourceUse, Next, Prev);
+    
+    return(Result);
+}
+
+void LoadAsset(assets* Assets, asset* Asset){
+    asset_header* Header = &Asset->Header;
+    
+    // NOTE(Dima): Loading data
+    u32 DataSize = Header->TotalDataSize;
+    // TODO(Dima): Change this
+    void* Data = malloc(DataSize);
+    
+    char* FilePath = Asset->FileSource->FileDescription.FullPath;
+    
+    b32 ReadSucceeded = platform.FileOffsetRead(FilePath,
+                                                Asset->OffsetToData,
+                                                DataSize,
+                                                Data);
+    
+    ASSERT(ReadSucceeded);
+    
+    switch(Asset->Type){
+        case AssetType_Bitmap:{
+            // NOTE(Dima): Allocating asset value
+            GET_ASSET_PTR_MEMBER(Asset, bmp_info) = (bmp_info*)malloc(sizeof(bmp_info));
+            
+            bmp_info* Result = GET_ASSET_PTR_MEMBER(Asset, bmp_info);
+            asset_bitmap* Src = &Header->Bitmap;
+            
+            // NOTE(Dima): Initializing bitmap
+            AllocateBitmapInternal(Result, Src->Width, Src->Height, Data);
+            
+            // NOTE(Dima): Adding to atlas if needed
+            if(Src->BakeToAtlas){
+                AddBitmapToAtlas(&Assets->MainLargeAtlas, Result);
+            }
+        }break;
+        
+        case AssetType_Glyph:{
+            
+        }break;
+        
+        case AssetType_BitmapArray:{
+            
+        }break;
+        
+        case AssetType_Mesh:{
+            
+        }break;
+        
+        case AssetType_Sound:{
+            
+        }break;
+        
+        case AssetType_Font:{
+            // NOTE(Dima): Allocating asset value
+            GET_ASSET_PTR_MEMBER(Asset, font_info) = (font_info*)malloc(sizeof(font_info));
+            
+            font_info* Result = GET_ASSET_PTR_MEMBER(Asset, font_info);
+            asset_font* Src = &Header->Font;
+            
+            int* Mapping = (int*)((u8*)Data + Header->Font.DataOffsetToMapping);
+            float* KerningPairs = (float*)((u8*)Data + Header->Font.DataOffsetToKerning);
+            
+            u32 MappingSize = Header->Font.MappingSize;
+            u32 KerningSize = Header->Font.KerningSize;
+            
+            ASSERT(MappingSize == sizeof(float) * FONT_INFO_MAX_GLYPH_COUNT);
+            
+            Result->AscenderHeight = Header->Font.AscenderHeight;
+            Result->DescenderHeight = Header->Font.DescenderHeight;
+            Result->LineGap = Header->Font.LineGap;
+            Result->GlyphCount = Header->Font.GlyphCount;
+            
+            // NOTE(Dima): Copy mapping
+            for(int I = 0; I < FONT_INFO_MAX_GLYPH_COUNT; I++){
+                Result->Codepoint2Glyph[I] = Mapping[I];
+            }
+            
+            // NOTE(Dima): Setting kerning
+            Result->KerningPairs = KerningPairs;
         }break;
     }
 }
@@ -123,7 +229,7 @@ inline asset* AllocateAsset(assets* Assets)
     // NOTE(Dima): If block assets are not allocated yet
     if(!CurBlock->BlockAssets){
         // NOTE(Dima): Allocating
-        CurBlock->BlockAssets = PushArray(Assets->Region, asset, MAX_ASSETS_IN_ASSET_BLOCK);
+        CurBlock->BlockAssets = PushArray(Assets->Memory, asset, MAX_ASSETS_IN_ASSET_BLOCK);
     }
     
     u32 ResultAssetID = 
@@ -140,43 +246,160 @@ inline asset* AllocateAsset(assets* Assets)
     return(Result);
 }
 
-INTERNAL_FUNCTION added_asset AddAsset(assets* Assets){
-    added_asset Result = {};
-    
-    asset* Asset = AllocateAsset(Assets);
-    
-    Result.Asset = Asset;
-    Result.ID = Asset->ID;
-    
-    return(Result);
-}
-
 void InitAssets(assets* Assets){
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // NOTE(Dima): Memory region is already initialized
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     // NOTE(Dima): Large atlas initialization
-    Assets->MainLargeAtlas = InitAtlas(Assets->Region, 1024);
+    Assets->MainLargeAtlas = InitAtlas(Assets->Memory, 1024);
     
+    // NOTE(Dima): Init asset files sources
+    DLIST_REFLECT_PTRS(Assets->FileSourceUse, Next, Prev);
+    DLIST_REFLECT_PTRS(Assets->FileSourceFree, Next, Prev);
     
+    mem_region AssetInitMem = {};
     
     // NOTE(Dima): Temp initialization of asset families
     for(int FamIndex = 0;
         FamIndex < GameAsset_Count;
         FamIndex++)
     {
-        asset_family* Fam = &Assets->Families[FamIndex];
+        asset_group* Grp = &Assets->Groups[FamIndex];
         
-        asset* AllocatedAsset = AllocateAsset(Assets);
-        
-        Fam->AssetID = AllocatedAsset->ID;
+        Grp->InGroupAssetCount = 0;
+        DLIST_REFLECT_PTRS(Grp->Sentinel, Next, Prev);
     }
     
+    // NOTE(Dima): Loading from asset files
+    platform.OpenFilesBegin("../Data/", "*ja");
+    
+    platform_file_desc FileDesc;
+    
+    while(platform.OpenNextFile(&FileDesc)){
+        // NOTE(Dima): Allocating and setting file source
+        asset_file_source* FileSource = AllocateFileSource(Assets);
+        FileSource->FileDescription = FileDesc;
+        
+        char* FileFullPath = FileSource->FileDescription.FullPath;
+        
+        asset_file_header FileHeader;
+        b32 ReadFileResult = platform.FileOffsetRead(FileFullPath, 
+                                                     0, sizeof(asset_file_header), 
+                                                     &FileHeader);
+        
+        Assert(ReadFileResult);
+        
+        b32 HeaderIsEqual =
+            FileHeader.FileHeader[0] == 'J' &&
+            FileHeader.FileHeader[1] == 'A' &&
+            FileHeader.FileHeader[2] == 'S' &&
+            FileHeader.FileHeader[3] == 'S';
+        
+        u32 FileVersion = FileHeader.Version;
+        u32 EngineFileVersion = GetVersionInt(ASSET_FILE_VERSION_MAJOR,
+                                              ASSET_FILE_VERSION_MINOR);
+        
+        // NOTE(Dima): Some checking
+        Assert(HeaderIsEqual);
+        Assert(FileVersion == EngineFileVersion);
+        Assert(FileHeader.GroupsCount == GameAsset_Count);
+        
+        asset_file_group *FileGroups = PushArray(&AssetInitMem,
+                                                 asset_file_group,
+                                                 GameAsset_Count);
+        
+        // NOTE(Dima): Reading groups
+        Assert(FileHeader.GroupsByteOffset == sizeof(asset_file_header));
+        b32 ReadGroupsResult = platform.FileOffsetRead(FileFullPath,
+                                                       FileHeader.GroupsByteOffset,
+                                                       sizeof(asset_file_group) * 
+                                                       FileHeader.GroupsCount,
+                                                       FileGroups);
+        Assert(ReadGroupsResult);
+        
+        // NOTE(Dima): Reading lines offsets
+        u32 FileAssetCount = FileHeader.EffectiveAssetsCount;
+        u32* AssetLinesOffsets = 0;
+        
+        if(FileAssetCount){
+            AssetLinesOffsets = PushArray(&AssetInitMem, u32, FileAssetCount);
+            b32 ReadOffsetsRes = platform.FileOffsetRead(FileFullPath,
+                                                         FileHeader.LinesOffsetsByteOffset,
+                                                         FileAssetCount * sizeof(u32),
+                                                         AssetLinesOffsets);
+            
+            Assert(ReadOffsetsRes);
+        }
+        
+        // NOTE(Dima): Reading assets
+        for(int FileGroupIndex = 0; 
+            FileGroupIndex < GameAsset_Count; 
+            FileGroupIndex++)
+        {
+            asset_file_group* FileGrp = FileGroups + FileGroupIndex;
+            asset_group* ToGroup = Assets->Groups + FileGroupIndex;
+            
+            // NOTE(Dima): Iterating through regions in file
+            for(int RegionIndex = 0;
+                RegionIndex < FileGrp->Count;
+                RegionIndex++)
+            {
+                asset_file_group_region* Reg = FileGrp->Regions + RegionIndex;
+                
+                u32 FirstFileAssetIndex = Reg->FirstAssetIndex;
+                u32 OnePastLastFileAssetIndex = FirstFileAssetIndex + Reg->AssetCount;
+                
+                // NOTE(Dima): Iterating through region assets
+                for(int FileAssetIndex = FirstFileAssetIndex;
+                    FileAssetIndex < OnePastLastFileAssetIndex;
+                    FileAssetIndex++)
+                {
+                    // NOTE(Dima): Reading asset header
+                    asset_header AssetHeader;
+                    
+                    u32 LineOffset = AssetLinesOffsets[FileAssetIndex - 1];
+                    
+                    b32 ReadAssetHeader = platform.FileOffsetRead(
+                        FileFullPath,
+                        LineOffset,
+                        sizeof(asset_header),
+                        &AssetHeader);
+                    
+                    Assert(ReadAssetHeader);
+                    
+                    // NOTE(Dima): Allocating asset
+                    asset* NewAsset = AllocateAsset(Assets);
+                    
+                    NewAsset->State = AssetState_Unloaded;
+                    NewAsset->Header = AssetHeader;
+                    NewAsset->FileSource = FileSource;
+                    NewAsset->Type = AssetHeader.AssetType;
+                    
+                    DLIST_INSERT_BEFORE_SENTINEL(NewAsset, ToGroup->Sentinel, Next, Prev);
+                    ToGroup->InGroupAssetCount++;
+                    
+                    u32 DataOffsetInFile = LineOffset + AssetHeader.LineDataOffset;
+                    NewAsset->OffsetToData = DataOffsetInFile;
+                    
+                    LoadAsset(Assets, NewAsset);
+                }
+            }
+        }
+        
+        FreeNoDealloc(&AssetInitMem);
+    }
+    
+    platform.OpenFilesEnd();
+    
+    Free(&AssetInitMem);
+    
+    
+#if 0    
 #define TEMP_INIT_FAM_ASSET(fam_id, data_type, value) \
     {\
-        asset_family* Fam = &Assets->Families[fam_id];\
-        asset* Asset = GetAssetByID(Assets, Fam->AssetID);\
+        asset_group* Grp = &Assets->Groups[fam_id];\
+        asset* Asset = GetAssetByID(Assets, Grp->AssetID);\
         Asset->Type = AssetType_Type_##data_type;\
         Asset->Data_##data_type = value;\
         Asset->Ptr_##data_type = &Asset->Data_##data_type;\
@@ -208,4 +431,6 @@ void InitAssets(assets* Assets){
                         LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 18.0f, LoadFont_BakeBlur));
     TEMP_INIT_FAM_ASSET(GameAsset_MollyJackFont, font_info, 
                         LoadFont("../Data/Fonts/MollyJack.otf", 40.0f, LoadFont_BakeBlur));
+#endif
+    
 }

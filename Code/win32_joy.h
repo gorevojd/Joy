@@ -187,6 +187,7 @@ struct win_state{
     b32 InOpenFilesBlock;
     WIN32_FIND_DATAA OpenFilesFindData;
     HANDLE OpenFilesFindHandle;
+    char OpenFilesDirectory[MAX_PATH];
     
     WINDOWPLACEMENT windowPlacement;
     XINPUT_STATE ControllerStates[XUSER_MAX_COUNT];

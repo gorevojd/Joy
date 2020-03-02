@@ -17,8 +17,6 @@ struct game_asset_group{
     int RegionsCount;
 };
 
-#define MAX_TAGS_PER_ASSET 4
-
 enum game_asset_tag_value_type{
     GameAssetTagValue_Float,
     GameAssetTagValue_Int,

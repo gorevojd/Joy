@@ -39,7 +39,6 @@ INTERNAL_FUNCTION inline b32 AdvanceGameMode(game_state* Game){
 }
 
 void GameInit(game_state* Game, platform_to_game_api Platform2GameAPI){
-    
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!
     // NOTE(Dima): Init engine systems
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!
@@ -51,7 +50,7 @@ void GameInit(game_state* Game, platform_to_game_api Platform2GameAPI){
     
     // NOTE(Dima): Assets
     Game->AssetMemory = {};
-    PushMemoryStruct(&Game->AssetMemory, assets, Game->Assets, Region);
+    PushMemoryStruct(&Game->AssetMemory, assets, Game->Assets, Memory);
     InitAssets(Game->Assets);
     
     // NOTE(Dima): Render

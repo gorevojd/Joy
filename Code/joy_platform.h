@@ -160,20 +160,22 @@ enum Platform_File_Flags{
 
 struct platform_file_desc{
     char Name[256];
+    char FullPath[256];
     
     u64 Size;
     
     u32 Flags;
 };
 
-
 #define PLATFORM_OPEN_FILES_BEGIN(name) void name(char* DirectoryPath, char* Wildcard)
 #define PLATFORM_OPEN_FILES_END(name) void name()
 #define PLATFORM_OPEN_NEXT_FILE(name) b32 name(platform_file_desc* OutFile)
+#define PLATFORM_FILE_OFFSET_READ(name) b32 name(char* FilePath, u64 Offset, u32 ReadCount, void* ReadTo)
 
 typedef PLATFORM_OPEN_FILES_BEGIN(platform_open_files_begin);
 typedef PLATFORM_OPEN_FILES_END(platform_open_files_end);
 typedef PLATFORM_OPEN_NEXT_FILE(platform_open_next_file);
+typedef PLATFORM_FILE_OFFSET_READ(platform_file_offset_read);
 
 #define PLATFORM_PROCESS_INPUT(name) void name(struct input_state* Input)
 typedef PLATFORM_PROCESS_INPUT(platform_process_input);
@@ -196,6 +198,7 @@ struct Platform{
     platform_open_files_begin* OpenFilesBegin;
     platform_open_files_end* OpenFilesEnd;
     platform_open_next_file* OpenNextFile;
+    platform_file_offset_read* FileOffsetRead;
     
     Platform_Begin_List_Files_In_Dir* BeginListFilesInDir;
     Platform_End_List_Files_In_Dir* EndListFilesInDir;

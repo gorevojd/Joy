@@ -1488,11 +1488,14 @@ PLATFORM_OPEN_FILES_BEGIN(Win32OpenFilesBegin){
     CopyStrings(NewDirPath, DirectoryPath);
     ChangeAllChars(NewDirPath, '\\', '/');
     int DirPathLen = StringLength(NewDirPath);
-    char* LastSymbol = &NewDirPath[DirPathLen];
-    if(*LastSymbol != '/'){
+    char* LastSymbol = &NewDirPath[DirPathLen - 1];
+    if((*LastSymbol != '/') && (DirPathLen - 1 >= 0)){
+        LastSymbol++;
         *LastSymbol++ = '/';
+        *LastSymbol = 0;
     }
-    *LastSymbol = 0;
+    
+    CopyStrings(GlobalWin32.OpenFilesDirectory, NewDirPath);
     
     char NewWildcard[16];
     if(Wildcard){
@@ -1515,6 +1518,8 @@ PLATFORM_OPEN_FILES_BEGIN(Win32OpenFilesBegin){
 }
 
 PLATFORM_OPEN_FILES_END(Win32OpenFilesEnd){
+    GlobalWin32.OpenFilesDirectory[0] = 0;
+    
     FindClose(GlobalWin32.OpenFilesFindHandle);
     
     ASSERT(GlobalWin32.InOpenFilesBlock == 1);
@@ -1524,13 +1529,18 @@ PLATFORM_OPEN_FILES_END(Win32OpenFilesEnd){
 PLATFORM_OPEN_NEXT_FILE(Win32OpenNextFile){
     b32 Result = GlobalWin32.OpenFilesNextFound;
     
+    platform_file_desc ResultDesc = {};
+    
     if(Result){
-        
-        platform_file_desc ResultDesc = {};
         WIN32_FIND_DATAA* FindData = &GlobalWin32.OpenFilesFindData;
         
         // NOTE(Dima): Copy file name
         CopyStrings(ResultDesc.Name, FindData->cFileName);
+        
+        // NOTE(Dima): Full file name
+        ConcatStringsUnsafe(ResultDesc.FullPath, 
+                            GlobalWin32.OpenFilesDirectory,
+                            FindData->cFileName);
         
         // NOTE(Dima): Getting size
         ResultDesc.Size = (((u64)FindData->nFileSizeHigh) << 32) | (FindData->nFileSizeLow);
@@ -1568,6 +1578,42 @@ PLATFORM_OPEN_NEXT_FILE(Win32OpenNextFile){
         
         GlobalWin32.OpenFilesNextFound = FindNextFileA(GlobalWin32.OpenFilesFindHandle, 
                                                        &GlobalWin32.OpenFilesFindData);
+    }
+    
+    if(OutFile){
+        *OutFile = ResultDesc;
+    }
+    
+    return(Result);
+}
+
+PLATFORM_FILE_OFFSET_READ(Win32FileOffsetRead){
+    b32 Result = 0;
+    
+    HANDLE FileHandle = CreateFileA(
+        FilePath,
+        GENERIC_READ,
+        FILE_SHARE_READ,
+        0,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        0);
+    
+    if(FileHandle != INVALID_HANDLE_VALUE){
+        
+        OVERLAPPED Overlapped = {};
+        Overlapped.Offset = Offset & 0xFFFFFFFF;
+        Overlapped.OffsetHigh = (Offset >> 32) & 0xFFFFFFFF;
+        
+        DWORD BytesRead;
+        BOOL ReadSuccess = ReadFile(
+            FileHandle,
+            ReadTo,
+            (u32)ReadCount,
+            &BytesRead,
+            &Overlapped);
+        
+        Result = ReadSuccess && (BytesRead == ReadCount);
     }
     
     return(Result);
@@ -2392,29 +2438,12 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     platform.OpenFilesBegin = Win32OpenFilesBegin;
     platform.OpenFilesEnd = Win32OpenFilesEnd;
     platform.OpenNextFile = Win32OpenNextFile;
+    platform.FileOffsetRead = Win32FileOffsetRead;
     
     // NOTE(Dima): Initializing memory sentinel
     GlobalWin32.memorySentinel = {};
     GlobalWin32.memorySentinel.Prev = &GlobalWin32.memorySentinel;
     GlobalWin32.memorySentinel.Next = &GlobalWin32.memorySentinel;
-    
-#if PROF_ENABLED
-    // NOTE(Dima): Initializing global record table if needed
-    mem_region ProfTableMem = {};
-    GlobalRecordTable = PushStruct(&ProfTableMem, debug_record_table);
-    
-    //NOTE(dima): Initializing of debug layer global record table
-    DebugSetRecording(1);
-    DebugSetLogRecording(1);
-    
-    for (int DebugLogIndex = 0;
-         DebugLogIndex < DEBUG_LOGS_COUNT;
-         DebugLogIndex++)
-    {
-        GlobalRecordTable->LogsInited[DebugLogIndex] = 0;
-        GlobalRecordTable->LogsTypes[DebugLogIndex] = 0;
-    }
-#endif
     
     // TODO(Dima): Add array of count Renderer_Count and init all renderers
     // TODO(Dima): Or leave if not supported

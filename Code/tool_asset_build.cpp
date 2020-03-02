@@ -370,6 +370,8 @@ void WriteAssetFile(asset_system* Assets, char* FileName) {
             game_asset_group* Src = &Assets->AssetGroups[GroupIndex];
             asset_file_group Group;
             
+            Group.Count = Src->RegionsCount;
+            
             // NOTE(Dima): Copy all groups and regions
             int i;
             for(i = 0; i < Src->RegionsCount; i++)
@@ -400,7 +402,7 @@ void WriteAssetFile(asset_system* Assets, char* FileName) {
             asset_header* Header = Assets->FileHeaders + AssetIndex;
             
             u32 HeaderByteSize = sizeof(asset_header);
-            u32 TagsByteSize = Asset->TagCount * sizeof(asset_tag_header);
+            u32 TagsByteSize = MAX_TAGS_PER_ASSET * sizeof(asset_tag_header);
             u32 DataByteSize = 0;
             
             /*
@@ -446,6 +448,12 @@ void WriteAssetFile(asset_system* Assets, char* FileName) {
                     Header->Font.LineOffsetToMapping = GetLineOffsetForData();
                     Header->Font.LineOffsetToKerningPairs = Header->Font.LineOffsetToMapping + SizeOfMapping;
                     
+                    Header->Font.MappingSize = SizeOfMapping;
+                    Header->Font.KerningSize = SizeOfKerning;
+                    
+                    Header->Font.DataOffsetToMapping = 0;
+                    Header->Font.DataOffsetToKerning = SizeOfMapping;
+                    
                     DataByteSize = SizeOfMapping + SizeOfKerning;
                 }break;
                 
@@ -462,17 +470,27 @@ void WriteAssetFile(asset_system* Assets, char* FileName) {
                 }break;
             }
             
-            //NOTE(dima): Forming and writing header
+            //NOTE(dima): Forming header
             Header->LineDataOffset = GetLineOffsetForData();
-            Header->Pitch = HeaderByteSize + DataByteSize + TagsByteSize;
-            Header->LineFirstTagOffset = HeaderByteSize + DataByteSize;
+            Header->Pitch = HeaderByteSize + DataByteSize;
             Header->TagCount = Asset->TagCount;
             Header->AssetType = Asset->Type;
             Header->TotalDataSize = DataByteSize;
             Header->TotalTagsSize = TagsByteSize;
             
-            ASSERT(Header->TotalTagsSize == Asset->TagCount * sizeof(asset_tag_header));
+            // NOTE(Dima): Forming tags in header
+            for (int AssetTagIndex = 0;
+                 AssetTagIndex < MAX_TAGS_PER_ASSET;
+                 AssetTagIndex++)
+            {
+                game_asset_tag* From = Asset->Tags + AssetTagIndex;
+                asset_tag_header* To = Header->Tags + AssetTagIndex;
+                
+                To->Type = From->Type;
+                To->Value_Float = From->Value_Float;
+            }
             
+            // NOTE(Dima): Writing asset header
             fwrite(Header, sizeof(asset_header), 1, fp);
             
             //NOTE(dima): Writing asset data
@@ -484,12 +502,13 @@ void WriteAssetFile(asset_system* Assets, char* FileName) {
                 
                 case AssetType_Font: {
                     //NOTE(dima): Writing mapping data
+                    // NOTE(Dima): FIRST - WRITING MAPPING
                     fwrite(
 						Asset->Font->Codepoint2Glyph,
 						sizeof(int) * FONT_INFO_MAX_GLYPH_COUNT,
 						1, fp);
                     
-                    //NOTE(dima): Writing kerning pairs
+                    //NOTE(dima): SECOND - WRITING KERNING
                     fwrite(
 						Asset->Font->KerningPairs,
 						sizeof(float) * Asset->Font->GlyphCount * Asset->Font->GlyphCount,
@@ -514,21 +533,6 @@ void WriteAssetFile(asset_system* Assets, char* FileName) {
                         1, fp);
                 }break;
             }
-            
-            //NOTE(dima): Forming tags
-            asset_tag_header WriteTags[MAX_TAGS_PER_ASSET];
-            
-            for (int AssetTagIndex = 0;
-                 AssetTagIndex < Asset->TagCount;
-                 AssetTagIndex++)
-            {
-                game_asset_tag* From = Asset->Tags + AssetTagIndex;
-                asset_tag_header* To = WriteTags + AssetTagIndex;
-                
-                To->Type = From->Type;
-                To->Value_Float = From->Value_Float;
-            }
-            fwrite(WriteTags, TagsByteSize, 1, fp);
             
             //NOTE(dima): Freeing freareas
             for (int FreeIndex = 0; FreeIndex < Free->SetCount; FreeIndex++) {

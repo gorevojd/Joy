@@ -117,26 +117,26 @@ GAME_MODE_UPDATE(TestUpdate){
     }
     
     PushMesh(Game->Assets, Stack, 
-             GetFirstInFamily(Game->Assets, GameAsset_Cube),
+             GetFirst(Game->Assets, GameAsset_Cube),
              V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
              QuatI(), V3(1.0f));
     
     PushMesh(Game->Assets, Stack, 
-             GetFirstInFamily(Game->Assets, GameAsset_Cube),
+             GetFirst(Game->Assets, GameAsset_Cube),
              V3(0.0f, 1.0f + Sin(Game->Input->Time * 3.0f) * 0.5f, 0.0f), 
              QuatI(), V3(1.0f));
     
     PushMesh(Game->Assets, Stack, 
-             GetFirstInFamily(Game->Assets, GameAsset_Cylynder),
+             GetFirst(Game->Assets, GameAsset_Cylynder),
              V3(-10.0f, 1.0f, 0.0f), 
              Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), V3(2.0f));
     
     PushMesh(Game->Assets, Stack, 
-             GetFirstInFamily(Game->Assets, GameAsset_Sphere),V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
+             GetFirst(Game->Assets, GameAsset_Sphere),V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
              QuatI(), V3(1.0f));
     
     PushMesh(Game->Assets, Stack, 
-             GetFirstInFamily(Game->Assets, GameAsset_Plane),
+             GetFirst(Game->Assets, GameAsset_Plane),
              V3(0.0f, -1.0f, 0.0f), 
              QuatI(), V3(100.0f));
     

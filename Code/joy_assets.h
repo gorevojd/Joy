@@ -11,7 +11,6 @@
 #include "joy_memory.h"
 
 #include "joy_asset_ids.h"
-
 #include "joy_data_structures.h"
 
 struct asset_file_source{
@@ -38,18 +37,10 @@ struct asset{
     mem_entry* DataMemoryEntry;
     
     // NOTE(Dima): In list stuff
-    asset* NextInFamily;
-    asset* PrevInFamily;
+    asset* Next;
+    asset* Prev;
     
     // NOTE(Dima): Data
-    union{
-        ASSET_VALUE_MEMBER(font_info);
-        ASSET_VALUE_MEMBER(bmp_info);
-        ASSET_VALUE_MEMBER(mesh_info);
-        ASSET_VALUE_MEMBER(glyph_info);
-        ASSET_VALUE_MEMBER(sound_info);
-    };
-    
     union{
         ASSET_PTR_MEMBER(font_info);
         ASSET_PTR_MEMBER(bmp_info);
@@ -69,8 +60,9 @@ struct asset_id_range{
     int Count;
 };
 
-struct asset_family{
-    u32 AssetID;
+struct asset_group{
+    int InGroupAssetCount;
+    asset Sentinel;
 };
 
 #define MAX_ASSETS_IN_ASSET_BLOCK 8
@@ -83,19 +75,27 @@ struct asset_block{
 
 // NOTE(dima): Bitmaps are stored in gamma-corrected premultiplied alpha format
 struct assets{
-    mem_region* Region;
+    mem_region* Memory;
     
     Asset_Atlas MainLargeAtlas;
+    
+    // NOTE(Dima): Asset files sources
+    asset_file_source FileSourceUse;
+    asset_file_source FileSourceFree;
     
     // NOTE(Dima): Memory entries
     mem_box MemBox;
     
     // NOTE(Dima): Assets
-    asset_family Families[GameAsset_Count];
+    asset_group Groups[GameAsset_Count];
     
     int CurrentBlockIndex;
     asset_block AssetBlocks[MAX_ASSET_BLOCKS_COUNT];
 };
+
+inline u32 SumAssetID(assets* Assets, u32 ID, int AddValue){
+    
+}
 
 inline asset* GetAssetByID(assets* Assets, u32 ID){
     int InBlockIndex = ID & 0xFFFF;
@@ -111,6 +111,6 @@ inline asset* GetAssetByID(assets* Assets, u32 ID){
 }
 
 void InitAssets(assets* Assets);
-u32 GetFirstInFamily(assets* Assets, u32 Family);
+u32 GetFirst(assets* Assets, u32 Family);
 
 #endif

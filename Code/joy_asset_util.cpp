@@ -121,27 +121,35 @@ void FreeStringList(Loaded_Strings* list){
     }
 }
 
-bmp_info AllocateBitmapInternal(u32 width, u32 height, void* pixelsData) {
+bmp_info AllocateBitmapInternal(u32 Width, u32 Height, void* pixelsData) {
 	bmp_info res = {};
     
-	res.Width = width;
-	res.Height = height;
-	res.Pitch = 4 * width;
+	res.Width = Width;
+	res.Height = Height;
+	res.Pitch = 4 * Width;
     
-	res.WidthOverHeight = (float)width / (float)height;
+	res.WidthOverHeight = (float)Width / (float)Height;
     
 	res.Pixels = pixelsData;
     
 	return(res);
 }
 
-bmp_info AllocateBitmap(u32 width, u32 height) {
-	u32 BitmapDataSize = width * height * 4;
+void AllocateBitmapInternal(bmp_info* Bmp, u32 Width, u32 Height, void* PixelsData){
+    
+    if(Bmp){
+        *Bmp = AllocateBitmapInternal(Width, Height, PixelsData);
+    }
+    
+}
+
+bmp_info AllocateBitmap(u32 Width, u32 Height) {
+	u32 BitmapDataSize = Width * Height * 4;
 	void* PixelsData = calloc(BitmapDataSize, 1);
     
 	memset(PixelsData, 0, BitmapDataSize);
     
-	bmp_info res = AllocateBitmapInternal(width, height, PixelsData);
+	bmp_info res = AllocateBitmapInternal(Width, Height, PixelsData);
     
 	return(res);
 }
