@@ -16,6 +16,9 @@
 struct asset_file_source{
     platform_file_desc FileDescription;
     
+    u32 IntegrationBaseID;
+    b32 IntegrationBaseIDInitialized;
+    
     asset_file_source* Next;
     asset_file_source* Prev;
 };
@@ -93,19 +96,49 @@ struct assets{
     asset_block AssetBlocks[MAX_ASSET_BLOCKS_COUNT];
 };
 
-inline u32 SumAssetID(assets* Assets, u32 ID, int AddValue){
+struct parsed_asset_id{
+    int InBlockIndex;
+    int BlockIndex;
+};
+
+inline parsed_asset_id ParseAssetID(u32 ID2Parse){
+    parsed_asset_id Result = {};
     
+    Result.InBlockIndex = ID2Parse & 0xFFFF;
+    Result.BlockIndex = (ID2Parse >> 16) & 0xFFFF;
+    
+    return(Result);
 }
 
-inline asset* GetAssetByID(assets* Assets, u32 ID){
-    int InBlockIndex = ID & 0xFFFF;
-    int AssetBlockIndex = (ID >> 16) & 0xFFFF;
+inline u32 RecoverAssetID(u32 BlockIndex, u32 InBlockIndex){
+    u32 ResultAssetID = 
+        (InBlockIndex & 0xFFFF) | 
+        ((BlockIndex & 0xFFFF) << 16);
     
-    asset_block* Block = &Assets->AssetBlocks[AssetBlockIndex];
+    return(ResultAssetID);
+}
+
+inline u32 SumAssetID(u32 ID, int AddValue){
+    // NOTE(Dima): I guess we can cheat here and just add as always
+    u32 Result = ID + AddValue;
+    
+    if((int)ID + AddValue < 0){
+        INVALID_CODE_PATH;
+        Result = 0;
+    }
+    
+    return(Result);
+}
+
+
+inline asset* GetAssetByID(assets* Assets, u32 ID){
+    parsed_asset_id ParsedID = ParseAssetID(ID);
+    
+    asset_block* Block = &Assets->AssetBlocks[ParsedID.BlockIndex];
     
     ASSERT(Block->BlockAssets);
     
-    asset* Result = &Block->BlockAssets[InBlockIndex];
+    asset* Result = &Block->BlockAssets[ParsedID.InBlockIndex];
     
     return(Result);
 }

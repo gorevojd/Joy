@@ -1,0 +1,19 @@
+
+
+#NAVIGATION
+"Simplified 3D Movement and Pathfinding Using Navigation Meshes" in Game Programming Gems
+https://www.gamedev.net/articles/programming/artificial-intelligence/navigation-meshes-and-pathfinding-r4880/
+
+###GRAPHICS
+
+***GTA5 frame render
+http://www.adriancourreges.com/blog/2015/11/02/gta-v-graphics-study/
+
+***Octahedron normal encoding
+http://jcgt.org/published/0003/02/01/paper.pdf
+
+***PPSLOAN publications
+https://www.ppsloan.org/publications/
+
+***Real-Time Polygonal-Light Shading with Linearly Transformed Cosines
+https://drive.google.com/file/d/0BzvWIdpUpRx_d09ndGVjNVJzZjA/view

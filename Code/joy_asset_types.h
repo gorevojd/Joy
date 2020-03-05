@@ -164,6 +164,7 @@ struct font_info{
     
     float* KerningPairs;
     
+    u32 GlyphIDs[FONT_INFO_MAX_GLYPH_COUNT];
     glyph_info Glyphs[FONT_INFO_MAX_GLYPH_COUNT];
     int GlyphCount;
     

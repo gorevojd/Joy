@@ -124,6 +124,7 @@ inline asset_file_source* AllocateFileSource(assets* Assets){
 
 void LoadAsset(assets* Assets, asset* Asset){
     asset_header* Header = &Asset->Header;
+    asset_file_source* FileSource = Asset->FileSource;
     
     // NOTE(Dima): Loading data
     u32 DataSize = Header->TotalDataSize;
@@ -141,8 +142,11 @@ void LoadAsset(assets* Assets, asset* Asset){
     
     switch(Asset->Type){
         case AssetType_Bitmap:{
+            // TODO(Dima): REDO this
             // NOTE(Dima): Allocating asset value
-            GET_ASSET_PTR_MEMBER(Asset, bmp_info) = (bmp_info*)malloc(sizeof(bmp_info));
+#define ALLOC_ASS_PTR_MEMBER(type) GET_ASSET_PTR_MEMBER(Asset, type) = (type*)malloc(sizeof(type))
+            
+            ALLOC_ASS_PTR_MEMBER(bmp_info);
             
             bmp_info* Result = GET_ASSET_PTR_MEMBER(Asset, bmp_info);
             asset_bitmap* Src = &Header->Bitmap;
@@ -157,7 +161,9 @@ void LoadAsset(assets* Assets, asset* Asset){
         }break;
         
         case AssetType_Glyph:{
+            ALLOC_ASS_PTR_MEMBER(glyph_info);
             
+            glyph_info* Result = GET_ASSET_PTR_MEMBER(Asset, glyph_info);
         }break;
         
         case AssetType_BitmapArray:{
@@ -174,7 +180,7 @@ void LoadAsset(assets* Assets, asset* Asset){
         
         case AssetType_Font:{
             // NOTE(Dima): Allocating asset value
-            GET_ASSET_PTR_MEMBER(Asset, font_info) = (font_info*)malloc(sizeof(font_info));
+            ALLOC_ASS_PTR_MEMBER(font_info);
             
             font_info* Result = GET_ASSET_PTR_MEMBER(Asset, font_info);
             asset_font* Src = &Header->Font;
@@ -191,6 +197,18 @@ void LoadAsset(assets* Assets, asset* Asset){
             Result->DescenderHeight = Header->Font.DescenderHeight;
             Result->LineGap = Header->Font.LineGap;
             Result->GlyphCount = Header->Font.GlyphCount;
+            
+            ASSERT(FileSource->IntegrationBaseIDInitialized);
+            Header->Font.FirstGlyphID = Header->Font.FirstGlyphID - 1 + FileSource->IntegrationBaseID;
+            
+            // NOTE(Dima): Setting glyph IDs
+            for(int GlyphIndex = 0; 
+                GlyphIndex < Header->Font.GlyphCount;
+                GlyphIndex++)
+            {
+                Result->GlyphIDs[GlyphIndex] = SumAssetID(Header->Font.FirstGlyphID, 
+                                                          GlyphIndex);
+            }
             
             // NOTE(Dima): Copy mapping
             for(int I = 0; I < FONT_INFO_MAX_GLYPH_COUNT; I++){
@@ -232,9 +250,7 @@ inline asset* AllocateAsset(assets* Assets)
         CurBlock->BlockAssets = PushArray(Assets->Memory, asset, MAX_ASSETS_IN_ASSET_BLOCK);
     }
     
-    u32 ResultAssetID = 
-        (TargetInBlockIndex & 0xFFFF) | 
-        ((AssetBlockIndex & 0xFFFF) << 16);
+    u32 ResultAssetID = RecoverAssetID(AssetBlockIndex, TargetInBlockIndex);
     
     asset* Result = &CurBlock->BlockAssets[TargetInBlockIndex];
     
@@ -280,6 +296,8 @@ void InitAssets(assets* Assets){
         // NOTE(Dima): Allocating and setting file source
         asset_file_source* FileSource = AllocateFileSource(Assets);
         FileSource->FileDescription = FileDesc;
+        FileSource->IntegrationBaseIDInitialized = JOY_FALSE;
+        FileSource->IntegrationBaseID = 0;
         
         char* FileFullPath = FileSource->FileDescription.FullPath;
         
@@ -370,6 +388,12 @@ void InitAssets(assets* Assets){
                     
                     // NOTE(Dima): Allocating asset
                     asset* NewAsset = AllocateAsset(Assets);
+                    
+                    if(!FileSource->IntegrationBaseIDInitialized){
+                        FileSource->IntegrationBaseIDInitialized= JOY_TRUE;
+                        
+                        FileSource->IntegrationBaseID = NewAsset->ID;
+                    }
                     
                     NewAsset->State = AssetState_Unloaded;
                     NewAsset->Header = AssetHeader;
