@@ -169,6 +169,13 @@ void DeallocateBitmap(bmp_info* Buffer) {
 	}
 }
 
+sound_info LoadSound(char* FilePath){
+    sound_info Result = {};
+    
+    
+    
+    return(Result);
+}
 
 bmp_info LoadBMP(char* FilePath){
     bmp_info res = {};
@@ -992,10 +999,11 @@ sound_info MakeSound(const std::vector<i16>& Samples,
     sound_info Result = {};
     
     Result.SamplesPerSec = SamplesPerSec;
+    Result.Channels = 2;
     
     if(Samples.size()){
         
-        size_t MemNeeded = Samples.size() * sizeof(i16) * 2;
+        size_t MemNeeded = Samples.size() * sizeof(i16) * Result.Channels;
         i16* ResultSamples = (i16*)malloc(MemNeeded);
         
         Result.Samples[0] = ResultSamples;
@@ -1003,17 +1011,10 @@ sound_info MakeSound(const std::vector<i16>& Samples,
         
         Result.SampleCount = Samples.size();
         
-#if 0
-        std::copy(Samples.begin(), Samples.end(), Result.Samples[0]);
-        std::copy(Samples.begin(), Samples.end(), Result.Samples[1]);
-#else
-        
         for(int i = 0; i < Samples.size(); i++){
             *(Result.Samples[0] + i) = Samples[i];
             *(Result.Samples[1] + i) = Samples[i];
         }
-#endif
-        
     }
     
     return(Result);

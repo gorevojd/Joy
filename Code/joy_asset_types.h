@@ -28,6 +28,7 @@ struct sound_info{
     // NOTE(Dima): Left and Right channels
     i16* Samples[2];
     
+    int Channels;
     int SampleCount;
     int SamplesPerSec;
 };

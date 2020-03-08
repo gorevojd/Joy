@@ -29,6 +29,7 @@ void DeallocateBitmap(bmp_info* buffer);
 void CopyBitmapData(bmp_info* dst, bmp_info* src);
 
 // NOTE(Dima): Functions for loading stuff
+sound_info LoadSound(char* FilePath);
 bmp_info LoadBMP(char* filePath);
 Loaded_Strings LoadStringListFromFile(char* filePath);
 void FreeStringList(Loaded_Strings* list);

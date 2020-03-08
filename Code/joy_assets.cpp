@@ -110,6 +110,19 @@ inline asset_id FileToIntegratedID(asset_file_source* Source, u32 FileID){
     return(Result);
 }
 
+void* AllocateAssetType(assets* Assets, asset* Asset, u32 AssetTypeSize){
+    Asset->TypeMemEntry = AllocateMemLayerEntry(
+        &Assets->LayeredMemory, AssetTypeSize);
+    
+    ASSERT(Asset->TypeMemEntry);
+    
+    void* Result = Asset->TypeMemEntry->Data;
+    
+    return(Result);
+}
+
+#define ALLOC_ASS_PTR_MEMBER(type) (GET_ASSET_PTR_MEMBER(Asset, type) = (type*)AllocateAssetType(Assets, Asset, sizeof(type)))
+
 void LoadAsset(assets* Assets, asset* Asset){
     asset_header* Header = &Asset->Header;
     asset_file_source* FileSource = Asset->FileSource;
@@ -128,19 +141,15 @@ void LoadAsset(assets* Assets, asset* Asset){
     
     ASSERT(ReadSucceeded);
     
-#define ALLOC_ASS_PTR_MEMBER(type) GET_ASSET_PTR_MEMBER(Asset, type) = (type*)Asset->TypeMemEntry->Data
-    
     switch(Asset->Type){
         case AssetType_Bitmap:{
-            
             Asset->TypeMemEntry = AllocateMemLayerEntry(
                 &Assets->LayeredMemory,sizeof(bmp_info));
             
             ASSERT(Asset->TypeMemEntry);
             
-            ALLOC_ASS_PTR_MEMBER(bmp_info);
+            bmp_info* Result = ALLOC_ASS_PTR_MEMBER(bmp_info);
             
-            bmp_info* Result = GET_ASSET_PTR_MEMBER(Asset, bmp_info);
             asset_bitmap* Src = &Header->Bitmap;
             
             *Result = {};
@@ -155,14 +164,8 @@ void LoadAsset(assets* Assets, asset* Asset){
         }break;
         
         case AssetType_Glyph:{
-            Asset->TypeMemEntry = AllocateMemLayerEntry(
-                &Assets->LayeredMemory,sizeof(glyph_info));
+            glyph_info* Result = ALLOC_ASS_PTR_MEMBER(glyph_info);
             
-            ASSERT(Asset->TypeMemEntry);
-            
-            ALLOC_ASS_PTR_MEMBER(glyph_info);
-            
-            glyph_info* Result = GET_ASSET_PTR_MEMBER(Asset, glyph_info);
             asset_glyph* Src = &Header->Glyph;
             
             Result->BitmapID = FileToIntegratedID(FileSource, Src->BitmapID);
@@ -178,14 +181,7 @@ void LoadAsset(assets* Assets, asset* Asset){
         }break;
         
         case AssetType_BitmapArray:{
-            Asset->TypeMemEntry = AllocateMemLayerEntry(
-                &Assets->LayeredMemory,sizeof(bmp_array_info));
-            
-            ASSERT(Asset->TypeMemEntry);
-            
-            ALLOC_ASS_PTR_MEMBER(bmp_array_info);
-            
-            bmp_array_info* Result = GET_ASSET_PTR_MEMBER(Asset, bmp_array_info);
+            bmp_array_info* Result = ALLOC_ASS_PTR_MEMBER(bmp_array_info);
             asset_bitmap_array* Src = &Header->BmpArray;
             
             Result->FirstBmpID = Src->FirstBmpID;
@@ -193,14 +189,7 @@ void LoadAsset(assets* Assets, asset* Asset){
         }break;
         
         case AssetType_Mesh:{
-            Asset->TypeMemEntry = AllocateMemLayerEntry(
-                &Assets->LayeredMemory,sizeof(mesh_info));
-            
-            ASSERT(Asset->TypeMemEntry);
-            
-            ALLOC_ASS_PTR_MEMBER(mesh_info);
-            
-            mesh_info* Result = GET_ASSET_PTR_MEMBER(Asset, mesh_info);
+            mesh_info* Result = ALLOC_ASS_PTR_MEMBER(mesh_info);
             asset_mesh* Src = &Header->Mesh;
             
             *Result = {};
@@ -225,14 +214,7 @@ void LoadAsset(assets* Assets, asset* Asset){
         }break;
         
         case AssetType_Font:{
-            Asset->TypeMemEntry = AllocateMemLayerEntry(
-                &Assets->LayeredMemory,sizeof(font_info));
-            
-            ASSERT(Asset->TypeMemEntry);
-            
-            ALLOC_ASS_PTR_MEMBER(font_info);
-            
-            font_info* Result = GET_ASSET_PTR_MEMBER(Asset, font_info);
+            font_info* Result = ALLOC_ASS_PTR_MEMBER(font_info);
             asset_font* Src = &Header->Font;
             
             *Result = {};

@@ -117,6 +117,7 @@ struct asset_mesh{
 struct asset_sound{
     int SampleCount;
     int SamplesPerSec;
+    int Channels;
 };
 
 #define MAX_TAGS_PER_ASSET 4

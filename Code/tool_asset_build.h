@@ -191,6 +191,7 @@ struct game_asset_source_material{
 
 struct game_asset_source_sound {
 	char* Path;
+    sound_info* Sound;
 };
 
 struct game_asset_source_font {

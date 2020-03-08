@@ -191,14 +191,27 @@ INTERNAL_FUNCTION added_asset AddIconAsset(asset_system* System,
 }
 
 INTERNAL_FUNCTION added_asset AddSoundAsset(asset_system* System, 
-                                            char* Path,
-                                            u32 BitmapLoadFlags = 0) 
+                                            char* Path) 
 {
 	added_asset Added = AddAsset(System, AssetType_Sound);
     
     // NOTE(Dima): Setting source
 	game_asset_source* Source = Added.Source;
 	Source->SoundSource.Path = Path;
+    Source->SoundSource.Sound = 0;
+    
+	return(Added);
+}
+
+INTERNAL_FUNCTION added_asset AddSoundAssetManual(asset_system* System, 
+                                                  sound_info* Sound)
+{
+    added_asset Added = AddAsset(System, AssetType_Sound);
+    
+    // NOTE(Dima): Setting source
+	game_asset_source* Source = Added.Source;
+	Source->SoundSource.Sound = Sound;
+    Source->SoundSource.Path = 0;
     
 	return(Added);
 }
@@ -762,6 +775,32 @@ void WriteAssetFile(asset_system* Assets, char* FileName) {
                     DataByteSize = Asset->Bitmap->Width * Asset->Bitmap->Height * 4;
                 }break;
                 
+                case AssetType_Sound:{
+                    b32 SoundAllocatedHere = 0;
+                    if(!Source->SoundSource.Sound){
+                        Asset->Sound = (sound_info*)malloc(sizeof(sound_info));
+                        *Asset->Sound = LoadSound(Source->SoundSource.Path);
+                        
+                        SoundAllocatedHere = 1;
+                    }
+                    else{
+                        Asset->Sound = Source->SoundSource.Sound;
+                    }
+                    AddFreeareaToAsset(Assets, Asset, Asset->Sound->Samples[0]);
+                    
+                    if(SoundAllocatedHere){
+                        AddFreeareaToAsset(Assets, Asset, Asset->Sound);
+                    }
+                    
+                    // NOTE(Dima): Setting asset header
+                    Header->Sound.SampleCount = Asset->Sound->SampleCount;
+                    Header->Sound.SamplesPerSec = Asset->Sound->SamplesPerSec;
+                    Header->Sound.Channels = Asset->Sound->Channels;
+                    
+                    // NOTE(Dima): Setting data size
+                    DataByteSize = Asset->Sound->SampleCount * Asset->Sound->Channels * sizeof(i16);
+                }break;
+                
                 case AssetType_Font: {
                     Asset->Font = Source->FontSource.FontInfo;
                     
@@ -823,6 +862,10 @@ void WriteAssetFile(asset_system* Assets, char* FileName) {
                 case AssetType_Bitmap: {
                     //NOTE(dima): Writing bitmap pixel data
                     fwrite(Asset->Bitmap->Pixels, DataByteSize, 1, fp);
+                }break;
+                
+                case AssetType_Sound:{
+                    fwrite(Asset->Sound->Samples, DataByteSize, 1, fp);
                 }break;
                 
                 case AssetType_Font: {
@@ -1105,22 +1148,6 @@ INTERNAL_FUNCTION void WriteIcons(){
     WriteAssetFile(System, "../Data/Icons.ja");
 }
 
-INTERNAL_FUNCTION void WriteSounds(){
-    asset_system System_ = {};
-    asset_system* System = &System_;
-    InitAssetFile(System);
-    
-    BeginAsset(System, GameAsset_CheckboxMark);
-    EndAsset(System);
-    
-    BeginAsset(System, GameAsset_ChamomileIcon);
-    EndAsset(System);
-    
-    WriteAssetFile(System, "../Data/GeneratedSounds.ja");
-}
-
-
-
 INTERNAL_FUNCTION void WriteBitmapArray(){
     asset_system System_ = {};
     asset_system* System = &System_;
@@ -1167,6 +1194,20 @@ INTERNAL_FUNCTION void WriteBitmaps(){
     
     
     WriteAssetFile(System, "../Data/Bitmaps.ja");
+}
+
+INTERNAL_FUNCTION void WriteSounds(){
+    asset_system System_ = {};
+    asset_system* System = &System_;
+    InitAssetFile(System);
+    
+    sound_info Sine = MakeSineSound256(44100 * 2, 44100);
+    
+    BeginAsset(System, GameAsset_SineTest);
+    AddSoundAssetManual(System, &Sine);
+    EndAsset(System);
+    
+    WriteAssetFile(System, "../Data/Sounds.ja");
 }
 
 INTERNAL_FUNCTION void WriteMeshPrimitives(){
@@ -1232,6 +1273,7 @@ int main() {
     WriteMeshPrimitives();
     WriteFonts();
     WriteBitmapArray();
+    WriteSounds();
     
     system("pause");
     return(0);
