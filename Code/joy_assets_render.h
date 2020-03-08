@@ -5,10 +5,27 @@
 #include "joy_asset_ids.h"
 #include "joy_render.h"
 
+inline void PushBitmap(assets* Assets, 
+                       render_stack* Stack,
+                       v2 P, v2 Dim,
+                       asset_id BmpID,
+                       v4 ModColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
+{
+    asset* Asset = GetAssetByID(Assets, BmpID);
+    
+    ASSERT(Asset->Type == AssetType_Bitmap);
+    
+    bmp_info* Bmp = GET_ASSET_PTR_MEMBER(Asset, bmp_info);
+    
+    if(Bmp){
+        PushBitmap(Stack, Bmp, P, Dim.y, ModColor);
+    }
+}
+
 inline void PushGlyph(assets* Assets, 
                       render_stack* Stack,
                       v2 P, v2 Dim,
-                      ASSET_TYPED_ID(bmp_info) BmpID, 
+                      asset_id BmpID, 
                       v4 ModColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
     asset* Asset = GetAssetByID(Assets, BmpID);
@@ -20,14 +37,16 @@ inline void PushGlyph(assets* Assets,
     v2 MinUV = Bmp->MinUV;
     v2 MaxUV = Bmp->MaxUV;
     
-    PushGlyph(Stack, P, Dim, Bmp, 
-              Bmp->MinUV, Bmp->MaxUV,
-              ModColor);
+    if(Bmp){
+        PushGlyph(Stack, P, Dim, Bmp, 
+                  Bmp->MinUV, Bmp->MaxUV,
+                  ModColor);
+    }
 }
 
 inline void PushMesh(assets* Assets, 
                      render_stack* Stack,
-                     ASSET_TYPED_ID(mesh_info) MeshID,
+                     asset_id MeshID,
                      v3 P,
                      quat R,
                      v3 S)
@@ -38,7 +57,9 @@ inline void PushMesh(assets* Assets,
     
     mesh_info* Mesh = GET_ASSET_PTR_MEMBER(Asset, mesh_info);
     
-    PushMesh(Stack, Mesh, P, R, S);
+    if(Mesh){
+        PushMesh(Stack, Mesh, P, R, S);
+    }
 }
 
 #endif

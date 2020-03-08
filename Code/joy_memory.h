@@ -15,6 +15,24 @@ struct mem_region{
     u32 GrowSize;
 };
 
+struct mem_layer_entry{
+    mem_layer_entry* Next;
+    mem_layer_entry* Prev;
+    
+    void* Data;
+    
+    u32 LayerSize;
+    int LayerIndex;
+};
+
+struct layered_mem{
+    mem_region* Region;
+    
+    mem_layer_entry* LayersSentinels;
+    mem_layer_entry* FreeSentinels;
+    int LayersCount;
+};
+
 inline void RegionSetGrowSize(mem_region* Region, u32 GrowSize){
     Region->GrowSize = GrowSize;
 }
@@ -22,18 +40,6 @@ inline void RegionSetGrowSize(mem_region* Region, u32 GrowSize){
 enum memory_entry_state{
     MemoryEntry_Released,
     MemoryEntry_Used,
-};
-
-struct mem_entry_snapshot{
-    u32 DataSize;
-    
-    struct mem_entry* CorrespondingEntry;
-    
-    b32 operator>(mem_entry_snapshot& Entry){
-        b32 Result = this->DataSize > Entry.DataSize;
-        
-        return(Result);
-    }
 };
 
 struct mem_entry{
@@ -56,8 +62,6 @@ struct mem_entry{
     u32 ActualDataSize;
     
     u32 State;
-    
-    mem_entry_snapshot* Snapshot;
 };
 
 struct mem_box{
@@ -67,8 +71,6 @@ struct mem_box{
     
     mem_entry* First;
     mem_entry* FirstReleased;
-    
-    std::vector<mem_entry_snapshot> ReleasedSnapshots;
     
     mem_box* NextBox;
 };
@@ -196,14 +198,28 @@ inline void FreeNoDealloc(mem_region* Region){
     name->##region_member_name = region;\
 }
 
+// NOTE(Dima): Definitions
 #define PushSize(region, size) PushSomeMem(region, size)
 #define PushStruct(region, type) (type*)PushSomeMem(region, sizeof(type))
 #define PushArray(region, type, count) (type*)PushSomeMem(region, sizeof(type) * count)
 #define PushString(region, text) (char*)PushSomeMem(region, strlen(text) + 1)
 #define PushStringSize(region, text, textlen) (char*)PushSomeMem(region, (textlen) + 1)
 
+// NOTE(Dima): Memory box
 mem_box InitMemoryBox(mem_region* Region, u32 BoxSizeInBytes);
 mem_entry* AllocateMemoryFromBox(mem_box* box, u32 RequestMemorySize);
 void ReleaseMemoryFromBox(mem_box* box, mem_entry* memEntry);
+
+// NOTE(Dima): Layered
+void InitLayeredMem(layered_mem* Mem, 
+                    mem_region* Region,
+                    u32* LayersSizes,
+                    int LayersSizesCount);
+
+void DeallocateMemLayerEntry(layered_mem* Mem, 
+                             mem_layer_entry* ToDeallocate);
+
+mem_layer_entry* AllocateMemLayerEntry(layered_mem* MemLayered, 
+                                       u32 SizeToAllocate);
 
 #endif

@@ -7,6 +7,39 @@
 #include "joy_asset_ids.h"
 #include "joy_asset_util.h"
 
+
+struct tool_glyph_info{
+    int Codepoint;
+    
+    int Width;
+    int Height;
+    
+    bmp_info Bitmap;
+    
+    /*Theese are offset from glyph origin to top-left of bitmap*/
+	float XOffset;
+	float YOffset;
+	float Advance;
+	float LeftBearingX;
+};
+
+
+
+struct tool_font_info{
+    float AscenderHeight;
+	float DescenderHeight;
+	float LineGap;
+    
+    float* KerningPairs;
+    
+    u32 GlyphIDs[FONT_INFO_MAX_GLYPH_COUNT];
+    
+    tool_glyph_info Glyphs[FONT_INFO_MAX_GLYPH_COUNT];
+    int GlyphCount;
+    
+    int Codepoint2Glyph[FONT_INFO_MAX_GLYPH_COUNT];
+};
+
 struct game_asset_group_region {
 	u32 FirstAssetIndex;
 	u32 AssetCount;
@@ -122,11 +155,11 @@ struct game_asset {
     
 	union {
 		bmp_info* Bitmap;
-		font_info* Font;
+		tool_font_info* Font;
 		sound_info* Sound;
 		model_info* Model;
 		mesh_info* Mesh;
-		glyph_info* Glyph;
+		tool_glyph_info* Glyph;
 	};
 };
 
@@ -161,11 +194,11 @@ struct game_asset_source_sound {
 };
 
 struct game_asset_source_font {
-	font_info* FontInfo;
+	tool_font_info* FontInfo;
 };
 
 struct game_asset_source_glyph {
-	glyph_info* Glyph;
+	tool_glyph_info* Glyph;
 };
 
 struct game_asset_source {

@@ -1,9 +1,23 @@
 #include "tool_asset_build.h"
+
+#include "joy_software_renderer.h"
+#include "joy_render_blur.h"
+
 #include <stdio.h>
+#include <string>
+#include <vector>
+#include <map>
+#include <set>
 
 #define STB_SPRINTF_STATIC
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
+
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#define STB_TRUETYPE_STATIC
+#include "stb_truetype.h"
+
 
 INTERNAL_FUNCTION void BeginAsset(asset_system* System, u32 GroupID) {
 	System->CurrentGroup = System->AssetGroups + GroupID;
@@ -163,6 +177,7 @@ INTERNAL_FUNCTION added_asset AddBitmapAssetManual(asset_system* System,
 	game_asset_source* Source = Added.Source;
 	Source->BitmapSource.BitmapInfo = Bitmap;
     Source->BitmapSource.Path = 0;
+    Source->BitmapSource.LoadFlags = BitmapLoadFlags;
     
 	return(Added);
 }
@@ -233,9 +248,12 @@ INTERNAL_FUNCTION added_asset AddMeshAsset(asset_system* System,
     FileHeader->Mesh.IndicesCount = sizeof(u32);
 	FileHeader->Mesh.IndicesCount = Mesh->IndicesCount;
 	FileHeader->Mesh.VerticesCount = Mesh->VerticesCount;
-	FileHeader->Mesh.LineOffsetToVertices = GetLineOffsetForData();
-	FileHeader->Mesh.LineOffsetToIndices = FileHeader->Mesh.LineOffsetToVertices +
-		Mesh->VerticesCount * VertexTypeSize;
+    
+    FileHeader->Mesh.DataVerticesSize = FileHeader->Mesh.VertexTypeSize * Mesh->VerticesCount;
+    FileHeader->Mesh.DataIndicesSize = sizeof(u32) * Mesh->IndicesCount;
+    
+	FileHeader->Mesh.DataOffsetToVertices = 0;
+	FileHeader->Mesh.DataOffsetToIndices = FileHeader->Mesh.DataVerticesSize;
     
 	AddFreeareaToAsset(System, Added.Asset, Mesh->Indices);
 	AddFreeareaToAsset(System, Added.Asset, Mesh->Vertices);
@@ -245,8 +263,7 @@ INTERNAL_FUNCTION added_asset AddMeshAsset(asset_system* System,
 
 INTERNAL_FUNCTION added_asset AddFontAsset(
 asset_system* System,
-font_info* FontInfo,
-u32 FirstGlyphID)
+tool_font_info* FontInfo)
 {
 	added_asset Added = AddAsset(System, AssetType_Font);
     
@@ -260,18 +277,17 @@ u32 FirstGlyphID)
 	Header->Font.DescenderHeight = FontInfo->DescenderHeight;
 	Header->Font.LineGap = FontInfo->LineGap;
 	Header->Font.GlyphCount = FontInfo->GlyphCount;
-    Header->Font.FirstGlyphID = FirstGlyphID;
     
-	Header->Font.LineOffsetToKerningPairs= GetLineOffsetForData();
-	
-    AddFreeareaToAsset(System, Added.Asset, FontInfo->KerningPairs);
+    if(FontInfo->GlyphCount){
+        AddFreeareaToAsset(System, Added.Asset, FontInfo->KerningPairs);
+    }
     
 	return(Added);
 }
 
 INTERNAL_FUNCTION added_asset AddGlyphAssetInternal(
 asset_system* System,
-glyph_info* GlyphInfo, 
+tool_glyph_info* GlyphInfo, 
 u32 BitmapID)
 {
     added_asset Added = AddAsset(System, AssetType_Glyph);
@@ -283,21 +299,39 @@ u32 BitmapID)
 	Header->Glyph.Codepoint = GlyphInfo->Codepoint;
 	Header->Glyph.BitmapWidth = GlyphInfo->Bitmap.Width;
 	Header->Glyph.BitmapHeight = GlyphInfo->Bitmap.Height;
-	Header->Glyph.XOffset = GlyphInfo->XOffset;
+	Header->Glyph.BitmapWidthOverHeight = 
+        (float)GlyphInfo->Bitmap.Width /
+        (float)GlyphInfo->Bitmap.Height;
+    Header->Glyph.XOffset = GlyphInfo->XOffset;
 	Header->Glyph.YOffset = GlyphInfo->YOffset;
 	Header->Glyph.Advance = GlyphInfo->Advance;
 	Header->Glyph.LeftBearingX = GlyphInfo->LeftBearingX;
+    Header->Glyph.BitmapID = BitmapID;
     
 	return(Added);
 }
 
 INTERNAL_FUNCTION added_asset AddGlyphAsset(asset_system* System,
-                                            glyph_info* Glyph)
+                                            tool_glyph_info* Glyph)
 {
     added_asset BmpAsset = AddBitmapAssetManual(System, &Glyph->Bitmap, BitmapLoad_BakeIcon);
     added_asset Result = AddGlyphAssetInternal(System, Glyph, BmpAsset.ID);
     
     return(Result);
+}
+
+INTERNAL_FUNCTION added_asset AddBitmapArray(asset_system* System, 
+                                             u32 FirstBitmapID, 
+                                             int Count)
+{
+    added_asset Added = AddAsset(System, AssetType_BitmapArray);
+    
+	asset_header* Header = Added.FileHeader;
+    
+    Header->BmpArray.Count = Count;
+    Header->BmpArray.FirstBmpID = FirstBitmapID;
+    
+    return(Added);
 }
 
 void InitAssetFile(asset_system* Assets) {
@@ -334,6 +368,296 @@ void InitAssetFile(asset_system* Assets) {
 		}
 	}
 }
+
+
+void LoadFontAddCodepoint(
+tool_font_info* FontInfo, 
+stbtt_fontinfo* STBFont,
+int Codepoint,
+int* AtlasWidth, 
+int* AtlasHeight,
+float FontScale,
+u32 Flags,
+int BlurRadius,
+float* GaussianBox)
+{
+    int glyphIndex = FontInfo->GlyphCount++;
+    tool_glyph_info* glyph = &FontInfo->Glyphs[glyphIndex];
+    
+    FontInfo->Codepoint2Glyph[Codepoint] = glyphIndex;
+    
+    int CharWidth;
+	int CharHeight;
+	int XOffset;
+	int YOffset;
+	int Advance;
+	int LeftBearingX;
+    
+    u8* Bitmap = stbtt_GetCodepointBitmap(
+        STBFont,
+        FontScale, FontScale,
+        Codepoint,
+        &CharWidth, &CharHeight,
+        &XOffset, &YOffset);
+    
+    if(CharWidth > 9999){
+        CharWidth = 0;
+    }
+    if(CharHeight > 9999){
+        CharHeight = 0;
+    }
+    
+    int CharBorder = 3;
+    int ShadowOffset = 0;
+    
+    if(Flags & LoadFont_BakeShadow){
+        ShadowOffset = 2;
+    }
+    
+    int CharBmpWidth= CharBorder * 2 + CharWidth;
+    int CharBmpHeight = CharBorder * 2 + CharHeight;
+    
+    stbtt_GetCodepointHMetrics(STBFont, Codepoint, &Advance, &LeftBearingX);
+    
+    glyph->Width = CharBmpWidth + ShadowOffset;
+	glyph->Height = CharBmpHeight + ShadowOffset;
+	glyph->Bitmap = AllocateBitmap(glyph->Width, glyph->Height);
+	glyph->Advance = Advance * FontScale;
+	glyph->LeftBearingX = LeftBearingX * FontScale;
+	glyph->XOffset = XOffset - CharBorder;
+	glyph->YOffset = YOffset - CharBorder;
+	glyph->Codepoint = Codepoint;
+    
+    *AtlasWidth += glyph->Width;
+	*AtlasHeight = Max(*AtlasHeight, glyph->Height);
+    
+    //NOTE(dima): Clearing the image bytes
+	u32* Pixel = (u32*)glyph->Bitmap.Pixels;
+	for (int Y = 0; Y < glyph->Height; Y++) {
+		for (int X = 0; X < glyph->Width; X++) {
+			*Pixel++ = 0;
+		}
+	}
+    
+    //NOTE(dima): Forming char bitmap
+	float OneOver255 = 1.0f / 255.0f;
+    
+    bmp_info CharBitmap= AllocateBitmap(CharWidth, CharHeight);
+	
+	for (int j = 0; j < CharHeight; j++) {
+		for (int i = 0; i < CharWidth; i++) {
+			u8 Grayscale = *((u8*)Bitmap + j * CharWidth + i);
+			float Grayscale01 = (float)Grayscale * OneOver255;
+            
+			v4 resColor = V4(1.0f, 1.0f, 1.0f, Grayscale01);
+            
+			/*Alpha premultiplication*/
+			resColor.r *= resColor.a;
+			resColor.g *= resColor.a;
+			resColor.b *= resColor.a;
+            
+			u32 ColorValue = PackRGBA(resColor);
+			u32* TargetPixel = (u32*)((u8*)CharBitmap.Pixels + j* CharBitmap.Pitch + i * 4);
+			*TargetPixel = ColorValue;
+		}
+	}
+    
+    //NOTE(dima): Render blur if needed
+	if (Flags & LoadFont_BakeBlur) {
+		bmp_info ToBlur = AllocateBitmap(
+            2 * CharBorder + CharWidth,
+            2 * CharBorder + CharHeight);
+        
+		bmp_info BlurredResult = AllocateBitmap(
+            2 * CharBorder + CharWidth,
+            2 * CharBorder + CharHeight);
+        
+		bmp_info TempBitmap = AllocateBitmap(
+            2 * CharBorder + CharWidth,
+            2 * CharBorder + CharHeight);
+        
+		RenderOneBitmapIntoAnother(
+            &ToBlur,
+            &CharBitmap,
+            CharBorder,
+            CharBorder,
+            V4(1.0f, 1.0f, 1.0f, 1.0f));
+        
+#if 1
+		BlurBitmapExactGaussian(
+            &ToBlur,
+            BlurredResult.Pixels,
+            ToBlur.Width,
+            ToBlur.Height,
+            BlurRadius,
+            GaussianBox);
+        
+        
+		for (int Y = 0; Y < ToBlur.Height; Y++) {
+			for (int X = 0; X < ToBlur.Width; X++) {
+				u32* FromPix = (u32*)BlurredResult.Pixels + Y * BlurredResult.Width + X;
+				u32* ToPix = (u32*)ToBlur.Pixels + Y * ToBlur.Width + X;
+                
+				v4 FromColor = UnpackRGBA(*FromPix);
+                
+				v4 resColor = FromColor;
+				if (resColor.a < 0.15f) {
+                    resColor.a = 0.0f;
+				}
+                else{
+                    resColor.a = 1.0f;
+                }
+                
+				*ToPix = PackRGBA(resColor);
+			}
+		}
+        
+		BlurBitmapExactGaussian(
+            &ToBlur,
+            BlurredResult.Pixels,
+            ToBlur.Width,
+            ToBlur.Height,
+            BlurRadius,
+            GaussianBox);
+        
+#else
+		BlurBitmapApproximateGaussian(
+            &ToBlur,
+            BlurredResult.Pixels,
+            TempBitmap.Pixels,
+            ToBlur.Width,
+            ToBlur.Height,
+            BlurRadius);
+		for (int Y = 0; Y < ToBlur.Height; Y++) {
+			for (int X = 0; X < ToBlur.Width; X++) {
+				u32* FromPix = (u32*)BlurredResult.Pixels + Y * BlurredResult.Width + X;
+				u32* ToPix = (u32*)ToBlur.Pixels + Y * ToBlur.Width + X;
+				v4 FromColor = UnpackRGBA(*FromPix);
+				v4 resColor = FromColor;
+				if (resColor.a > 0.05f) {
+					resColor.a = 1.0f;
+				}
+				*ToPix = PackRGBA(resColor);
+			}
+		}
+		BlurBitmapApproximateGaussian(
+            &ToBlur,
+            BlurredResult.Pixels,
+            TempBitmap.Pixels,
+            ToBlur.Width,
+            ToBlur.Height,
+            BlurRadius);
+#endif
+        
+		RenderOneBitmapIntoAnother(
+            &glyph->Bitmap,
+            &BlurredResult,
+            0, 0,
+            V4(0.0f, 0.0f, 0.0f, 1.0f));
+        
+		DeallocateBitmap(&TempBitmap);
+		DeallocateBitmap(&ToBlur);
+		DeallocateBitmap(&BlurredResult);
+	}
+    
+    if(Flags & LoadFont_BakeShadow){
+        
+        RenderOneBitmapIntoAnother(
+            &glyph->Bitmap,
+            &CharBitmap,
+            CharBorder + ShadowOffset,
+            CharBorder + ShadowOffset,
+            V4(0.0f, 0.0f, 0.0f, 1.0f));
+        
+    }
+    
+    RenderOneBitmapIntoAnother(
+        &glyph->Bitmap,
+        &CharBitmap,
+        CharBorder,
+        CharBorder,
+        V4(1.0f, 1.0f, 1.0f, 1.0f));
+    
+    DeallocateBitmap(&CharBitmap);
+    stbtt_FreeBitmap(Bitmap, 0);
+}
+
+tool_font_info LoadFont(char* FilePath, float height, u32 Flags){
+    tool_font_info res = {};
+    
+    stbtt_fontinfo STBFont;
+    
+    data_buffer TTFBuffer = ReadFileToDataBuffer(FilePath);
+    stbtt_InitFont(&STBFont, TTFBuffer.Data, 
+                   stbtt_GetFontOffsetForIndex(TTFBuffer.Data, 0));
+    
+    float Scale = stbtt_ScaleForPixelHeight(&STBFont, height);
+    
+    int AscenderHeight;
+	int DescenderHeight;
+	int LineGap;
+    
+    stbtt_GetFontVMetrics(
+        &STBFont,
+        &AscenderHeight,
+        &DescenderHeight,
+        &LineGap);
+    
+    res.AscenderHeight = (float)AscenderHeight * Scale;
+	res.DescenderHeight = (float)DescenderHeight * Scale;
+	res.LineGap = (float)LineGap * Scale;
+    
+    int AtlasWidth = 0;
+    int AtlasHeight = 0;
+    
+    //NOTE(dima): This is for blurring
+	int BlurRadius = 2;
+	float GaussianBox[256];
+	if (Flags & LoadFont_BakeBlur) {
+        
+		u32 GaussianBoxCompCount = Calcualte2DGaussianBoxComponentsCount(BlurRadius);
+		Calculate2DGaussianBox(GaussianBox, BlurRadius);
+	}
+    
+    for(int Codepoint = ' ';
+        Codepoint <= '~';
+        Codepoint++)
+    {
+        LoadFontAddCodepoint(
+            &res, 
+            &STBFont,
+            Codepoint,
+            &AtlasWidth,
+            &AtlasHeight,
+            Scale,
+            Flags,
+            BlurRadius,
+            GaussianBox);
+    }
+    
+    if(res.GlyphCount){
+        //NOTE(dima): Processing kerning
+        res.KerningPairs = (float*)malloc(sizeof(float) * res.GlyphCount * res.GlyphCount);
+        
+        for (int firstIndex = 0; firstIndex < res.GlyphCount; firstIndex++) {
+            for (int secondIndex = 0; secondIndex < res.GlyphCount; secondIndex++) {
+                u32 KerningIndex = secondIndex * res.GlyphCount + firstIndex;
+                
+                int FirstCodepoint = res.Glyphs[firstIndex].Codepoint;
+                int SecondCodepoint = res.Glyphs[secondIndex].Codepoint;
+                
+                int Kern = stbtt_GetGlyphKernAdvance(&STBFont, FirstCodepoint, SecondCodepoint);
+                
+                res.KerningPairs[KerningIndex] = (float)Kern * Scale;
+            }
+        }
+    }
+    
+    FreeDataBuffer(&TTFBuffer);
+    
+    return(res);
+}
+
 
 void WriteAssetFile(asset_system* Assets, char* FileName) {
 	FILE* fp = fopen(FileName, "wb");
@@ -431,7 +755,8 @@ void WriteAssetFile(asset_system* Assets, char* FileName) {
                     //NOTE(dima): Setting asset header
                     Header->Bitmap.Width = Asset->Bitmap->Width;
                     Header->Bitmap.Height = Asset->Bitmap->Height;
-                    Header->Bitmap.BakeToAtlas = ((Source->BitmapSource.LoadFlags & BitmapLoad_BakeIcon) != 0);
+                    Header->Bitmap.BakeToAtlas = ((Source->BitmapSource.LoadFlags & 
+                                                   BitmapLoad_BakeIcon) != 0);
                     
                     //NOTE(dima): Set data size
                     DataByteSize = Asset->Bitmap->Width * Asset->Bitmap->Height * 4;
@@ -441,20 +766,20 @@ void WriteAssetFile(asset_system* Assets, char* FileName) {
                     Asset->Font = Source->FontSource.FontInfo;
                     
                     u32 SizeOfMapping = sizeof(int) * FONT_INFO_MAX_GLYPH_COUNT;
+                    u32 SizeOfIDs = sizeof(u32) * Asset->Font->GlyphCount;
                     u32 SizeOfKerning = sizeof(float) * 
                         Asset->Font->GlyphCount * 
                         Asset->Font->GlyphCount;
                     
-                    Header->Font.LineOffsetToMapping = GetLineOffsetForData();
-                    Header->Font.LineOffsetToKerningPairs = Header->Font.LineOffsetToMapping + SizeOfMapping;
-                    
                     Header->Font.MappingSize = SizeOfMapping;
                     Header->Font.KerningSize = SizeOfKerning;
+                    Header->Font.IDsSize = SizeOfIDs;
                     
                     Header->Font.DataOffsetToMapping = 0;
                     Header->Font.DataOffsetToKerning = SizeOfMapping;
+                    Header->Font.DataOffsetToIDs = SizeOfMapping + SizeOfKerning;
                     
-                    DataByteSize = SizeOfMapping + SizeOfKerning;
+                    DataByteSize = SizeOfMapping + SizeOfKerning + SizeOfIDs;
                 }break;
                 
                 case AssetType_Glyph: {
@@ -501,18 +826,26 @@ void WriteAssetFile(asset_system* Assets, char* FileName) {
                 }break;
                 
                 case AssetType_Font: {
-                    //NOTE(dima): Writing mapping data
+                    // IMPORTANT(Dima): Order is important
+                    
                     // NOTE(Dima): FIRST - WRITING MAPPING
                     fwrite(
 						Asset->Font->Codepoint2Glyph,
-						sizeof(int) * FONT_INFO_MAX_GLYPH_COUNT,
+						Header->Font.MappingSize,
 						1, fp);
                     
                     //NOTE(dima): SECOND - WRITING KERNING
                     fwrite(
-						Asset->Font->KerningPairs,
-						sizeof(float) * Asset->Font->GlyphCount * Asset->Font->GlyphCount,
-						1, fp);
+                        Asset->Font->KerningPairs,
+                        Header->Font.KerningSize,
+                        1, fp);
+                    
+                    //NOTE(dima): THIRD - Write glyph IDs
+                    fwrite(
+                        Asset->Font->GlyphIDs,
+                        Header->Font.IDsSize,
+                        1, fp);
+                    
                 }break;
                 
                 case AssetType_Glyph: {
@@ -630,7 +963,7 @@ void WriteAssetFile(asset_system* Assets, char* FileName) {
     printf("File %s has been written...\n", FileName);
 }
 
-INTERNAL_FUNCTION void WriteFontsChunk(font_info* Fonts,
+INTERNAL_FUNCTION void WriteFontsChunk(tool_font_info** Fonts,
                                        u32* FontsGroups,
                                        game_asset_tag_hub* FontsTags,
                                        int FontsCount, 
@@ -640,15 +973,13 @@ INTERNAL_FUNCTION void WriteFontsChunk(font_info* Fonts,
     asset_system* System = &System_;
     InitAssetFile(System);
     
-    u32 FirstGlyphIDsForFonts[ASSET_GROUP_REGIONS_COUNT];
-    
     // NOTE(Dima): Adding glyphs
     BeginAsset(System, GameAsset_Type_Glyph);
     for (int FontIndex = 0;
          FontIndex < FontsCount;
          FontIndex++)
     {
-        font_info* Font = &Fonts[FontIndex];
+        tool_font_info* Font = Fonts[FontIndex];
         
         for (int GlyphIndex = 0;
              GlyphIndex < Font->GlyphCount;
@@ -656,10 +987,7 @@ INTERNAL_FUNCTION void WriteFontsChunk(font_info* Fonts,
         {
             added_asset AddedGlyphAsset = AddGlyphAsset(System, &Font->Glyphs[GlyphIndex]);
             
-            if (GlyphIndex == 0) {
-                u32 AddedGlyphID = AddedGlyphAsset.ID;
-                FirstGlyphIDsForFonts[FontIndex] = AddedGlyphID;
-            }
+            Font->GlyphIDs[GlyphIndex] = AddedGlyphAsset.ID;
         }
     }
     EndAsset(System);
@@ -669,12 +997,12 @@ INTERNAL_FUNCTION void WriteFontsChunk(font_info* Fonts,
          FontIndex < FontsCount;
          FontIndex++)
     {
-        font_info* Font = &Fonts[FontIndex];
+        tool_font_info* Font = Fonts[FontIndex];
         game_asset_tag_hub* TagHub = FontsTags + FontIndex;
         
         BeginAsset(System, FontsGroups[FontIndex]);
         // NOTE(Dima): Adding font asset
-        AddFontAsset(System, Font, FirstGlyphIDsForFonts[FontIndex]);
+        AddFontAsset(System, Font);
         // NOTE(Dima): Adding font tags
         for(int TagIndex = 0; 
             TagIndex < TagHub->TagCount;
@@ -707,13 +1035,13 @@ INTERNAL_FUNCTION void WriteFontsChunk(font_info* Fonts,
 }
 
 INTERNAL_FUNCTION void WriteFonts(){
-    font_info LibMono = LoadFont("../Data/Fonts/LiberationMono-Regular.ttf", 18.0f, LoadFont_BakeShadow);
-    font_info Lilita = LoadFont("../Data/Fonts/LilitaOne.ttf", 20.0f, LoadFont_BakeShadow);
-    font_info Inconsolata = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, LoadFont_BakeBlur);
-    font_info PFDIN = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 18.0f, LoadFont_BakeBlur);
-    font_info MollyJack = LoadFont("../Data/Fonts/MollyJack.otf", 40.0f, LoadFont_BakeBlur);
+    tool_font_info LibMono = LoadFont("../Data/Fonts/LiberationMono-Regular.ttf", 18.0f, LoadFont_BakeShadow);
+    tool_font_info Lilita = LoadFont("../Data/Fonts/LilitaOne.ttf", 20.0f, LoadFont_BakeShadow);
+    tool_font_info Inconsolata = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, LoadFont_BakeBlur);
+    tool_font_info PFDIN = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 18.0f, LoadFont_BakeBlur);
+    tool_font_info MollyJack = LoadFont("../Data/Fonts/MollyJack.otf", 40.0f, LoadFont_BakeBlur);
     
-    font_info* Fonts[] = {
+    tool_font_info* Fonts[] = {
         &LibMono,
         &Lilita,
         &Inconsolata,
@@ -745,7 +1073,7 @@ INTERNAL_FUNCTION void WriteFonts(){
         FontIndex += ASSET_GROUP_REGIONS_COUNT,
         ChunkIndex++)
     {
-        font_info* CurFontsChunk = Fonts[FontIndex];
+        tool_font_info** CurFontsChunk = &Fonts[FontIndex];
         u32 * CurChunkGroups = Groups + FontIndex;
         game_asset_tag_hub* CurChunkTagHub = Tags + FontIndex;
         
@@ -789,6 +1117,46 @@ INTERNAL_FUNCTION void WriteSounds(){
     EndAsset(System);
     
     WriteAssetFile(System, "../Data/GeneratedSounds.ja");
+}
+
+
+
+INTERNAL_FUNCTION void WriteBitmapArray(){
+    asset_system System_ = {};
+    asset_system* System = &System_;
+    InitAssetFile(System);
+    
+    std::string FolderPath("../Data/Images/");
+    std::string ListFileName("ToLoadImages.txt");
+    
+    std::vector<std::string> BitmapPaths;
+    
+    // NOTE(Dima): Initializing bitmap paths
+    Loaded_Strings BitmapNames = LoadStringListFromFile((char*)(FolderPath + ListFileName).c_str());
+    int BitmapCount = BitmapNames.Count;
+    for(int i = 0; i < BitmapCount; i++){
+        BitmapPaths.push_back(FolderPath + std::string(BitmapNames.Strings[i]));
+    }
+    FreeStringList(&BitmapNames);
+    
+    // NOTE(Dima): Adding bitmap assets
+    BeginAsset(System, GameAsset_Type_Bitmap);
+    u32 FirstBitmapID = 0;
+    for(int i = 0; i < BitmapPaths.size(); i++){
+        added_asset Asset = AddBitmapAsset(System, (char*)BitmapPaths[i].c_str());
+        
+        if(i == 0){
+            FirstBitmapID = Asset.ID;
+        }
+    }
+    EndAsset(System);
+    
+    // NOTE(Dima): adding bitmap array
+    BeginAsset(System, GameAsset_FadeoutBmps);
+    AddBitmapArray(System, FirstBitmapID, BitmapCount);
+    EndAsset(System);
+    
+    WriteAssetFile(System, "../Data/BitmapsArray.ja");
 }
 
 INTERNAL_FUNCTION void WriteBitmaps(){
@@ -859,10 +1227,11 @@ INTERNAL_FUNCTION void WriteMeshPrimitives(){
 }
 
 int main() {
-    WriteFonts();
     WriteBitmaps();
     WriteIcons();
     WriteMeshPrimitives();
+    WriteFonts();
+    WriteBitmapArray();
     
     system("pause");
     return(0);

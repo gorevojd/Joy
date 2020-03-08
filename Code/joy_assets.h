@@ -16,6 +16,8 @@
 struct asset_file_source{
     platform_file_desc FileDescription;
     
+    u32 IntegrationBaseID;
+    
     asset_file_source* Next;
     asset_file_source* Prev;
 };
@@ -40,10 +42,13 @@ struct asset{
     asset* Next;
     asset* Prev;
     
+    mem_layer_entry* TypeMemEntry;
+    
     // NOTE(Dima): Data
     union{
         ASSET_PTR_MEMBER(font_info);
         ASSET_PTR_MEMBER(bmp_info);
+        ASSET_PTR_MEMBER(bmp_array_info);
         ASSET_PTR_MEMBER(mesh_info);
         ASSET_PTR_MEMBER(glyph_info);
         ASSET_PTR_MEMBER(sound_info);
@@ -65,7 +70,7 @@ struct asset_group{
     asset Sentinel;
 };
 
-#define MAX_ASSETS_IN_ASSET_BLOCK 8
+#define MAX_ASSETS_IN_ASSET_BLOCK 4096
 #define MAX_ASSET_BLOCKS_COUNT 1024
 
 struct asset_block{
@@ -76,6 +81,7 @@ struct asset_block{
 // NOTE(dima): Bitmaps are stored in gamma-corrected premultiplied alpha format
 struct assets{
     mem_region* Memory;
+    layered_mem LayeredMemory;
     
     Asset_Atlas MainLargeAtlas;
     
@@ -86,26 +92,45 @@ struct assets{
     // NOTE(Dima): Memory entries
     mem_box MemBox;
     
-    // NOTE(Dima): Assets
+    // NOTE(Dima): Asset groups
     asset_group Groups[GameAsset_Count];
     
-    int CurrentBlockIndex;
+    // NOTE(Dima): Actual asset storage
     asset_block AssetBlocks[MAX_ASSET_BLOCKS_COUNT];
+    int CurrentBlockIndex;
 };
 
-inline u32 SumAssetID(assets* Assets, u32 ID, int AddValue){
+struct parsed_asset_id{
+    u32 InBlockIndex;
+    u32 BlockIndex;
+};
+
+inline parsed_asset_id ParseAssetID(u32 ID){
+    parsed_asset_id Result = {};
     
+    Result.InBlockIndex = ID & 0xFFF;
+    Result.BlockIndex = (ID >> 12) & 0xFFFFF;
+    
+    return(Result);
+}
+
+inline u32 RestoreAssetID(u32 BlockIndex, u32 InBlockIndex){
+    u32 Result = 
+        (InBlockIndex & 0xFFF) | 
+        ((BlockIndex & 0xFFFFF) << 12);
+    
+    return(Result);
 }
 
 inline asset* GetAssetByID(assets* Assets, u32 ID){
-    int InBlockIndex = ID & 0xFFFF;
-    int AssetBlockIndex = (ID >> 16) & 0xFFFF;
     
-    asset_block* Block = &Assets->AssetBlocks[AssetBlockIndex];
+    parsed_asset_id ParsedID = ParseAssetID(ID);
+    
+    asset_block* Block = &Assets->AssetBlocks[ParsedID.BlockIndex];
     
     ASSERT(Block->BlockAssets);
     
-    asset* Result = &Block->BlockAssets[InBlockIndex];
+    asset* Result = &Block->BlockAssets[ParsedID.InBlockIndex];
     
     return(Result);
 }

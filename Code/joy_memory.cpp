@@ -1,5 +1,105 @@
 #include "joy_memory.h"
 
+INTERNAL_FUNCTION void InitLayerSentinels(mem_layer_entry* Entries, 
+                                          u32* LayersSizes,
+                                          int LayersSizesCount)
+{
+    for(int SentIndex = 0;
+        SentIndex < LayersSizesCount;
+        SentIndex++)
+    {
+        mem_layer_entry* LayerEntry = Entries + SentIndex;
+        
+        LayerEntry->Next = LayerEntry;
+        LayerEntry->Prev = LayerEntry;
+        
+        LayerEntry->LayerSize = LayersSizes[SentIndex];
+        LayerEntry->Data = 0;
+    }
+}
+
+void InitLayeredMem(layered_mem* Mem, 
+                    mem_region* Region,
+                    u32* LayersSizes,
+                    int LayersSizesCount)
+{
+    *Mem = {};
+    
+    Mem->Region = Region;;
+    Mem->LayersSentinels = PushArray(Region, mem_layer_entry, LayersSizesCount);
+    Mem->FreeSentinels = PushArray(Region, mem_layer_entry, LayersSizesCount);
+    Mem->LayersCount = LayersSizesCount;
+    
+    
+    // NOTE(Dima): Initializing layers sentinels
+    InitLayerSentinels(Mem->LayersSentinels, LayersSizes, LayersSizesCount);
+    
+    // NOTE(Dima): Initializing layers free sentinels
+    InitLayerSentinels(Mem->FreeSentinels, LayersSizes, LayersSizesCount);
+}
+
+void DeallocateMemLayerEntry(layered_mem* Mem, mem_layer_entry* ToDeallocate){
+    int LayerIndex = ToDeallocate->LayerIndex;
+    
+    mem_layer_entry* Sent = &Mem->LayersSentinels[LayerIndex];
+    mem_layer_entry* Free = &Mem->FreeSentinels[LayerIndex];
+    
+    DLIST_REMOVE_ENTRY(ToDeallocate, Next, Prev);
+    DLIST_INSERT_BEFORE(ToDeallocate, Free, Next, Prev);
+}
+
+mem_layer_entry* 
+AllocateMemLayerEntry(layered_mem* MemLayered, u32 SizeToAllocate)
+{
+    int ResultLayerIndex = -1;
+    u32 ResultLayerSize = 0xFFFFFFFF;
+    
+    // NOTE(Dima): Detecting best fit layer
+    for(int LayerIndex = 0;
+        LayerIndex < MemLayered->LayersCount;
+        LayerIndex++)
+    {
+        u32 LayerSize = MemLayered->LayersSentinels[LayerIndex].LayerSize;
+        
+        if((LayerSize > SizeToAllocate) && 
+           (LayerSize < ResultLayerSize))
+        {
+            ResultLayerIndex = LayerIndex;
+            ResultLayerSize = LayerSize;
+        }
+        
+        ASSERT(ResultLayerSize >= SizeToAllocate);
+    }
+    
+    mem_layer_entry* Result = 0;
+    
+    if(ResultLayerIndex != -1){
+        mem_layer_entry* Sent = &MemLayered->LayersSentinels[ResultLayerIndex];
+        mem_layer_entry* Free = &MemLayered->FreeSentinels[ResultLayerIndex];
+        
+        if(Free->Next == Free){
+            const int Count = 128;
+            mem_layer_entry* Pool = PushArray(MemLayered->Region, mem_layer_entry, Count);
+            
+            for(int I = 0; I < Count; I++){
+                mem_layer_entry* Elem = &Pool[I];
+                
+                Elem->LayerSize = ResultLayerSize;
+                Elem->Data = PushSomeMem(MemLayered->Region, ResultLayerSize);
+                Elem->LayerIndex = ResultLayerIndex;
+                
+                DLIST_INSERT_BEFORE(Elem, Free, Next, Prev);
+            }
+        }
+        
+        Result = Free->Next;
+        
+        DLIST_REMOVE_ENTRY(Result, Next, Prev);
+        DLIST_INSERT_BEFORE(Result, Sent, Next, Prev);
+    }
+    
+    return(Result);
+}
 
 INTERNAL_FUNCTION inline mem_entry* AllocateMemoryEntry(mem_box* box) {
 	mem_entry* Result = 0;

@@ -52,14 +52,6 @@ INTERNAL_FUNCTION void AddBitmapToAtlas(Asset_Atlas* atlas,
     atlas->MaxInRowHeight = Max(atlas->MaxInRowHeight, ActualHeight);
 }
 
-INTERNAL_FUNCTION void AddFontToAtlas(Asset_Atlas* atlas, font_info* font){
-    for(int i = 0; i < font->GlyphCount; i++){
-        glyph_info* glyph = &font->Glyphs[i];
-        
-        AddBitmapToAtlas(atlas, &glyph->Bitmap);
-    }
-}
-
 INTERNAL_FUNCTION Asset_Atlas InitAtlas(mem_region* Region, int Dim){
     Asset_Atlas atlas = {};
     
@@ -91,16 +83,6 @@ u32 GetFirst(assets* Assets, u32 Group){
     return(Result);
 }
 
-INTERNAL_FUNCTION inline void FinalAssetLoading(assets* Assets, asset* Asset)
-{
-    switch(Asset->Type){
-        case AssetType_Font:{
-            AddFontToAtlas(&Assets->MainLargeAtlas,
-                           GET_ASSET_PTR_MEMBER(Asset, font_info));
-        }break;
-    }
-}
-
 inline asset_file_source* AllocateFileSource(assets* Assets){
     if(DLIST_FREE_IS_EMPTY(Assets->FileSourceFree, Next)){
         const int Count = 128;
@@ -122,8 +104,15 @@ inline asset_file_source* AllocateFileSource(assets* Assets){
     return(Result);
 }
 
+inline asset_id FileToIntegratedID(asset_file_source* Source, u32 FileID){
+    asset_id Result = FileID - 1 + Source->IntegrationBaseID;
+    
+    return(Result);
+}
+
 void LoadAsset(assets* Assets, asset* Asset){
     asset_header* Header = &Asset->Header;
+    asset_file_source* FileSource = Asset->FileSource;
     
     // NOTE(Dima): Loading data
     u32 DataSize = Header->TotalDataSize;
@@ -139,13 +128,22 @@ void LoadAsset(assets* Assets, asset* Asset){
     
     ASSERT(ReadSucceeded);
     
+#define ALLOC_ASS_PTR_MEMBER(type) GET_ASSET_PTR_MEMBER(Asset, type) = (type*)Asset->TypeMemEntry->Data
+    
     switch(Asset->Type){
         case AssetType_Bitmap:{
-            // NOTE(Dima): Allocating asset value
-            GET_ASSET_PTR_MEMBER(Asset, bmp_info) = (bmp_info*)malloc(sizeof(bmp_info));
+            
+            Asset->TypeMemEntry = AllocateMemLayerEntry(
+                &Assets->LayeredMemory,sizeof(bmp_info));
+            
+            ASSERT(Asset->TypeMemEntry);
+            
+            ALLOC_ASS_PTR_MEMBER(bmp_info);
             
             bmp_info* Result = GET_ASSET_PTR_MEMBER(Asset, bmp_info);
             asset_bitmap* Src = &Header->Bitmap;
+            
+            *Result = {};
             
             // NOTE(Dima): Initializing bitmap
             AllocateBitmapInternal(Result, Src->Width, Src->Height, Data);
@@ -157,15 +155,69 @@ void LoadAsset(assets* Assets, asset* Asset){
         }break;
         
         case AssetType_Glyph:{
+            Asset->TypeMemEntry = AllocateMemLayerEntry(
+                &Assets->LayeredMemory,sizeof(glyph_info));
             
+            ASSERT(Asset->TypeMemEntry);
+            
+            ALLOC_ASS_PTR_MEMBER(glyph_info);
+            
+            glyph_info* Result = GET_ASSET_PTR_MEMBER(Asset, glyph_info);
+            asset_glyph* Src = &Header->Glyph;
+            
+            Result->BitmapID = FileToIntegratedID(FileSource, Src->BitmapID);
+            
+            Result->Codepoint = Src->Codepoint;
+            Result->Width = Src->BitmapWidth;
+            Result->Height = Src->BitmapHeight;
+            Result->WidthOverHeight = Src->BitmapWidthOverHeight;
+            Result->XOffset = Src->XOffset;
+            Result->YOffset = Src->YOffset;
+            Result->Advance = Src->Advance;
+            Result->LeftBearingX = Src->LeftBearingX;
         }break;
         
         case AssetType_BitmapArray:{
+            Asset->TypeMemEntry = AllocateMemLayerEntry(
+                &Assets->LayeredMemory,sizeof(bmp_array_info));
             
+            ASSERT(Asset->TypeMemEntry);
+            
+            ALLOC_ASS_PTR_MEMBER(bmp_array_info);
+            
+            bmp_array_info* Result = GET_ASSET_PTR_MEMBER(Asset, bmp_array_info);
+            asset_bitmap_array* Src = &Header->BmpArray;
+            
+            Result->FirstBmpID = Src->FirstBmpID;
+            Result->Count = Src->Count;
         }break;
         
         case AssetType_Mesh:{
+            Asset->TypeMemEntry = AllocateMemLayerEntry(
+                &Assets->LayeredMemory,sizeof(mesh_info));
             
+            ASSERT(Asset->TypeMemEntry);
+            
+            ALLOC_ASS_PTR_MEMBER(mesh_info);
+            
+            mesh_info* Result = GET_ASSET_PTR_MEMBER(Asset, mesh_info);
+            asset_mesh* Src = &Header->Mesh;
+            
+            *Result = {};
+            
+            Result->VerticesCount = Src->VerticesCount;
+            Result->IndicesCount = Src->IndicesCount;
+            Result->MeshType = Src->MeshType;
+            
+            // NOTE(Dima): Load mesh data
+            u32 VertSize = Header->Mesh.DataVerticesSize;
+            u32 IndiSize = Header->Mesh.DataIndicesSize;
+            
+            void* Vertices = (u8*)Data + Header->Mesh.DataOffsetToVertices;
+            u32* Indices = (u32*)((u8*)Data + Header->Mesh.DataOffsetToIndices);
+            
+            Result->Vertices = Vertices;
+            Result->Indices = Indices;
         }break;
         
         case AssetType_Sound:{
@@ -173,17 +225,25 @@ void LoadAsset(assets* Assets, asset* Asset){
         }break;
         
         case AssetType_Font:{
-            // NOTE(Dima): Allocating asset value
-            GET_ASSET_PTR_MEMBER(Asset, font_info) = (font_info*)malloc(sizeof(font_info));
+            Asset->TypeMemEntry = AllocateMemLayerEntry(
+                &Assets->LayeredMemory,sizeof(font_info));
+            
+            ASSERT(Asset->TypeMemEntry);
+            
+            ALLOC_ASS_PTR_MEMBER(font_info);
             
             font_info* Result = GET_ASSET_PTR_MEMBER(Asset, font_info);
             asset_font* Src = &Header->Font;
             
+            *Result = {};
+            
             int* Mapping = (int*)((u8*)Data + Header->Font.DataOffsetToMapping);
             float* KerningPairs = (float*)((u8*)Data + Header->Font.DataOffsetToKerning);
+            u32* GlyphIDs = (u32*)((u8*)Data + Header->Font.DataOffsetToIDs);
             
             u32 MappingSize = Header->Font.MappingSize;
             u32 KerningSize = Header->Font.KerningSize;
+            u32 IDsSize = Header->Font.IDsSize;
             
             ASSERT(MappingSize == sizeof(float) * FONT_INFO_MAX_GLYPH_COUNT);
             
@@ -191,6 +251,19 @@ void LoadAsset(assets* Assets, asset* Asset){
             Result->DescenderHeight = Header->Font.DescenderHeight;
             Result->LineGap = Header->Font.LineGap;
             Result->GlyphCount = Header->Font.GlyphCount;
+            
+            // NOTE(Dima): Copy glyph IDs
+            Result->GlyphIDs = GlyphIDs;
+            
+            // NOTE(Dima): Fixing Glyph IDs
+            for(int GlyphIndex = 0;
+                GlyphIndex < Header->Font.GlyphCount;
+                GlyphIndex++)
+            {
+                Result->GlyphIDs[GlyphIndex] = FileToIntegratedID(
+                    FileSource,
+                    Result->GlyphIDs[GlyphIndex]);
+            }
             
             // NOTE(Dima): Copy mapping
             for(int I = 0; I < FONT_INFO_MAX_GLYPH_COUNT; I++){
@@ -203,45 +276,17 @@ void LoadAsset(assets* Assets, asset* Asset){
     }
 }
 
-inline asset* AllocateAsset(assets* Assets)
+inline asset* AllocateAsset(assets* Assets, asset_file_source* FileSource, u32 FileID)
 {
-    asset_block* PrevBlock = &Assets->AssetBlocks[Assets->CurrentBlockIndex];
-    
-    int TargetInBlockIndex = PrevBlock->InBlockCount++;
-    
-    asset_block* CurBlock = PrevBlock;
-    
-    if(TargetInBlockIndex < MAX_ASSETS_IN_ASSET_BLOCK){
-        // NOTE(Dima): Nothing to do!
-    }
-    else{
-        TargetInBlockIndex = 0;
-        
-        ++Assets->CurrentBlockIndex;
-        ASSERT(Assets->CurrentBlockIndex < MAX_ASSET_BLOCKS_COUNT);
-        
-        CurBlock = &Assets->AssetBlocks[Assets->CurrentBlockIndex];
-        CurBlock->InBlockCount = 1;
-    }
-    
-    int AssetBlockIndex = Assets->CurrentBlockIndex;
-    
-    // NOTE(Dima): If block assets are not allocated yet
-    if(!CurBlock->BlockAssets){
-        // NOTE(Dima): Allocating
-        CurBlock->BlockAssets = PushArray(Assets->Memory, asset, MAX_ASSETS_IN_ASSET_BLOCK);
-    }
-    
-    u32 ResultAssetID = 
-        (TargetInBlockIndex & 0xFFFF) | 
-        ((AssetBlockIndex & 0xFFFF) << 16);
-    
-    asset* Result = &CurBlock->BlockAssets[TargetInBlockIndex];
+    u32 ResultIntegratedID = FileToIntegratedID(FileSource, FileID);
+    asset* Result = GetAssetByID(Assets, ResultIntegratedID);
     
     Result->Type = AssetType_None;
     Result->State = AssetState_Unloaded;
+    Result->ID = ResultIntegratedID;
+    Result->FileSource = FileSource;
     Result->DataMemoryEntry = 0;
-    Result->ID = ResultAssetID;
+    Result->TypeMemEntry = 0;
     
     return(Result);
 }
@@ -254,11 +299,23 @@ void InitAssets(assets* Assets){
     // NOTE(Dima): Large atlas initialization
     Assets->MainLargeAtlas = InitAtlas(Assets->Memory, 1024);
     
+    // NOTE(Dima): Init asset layered memory to allocate asset types
+    u32 LayersSizes[] = {64, 128, 256, 512, 1024};
+    u32 LayersSizesCount = ARRAY_COUNT(LayersSizes);
+    InitLayeredMem(&Assets->LayeredMemory, 
+                   Assets->Memory, 
+                   LayersSizes, 
+                   LayersSizesCount);
+    
     // NOTE(Dima): Init asset files sources
     DLIST_REFLECT_PTRS(Assets->FileSourceUse, Next, Prev);
     DLIST_REFLECT_PTRS(Assets->FileSourceFree, Next, Prev);
     
     mem_region AssetInitMem = {};
+    
+    // NOTE(Dima): Init first null asset
+    Assets->AssetBlocks[0].BlockAssets = PushArray(Assets->Memory, asset, MAX_ASSETS_IN_ASSET_BLOCK);
+    Assets->AssetBlocks[0].InBlockCount = 1;
     
     // NOTE(Dima): Temp initialization of asset families
     for(int FamIndex = 0;
@@ -280,6 +337,7 @@ void InitAssets(assets* Assets){
         // NOTE(Dima): Allocating and setting file source
         asset_file_source* FileSource = AllocateFileSource(Assets);
         FileSource->FileDescription = FileDesc;
+        FileSource->IntegrationBaseID = 0;
         
         char* FileFullPath = FileSource->FileDescription.FullPath;
         
@@ -332,6 +390,35 @@ void InitAssets(assets* Assets){
             Assert(ReadOffsetsRes);
         }
         
+        // NOTE(Dima): Getting needed asset chunk
+        asset_block* PrevBlock = &Assets->AssetBlocks[Assets->CurrentBlockIndex];
+        asset_block* CurBlock = PrevBlock;
+        
+        if(PrevBlock->InBlockCount + FileAssetCount >= MAX_ASSETS_IN_ASSET_BLOCK){
+            ++Assets->CurrentBlockIndex;
+            ASSERT(Assets->CurrentBlockIndex < MAX_ASSET_BLOCKS_COUNT);
+            
+            CurBlock = &Assets->AssetBlocks[Assets->CurrentBlockIndex];
+            CurBlock->InBlockCount = 0;
+        }
+        
+        int AssetBlockIndex = Assets->CurrentBlockIndex;
+        
+        // NOTE(Dima): If block assets are not allocated yet
+        if(!CurBlock->BlockAssets){
+            // NOTE(Dima): Allocating
+            CurBlock->BlockAssets = PushArray(Assets->Memory, asset, MAX_ASSETS_IN_ASSET_BLOCK);
+        }
+        
+        u32 IntegrationBaseID = RestoreAssetID(
+            AssetBlockIndex, CurBlock->InBlockCount);
+        
+        // NOTE(Dima): Setting integration base ID
+        FileSource->IntegrationBaseID = IntegrationBaseID;
+        
+        // NOTE(Dima): Settings new Assets Count
+        CurBlock->InBlockCount += FileAssetCount;
+        
         // NOTE(Dima): Reading assets
         for(int FileGroupIndex = 0; 
             FileGroupIndex < GameAsset_Count; 
@@ -369,7 +456,7 @@ void InitAssets(assets* Assets){
                     Assert(ReadAssetHeader);
                     
                     // NOTE(Dima): Allocating asset
-                    asset* NewAsset = AllocateAsset(Assets);
+                    asset* NewAsset = AllocateAsset(Assets, FileSource, FileAssetIndex);
                     
                     NewAsset->State = AssetState_Unloaded;
                     NewAsset->Header = AssetHeader;
@@ -393,44 +480,5 @@ void InitAssets(assets* Assets){
     platform.OpenFilesEnd();
     
     Free(&AssetInitMem);
-    
-    
-#if 0    
-#define TEMP_INIT_FAM_ASSET(fam_id, data_type, value) \
-    {\
-        asset_group* Grp = &Assets->Groups[fam_id];\
-        asset* Asset = GetAssetByID(Assets, Grp->AssetID);\
-        Asset->Type = AssetType_Type_##data_type;\
-        Asset->Data_##data_type = value;\
-        Asset->Ptr_##data_type = &Asset->Data_##data_type;\
-        FinalAssetLoading(Assets, Asset);}
-    
-    TEMP_INIT_FAM_ASSET(GameAsset_CheckboxMark, 
-                        bmp_info,
-                        LoadBMP("../Data/Icons/checkmark64.png"));
-    TEMP_INIT_FAM_ASSET(GameAsset_ChamomileIcon, bmp_info, 
-                        LoadBMP("../Data/Icons/chamomile.png"));
-    TEMP_INIT_FAM_ASSET(GameAsset_SineTest, sound_info, 
-                        MakeSineSound256(44100 * 4, 44100));
-    TEMP_INIT_FAM_ASSET(GameAsset_SineTest, sound_info, 
-                        MakeSineSound(
-        std::vector<int>{256, 128, 430}, 
-        44100 * 4, 44100));
-    TEMP_INIT_FAM_ASSET(GameAsset_Cube, mesh_info, MakeCube());
-    TEMP_INIT_FAM_ASSET(GameAsset_Plane, mesh_info, MakePlane());
-    TEMP_INIT_FAM_ASSET(GameAsset_Sphere, mesh_info, MakeSphere(20, 12));
-    TEMP_INIT_FAM_ASSET(GameAsset_Cylynder, mesh_info,
-                        MakeCylynder(2.0f, 0.5f, 16));
-    TEMP_INIT_FAM_ASSET(GameAsset_LiberationMono, font_info, 
-                        LoadFont("../Data/Fonts/LiberationMono-Regular.ttf", 18.0f, LoadFont_BakeShadow));
-    TEMP_INIT_FAM_ASSET(GameAsset_LilitaOne, font_info, 
-                        LoadFont("../Data/Fonts/LilitaOne.ttf", 20.0f, LoadFont_BakeShadow));
-    TEMP_INIT_FAM_ASSET(GameAsset_Inconsolata, font_info, 
-                        LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 18.0f, LoadFont_BakeBlur));
-    TEMP_INIT_FAM_ASSET(GameAsset_PFDIN, font_info, 
-                        LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 18.0f, LoadFont_BakeBlur));
-    TEMP_INIT_FAM_ASSET(GameAsset_MollyJackFont, font_info, 
-                        LoadFont("../Data/Fonts/MollyJack.otf", 40.0f, LoadFont_BakeBlur));
-#endif
     
 }

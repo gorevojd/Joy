@@ -30,7 +30,6 @@ void CopyBitmapData(bmp_info* dst, bmp_info* src);
 
 // NOTE(Dima): Functions for loading stuff
 bmp_info LoadBMP(char* filePath);
-font_info LoadFont(char* filePath, float height, u32 flags = 0);
 Loaded_Strings LoadStringListFromFile(char* filePath);
 void FreeStringList(Loaded_Strings* list);
 

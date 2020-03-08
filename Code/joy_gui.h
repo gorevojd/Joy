@@ -19,22 +19,36 @@ It can have some children and parents elements. The tree of elements is a
 Gui_Page. It's done this way because of comfortability to group the elements
 */
 
-inline float GetBaseline(font_info* fontInfo, float scale = 1.0f){
-    float res = (fontInfo->AscenderHeight + fontInfo->LineGap) * scale;
+inline float GetBaseline(font_info* FontInfo, float Scale = 1.0f){
+    float Res = 0.0f;
     
-    return(res);
+    if(FontInfo){
+        Res = (FontInfo->AscenderHeight + FontInfo->LineGap) * Scale;
+    }
+    
+    return(Res);
 }
 
-inline float GetLineAdvance(font_info* fontInfo, float scale = 1.0f){
-    float res = (fontInfo->AscenderHeight + fontInfo->LineGap - fontInfo->DescenderHeight) * scale;
+inline float GetLineAdvance(font_info* FontInfo, float Scale = 1.0f){
+    float Res = 0.0f; 
     
-    return(res);
+    if(FontInfo){
+        Res = (FontInfo->AscenderHeight + 
+               FontInfo->LineGap - 
+               FontInfo->DescenderHeight) * Scale;
+    }
+    
+    return(Res);
 }
 
-inline float GetScaledAscender(font_info* fontInfo, float scale = 1.0f){
-    float res = fontInfo->AscenderHeight * scale;
+inline float GetScaledAscender(font_info* FontInfo, float Scale = 1.0f){
+    float Res = 0.0f;
     
-    return(res);
+    if(FontInfo){
+        Res = FontInfo->AscenderHeight * Scale;
+    }
+    
+    return(Res);
 }
 
 enum GuiColorType{
@@ -307,10 +321,10 @@ struct gui_frame_info{
 struct gui_state{
     assets* Assets;
     
-    ASSET_TYPED_ID(font_info) MainFontID;
-    ASSET_TYPED_ID(font_info) TileFontID;
-    ASSET_TYPED_ID(bmp_info) CheckboxMarkID;
-    ASSET_TYPED_ID(bmp_info) ChamomileID;
+    asset_id MainFontID;
+    asset_id TileFontID;
+    asset_id CheckboxMarkID;
+    asset_id ChamomileID;
     
     font_info* MainFont;
     font_info* TileFont;
@@ -705,14 +719,14 @@ inline rc2 GetTxtElemRect(gui_state* Gui, Gui_Layout* lay, rc2 txtRc, v2 growSca
     return(txtRc);
 }
 
-inline float GuiGetBaseline(gui_state* Gui, float scale = 1.0f){
-    float res = GetBaseline(Gui->MainFont, Gui->fontScale * scale);
+inline float GuiGetBaseline(gui_state* Gui, float Scale = 1.0f){
+    float res = GetBaseline(Gui->MainFont, Gui->fontScale * Scale);
     
     return(res);
 }
 
-inline float GuiGetLineAdvance(gui_state* Gui, float scale = 1.0f){
-    float res = GetLineAdvance(Gui->MainFont, Gui->fontScale * scale);
+inline float GuiGetLineAdvance(gui_state* Gui, float Scale = 1.0f){
+    float res = GetLineAdvance(Gui->MainFont, Gui->fontScale * Scale);
     
     return(res);
 }
@@ -722,22 +736,10 @@ enum print_text_operation{
     PrintTextOp_GetSize,
 };
 
-rc2 PrintTextInternal(font_info* fontInfo, 
-                      render_stack* Stack, 
-                      char* text, 
-                      v2 P, 
-                      u32 textOp, 
-                      float scale = 1.0f, 
-                      v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f), 
-                      int CaretP = 0, 
-                      v2* CaretPrintPOut = 0);
-v2 GetTextSizeInternal(font_info* fontInfo, char* text, float scale);
-rc2 PrintTextCenteredInRectInternal(font_info* fontInfo, render_stack* Stack, char* text, rc2 rect, float scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
-
-v2 GetTextSize(gui_state* Gui, char* Text, float scale = 1.0f);
-rc2 GetTextRect(gui_state* Gui, char* Text, v2 p, float scale = 1.0f);
-rc2 PrintText(gui_state* Gui, char* text, v2 P, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f), float scale = 1.0f);
-rc2 PrintTextCenteredInRect(gui_state* Gui, char* text, rc2 tect, float scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
+v2 GetTextSize(gui_state* Gui, char* Text, float Scale = 1.0f);
+rc2 GetTextRect(gui_state* Gui, char* Text, v2 p, float Scale = 1.0f);
+rc2 PrintText(gui_state* Gui, char* text, v2 P, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f), float Scale = 1.0f);
+rc2 PrintTextCenteredInRect(gui_state* Gui, char* text, rc2 tect, float Scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
 
 void GuiUpdateWindows(gui_state* Gui);
 

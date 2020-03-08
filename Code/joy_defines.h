@@ -68,6 +68,12 @@
     (entry_ptr)->##prev##->##next = (entry_ptr); \
     (entry_ptr)->##next##->##prev = (entry_ptr);}
 
+#define DLIST_INSERT_BEFORE(entry_ptr, before_ptr, next, prev) \
+{\
+    (entry_ptr)->##next = (before_ptr); \
+    (entry_ptr)->##prev = (before_ptr)->##prev##; \
+    (entry_ptr)->##prev##->##next = (entry_ptr); \
+    (entry_ptr)->##next##->##prev = (entry_ptr);}
 
 #define DLIST_REMOVE_ENTRY(entry_ptr, next, prev) \
 {\

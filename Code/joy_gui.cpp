@@ -506,7 +506,16 @@ assets* Assets)
     Gui->colors[GuiColor_WindowBorderActive] = GUI_GETCOLOR_COLSYS(Color_Blue);
 }
 
-rc2 PrintTextInternal(font_info* font, render_stack* stack, char* text, v2 p, u32 textOp, float scale, v4 color, int CaretP, v2* CaretPrintPOut)
+rc2 PrintTextInternal(font_info* Font, 
+                      render_stack* stack, 
+                      assets* Assets, 
+                      char* text, 
+                      v2 p, 
+                      u32 textOp, 
+                      float Scale = 1.0f, 
+                      v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f), 
+                      int CaretP = 0, 
+                      v2* CaretPrintPOut = 0)
 {
     rc2 txtRc;
     
@@ -524,31 +533,35 @@ rc2 PrintTextInternal(font_info* font, render_stack* stack, char* text, v2 p, u3
         
         if(*at >= ' ' && *at <= '~'){
             
-            int glyphIndex = font->Codepoint2Glyph[*at];
-            glyph_info* glyph = &font->Glyphs[glyphIndex];
+            u32 GlyphAssetID = Font->GlyphIDs[Font->Codepoint2Glyph[*at]];
+            asset* GlyphAsset = GetAssetByID(Assets, GlyphAssetID);
             
-            float bmpScale = glyph->Height * scale;
+            glyph_info* Glyph = GET_ASSET_PTR_MEMBER(GlyphAsset, glyph_info);
             
-            v2 bitmapDim = { glyph->Bitmap.WidthOverHeight * bmpScale, bmpScale };
-            
-            if(textOp == PrintTextOp_Print){
-                float bitmapMinY = curP.y + glyph->YOffset * scale;
-                float bitmapMinX = curP.x + glyph->XOffset * scale;
+            if(Glyph){
+                float bmpScale = Glyph->Height * Scale;
                 
-                PushGlyph(stack, 
-                          V2(bitmapMinX, bitmapMinY), 
-                          bitmapDim, 
-                          &glyph->Bitmap,
-                          glyph->Bitmap.MinUV,
-                          glyph->Bitmap.MaxUV,
-                          color);
+                v2 bitmapDim = { Glyph->WidthOverHeight * bmpScale, bmpScale };
+                
+                if(textOp == PrintTextOp_Print){
+                    float bitmapMinY = curP.y + Glyph->YOffset * Scale;
+                    float bitmapMinX = curP.x + Glyph->XOffset * Scale;
+                    
+                    PushGlyph(Assets,
+                              stack, 
+                              V2(bitmapMinX, bitmapMinY), 
+                              bitmapDim, 
+                              Glyph->BitmapID,
+                              color);
+                    
+                }
+                
+                curP.x += ((float)Glyph->Advance * Scale);
             }
-            
-            curP.x += ((float)glyph->Advance * scale);
             
         }
         else if(*at == '\t'){
-            curP.x += ((float)font->AscenderHeight * 4 * scale);
+            curP.x += ((float)Font->AscenderHeight * 4 * Scale);
         }
         
         at++;
@@ -561,9 +574,9 @@ rc2 PrintTextInternal(font_info* font, render_stack* stack, char* text, v2 p, u3
     }
     
     txtRc.min.x = p.x;
-    txtRc.min.y = p.y - font->AscenderHeight * scale;
+    txtRc.min.y = p.y - Font->AscenderHeight * Scale;
     txtRc.max.x = curP.x;
-    txtRc.max.y = curP.y - font->DescenderHeight * scale;
+    txtRc.max.y = curP.y - Font->DescenderHeight * Scale;
     
     return(txtRc);
 }
@@ -579,22 +592,23 @@ void PrintCaret(gui_state* Gui, v2 PrintP, v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f)
     PushRect(Gui->Stack, RcMinDim(CaretMin, CaretDim), Color);
 }
 
-v2 GetTextSizeInternal(font_info* font, char* Text, float scale){
+v2 GetTextSizeInternal(font_info* Font, assets* Assets, char* Text, float Scale){
     rc2 TextRc = PrintTextInternal(
-        font, 
-        0, 
+        Font, 
+        0,
+        Assets,
         Text, V2(0.0f, 0.0f), 
         PrintTextOp_GetSize, 
-        scale);
+        Scale);
     
     v2 result = GetRectDim(TextRc);
     
     return(result);
 }
 
-inline v2 GetCenteredTextOffset(font_info* font, float TextDimX, rc2 Rect, float scale = 1.0f){
-    float LineDimY = GetLineAdvance(font, scale);
-    float LineDelta = (font->AscenderHeight + font->LineGap) * scale - LineDimY * 0.5f;
+inline v2 GetCenteredTextOffset(font_info* font, float TextDimX, rc2 Rect, float Scale = 1.0f){
+    float LineDimY = GetLineAdvance(font, Scale);
+    float LineDelta = (font->AscenderHeight + font->LineGap) * Scale - LineDimY * 0.5f;
     
     v2 CenterRc = Rect.min + GetRectDim(Rect) * 0.5f;
     
@@ -602,61 +616,75 @@ inline v2 GetCenteredTextOffset(font_info* font, float TextDimX, rc2 Rect, float
     return(TargetP);
 }
 
-inline float GetCenteredTextOffsetY(font_info* font, rc2 rect, float scale = 1.0f){
-    float result = GetCenteredTextOffset(font, 0.0f, rect, scale).y;
+inline float GetCenteredTextOffsetY(font_info* font, rc2 rect, float Scale = 1.0f){
+    float result = GetCenteredTextOffset(font, 0.0f, rect, Scale).y;
     
     return(result);
 }
 
-inline v2 GetCenteredTextOffset(font_info* font, char* Text, rc2 rect, float scale = 1.0f){
-    v2 TextDim = GetTextSizeInternal(font, Text, scale);
+inline v2 GetCenteredTextOffset(font_info* Font, 
+                                assets* Assets, 
+                                char* Text, 
+                                rc2 rect, 
+                                float Scale = 1.0f)
+{
+    v2 TextDim = GetTextSizeInternal(Font, Assets, Text, Scale);
     
-    v2 result = GetCenteredTextOffset(font, TextDim.x, rect, scale);
+    v2 result = GetCenteredTextOffset(Font, TextDim.x, rect, Scale);
     
     return(result);
 }
 
 rc2 PrintTextCenteredInRectInternal(
-font_info* font, 
-render_stack* stack, 
+font_info* Font, 
+render_stack* stack,
+assets* Assets,
 char* text, 
 rc2 rect, 
-float scale, 
-v4 color)
+float Scale = 1.0f, 
+v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
-    v2 targetP = GetCenteredTextOffset(font, text, rect, scale);
-    rc2 result = PrintTextInternal(font, stack, text, targetP, PrintTextOp_Print, scale, color);
+    v2 targetP = GetCenteredTextOffset(Font, Assets, text, rect, Scale);
+    rc2 result = PrintTextInternal(Font, stack, Assets, text, targetP, PrintTextOp_Print, Scale, color);
     
     return(result);
 }
 
-v2 GetTextSize(gui_state* Gui, char* text, float scale){
-    v2 result = GetTextSizeInternal(Gui->MainFont, 
+v2 GetTextSize(gui_state* Gui, char* text, float Scale){
+    v2 result = GetTextSizeInternal(Gui->MainFont,
+                                    Gui->Assets,
                                     text, 
-                                    Gui->fontScale * scale);
+                                    Gui->fontScale * Scale);
     
     return(result);
 }
 
-rc2 GetTextRect(gui_state* Gui, char* text, v2 p, float scale){
+rc2 GetTextRect(gui_state* Gui, char* text, v2 p, float Scale){
     rc2 TextRc = PrintTextInternal(
         Gui->MainFont, 
         Gui->Stack, 
+        Gui->Assets,
         text, p, 
         PrintTextOp_GetSize, 
-        Gui->fontScale * scale);
+        Gui->fontScale * Scale);
     
     return(TextRc);
 }
 
-rc2 PrintText(gui_state* Gui, char* text, v2 p, v4 color, float scale){
+rc2 PrintText(gui_state* Gui, 
+              char* text, 
+              v2 p, 
+              v4 Color, 
+              float Scale)
+{
     rc2 TextRc = PrintTextInternal(
         Gui->MainFont, 
         Gui->Stack, 
+        Gui->Assets,
         text, p, 
         PrintTextOp_Print, 
-        Gui->fontScale * scale,
-        color);
+        Gui->fontScale * Scale,
+        Color);
     
     return(TextRc);
 }
@@ -668,6 +696,7 @@ v2 GetCaretPrintP(gui_state* Gui, char* text, v2 p, int CaretP){
     rc2 TextRc = PrintTextInternal(
         Gui->MainFont, 
         Gui->Stack, 
+        Gui->Assets,
         text, p, 
         PrintTextOp_Print, 
         Gui->fontScale * Gui->fontScale,
@@ -678,13 +707,14 @@ v2 GetCaretPrintP(gui_state* Gui, char* text, v2 p, int CaretP){
 }
 
 
-rc2 PrintTextCenteredInRect(gui_state* Gui, char* text, rc2 rect, float scale, v4 color){
+rc2 PrintTextCenteredInRect(gui_state* Gui, char* text, rc2 rect, float Scale, v4 Color){
     rc2 result = PrintTextCenteredInRectInternal(Gui->MainFont,
                                                  Gui->Stack,
+                                                 Gui->Assets,
                                                  text, 
                                                  rect,
-                                                 Gui->fontScale * scale,
-                                                 color);
+                                                 Gui->fontScale * Scale,
+                                                 Color);
     
     return(result);
 }
@@ -1273,8 +1303,8 @@ enum Push_But_Type{
 
 INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui, 
                                   rc2 rect, 
-                                  u32 type = PushBut_DefaultGrad, v4 color = V4(0.0f, 0.0f, 0.0f, 1.0f),
-                                  v4 color2 = V4(0.0f, 0.0f, 0.0f, 1.0f))
+                                  u32 type = PushBut_DefaultGrad, v4 Color = V4(0.0f, 0.0f, 0.0f, 1.0f),
+                                  v4 Color2 = V4(0.0f, 0.0f, 0.0f, 1.0f))
 {
     
     switch(type){
@@ -1283,12 +1313,12 @@ INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui,
         }break;
         
         case PushBut_Color:{
-            PushRect(Gui->Stack, rect, color);
+            PushRect(Gui->Stack, rect, Color);
         }break;
         
         case PushBut_Grad:{
             PushGradient(Gui->Stack, rect, 
-                         color, color2, 
+                         Color, Color2, 
                          RenderEntryGradient_Vertical);
         }break;
         
@@ -1309,12 +1339,12 @@ INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui,
         }break;
         
         case PushBut_Outline:{
-            PushRectOutline(Gui->Stack, rect, 2, color);
+            PushRectOutline(Gui->Stack, rect, 2, Color);
         }break;
         
         case PushBut_RectAndOutline:{
             PushRect(Gui->Stack, rect, GUI_GETCOLOR(GuiColor_ButtonBackground));
-            PushRectOutline(Gui->Stack, rect, 1, color);
+            PushRectOutline(Gui->Stack, rect, 1, Color);
         }break;
     }
 }
@@ -2393,6 +2423,7 @@ b32 GuiGridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
         GuiPushBut(Gui, WorkRect, PushBut_Outline, OutlineColor); 
         PrintTextCenteredInRectInternal(Gui->TileFont, 
                                         Gui->Stack, 
+                                        Gui->Assets,
                                         Name, 
                                         WorkRect, 
                                         1.6f);

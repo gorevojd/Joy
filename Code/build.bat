@@ -1,7 +1,7 @@
 @echo off
 
 set DISABLED_WARNS=/wd4530 /wd4577 /wd4005
-SET COMP_OPTS=/FC /Oi /EHa- /Gm- /Zi /GR- /nologo %DISABLED_WARNS%
+SET COMP_OPTS=/FC /Oi /MP /EHa- /Gm- /Zi /GR- /nologo %DISABLED_WARNS%
 SET INCLUDE_PATH=/I"C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include"
 
 IF NOT EXIST ..\Build MKDIR ..\Build

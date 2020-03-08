@@ -4,6 +4,11 @@
 #include "joy_types.h"
 #include "joy_math.h"
 
+struct bmp_array_info{
+    u32 FirstBmpID;
+    int Count;
+};
+
 struct bmp_info{
     void* Pixels;
     int Width;
@@ -25,24 +30,6 @@ struct sound_info{
     
     int SampleCount;
     int SamplesPerSec;
-};
-
-struct glyph_info{
-    int Codepoint;
-    
-    int Width;
-    int Height;
-    
-    bmp_info Bitmap;
-    
-    /*Theese are offset from glyph origin to top-left of bitmap*/
-	float XOffset;
-	float YOffset;
-	float Advance;
-	float LeftBearingX;
-    
-    v2 MinUV;
-    v2 MaxUV;
 };
 
 struct Asset_Atlas{
@@ -156,6 +143,22 @@ struct mesh_info{
     mesh_handles Handles;
 };
 
+struct glyph_info{
+    int Codepoint;
+    
+    int Width;
+    int Height;
+    float WidthOverHeight;
+    
+    u32 BitmapID;
+    
+    /*Theese are offset from glyph origin to top-left of bitmap*/
+	float XOffset;
+	float YOffset;
+	float Advance;
+	float LeftBearingX;
+};
+
 #define FONT_INFO_MAX_GLYPH_COUNT 256
 struct font_info{
     float AscenderHeight;
@@ -164,10 +167,10 @@ struct font_info{
     
     float* KerningPairs;
     
-    glyph_info Glyphs[FONT_INFO_MAX_GLYPH_COUNT];
+    u32* GlyphIDs;
     int GlyphCount;
     
-    int Codepoint2Glyph[FONT_INFO_MAX_GLYPH_COUNT];
+    u8 Codepoint2Glyph[FONT_INFO_MAX_GLYPH_COUNT];
 };
 
 struct material_info{

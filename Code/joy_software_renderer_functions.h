@@ -2,7 +2,6 @@
 #define JOY_SOFTWARE_RENDERER_FUNCTIONS_H
 
 #include "joy_math.h"
-#include "joy_assets.h"
 #include "joy_render_stack.h"
 #include "joy_platform.h"
 

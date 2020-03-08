@@ -162,16 +162,19 @@ struct image_swapper_state{
 GAME_MODE_UPDATE(ChangingPicturesUpdate){
     GAME_GET_MODE_STATE(image_swapper_state, State);
     
+    asset_id ArrID = GetFirst(Game->Assets, GameAsset_FadeoutBmps);
+    asset* Asset = GetAssetByID(Game->Assets, ArrID);
+    ASSERT(Asset->Type == AssetType_BitmapArray);
     
-#if 0    
-    bmp_info* ToShowArray = Game->Assets->fadeoutBmps;
-    int ToShowCount = Game->Assets->fadeoutBmpsCount;
+    bmp_array_info* Arr = GET_ASSET_PTR_MEMBER(Asset, bmp_array_info);
     
     render_pass* Pass = BeginRenderPass(Game->Render);
     render_stack* Stack = RenderFindStack(Game->Render, "Main");
     AddStackToRenderPass(Pass, Stack);
     
     PushClearColor(Stack, V3(1.0f, 0.5f, 0.0f));
+    
+    int ToShowCount = Arr->Count;
     
     if(!State->Initialized){
         State->FadeoutTime = 1.5f;
@@ -183,6 +186,7 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
         
         State->Initialized = JOY_TRUE;
     }
+#if 0    
     
     bmp_info* toShow = ToShowArray + State->ShowIndex;
     bmp_info* toShowNext = ToShowArray + State->ShowNextIndex;
@@ -219,6 +223,7 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
         State->ShowNextIndex = (State->ShowIndex + 1) % ToShowCount;
         State->TimeSinceShow = 0.0f;
     }
+#endif
     
     GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
     
@@ -227,7 +232,6 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
                V2(100, 100),
                1000,
                V4(1.0f, 1.0f, 1.0f, 1.0f));
-#endif
     
 }
 

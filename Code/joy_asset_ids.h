@@ -33,16 +33,7 @@ enum asset_state{
     AssetState_Loaded,
 };
 
-#define ASSET_TYPED_ID(data_type) asset_id_##data_type
-
-typedef u32 ASSET_TYPED_ID(bmp_info);
-typedef u32 ASSET_TYPED_ID(bmp_array_info);
-typedef u32 ASSET_TYPED_ID(mesh_info);
-typedef u32 ASSET_TYPED_ID(sound_info);
-typedef u32 ASSET_TYPED_ID(font_info);
-typedef u32 ASSET_TYPED_ID(glyph_info);
-typedef u32 ASSET_TYPED_ID(material_info);
-typedef u32 ASSET_TYPED_ID(model_info);
+typedef u32 asset_id;
 
 #define ASSET_VALUE_MEMBER(data_type) data_type Data_##data_type
 #define ASSET_PTR_MEMBER(data_type) data_type* Ptr_##data_type
@@ -51,19 +42,19 @@ typedef u32 ASSET_TYPED_ID(model_info);
 
 
 struct asset_material{
-    ASSET_TYPED_ID(bmp_info) Diffuse;
-    ASSET_TYPED_ID(bmp_info) Specular;
-    ASSET_TYPED_ID(bmp_info) Normal;
-    ASSET_TYPED_ID(bmp_info) Emission;
+    asset_id Diffuse;
+    asset_id Specular;
+    asset_id Normal;
+    asset_id Emission;
     
-    ASSET_TYPED_ID(bmp_info) Albedo;
-    ASSET_TYPED_ID(bmp_info) Roughness;
-    ASSET_TYPED_ID(bmp_info) Metallic;
+    asset_id Albedo;
+    asset_id Roughness;
+    asset_id Metallic;
 };
 
 struct asset_model{
-    ASSET_TYPED_ID(mesh_info) MeshID;
-    ASSET_TYPED_ID(material_info) MaterialID;
+    asset_id MeshID;
+    asset_id MaterialID;
 };
 
 struct asset_bitmap{
@@ -73,13 +64,19 @@ struct asset_bitmap{
     b32 BakeToAtlas;
 };
 
+struct asset_bitmap_array{
+    u32 FirstBmpID;
+    int Count;
+};
+
 struct asset_glyph{
-    ASSET_TYPED_ID(bmp_info) BitmapID;
+    asset_id BitmapID;
     
     int Codepoint;
     
     u32 BitmapWidth;
     u32 BitmapHeight;
+    float BitmapWidthOverHeight;
     
     float XOffset;
 	float YOffset;
@@ -92,17 +89,15 @@ struct asset_font{
 	float DescenderHeight;
 	float LineGap;
     
-    u32 FirstGlyphID;
     int GlyphCount;
-    
-	u32 LineOffsetToMapping;
-    u32 LineOffsetToKerningPairs;
     
     u32 DataOffsetToMapping;
     u32 DataOffsetToKerning;
+    u32 DataOffsetToIDs;
     
     u32 MappingSize;
     u32 KerningSize;
+    u32 IDsSize;
 };
 
 struct asset_mesh{
@@ -112,8 +107,11 @@ struct asset_mesh{
     u32 VerticesCount;
     u32 IndicesCount;
     
-    u32 LineOffsetToVertices;
-    u32 LineOffsetToIndices;
+    u32 DataVerticesSize;
+    u32 DataIndicesSize;
+    
+    u32 DataOffsetToVertices;
+    u32 DataOffsetToIndices;
 };
 
 struct asset_sound{
@@ -149,6 +147,7 @@ struct asset_header{
         asset_model Model;
         asset_material Material;
         asset_bitmap Bitmap;
+        asset_bitmap_array BmpArray;
         asset_glyph Glyph;
         asset_mesh Mesh;
         asset_font Font;
