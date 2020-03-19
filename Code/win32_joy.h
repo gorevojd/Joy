@@ -163,7 +163,7 @@ struct DSound_State{
 };
 
 struct Win_Memory_Region{
-    mem_block Block;
+    mem_block_entry Block;
     
     // NOTE(Dima): Total commited size
     mi TotalCommittedSize;
@@ -174,6 +174,11 @@ struct Win_Memory_Region{
 
 #define WIN32_DEBUG_OUTPUT(name) void name(const char* Str)
 typedef WIN32_DEBUG_OUTPUT(win32_debug_output);
+
+struct win_critical_section_slot{
+    CRITICAL_SECTION Section;
+    b32 InUse;
+};
 
 struct win_state{
 	HWND window;
@@ -191,6 +196,11 @@ struct win_state{
     
     WINDOWPLACEMENT windowPlacement;
     XINPUT_STATE ControllerStates[XUSER_MAX_COUNT];
+    
+#define MAX_CRITICAL_SECTIONS_COUNT 1024
+    win_critical_section_slot CriticalSections[MAX_CRITICAL_SECTIONS_COUNT];
+    u16 NotUsedCriticalSectionIndices[MAX_CRITICAL_SECTIONS_COUNT];
+    int NotUsedCriticalSectionIndicesCount;
     
     HDC glDC;
     HGLRC renderCtx;

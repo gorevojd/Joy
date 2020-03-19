@@ -39,6 +39,7 @@ set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_world.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_game_mode.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_modes.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_input.cpp
+set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_engine.cpp
 
 ECHO ___________
 ECHO ***********

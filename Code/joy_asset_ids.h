@@ -13,8 +13,6 @@ enum asset_type{
     AssetType_Sound,
     AssetType_Font,
     AssetType_Glyph,
-    AssetType_Material,
-    AssetType_Model,
     
     // NOTE(Dima) These are fake types for fast access through macros
     AssetType_Type_bmp_info = AssetType_Bitmap,
@@ -23,8 +21,6 @@ enum asset_type{
     AssetType_Type_sound_info = AssetType_Sound,
     AssetType_Type_font_info = AssetType_Font,
     AssetType_Type_glyph_info = AssetType_Glyph,
-    AssetType_Type_asset_material = AssetType_Material,
-    AssetType_Type_asset_model = AssetType_Model,
 };
 
 enum asset_state{

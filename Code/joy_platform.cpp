@@ -1,7 +1,5 @@
 #include "joy_platform.h"
 
-#define PLATFORM_USE_STD_MUTEX 1
-
 PLATFORM_READ_FILE(PlatformReadFile) {
     Platform_Read_File_Result res = {};
     

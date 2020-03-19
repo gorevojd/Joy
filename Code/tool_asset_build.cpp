@@ -216,24 +216,6 @@ INTERNAL_FUNCTION added_asset AddSoundAssetManual(asset_system* System,
 	return(Added);
 }
 
-INTERNAL_FUNCTION added_asset AddModelAsset(asset_system* System, 
-                                            u32 MeshID, 
-                                            u32 MaterialID) 
-{
-	added_asset Added = AddAsset(System, AssetType_Model);
-    
-	game_asset_source* Source = Added.Source;
-    asset_header* FileHeader = Added.FileHeader;
-    
-    // NOTE(Dima): Setting source
-    
-    
-    // NOTE(Dima): Setting file header
-    FileHeader->Model.MeshID = MeshID;
-    FileHeader->Model.MaterialID = MaterialID;
-    
-	return(Added);
-}
 
 INTERNAL_FUNCTION added_asset AddMeshAsset(asset_system* System, 
                                            mesh_info* Mesh) 

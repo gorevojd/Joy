@@ -34,30 +34,33 @@ struct Loaded_Strings{
     int Count;
 };
 
-
 struct mem_block{
     void* Base;
     size_t Used;
     size_t Total;
-    
-    mem_block* Old;
-    mem_block* Next;
 };
 
-inline void InitMemoryBlock(mem_block* block, void* Base, mi Size){
-    block->Base = Base;
-    block->Used = 0;
-    block->Total = Size;
+struct mem_block_entry{
+    mem_block Block;
+    
+    mem_block_entry* Old;
+    mem_block_entry* Next;
+};
+
+inline void InitMemoryBlock(mem_block* Block, void* Base, mi Size){
+    Block->Base = Base;
+    Block->Used = 0;
+    Block->Total = Size;
 }
 
 inline mem_block InitMemoryBlock(void* Base, mi Size){
-    mem_block block;
+    mem_block Block;
     
-    block.Base = Base;
-    block.Used = 0;
-    block.Total = Size;
+    Block.Base = Base;
+    Block.Used = 0;
+    Block.Total = Size;
     
-    return(block);
+    return(Block);
 }
 
 inline int SafeTruncateToUInt(float Value){

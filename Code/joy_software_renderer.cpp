@@ -96,7 +96,7 @@ struct Render_Queue_Work_Data{
 };
 
 PLATFORM_CALLBACK(RenderQueueWork){
-    Render_Queue_Work_Data* work = (Render_Queue_Work_Data*)data;
+    Render_Queue_Work_Data* work = (Render_Queue_Work_Data*)Data;
     
     SoftwareRenderStackToOutput(
         work->stack,
@@ -110,7 +110,7 @@ struct Render_Queue_rgba2bgra_Work{
 };
 
 PLATFORM_CALLBACK(RenderQueueRGBA2BGRAWork){
-    Render_Queue_rgba2bgra_Work* work = (Render_Queue_rgba2bgra_Work*)data;
+    Render_Queue_rgba2bgra_Work* work = (Render_Queue_rgba2bgra_Work*)Data;
     
     RenderRGBA2BGRASSE(work->buf, work->clipRect);
 }

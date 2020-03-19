@@ -32,7 +32,6 @@
 
 #endif
 
-
 #if defined(PLATFORM_WINDOWS)
 #if defined(PLATFORM_WINDOWS_X64)
 inline u16 GetThreadID(){
@@ -73,6 +72,13 @@ inline void EndTicketMutex(ticket_mutex* Mutex){
     Mutex->release.fetch_add(1, std::memory_order::memory_order_release);
 }
 
+struct platform_mutex{
+    u64 NativeHandle;
+};
+
+#define PLATFORM_MUTEX_FUNCTION(name) void name(platform_mutex* Mutex)
+typedef PLATFORM_MUTEX_FUNCTION(platform_mutex_function);
+
 #define PLATFORM_READ_FILE(name) Platform_Read_File_Result name(char* filePath)
 typedef PLATFORM_READ_FILE(Platform_Read_File);
 PLATFORM_READ_FILE(PlatformReadFile);
@@ -97,7 +103,7 @@ typedef PLATFORM_SHOW_ERROR(Platform_Show_Error);
 #define PLATFORM_DEBUG_OUTPUT_STRING(name) void name(char* text)
 typedef PLATFORM_DEBUG_OUTPUT_STRING(Platform_Debug_Output_String);
 
-#define PLATFORM_CALLBACK(name) void name(void* data)
+#define PLATFORM_CALLBACK(name) void name(void* Data)
 typedef PLATFORM_CALLBACK(Platform_Callback);
 
 struct platform_job{
@@ -106,8 +112,7 @@ struct platform_job{
 };
 
 struct platform_job_queue{
-    ticket_mutex AddMutex;
-    std::mutex AddMutexSTD;
+    platform_mutex AddMutex;
     
     std::atomic_uint32_t AddIndex;
     std::atomic_uint32_t DoIndex;
@@ -124,14 +129,17 @@ struct platform_job_queue{
     std::vector<std::thread> Threads;
 };
 
-#define PLATFORM_MEMALLOC(name) mem_block* name(mi Size)
+#define PLATFORM_MEMALLOC(name) mem_block_entry* name(mi Size)
 typedef PLATFORM_MEMALLOC(platform_memalloc);
 
-#define PLATFORM_MEMFREE(name) void name(mem_block* ToFree)
+#define PLATFORM_MEMFREE(name) void name(mem_block_entry* ToFree)
 typedef PLATFORM_MEMFREE(platform_memfree);
 
-#define PLATFORM_MEMZERO(name) void name(mem_block* ToZero)
+#define PLATFORM_MEMZERO(name) void name(mem_block_entry* ToZero)
 typedef PLATFORM_MEMZERO(platform_memzero);
+
+#define PLATFORM_MEMZERO_RAW(name) void name(void* Data, mi DataSize)
+typedef PLATFORM_MEMZERO_RAW(platform_memzero_raw);
 
 #define PLATFORM_ADD_ENTRY(name) void name(platform_job_queue* queue, Platform_Callback* callback, void* data)
 typedef PLATFORM_ADD_ENTRY(Platform_Add_Entry);
@@ -180,7 +188,7 @@ typedef PLATFORM_FILE_OFFSET_READ(platform_file_offset_read);
 #define PLATFORM_PROCESS_INPUT(name) void name(struct input_state* Input)
 typedef PLATFORM_PROCESS_INPUT(platform_process_input);
 
-struct Platform{
+struct platform_api{
     Platform_Read_File* ReadFile;
     Platform_Write_File* WriteFile;
     Platform_Free_File_Memory* FreeFileMemory;
@@ -194,6 +202,12 @@ struct Platform{
     platform_memalloc* MemAlloc;
     platform_memfree* MemFree;
     platform_memzero* MemZero;
+    platform_memzero_raw* MemZeroRaw;
+    
+    platform_mutex_function* InitMutex;
+    platform_mutex_function* LockMutex;
+    platform_mutex_function* UnlockMutex;
+    platform_mutex_function* FreeMutex;
     
     platform_open_files_begin* OpenFilesBegin;
     platform_open_files_end* OpenFilesEnd;
@@ -210,6 +224,6 @@ struct Platform{
 };
 
 /* Extern variables definition */
-extern Platform platform;
+extern platform_api Platform;
 
 #endif

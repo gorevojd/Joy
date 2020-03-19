@@ -35,7 +35,7 @@ GLOBAL_VARIABLE gl_state GlobalGL;
 GLOBAL_VARIABLE DirX_State GlobalDirX;
 #endif
 
-Platform platform;
+platform_api Platform;
 
 
 BOOL CALLBACK DirectSoundEnumerateCallback( 
@@ -1113,13 +1113,63 @@ void Win32FreeOpenGL(HGLRC renderCtx){
     wglDeleteContext(renderCtx);
 }
 
+PLATFORM_MUTEX_FUNCTION(Win32InitMutex){
+    win_critical_section_slot* Slot = 0;
+    ASSERT(GlobalWin32.NotUsedCriticalSectionIndicesCount);
+    
+    int Index = GlobalWin32.NotUsedCriticalSectionIndices[0];
+    int EndIndex = GlobalWin32.NotUsedCriticalSectionIndicesCount - 1;
+    
+    Slot = &GlobalWin32.CriticalSections[Index];
+    
+    // NOTE(Dima): Swapping with last
+    GlobalWin32.NotUsedCriticalSectionIndices[0] = GlobalWin32.NotUsedCriticalSectionIndices[EndIndex];
+    // NOTE(Dima): Setting last to invalid value
+    GlobalWin32.NotUsedCriticalSectionIndices[EndIndex] = 0xBEEF;
+    // NOTE(Dima): Decrementing array size
+    --GlobalWin32.NotUsedCriticalSectionIndicesCount;
+    
+    CRITICAL_SECTION* Section = &Slot->Section;
+    
+    // NOTE(Dima): Setting NativeHandle to index so we can get section in future
+    Mutex->NativeHandle = Index;
+    
+    // NOTE(Dima): Initializing critical section
+    InitializeCriticalSection(Section);
+}
+
+PLATFORM_MUTEX_FUNCTION(Win32LockMutex){
+    win_critical_section_slot* Slot = &GlobalWin32.CriticalSections[Mutex->NativeHandle];
+    CRITICAL_SECTION* Section = &Slot->Section;
+    
+    EnterCriticalSection(Section);
+}
+
+PLATFORM_MUTEX_FUNCTION(Win32UnlockMutex){
+    win_critical_section_slot* Slot = &GlobalWin32.CriticalSections[Mutex->NativeHandle];
+    CRITICAL_SECTION* Section = &Slot->Section;
+    
+    LeaveCriticalSection(Section);
+}
+
+PLATFORM_MUTEX_FUNCTION(Win32FreeMutex){
+    ASSERT(Mutex->NativeHandle != 0xDEADBEEF);
+    
+    win_critical_section_slot* Slot = &GlobalWin32.CriticalSections[Mutex->NativeHandle];
+    CRITICAL_SECTION* Section = &Slot->Section;
+    
+    int* Count = &GlobalWin32.NotUsedCriticalSectionIndicesCount;
+    ASSERT(*Count < MAX_CRITICAL_SECTIONS_COUNT);
+    GlobalWin32.NotUsedCriticalSectionIndices[(*Count)++] = Mutex->NativeHandle;
+    
+    // NOTE(Dima): Clearing mutex native handle as we do not need it anymore
+    Mutex->NativeHandle = 0xDEADBEEF;
+    
+    DeleteCriticalSection(Section);
+}
 
 PLATFORM_ADD_ENTRY(PlatformAddEntry){
-#if PLATFORM_USE_STD_MUTEX
-    queue->AddMutexSTD.lock();
-#else
-    BeginTicketMutex(&queue->AddMutex);
-#endif
+    Win32LockMutex(&queue->AddMutex);
     
     uint32_t oldAddIndex = queue->AddIndex.load(std::memory_order_relaxed);
     std::atomic_thread_fence(std::memory_order_acquire);
@@ -1137,11 +1187,8 @@ PLATFORM_ADD_ENTRY(PlatformAddEntry){
     queue->Started.fetch_add(1);
     
     queue->ConditionVariable.notify_all();
-#if PLATFORM_USE_STD_MUTEX
-    queue->AddMutexSTD.unlock();
-#else
-    EndTicketMutex(&queue->AddMutex);
-#endif
+    
+    Win32UnlockMutex(&queue->AddMutex);
 }
 
 INTERNAL_FUNCTION b32 PlatformDoWorkerWork(platform_job_queue* queue){
@@ -1190,6 +1237,8 @@ PLATFORM_WAIT_FOR_COMPLETION(PlatformWaitForCompletion){
 }
 
 INTERNAL_FUNCTION void InitJobQueue(platform_job_queue* queue, int jobsCount, int threadCount){
+    Win32InitMutex(&queue->AddMutex);
+    
     queue->AddIndex.store(0, std::memory_order_relaxed);
     queue->DoIndex.store(0, std::memory_order_relaxed);
     
@@ -1227,6 +1276,7 @@ INTERNAL_FUNCTION void FreeJobQueue(platform_job_queue* queue){
     }
     queue->Jobs = 0;
     queue->Threads.clear();
+    Win32FreeMutex(&queue->AddMutex);
 }
 
 PLATFORM_FREE_FILE_MEMORY(Win32FreeFileMemory){
@@ -1450,10 +1500,10 @@ PLATFORM_MEMALLOC(Win32MemAlloc){
     // NOTE(Dima): Initializing region
     Region->TotalCommittedSize = (ToAllocSize + PageSizeMask) & (~PageSizeMask);
     
-    mem_block* Result = (mem_block*)Region;
-    Result->Base = BlockBase;
-    Result->Used = 0;
-    Result->Total = Size;
+    mem_block_entry* Result = (mem_block_entry*)Region;
+    Result->Block.Base = BlockBase;
+    Result->Block.Used = 0;
+    Result->Block.Total = Size;
     
     return(Result);
 }
@@ -1476,7 +1526,14 @@ PLATFORM_MEMFREE(Win32MemFree){
 
 PLATFORM_MEMZERO(Win32MemZero){
     if(ToZero){
-        ZeroMemory(ToZero->Base, ToZero->Total);
+        ZeroMemory(ToZero->Block.Base, ToZero->Block.Total);
+    }
+}
+
+
+PLATFORM_MEMZERO_RAW(Win32MemZeroRaw){
+    if(Data){
+        ZeroMemory(Data, DataSize);
     }
 }
 
@@ -2421,24 +2478,35 @@ int APIENTRY WinMain(HINSTANCE hInstance,
                      LPSTR     lpCmdLine,
                      int       nCmdShow)
 {
-    // NOTE(Dima): Initializing platform API
-    InitJobQueue(&platform.highPriorityQueue, 2048, 8);
-    InitJobQueue(&platform.lowPriorityQueue, 2048, 2);
+    //NOTE(Dima): Setting critical sections
+    for(int i = 0; i < MAX_CRITICAL_SECTIONS_COUNT; i++){
+        GlobalWin32.NotUsedCriticalSectionIndices[i] = i;
+    }
+    GlobalWin32.NotUsedCriticalSectionIndicesCount = MAX_CRITICAL_SECTIONS_COUNT;
     
-    platform.AddEntry = PlatformAddEntry;
-    platform.WaitForCompletion = PlatformWaitForCompletion;
-    platform.ReadFile = Win32ReadFile;
-    platform.WriteFile = Win32WriteFile;
-    platform.FreeFileMemory = Win32FreeFileMemory;
-    platform.ShowError = Win32ShowError;
-    platform.OutputString = Win32DebugOutputString;
-    platform.MemAlloc = Win32MemAlloc;
-    platform.MemFree = Win32MemFree;
-    platform.MemZero = Win32MemZero;
-    platform.OpenFilesBegin = Win32OpenFilesBegin;
-    platform.OpenFilesEnd = Win32OpenFilesEnd;
-    platform.OpenNextFile = Win32OpenNextFile;
-    platform.FileOffsetRead = Win32FileOffsetRead;
+    // NOTE(Dima): Initializing platform API
+    InitJobQueue(&Platform.highPriorityQueue, 2048, 8);
+    InitJobQueue(&Platform.lowPriorityQueue, 2048, 2);
+    
+    Platform.AddEntry = PlatformAddEntry;
+    Platform.WaitForCompletion = PlatformWaitForCompletion;
+    Platform.ReadFile = Win32ReadFile;
+    Platform.WriteFile = Win32WriteFile;
+    Platform.FreeFileMemory = Win32FreeFileMemory;
+    Platform.ShowError = Win32ShowError;
+    Platform.OutputString = Win32DebugOutputString;
+    Platform.MemAlloc = Win32MemAlloc;
+    Platform.MemFree = Win32MemFree;
+    Platform.MemZero = Win32MemZero;
+    Platform.MemZeroRaw = Win32MemZeroRaw;
+    Platform.OpenFilesBegin = Win32OpenFilesBegin;
+    Platform.OpenFilesEnd = Win32OpenFilesEnd;
+    Platform.OpenNextFile = Win32OpenNextFile;
+    Platform.FileOffsetRead = Win32FileOffsetRead;
+    Platform.InitMutex = Win32InitMutex;
+    Platform.LockMutex = Win32LockMutex;
+    Platform.UnlockMutex = Win32UnlockMutex;
+    Platform.FreeMutex = Win32FreeMutex;
     
     // NOTE(Dima): Initializing memory sentinel
     GlobalWin32.memorySentinel = {};
@@ -2463,6 +2531,18 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     // NOTE(Dima): Calculating perfomance frequency
     QueryPerformanceFrequency(&GlobalWin32.PerformanceFreqLI);
     GlobalWin32.OneOverPerformanceFreq = 1.0 / (double)GlobalWin32.PerformanceFreqLI.QuadPart;
+    
+    platform_mutex Mutex1;
+    platform_mutex Mutex2;
+    platform_mutex Mutex3;
+    
+    Win32InitMutex(&Mutex1);
+    Win32InitMutex(&Mutex2);
+    Win32InitMutex(&Mutex3);
+    
+    Win32FreeMutex(&Mutex1);
+    Win32FreeMutex(&Mutex3);
+    Win32FreeMutex(&Mutex2);
     
     // NOTE(Dima): Init win32 debug output log func
     if(IsDebuggerPresent()){
@@ -2558,8 +2638,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     
     DestroyWindow(GlobalWin32.window);
     
-    FreeJobQueue(&platform.highPriorityQueue);
-    FreeJobQueue(&platform.lowPriorityQueue);
+    FreeJobQueue(&Platform.highPriorityQueue);
+    FreeJobQueue(&Platform.lowPriorityQueue);
     
     return (0);
 }

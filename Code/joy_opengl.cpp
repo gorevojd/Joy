@@ -20,7 +20,7 @@ INTERNAL_FUNCTION GLuint GlLoadFromSource(char* VertexSource, char* FragmentSour
 		glGetShaderInfoLog(VertexShader, sizeof(InfoLog), 0, InfoLog);
 		//TODO(dima): Logging
         fprintf(stderr, "Error while loading vertex shader(%s)\n%s\n", VertexSource, InfoLog);
-        platform.OutputString(InfoLog);
+        Platform.OutputString(InfoLog);
         assert(Success);
     }
     
@@ -33,7 +33,7 @@ INTERNAL_FUNCTION GLuint GlLoadFromSource(char* VertexSource, char* FragmentSour
 		glGetShaderInfoLog(FragmentShader, sizeof(InfoLog), 0, InfoLog);
 		//TODO(dima): Logging
         fprintf(stderr, "Error while loading fragment shader(%s)\n%s\n", FragmentSource, InfoLog);
-        platform.OutputString(InfoLog);
+        Platform.OutputString(InfoLog);
         assert(Success);
     }
     
@@ -48,7 +48,7 @@ INTERNAL_FUNCTION GLuint GlLoadFromSource(char* VertexSource, char* FragmentSour
             //TODO(dima): Logging
             fprintf(stderr, "Error while loading geometry shader(%s)\n%s\n", 
                     GeometrySource, InfoLog);
-            platform.OutputString(InfoLog);
+            Platform.OutputString(InfoLog);
             assert(Success);
         }
     }
@@ -66,7 +66,7 @@ INTERNAL_FUNCTION GLuint GlLoadFromSource(char* VertexSource, char* FragmentSour
 		glGetProgramInfoLog(Program, sizeof(InfoLog), 0, InfoLog);
 		//TODO(dima): Logging
         fprintf(stderr, "Error while linking shader program\n%s\n", InfoLog);
-        platform.OutputString(InfoLog);
+        Platform.OutputString(InfoLog);
         assert(Success);
 	}
     
@@ -92,7 +92,7 @@ INTERNAL_FUNCTION GLuint GlLoadFromSourceCompute(char* ComputeCode){
 	if (!Success) {
 		glGetShaderInfoLog(ComputeShader, sizeof(InfoLog), 0, InfoLog);
 		//TODO(dima): Logging
-        platform.OutputString(InfoLog);
+        Platform.OutputString(InfoLog);
         assert(Success);
     }
     
@@ -105,7 +105,7 @@ INTERNAL_FUNCTION GLuint GlLoadFromSourceCompute(char* ComputeCode){
 	if (!Success) {
 		glGetProgramInfoLog(Program, sizeof(InfoLog), 0, InfoLog);
 		//TODO(dima): Logging
-        platform.OutputString(InfoLog);
+        Platform.OutputString(InfoLog);
         assert(Success);
 	}
     

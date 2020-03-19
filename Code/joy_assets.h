@@ -9,9 +9,16 @@
 #include "joy_asset_util.h"
 #include "joy_platform.h"
 #include "joy_memory.h"
+#include "joy_engine.h"
 
 #include "joy_asset_ids.h"
 #include "joy_data_structures.h"
+
+#define ASSET_LOAD_IMMEDIATE JOY_TRUE
+#define ASSET_LOAD_DEFERRED JOY_FALSE
+
+#define ASSET_SHOULD_LOAD JOY_TRUE
+#define ASSET_SHOULD_NOT_LOAD JOY_FALSE
 
 struct asset_file_source{
     platform_file_desc FileDescription;
@@ -34,6 +41,8 @@ struct asset{
     // NOTE(Dima): File asset source
     asset_file_source* FileSource;
     u32 OffsetToData;
+    
+    void* TempData;
     
     // NOTE(Dima): Asset data memory entry
     mem_entry* DataMemoryEntry;
@@ -82,6 +91,7 @@ struct asset_block{
 struct assets{
     mem_region* Memory;
     layered_mem LayeredMemory;
+    task_data_pool LoadTasksPool;
     
     Asset_Atlas MainLargeAtlas;
     
@@ -137,5 +147,6 @@ inline asset* GetAssetByID(assets* Assets, u32 ID){
 
 void InitAssets(assets* Assets);
 u32 GetFirst(assets* Assets, u32 Family);
+void LoadAsset(assets* Assets, asset* Asset, b32 Immediate);
 
 #endif

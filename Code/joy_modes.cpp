@@ -7,20 +7,151 @@
 #include "joy_camera.h"
 #include "joy_data_structures.h"
 #include "joy_assets_render.h"
+#include "joy_random.h"
 
 #define STB_SPRINTF_STATIC
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
 
-struct test_game_mode_state{
+struct sphere_distribution{
+    int Count;
     
+    int MaxCount;
+    v3 *Samples;
+};
+
+// NOTE(Dima): Returns how manu distributions were actually generated
+// NOTE(Dima): Should not return more than ToGenerateEstimateCount
+#define GEN_SPHERE_DISTRIBUTION_CALLBACK(name) int name(int ToGenerateEstimateCount, v3* Samples)
+typedef GEN_SPHERE_DISTRIBUTION_CALLBACK(gen_sphere_distribution_callback);
+
+GEN_SPHERE_DISTRIBUTION_CALLBACK(GenFibonacciSphereDistributions){
+    int Result = ToGenerateEstimateCount;
+    
+    float GoldenRatio = (1.0f + Sqrt(5.0f)) * 0.5f;
+    float OneOverGoldenRatio = 1.0f / GoldenRatio;
+    
+    float N = ToGenerateEstimateCount;
+    float OneOverN = 1.0f / N;
+    
+    for(int Index = 0;
+        Index < ToGenerateEstimateCount;
+        Index++)
+    {
+        float tX = (float)Index * OneOverN;
+        float tY = (float)Index * OneOverGoldenRatio;
+        
+        float Theta = ACos(2.0f * tX - 1.0f) - JOY_PI_OVER_TWO;
+        float Phi = JOY_TWO_PI * tY;
+        
+        float UnitX = cosf(Theta) * cosf(Phi);
+        float UnitY = cosf(Theta) * sinf(Phi);
+        float UnitZ = sinf(Theta);
+        
+        v3 UnitVector = V3(UnitX, UnitY, UnitZ);
+        UnitVector = NOZ(UnitVector);
+        
+        Samples[Index] = UnitVector;
+    }
+    
+    return(Result);
+}
+
+GEN_SPHERE_DISTRIBUTION_CALLBACK(GenTrigonometricSphereDistributions){
+    int SideCount = (int)Sqrt(ToGenerateEstimateCount);
+    
+    int ResultCount = SideCount * SideCount;
+    
+    if(ResultCount){
+        for(int YIndex = 0; 
+            YIndex < SideCount; 
+            YIndex++)
+        {
+            for(int XIndex = 0; 
+                XIndex < SideCount;
+                XIndex++)
+            {
+                float RandomX = RandomUni();
+                float RandomY = RandomUni();
+                
+                float Theta = 2.0f * ACos(Sqrt(1.0f - RandomX));
+                float Phi = 2.0f * JOY_PI * RandomY;
+                
+                float UnitX = sinf(Theta) * cosf(Phi);
+                float UnitY = sinf(Theta) * sinf(Phi);
+                float UnitZ = cosf(Theta);
+                
+                v3 UnitVector = V3(UnitX, UnitY, UnitZ);
+                UnitVector = NOZ(UnitVector);
+                
+                int NewSampleIndex = YIndex * SideCount + XIndex;
+                Samples[NewSampleIndex] = UnitVector;
+            }
+        }
+    }
+    
+    return(ResultCount);
+}
+
+inline sphere_distribution 
+GenerateSphereDistribution(
+gen_sphere_distribution_callback* GenDistributions,
+int MaxCount,
+v3* TargetSamples)
+{
+    sphere_distribution Result = {};
+    
+    Result.MaxCount = MaxCount;
+    Result.Samples = TargetSamples;
+    if(GenDistributions){
+        Result.Count = GenDistributions(MaxCount, TargetSamples);
+    }
+    
+    return(Result);
+}
+
+struct test_game_mode_state{
     game_camera Camera;
     
     float CameraSpeed;
     float MouseSencitivity;
     
+    v3* SphereDistributionsTrig;
+    v3* SphereDistributionsFib;
+    sphere_distribution SphereDistributionTrig;
+    sphere_distribution SphereDistributionFib;
+    
     b32 Initialized;
 };
+
+INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
+                                               render_stack* Stack,
+                                               sphere_distribution* Distr, 
+                                               v3 SphereCenter, 
+                                               float SphereRad)
+{
+    PushOrLoadMesh(Game->Assets, Stack, 
+                   GetFirst(Game->Assets, GameAsset_Sphere), 
+                   SphereCenter, 
+                   QuatI(), 
+                   V3(SphereRad * 2.0f),
+                   ASSET_LOAD_DEFERRED);
+    
+    for(int SampleIndex = 0;
+        SampleIndex < Distr->Count;
+        SampleIndex++)
+    {
+        v3 TargetP = SphereCenter + Distr->Samples[SampleIndex] * SphereRad;
+        
+        PushOrLoadMesh(Game->Assets, Stack, 
+                       GetFirst(Game->Assets, GameAsset_Cube),
+                       TargetP, 
+                       QuatI(), 
+                       V3(0.05f),
+                       ASSET_LOAD_DEFERRED);
+    }
+    
+}
 
 // NOTE(Dima): TEST GAME MODE
 GAME_MODE_UPDATE(TestUpdate){
@@ -31,6 +162,19 @@ GAME_MODE_UPDATE(TestUpdate){
         State->Camera = {};
         State->CameraSpeed = 5.0f;
         State->MouseSencitivity = 0.25f;
+        
+        int SphereDistributionsmaxCount = 1024;
+        
+        State->SphereDistributionsTrig = PushArray(&Mode->Memory, v3, SphereDistributionsmaxCount);
+        State->SphereDistributionsFib = PushArray(&Mode->Memory, v3, SphereDistributionsmaxCount);
+        
+        State->SphereDistributionTrig = GenerateSphereDistribution(GenTrigonometricSphereDistributions,
+                                                                   SphereDistributionsmaxCount,
+                                                                   State->SphereDistributionsTrig);
+        
+        State->SphereDistributionFib = GenerateSphereDistribution(GenFibonacciSphereDistributions,
+                                                                  SphereDistributionsmaxCount,
+                                                                  State->SphereDistributionsFib);
         
         State->Initialized = JOY_TRUE;
     }
@@ -116,30 +260,44 @@ GAME_MODE_UPDATE(TestUpdate){
         GuiText(Game->Gui, "Right");
     }
     
-    PushMesh(Game->Assets, Stack, 
-             GetFirst(Game->Assets, GameAsset_Cube),
-             V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
-             QuatI(), V3(1.0f));
+    PushOrLoadMesh(Game->Assets, Stack, 
+                   GetFirst(Game->Assets, GameAsset_Cube),
+                   V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
+                   QuatI(), V3(1.0f), 
+                   ASSET_LOAD_DEFERRED);
     
-    PushMesh(Game->Assets, Stack, 
-             GetFirst(Game->Assets, GameAsset_Cube),
-             V3(0.0f, 1.0f + Sin(Game->Input->Time * 3.0f) * 0.5f, 0.0f), 
-             QuatI(), V3(1.0f));
+    PushOrLoadMesh(Game->Assets, Stack, 
+                   GetFirst(Game->Assets, GameAsset_Cube),
+                   V3(0.0f, 1.0f + Sin(Game->Input->Time * 3.0f) * 0.5f, 0.0f), 
+                   QuatI(), V3(1.0f), 
+                   ASSET_LOAD_DEFERRED);
     
-    PushMesh(Game->Assets, Stack, 
-             GetFirst(Game->Assets, GameAsset_Cylynder),
-             V3(-10.0f, 1.0f, 0.0f), 
-             Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), V3(2.0f));
+    PushOrLoadMesh(Game->Assets, Stack, 
+                   GetFirst(Game->Assets, GameAsset_Cylynder),
+                   V3(-10.0f, 1.0f, 0.0f), 
+                   Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), V3(2.0f),
+                   ASSET_LOAD_DEFERRED);
     
-    PushMesh(Game->Assets, Stack, 
-             GetFirst(Game->Assets, GameAsset_Sphere),V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
-             QuatI(), V3(1.0f));
+    PushOrLoadMesh(Game->Assets, Stack, 
+                   GetFirst(Game->Assets, GameAsset_Sphere),V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
+                   QuatI(), V3(1.0f),
+                   ASSET_LOAD_DEFERRED);
     
-    PushMesh(Game->Assets, Stack, 
-             GetFirst(Game->Assets, GameAsset_Plane),
-             V3(0.0f, -1.0f, 0.0f), 
-             QuatI(), V3(100.0f));
+    PushOrLoadMesh(Game->Assets, Stack, 
+                   GetFirst(Game->Assets, GameAsset_Plane),
+                   V3(0.0f, -1.0f, 0.0f), 
+                   QuatI(), V3(100.0f),
+                   ASSET_LOAD_DEFERRED);
     
+    ShowSphereDistributions(Game, Stack,
+                            &State->SphereDistributionTrig,
+                            V3(0.0f, 10.0f, 0.0f),
+                            2.0f);
+    
+    ShowSphereDistributions(Game, Stack,
+                            &State->SphereDistributionFib,
+                            V3(10.0f, 10.0f, 0.0f),
+                            2.0f);
 }
 
 // NOTE(Dima): MAIN MENU GAME MODE

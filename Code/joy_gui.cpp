@@ -420,14 +420,12 @@ assets* Assets)
     // NOTE(Dima): Getting IDs for needed assets
     Gui->MainFontID = GetFirst(Assets, GameAsset_Inconsolata);
     Gui->TileFontID = GetFirst(Assets, GameAsset_MollyJackFont);
+    
+    Gui->MainFont = PushOrLoadFont(Assets, Gui->MainFontID, ASSET_LOAD_IMMEDIATE);
+    Gui->TileFont = PushOrLoadFont(Assets, Gui->TileFontID, ASSET_LOAD_IMMEDIATE);
+    
     Gui->CheckboxMarkID = GetFirst(Assets, GameAsset_CheckboxMark);
     Gui->ChamomileID = GetFirst(Assets, GameAsset_ChamomileIcon);
-    
-    // NOTE(Dima): Getting needed assets from IDs
-    Gui->MainFont = GET_ASSET_PTR_MEMBER(GetAssetByID(Assets, Gui->MainFontID), 
-                                         font_info);
-    Gui->TileFont = GET_ASSET_PTR_MEMBER(GetAssetByID(Assets, Gui->TileFontID),
-                                         font_info);
     
     Gui->fontScale = 1.0f;
     
@@ -532,11 +530,10 @@ rc2 PrintTextInternal(font_info* Font,
         }
         
         if(*at >= ' ' && *at <= '~'){
-            
             u32 GlyphAssetID = Font->GlyphIDs[Font->Codepoint2Glyph[*at]];
             asset* GlyphAsset = GetAssetByID(Assets, GlyphAssetID);
             
-            glyph_info* Glyph = GET_ASSET_PTR_MEMBER(GlyphAsset, glyph_info);
+            glyph_info* Glyph = GET_ASSET_PTR_MEMBER(GlyphAsset, glyph_info);;
             
             if(Glyph){
                 float bmpScale = Glyph->Height * Scale;
@@ -547,12 +544,12 @@ rc2 PrintTextInternal(font_info* Font,
                     float bitmapMinY = curP.y + Glyph->YOffset * Scale;
                     float bitmapMinX = curP.x + Glyph->XOffset * Scale;
                     
-                    PushGlyph(Assets,
-                              stack, 
-                              V2(bitmapMinX, bitmapMinY), 
-                              bitmapDim, 
-                              Glyph->BitmapID,
-                              color);
+                    PushOrLoadGlyph(Assets,
+                                    stack, 
+                                    V2(bitmapMinX, bitmapMinY), 
+                                    bitmapDim, 
+                                    Glyph->BitmapID,
+                                    color);
                     
                 }
                 
@@ -1694,12 +1691,12 @@ void GuiCheckbox(gui_state* Gui, char* name, b32* value){
         GuiPushBut(Gui, chkRect);
         
         if(*value){
-            PushGlyph(Gui->Assets, 
-                      Gui->Stack,
-                      chkRect.min, 
-                      GetRectDim(chkRect),
-                      Gui->CheckboxMarkID,
-                      V4(1.0f, 1.0f, 1.0f, 1.0f));
+            PushOrLoadGlyph(Gui->Assets, 
+                            Gui->Stack,
+                            chkRect.min, 
+                            GetRectDim(chkRect),
+                            Gui->CheckboxMarkID,
+                            V4(1.0f, 1.0f, 1.0f, 1.0f));
         }
         
         // NOTE(Dima): Button name text printing
@@ -1880,12 +1877,12 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
                 rc2 HotRect = RcMinDim(V2(HotRectCenterX - HotRectDimX * 0.5f, SlideRc.min.y), 
                                        V2(HotRectDimX, HotRectDimX));
                 
-                PushGlyph(Gui->Assets,
-                          Gui->Stack,
-                          HotRect.min,
-                          GetRectDim(HotRect),
-                          Gui->ChamomileID,
-                          V4(1.0f, 1.0f, 1.0f, 1.0f));
+                PushOrLoadGlyph(Gui->Assets,
+                                Gui->Stack,
+                                HotRect.min,
+                                GetRectDim(HotRect),
+                                Gui->ChamomileID,
+                                V4(1.0f, 1.0f, 1.0f, 1.0f));
             }
             
             
@@ -1968,12 +1965,12 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
                 rc2 HotRect = RcMinDim(V2(HotRectCenterX - HotRectDimX * 0.5f, SlideRc.min.y), 
                                        V2(HotRectDimX, HotRectDimX));
                 
-                PushGlyph(Gui->Assets,
-                          Gui->Stack,
-                          HotRect.min,
-                          GetRectDim(HotRect),
-                          Gui->ChamomileID,
-                          V4(1.0f, 1.0f, 1.0f, 1.0f));
+                PushOrLoadGlyph(Gui->Assets,
+                                Gui->Stack,
+                                HotRect.min,
+                                GetRectDim(HotRect),
+                                Gui->ChamomileID,
+                                V4(1.0f, 1.0f, 1.0f, 1.0f));
             }
             
             

@@ -110,7 +110,7 @@ inline asset_id FileToIntegratedID(asset_file_source* Source, u32 FileID){
     return(Result);
 }
 
-void* AllocateAssetType(assets* Assets, asset* Asset, u32 AssetTypeSize){
+void* AllocateAssetType(assets* Assets, asset* Asset, void** Type, u32 AssetTypeSize){
     Asset->TypeMemEntry = AllocateMemLayerEntry(
         &Assets->LayeredMemory, AssetTypeSize);
     
@@ -118,23 +118,24 @@ void* AllocateAssetType(assets* Assets, asset* Asset, u32 AssetTypeSize){
     
     void* Result = Asset->TypeMemEntry->Data;
     
+    Platform.MemZeroRaw(Result, AssetTypeSize);
+    
+    *Type = Result;
+    
     return(Result);
 }
 
-#define ALLOC_ASS_PTR_MEMBER(type) (GET_ASSET_PTR_MEMBER(Asset, type) = (type*)AllocateAssetType(Assets, Asset, sizeof(type)))
-
-void LoadAsset(assets* Assets, asset* Asset){
+void LoadAssetDirectly(assets* Assets, 
+                       asset* Asset, 
+                       void* Data, 
+                       u64 DataSize)
+{
     asset_header* Header = &Asset->Header;
     asset_file_source* FileSource = Asset->FileSource;
     
-    // NOTE(Dima): Loading data
-    u32 DataSize = Header->TotalDataSize;
-    // TODO(Dima): Change this
-    void* Data = malloc(DataSize);
-    
     char* FilePath = Asset->FileSource->FileDescription.FullPath;
     
-    b32 ReadSucceeded = platform.FileOffsetRead(FilePath,
+    b32 ReadSucceeded = Platform.FileOffsetRead(FilePath,
                                                 Asset->OffsetToData,
                                                 DataSize,
                                                 Data);
@@ -143,60 +144,26 @@ void LoadAsset(assets* Assets, asset* Asset){
     
     switch(Asset->Type){
         case AssetType_Bitmap:{
-            Asset->TypeMemEntry = AllocateMemLayerEntry(
-                &Assets->LayeredMemory,sizeof(bmp_info));
-            
-            ASSERT(Asset->TypeMemEntry);
-            
-            bmp_info* Result = ALLOC_ASS_PTR_MEMBER(bmp_info);
-            
+            bmp_info* Result = GET_ASSET_PTR_MEMBER(Asset, bmp_info);
             asset_bitmap* Src = &Header->Bitmap;
-            
-            *Result = {};
             
             // NOTE(Dima): Initializing bitmap
             AllocateBitmapInternal(Result, Src->Width, Src->Height, Data);
-            
-            // NOTE(Dima): Adding to atlas if needed
-            if(Src->BakeToAtlas){
-                AddBitmapToAtlas(&Assets->MainLargeAtlas, Result);
-            }
         }break;
         
         case AssetType_Glyph:{
-            glyph_info* Result = ALLOC_ASS_PTR_MEMBER(glyph_info);
-            
+            glyph_info* Result = GET_ASSET_PTR_MEMBER(Asset, glyph_info);
             asset_glyph* Src = &Header->Glyph;
-            
-            Result->BitmapID = FileToIntegratedID(FileSource, Src->BitmapID);
-            
-            Result->Codepoint = Src->Codepoint;
-            Result->Width = Src->BitmapWidth;
-            Result->Height = Src->BitmapHeight;
-            Result->WidthOverHeight = Src->BitmapWidthOverHeight;
-            Result->XOffset = Src->XOffset;
-            Result->YOffset = Src->YOffset;
-            Result->Advance = Src->Advance;
-            Result->LeftBearingX = Src->LeftBearingX;
         }break;
         
         case AssetType_BitmapArray:{
-            bmp_array_info* Result = ALLOC_ASS_PTR_MEMBER(bmp_array_info);
+            bmp_array_info* Result = GET_ASSET_PTR_MEMBER(Asset, bmp_array_info);
             asset_bitmap_array* Src = &Header->BmpArray;
-            
-            Result->FirstBmpID = Src->FirstBmpID;
-            Result->Count = Src->Count;
         }break;
         
         case AssetType_Mesh:{
-            mesh_info* Result = ALLOC_ASS_PTR_MEMBER(mesh_info);
+            mesh_info* Result = GET_ASSET_PTR_MEMBER(Asset, mesh_info);
             asset_mesh* Src = &Header->Mesh;
-            
-            *Result = {};
-            
-            Result->VerticesCount = Src->VerticesCount;
-            Result->IndicesCount = Src->IndicesCount;
-            Result->MeshType = Src->MeshType;
             
             // NOTE(Dima): Load mesh data
             u32 VertSize = Header->Mesh.DataVerticesSize;
@@ -210,14 +177,13 @@ void LoadAsset(assets* Assets, asset* Asset){
         }break;
         
         case AssetType_Sound:{
-            
+            sound_info* Result = GET_ASSET_PTR_MEMBER(Asset, sound_info);
+            asset_sound* Src = &Header->Sound;
         }break;
         
         case AssetType_Font:{
-            font_info* Result = ALLOC_ASS_PTR_MEMBER(font_info);
+            font_info* Result = GET_ASSET_PTR_MEMBER(Asset, font_info);
             asset_font* Src = &Header->Font;
-            
-            *Result = {};
             
             int* Mapping = (int*)((u8*)Data + Header->Font.DataOffsetToMapping);
             float* KerningPairs = (float*)((u8*)Data + Header->Font.DataOffsetToKerning);
@@ -228,11 +194,6 @@ void LoadAsset(assets* Assets, asset* Asset){
             u32 IDsSize = Header->Font.IDsSize;
             
             ASSERT(MappingSize == sizeof(float) * FONT_INFO_MAX_GLYPH_COUNT);
-            
-            Result->AscenderHeight = Header->Font.AscenderHeight;
-            Result->DescenderHeight = Header->Font.DescenderHeight;
-            Result->LineGap = Header->Font.LineGap;
-            Result->GlyphCount = Header->Font.GlyphCount;
             
             // NOTE(Dima): Copy glyph IDs
             Result->GlyphIDs = GlyphIDs;
@@ -256,6 +217,85 @@ void LoadAsset(assets* Assets, asset* Asset){
             Result->KerningPairs = KerningPairs;
         }break;
     }
+    
+    // NOTE(Dima): Setting asset state
+    std::atomic_thread_fence(std::memory_order_release);
+    Asset->State.store(AssetState_Loaded);
+}
+
+struct load_asset_callback_data{
+    assets* Assets;
+    asset* Asset;
+    void* LoadDest;
+    u64 LoadDestSize;
+    task_data* Task;
+};
+
+PLATFORM_CALLBACK(LoadAssetCallback){
+    load_asset_callback_data* CallbackData = (load_asset_callback_data*)Data;
+    
+    void* DestData = CallbackData->LoadDest;
+    u64 DataSize = CallbackData->LoadDestSize;
+    asset* Asset = CallbackData->Asset;
+    assets* Assets = CallbackData->Assets;
+    
+    LoadAssetDirectly(Assets, Asset, DestData, DataSize);
+    
+    EndTaskData(&Assets->LoadTasksPool, CallbackData->Task);
+}
+
+void LoadAsset(assets* Assets, asset* Asset, b32 Immediate){
+    asset_header* Header = &Asset->Header;
+    asset_file_source* FileSource = Asset->FileSource;
+    
+    std::uint32_t ExpectedPrevState = AssetState_Unloaded;
+    if(Asset->State.compare_exchange_weak(ExpectedPrevState, 
+                                          AssetState_InProgress))
+    {
+        if(Immediate){
+            // NOTE(Dima): Loading data
+            u32 DataSize = Header->TotalDataSize;
+            // TODO(Dima): Change this
+            void* Data = malloc(DataSize);
+            
+            LoadAssetDirectly(Assets, Asset, Data, DataSize);
+        }
+        else{
+            task_data* Task = BeginTaskData(&Assets->LoadTasksPool);
+            
+            if(Task){
+                load_asset_callback_data* CallbackData =
+                    (load_asset_callback_data*)Task->Block.Base;
+                
+                // NOTE(Dima): Loading data
+                u32 DataSize = Header->TotalDataSize;
+                // TODO(Dima): Change this
+                void* Data = malloc(DataSize);
+                
+                
+                CallbackData->Assets = Assets;
+                CallbackData->Asset = Asset;
+                CallbackData->LoadDest = Data;
+                CallbackData->LoadDestSize = DataSize;
+                CallbackData->Task = Task;
+                
+                Platform.AddEntry(&Platform.lowPriorityQueue,
+                                  LoadAssetCallback, CallbackData);
+            }
+            else{
+                /*NOTE(Dima): If we can not get free memory slot 
+               to launch a load asset thread with it - we skip 
+              asset loading and assume that next time we will 
+            get it.
+               */
+            }
+        }
+    }
+    else{
+        /*NOTE(Dima): If Asset Load State was other value
+        we skip loading
+       */
+    }//State check
 }
 
 inline asset* AllocateAsset(assets* Assets, asset_file_source* FileSource, u32 FileID)
@@ -289,6 +329,11 @@ void InitAssets(assets* Assets){
                    LayersSizes, 
                    LayersSizesCount);
     
+    // NOTE(Dima): Init tasks datas pool
+    InitTaskDataPool(&Assets->LoadTasksPool, Assets->Memory,
+                     1024,
+                     sizeof(load_asset_callback_data));
+    
     // NOTE(Dima): Init asset files sources
     DLIST_REFLECT_PTRS(Assets->FileSourceUse, Next, Prev);
     DLIST_REFLECT_PTRS(Assets->FileSourceFree, Next, Prev);
@@ -311,11 +356,11 @@ void InitAssets(assets* Assets){
     }
     
     // NOTE(Dima): Loading from asset files
-    platform.OpenFilesBegin("../Data/", "*ja");
+    Platform.OpenFilesBegin("../Data/", "*ja");
     
     platform_file_desc FileDesc;
     
-    while(platform.OpenNextFile(&FileDesc)){
+    while(Platform.OpenNextFile(&FileDesc)){
         // NOTE(Dima): Allocating and setting file source
         asset_file_source* FileSource = AllocateFileSource(Assets);
         FileSource->FileDescription = FileDesc;
@@ -324,7 +369,7 @@ void InitAssets(assets* Assets){
         char* FileFullPath = FileSource->FileDescription.FullPath;
         
         asset_file_header FileHeader;
-        b32 ReadFileResult = platform.FileOffsetRead(FileFullPath, 
+        b32 ReadFileResult = Platform.FileOffsetRead(FileFullPath, 
                                                      0, sizeof(asset_file_header), 
                                                      &FileHeader);
         
@@ -351,7 +396,7 @@ void InitAssets(assets* Assets){
         
         // NOTE(Dima): Reading groups
         Assert(FileHeader.GroupsByteOffset == sizeof(asset_file_header));
-        b32 ReadGroupsResult = platform.FileOffsetRead(FileFullPath,
+        b32 ReadGroupsResult = Platform.FileOffsetRead(FileFullPath,
                                                        FileHeader.GroupsByteOffset,
                                                        sizeof(asset_file_group) * 
                                                        FileHeader.GroupsCount,
@@ -364,7 +409,7 @@ void InitAssets(assets* Assets){
         
         if(FileAssetCount){
             AssetLinesOffsets = PushArray(&AssetInitMem, u32, FileAssetCount);
-            b32 ReadOffsetsRes = platform.FileOffsetRead(FileFullPath,
+            b32 ReadOffsetsRes = Platform.FileOffsetRead(FileFullPath,
                                                          FileHeader.LinesOffsetsByteOffset,
                                                          FileAssetCount * sizeof(u32),
                                                          AssetLinesOffsets);
@@ -429,7 +474,7 @@ void InitAssets(assets* Assets){
                     
                     u32 LineOffset = AssetLinesOffsets[FileAssetIndex - 1];
                     
-                    b32 ReadAssetHeader = platform.FileOffsetRead(
+                    b32 ReadAssetHeader = Platform.FileOffsetRead(
                         FileFullPath,
                         LineOffset,
                         sizeof(asset_header),
@@ -451,7 +496,80 @@ void InitAssets(assets* Assets){
                     u32 DataOffsetInFile = LineOffset + AssetHeader.LineDataOffset;
                     NewAsset->OffsetToData = DataOffsetInFile;
                     
-                    LoadAsset(Assets, NewAsset);
+#define ALLOC_ASS_PTR_MEMBER(type) (type*)AllocateAssetType(Assets, NewAsset, (void**)&GET_ASSET_PTR_MEMBER(NewAsset, type), sizeof(type))
+                    
+                    // NOTE(Dima): Initializing assets
+                    // NOTE(Dima): Loading description info from file headers
+                    switch(NewAsset->Type){
+                        case AssetType_Bitmap: {
+                            bmp_info* Result = ALLOC_ASS_PTR_MEMBER(bmp_info);
+                            asset_bitmap* Src = &AssetHeader.Bitmap;
+                            
+                            if(Src->BakeToAtlas){
+                                LoadAsset(Assets, NewAsset, ASSET_LOAD_IMMEDIATE);
+                                bmp_info* Bmp = GET_ASSET_PTR_MEMBER(NewAsset, bmp_info);
+                                AddBitmapToAtlas(&Assets->MainLargeAtlas, Bmp);
+                            }
+                            else{
+                                // NOTE(Dima): Initializing bitmap & set pixels to 0
+                                AllocateBitmapInternal(Result, Src->Width, Src->Height, 0);
+                            }
+                        }break;
+                        
+                        case AssetType_BitmapArray: {
+                            bmp_array_info* Result = ALLOC_ASS_PTR_MEMBER(bmp_array_info);
+                            asset_bitmap_array* Src = &AssetHeader.BmpArray;
+                            
+                            Result->FirstBmpID = Src->FirstBmpID;
+                            Result->Count = Src->Count;
+                        }break;
+                        
+                        case AssetType_Mesh: {
+                            mesh_info* Result = ALLOC_ASS_PTR_MEMBER(mesh_info);
+                            asset_mesh* Src = &AssetHeader.Mesh;
+                            
+                            Result->VerticesCount = Src->VerticesCount;
+                            Result->IndicesCount = Src->IndicesCount;
+                            Result->MeshType = Src->MeshType;
+                        }break;
+                        
+                        case AssetType_Sound: {
+                            sound_info* Result = ALLOC_ASS_PTR_MEMBER(sound_info);
+                            asset_sound* Src = &AssetHeader.Sound;
+                            
+                            Result->SampleCount = Src->SampleCount;
+                            Result->SamplesPerSec = Src->SamplesPerSec;
+                            Result->Channels = Src->Channels;
+                        }break;
+                        
+                        case AssetType_Font: {
+                            font_info* Result = ALLOC_ASS_PTR_MEMBER(font_info);
+                            asset_font* Src = &AssetHeader.Font;
+                            
+                            Result->AscenderHeight = Src->AscenderHeight;
+                            Result->DescenderHeight = Src->DescenderHeight;
+                            Result->LineGap = Src->LineGap;
+                            Result->GlyphCount = Src->GlyphCount;
+                        }break;
+                        
+                        case AssetType_Glyph: {
+                            glyph_info* Result = ALLOC_ASS_PTR_MEMBER(glyph_info);
+                            asset_glyph* Src = &AssetHeader.Glyph;
+                            
+                            Result->BitmapID = FileToIntegratedID(FileSource, Src->BitmapID);
+                            
+                            Result->Codepoint = Src->Codepoint;
+                            Result->Width = Src->BitmapWidth;
+                            Result->Height = Src->BitmapHeight;
+                            Result->WidthOverHeight = Src->BitmapWidthOverHeight;
+                            Result->XOffset = Src->XOffset;
+                            Result->YOffset = Src->YOffset;
+                            Result->Advance = Src->Advance;
+                            Result->LeftBearingX = Src->LeftBearingX;
+                        }break;
+                    }
+                    
+                    //LoadAsset(Assets, NewAsset);
                 }
             }
         }
@@ -459,7 +577,7 @@ void InitAssets(assets* Assets){
         FreeNoDealloc(&AssetInitMem);
     }
     
-    platform.OpenFilesEnd();
+    Platform.OpenFilesEnd();
     
     Free(&AssetInitMem);
     

@@ -10,7 +10,7 @@
 // TODO(Dima): Add minimum block size param to allocation function
 
 struct mem_region{
-    mem_block* Block;
+    mem_block_entry* Block;
     
     u32 GrowSize;
 };
@@ -86,21 +86,22 @@ inline void* PushSomeMem(mem_region* Region, size_t Size, size_t Align = 8){
     size_t NewUsedCount = 0;
     
     if(Region->Block){
-        size_t BeforeAlign = (size_t)Region->Block->Base + Region->Block->Used;
+        size_t BeforeAlign = (size_t)Region->Block->Block.Base + Region->Block->Block.Used;
         AlignedPos = (BeforeAlign + Align - 1) & (~(Align - 1));
         size_t AdvancedByAlign = AlignedPos - BeforeAlign;
         
         size_t ToAllocateSize = AdvancedByAlign + Size;
-        NewUsedCount = Region->Block->Used + ToAllocateSize;
+        NewUsedCount = Region->Block->Block.Used + ToAllocateSize;
         
-        if(NewUsedCount > Region->Block->Total){
+        if(NewUsedCount > Region->Block->Block.Total){
             // NOTE(Dima): Need to allocate new block and set current
             // NOTE(Dima): block as old for new one.
             
             NeedNewBlock = JOY_TRUE;
             
+            // NOTE(Dima): Finding empty but not used blocks
             while(Region->Block->Next != 0){
-                if(Size <= Region->Block->Total){
+                if(Size <= Region->Block->Block.Total){
                     NeedNewBlock = JOY_FALSE;
                     
                     break;
@@ -133,7 +134,7 @@ inline void* PushSomeMem(mem_region* Region, size_t Size, size_t Align = 8){
             NewBlockSize = MinRegionSize;
         }
         
-        mem_block* NewBlock = platform.MemAlloc(NewBlockSize);
+        mem_block_entry* NewBlock = Platform.MemAlloc(NewBlockSize);
         NewBlock->Old = Region->Block; // NOTE(Dima): Region->Block is ZERO
         NewBlock->Next = 0;
         
@@ -143,17 +144,28 @@ inline void* PushSomeMem(mem_region* Region, size_t Size, size_t Align = 8){
         
         Region->Block = NewBlock;
         
-        Result = Region->Block->Base;
-        Region->Block->Used = Size;
+        Result = Region->Block->Block.Base;
+        Region->Block->Block.Used = Size;
     }
     else{
         // NOTE(Dima): Everything is OK. We can allocate here
-        Assert(NewUsedCount <= Region->Block->Total);
+        Assert(NewUsedCount <= Region->Block->Block.Total);
         
         Result = (void*)AlignedPos;
-        Region->Block->Used = NewUsedCount;
+        Region->Block->Block.Used = NewUsedCount;
     }
     
+    
+    return(Result);
+}
+
+inline mem_block PushSplit(mem_region* Region, mi Size)
+{
+    mem_block Result;
+    
+    Result.Base = PushSomeMem(Region, Size);
+    Result.Total = Size;
+    Result.Used = 0;
     
     return(Result);
 }
@@ -161,9 +173,9 @@ inline void* PushSomeMem(mem_region* Region, size_t Size, size_t Align = 8){
 // NOTE(Dima): This function deallocates all region
 inline void Free(mem_region* Region){
     while(Region->Block){
-        mem_block* OldBlock = Region->Block->Old;
+        mem_block_entry* OldBlock = Region->Block->Old;
         
-        platform.MemFree(Region->Block);
+        Platform.MemFree(Region->Block);
         
         Region->Block = OldBlock;
         
@@ -178,11 +190,11 @@ inline void Free(mem_region* Region){
 // NOTE(Dima): This function frees all region but not deallocates 
 // NOTE(Dima): its blocks but just zeroes them
 inline void FreeNoDealloc(mem_region* Region){
-    mem_block* LastValid = Region->Block;
+    mem_block_entry* LastValid = Region->Block;
     
     while(Region->Block){
-        platform.MemZero(Region->Block);
-        Region->Block->Used = 0;
+        Platform.MemZero(Region->Block);
+        Region->Block->Block.Used = 0;
         
         LastValid = Region->Block;
         

@@ -45,9 +45,14 @@ typedef union v2 {
 
 typedef union v3 {
 	struct {
-		float x;
-		float y;
-		float z;
+		union{
+            struct{
+                float x;
+                float y;
+            };
+            v2 xy;
+        };
+        float z;
 	};
     
 	struct {
@@ -1467,6 +1472,114 @@ inline rc2 BottomLeftToTopLeftRectange(rc2 Rect, float ScreenHeight)
     Result.max.y = ScreenHeight - Rect.min.y;
     
     return(Result);
+}
+
+inline float BiunitToUnit(float x){
+    float Result = x * 0.5f + 0.5f;
+    
+    return(Result);
+}
+
+inline float UnitToBiunit(float x){
+    float Result = x * 2.0f - 1.0f;
+    
+    return(Result);
+}
+
+inline v2 UnitToBiunit(v2 V){
+    v2 Result;
+    
+    Result.x = UnitToBiunit(V.x);
+    Result.y = UnitToBiunit(V.y);
+    
+    return(Result);
+}
+
+inline v3 UnitToBiunit(v3 V){
+    v3 Result;
+    
+    Result.x = UnitToBiunit(V.x);
+    Result.y = UnitToBiunit(V.y);
+    Result.z = UnitToBiunit(V.z);
+    
+    return(Result);
+}
+
+inline v2 BiunitToUnit(v2 V){
+    v2 Result;
+    
+    Result.x = BiunitToUnit(V.x);
+    Result.y = BiunitToUnit(V.y);
+    
+    return(Result);
+}
+
+inline v3 BiunitToUnit(v3 V){
+    v3 Result;
+    
+    Result.x = BiunitToUnit(V.x);
+    Result.y = BiunitToUnit(V.y);
+    Result.z = BiunitToUnit(V.z);
+    
+    return(Result);
+}
+
+inline float SignNotZero(float Value){
+    float Result = (Value >= 0.0f) ? 1.0f : -1.0f;
+    
+    return(Result);
+}
+
+inline v2 SignNotZero(v2 Value){
+    v2 Result;
+    
+    Result.x = SignNotZero(Value.x);
+    Result.y = SignNotZero(Value.y);
+    
+    return(Result);
+}
+
+
+inline v2 AbsVector(v2 Vector){
+    v2 AbsVector = V2(
+        abs(Vector.x),
+        abs(Vector.y));
+    
+    return(AbsVector);
+}
+
+inline v3 AbsVector(v3 Vector){
+    v3 AbsVector = V3(
+        abs(Vector.x),
+        abs(Vector.y),
+        abs(Vector.z));
+    
+    return(AbsVector);
+}
+
+inline v2 OctToBiunit(v3 Norm){
+    v3 Absol = AbsVector(Norm);
+    
+    float NormLen = Absol.x + Absol.y + Absol.z;
+    float InvNorm = 1.0f / NormLen;
+    
+    v2 Result = Norm.xy * InvNorm;
+    
+    if(Norm.z < 0.0f){
+        Result = Hadamard(V2(1.0f, 1.0f) - AbsVector(V2(Norm.y, Norm.x)), SignNotZero(Result));
+    }
+    
+    return(Result);
+}
+
+inline v3 BiunitToOct(v2 Coord){
+    v2 Absol = AbsVector(Coord);
+    v3 Res = V3(Coord.x, Coord.y, 1.0f - Absol.x - Absol.y);
+    if(Res.z < 0.0f){
+        Res.xy = Hadamard(V2(1.0f, 1.0f) - AbsVector(V2(Res.y, Res.x)), SignNotZero(Res.xy));
+    }
+    
+    return(NOZ(Res));
 }
 
 #endif
