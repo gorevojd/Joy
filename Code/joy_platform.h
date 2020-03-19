@@ -149,13 +149,6 @@ PLATFORM_ADD_ENTRY(PlatformAddEntry);
 typedef PLATFORM_WAIT_FOR_COMPLETION(Platform_Wait_For_Completion);
 PLATFORM_WAIT_FOR_COMPLETION(PlatformWaitForCompletion);
 
-#define PLATFORM_BEGIN_LIST_FILES_IN_DIR(name) Loaded_Strings name(char* DirectoryPath, char* Wildcard)
-typedef PLATFORM_BEGIN_LIST_FILES_IN_DIR(Platform_Begin_List_Files_In_Dir);
-
-#define PLATFORM_END_LIST_FILES_IN_DIR(name) void name(Loaded_Strings* Strings)
-typedef PLATFORM_END_LIST_FILES_IN_DIR(Platform_End_List_Files_In_Dir);
-
-
 enum Platform_File_Flags{
     File_Archive = 1,
     File_Compressed = 2,
@@ -213,9 +206,6 @@ struct platform_api{
     platform_open_files_end* OpenFilesEnd;
     platform_open_next_file* OpenNextFile;
     platform_file_offset_read* FileOffsetRead;
-    
-    Platform_Begin_List_Files_In_Dir* BeginListFilesInDir;
-    Platform_End_List_Files_In_Dir* EndListFilesInDir;
     
     Platform_Add_Entry* AddEntry;
     Platform_Wait_For_Completion* WaitForCompletion;

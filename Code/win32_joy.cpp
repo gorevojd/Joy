@@ -1352,87 +1352,6 @@ PLATFORM_WRITE_FILE(Win32WriteFile){
     return(result);
 }
 
-PLATFORM_BEGIN_LIST_FILES_IN_DIR(Win32BeginListFilesInDir){
-    Loaded_Strings Result = {};
-    
-    ASSERT(GlobalWin32.InListFilesBlock == 0);
-    GlobalWin32.InListFilesBlock = 1;
-    
-    char NewDirPath[MAX_PATH];
-    CopyStrings(NewDirPath, DirectoryPath);
-    ChangeAllChars(NewDirPath, '\\', '/');
-    int DirPathLen = StringLength(NewDirPath);
-    char* LastSymbol = &NewDirPath[DirPathLen];
-    if(*LastSymbol != '/'){
-        *LastSymbol++ = '/';
-    }
-    *LastSymbol = 0;
-    
-    char NewWildcard[16];
-    if(Wildcard){
-        CopyStrings(NewWildcard, Wildcard);
-    }
-    else{
-        CopyStrings(NewWildcard, "*");
-    }
-    
-    char ActualFindString[MAX_PATH];
-    ConcatStringsUnsafe(ActualFindString, NewDirPath, NewWildcard);
-    
-    GlobalWin32.LoadedStringsHolder.resize(0);
-    
-    size_t MemNeeded = 0;
-    
-    WIN32_FIND_DATAA FindData;
-    HANDLE FileHandle =  FindFirstFileA(
-        ActualFindString,
-        &FindData);
-    
-    if(FileHandle != INVALID_HANDLE_VALUE){
-        GlobalWin32.LoadedStringsHolder.push_back(std::string(FindData.cFileName));
-        
-        size_t Str1Size = lstrlenA(FindData.cFileName) + 1;
-        MemNeeded += Str1Size;
-        
-        while(FindNextFileA(FileHandle, &FindData)){
-            GlobalWin32.LoadedStringsHolder.push_back(std::string(FindData.cFileName));
-            
-            size_t StrSize = lstrlenA(FindData.cFileName) + 1;
-            MemNeeded += StrSize;
-        }
-        
-        MemNeeded += GlobalWin32.LoadedStringsHolder.size() * sizeof(char*);
-        
-        Result.Strings = (char**)malloc(MemNeeded);
-        Result.Count = GlobalWin32.LoadedStringsHolder.size();
-        
-        char* AtStr = (char*)Result.Strings + sizeof(char*) * Result.Count;
-        for(int i = 0; i < GlobalWin32.LoadedStringsHolder.size(); i++){
-            Result.Strings[i] = AtStr;
-            CopyStrings(Result.Strings[i], (char*)GlobalWin32.LoadedStringsHolder[i].c_str());
-            AtStr += GlobalWin32.LoadedStringsHolder[i].length() + 1;
-        }
-        
-        FindClose(FileHandle);
-    }
-    else{
-        
-    }
-    
-    return(Result);
-}
-
-PLATFORM_END_LIST_FILES_IN_DIR(Win32EndListFilesInDir){
-    ASSERT(GlobalWin32.InListFilesBlock == 1);
-    GlobalWin32.InListFilesBlock = 0;
-    
-    if(Strings->Strings){
-        free(Strings->Strings);
-        Strings->Strings = 0;
-        Strings->Count = 0;
-    }
-}
-
 PLATFORM_SHOW_ERROR(Win32ShowError){
     char* captionText = "Error";
     u32 mbType = MB_OK;
@@ -2486,7 +2405,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     
     // NOTE(Dima): Initializing platform API
     InitJobQueue(&Platform.highPriorityQueue, 2048, 8);
-    InitJobQueue(&Platform.lowPriorityQueue, 2048, 2);
+    InitJobQueue(&Platform.lowPriorityQueue, 2048, 4);
     
     Platform.AddEntry = PlatformAddEntry;
     Platform.WaitForCompletion = PlatformWaitForCompletion;
@@ -2599,13 +2518,6 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     Win32PlayDirectSoundBuffer(&GlobalDirectSound);
     
     //ShellExecuteA(NULL, "open", "http://www.microsoft.com", NULL, NULL, SW_SHOWNORMAL);
-    
-    mem_region Test = {};
-    PushSomeMem(&Test, Megabytes(1));
-    PushSomeMem(&Test, Megabytes(2));
-    FreeNoDealloc(&Test);
-    PushSomeMem(&Test, Megabytes(1));
-    PushSomeMem(&Test, Megabytes(2));
     
     LARGE_INTEGER BeginClockLI;
     QueryPerformanceCounter(&BeginClockLI);

@@ -1,7 +1,6 @@
 #ifndef WIN32_JOY_H
 #define WIN32_JOY_H
 
-
 #include <stdio.h>
 #include <io.h>
 #include <fcntl.h>

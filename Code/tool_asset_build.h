@@ -5,8 +5,19 @@
 #include "joy_types.h"
 #include "joy_asset_types.h"
 #include "joy_asset_ids.h"
-#include "joy_asset_util.h"
 
+#include <vector>
+
+
+struct Loaded_Strings{
+    char** Strings;
+    int Count;
+};
+
+struct data_buffer {
+	u8* Data;
+	u64 Size;
+};
 
 struct tool_glyph_info{
     int Codepoint;
@@ -22,8 +33,6 @@ struct tool_glyph_info{
 	float Advance;
 	float LeftBearingX;
 };
-
-
 
 struct tool_font_info{
     float AscenderHeight;
@@ -237,5 +246,27 @@ struct asset_system {
 	game_asset_group* CurrentGroup;
 	game_asset* PrevAssetPointer;
 };
+
+
+mesh_info MakeMesh(
+std::vector<v3>& Positions,
+std::vector<v2>& TexCoords,
+std::vector<v3>& Normals,
+std::vector<v3>& Tangents,
+std::vector<v3>& Colors,
+std::vector<u32> Indices,
+b32 CalculateNormals,
+b32 CalculateTangents);
+mesh_info MakePlane();
+mesh_info MakeCube();
+mesh_info MakeSphere(int Segments, int Rings);
+mesh_info MakeCylynder(float Height, float Radius, int SidesCount) ;
+
+sound_info MakeSound(const std::vector<i16>& Samples,
+                     int SamplesPerSec);
+sound_info MakeSineSound(const std::vector<int>& Frequencies, 
+                         int SampleCount,
+                         int SamplesPerSec);
+sound_info MakeSineSound256(int SampleCount, int SamplesPerSec);
 
 #endif

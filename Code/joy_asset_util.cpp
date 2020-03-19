@@ -40,83 +40,6 @@ void FreeDataBuffer(data_buffer* DataBuffer) {
 	}
 }
 
-
-inline b32 IsWhitespaceNewlineOrEndline(char c){
-    b32 res = (c == '\n' || 
-               c == '\r' ||
-               c == ' ' ||
-               c == 0);
-    
-    return(res);
-}
-
-Loaded_Strings LoadStringListFromFile(char* filePath){
-    Loaded_Strings result = {};
-    
-    data_buffer buf = ReadFileToDataBuffer(filePath);
-    
-    std::vector<std::string> strings;
-    
-    char* at = (char*)buf.Data;
-    
-    char bufStr[256];
-    int inLinePos = 0;
-    
-    if(buf.Size){
-        
-        while(at && *at != 0){
-            if(IsWhitespaceNewlineOrEndline(*at))
-            {
-                bufStr[inLinePos] = 0;
-                strings.push_back(std::string(bufStr));
-                
-                inLinePos = 0;
-                
-                // NOTE(Dima): Skip to next valid symbol
-                while(at && IsWhitespaceNewlineOrEndline(*at))
-                {
-                    if(*at == 0){
-                        break;
-                    }
-                    
-                    at++;
-                }
-            }
-            else{
-                bufStr[inLinePos++] = *at;
-                at++;
-            }
-        }
-        
-        result.Count = strings.size();
-        
-        size_t totalDataNeeded = 0;
-        for(int i = 0; i < strings.size(); i++){
-            totalDataNeeded += strings[i].length() + 1 + sizeof(char*);
-        }
-        
-        result.Strings = (char**)malloc(totalDataNeeded);
-        
-        int curSumOfSizes = 0;
-        for(int i = 0; i < result.Count; i++){
-            result.Strings[i] = (char*)result.Strings + result.Count * sizeof(char*) + curSumOfSizes;
-            curSumOfSizes += strings[i].length() + 1;
-            strcpy(result.Strings[i], strings[i].c_str());
-        }
-        
-        FreeDataBuffer(&buf);
-    }
-    
-    return(result);
-}
-
-void FreeStringList(Loaded_Strings* list){
-    if(list->Strings){
-        free(list->Strings);
-        list->Strings = 0;
-    }
-}
-
 bmp_info AllocateBitmapInternal(u32 Width, u32 Height, void* pixelsData) {
 	bmp_info res = {};
     
@@ -272,7 +195,6 @@ bmp_info LoadBMP(char* FilePath){
     
     return(res);
 }
-
 
 mesh_info MakeMesh(
 std::vector<v3>& Positions,

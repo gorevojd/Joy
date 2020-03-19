@@ -12,11 +12,6 @@ struct data_buffer {
 	u64 Size;
 };
 
-enum load_font_flags{
-    LoadFont_BakeShadow = 1,
-    LoadFont_BakeBlur = 2,
-};
-
 // NOTE(Dima): Data buffers utility functions
 data_buffer ReadFileToDataBuffer(char* fileName);
 void FreeDataBuffer(data_buffer* dataBuffer);
@@ -31,8 +26,6 @@ void CopyBitmapData(bmp_info* dst, bmp_info* src);
 // NOTE(Dima): Functions for loading stuff
 sound_info LoadSound(char* FilePath);
 bmp_info LoadBMP(char* filePath);
-Loaded_Strings LoadStringListFromFile(char* filePath);
-void FreeStringList(Loaded_Strings* list);
 
 // NOTE(Dima): Mesh helpers
 mesh_info MakeMesh(

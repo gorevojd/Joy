@@ -29,11 +29,6 @@ typedef uintptr_t umi;
 typedef u16 utf16_t;
 typedef u8 utf8_t;
 
-struct Loaded_Strings{
-    char** Strings;
-    int Count;
-};
-
 struct mem_block{
     void* Base;
     size_t Used;

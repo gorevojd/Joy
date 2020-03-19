@@ -7,17 +7,21 @@ SET INCLUDE_PATH=/I"C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Inc
 IF NOT EXIST ..\Build MKDIR ..\Build
 PUSHD ..\Build
 
-SET ASSBUILD_INCLUDE_PATH
-set ASSBUILD_COMPFILES=..\Code\tool_asset_build.cpp
-set ASSBUILD_COMPFILES=%ASSBUILD_COMPFILES% ..\Code\joy_render_blur.cpp
-set ASSBUILD_COMPFILES=%ASSBUILD_COMPFILES% ..\Code\joy_software_renderer_functions.cpp
-set ASSBUILD_COMPFILES=%ASSBUILD_COMPFILES% ..\Code\joy_asset_util.cpp
 ECHO ____________________
 ECHO ********************
 ECHO *   AssetBuilder   *
 ECHO ********************
+
+SET ASSBUILD_INCLUDE_PATH
+set ASSBUILD_COMPFILES=..\Code\tool_asset_build.cpp
+
 SET THIS_PROJECT_NAME=AssetBuilder
 cl /Fe%THIS_PROJECT_NAME% %COMP_OPTS% %ASSBUILD_INCLUDE_PATH% %ASSBUILD_COMPFILES% /link /NOLOGO /INCREMENTAL:no /OPT:ref kernel32.lib user32.lib gdi32.lib winmm.lib shell32.lib
+
+ECHO ___________
+ECHO ***********
+ECHO *   JOY   *
+ECHO ***********
 
 set COMPILATION_FILES=..\Code\win32_joy.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_data_structures.cpp
@@ -41,12 +45,8 @@ set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_modes.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_input.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_engine.cpp
 
-ECHO ___________
-ECHO ***********
-ECHO *   JOY   *
-ECHO ***********
 SET THIS_PROJECT_NAME=Joy
 ECHO Compiling Joy
-cl /Fe%THIS_PROJECT_NAME% %COMP_OPTS% %INCLUDE_PATH% %COMPILATION_FILES% /link /NOLOGO /INCREMENTAL:no /LIBPATH:"C:/Program Files (x86)/Microsoft DirectX SDK (June 2010)/Lib/x64" /OPT:ref kernel32.lib user32.lib gdi32.lib winmm.lib shell32.lib opengl32.lib dsound.lib Xinput.lib
+cl /Fe%THIS_PROJECT_NAME% %COMP_OPTS% %INCLUDE_PATH% %COMPILATION_FILES% /link /NOLOGO /INCREMENTAL:no /OPT:ref kernel32.lib user32.lib gdi32.lib winmm.lib shell32.lib opengl32.lib dsound.lib Xinput.lib
 
 POPD
