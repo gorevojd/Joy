@@ -12,8 +12,9 @@ ECHO ********************
 ECHO *   AssetBuilder   *
 ECHO ********************
 
-SET ASSBUILD_INCLUDE_PATH
 set ASSBUILD_COMPFILES=..\Code\tool_asset_build.cpp
+set ASSBUILD_COMPFILES=%ASSBUILD_COMPFILES% ..\Code\tool_asset_build_loading.cpp
+set ASSBUILD_COMPFILES=%ASSBUILD_COMPFILES% ..\Code\tool_asset_build_commands.cpp
 
 SET THIS_PROJECT_NAME=AssetBuilder
 cl /Fe%THIS_PROJECT_NAME% %COMP_OPTS% %ASSBUILD_INCLUDE_PATH% %ASSBUILD_COMPFILES% /link /NOLOGO /INCREMENTAL:no /OPT:ref kernel32.lib user32.lib gdi32.lib winmm.lib shell32.lib

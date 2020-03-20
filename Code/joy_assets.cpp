@@ -531,6 +531,18 @@ void InitAssets(assets* Assets){
                             Result->VerticesCount = Src->VerticesCount;
                             Result->IndicesCount = Src->IndicesCount;
                             Result->MeshType = Src->MeshType;
+                            
+                            // NOTE(Dima): Checking correctness of loaded vertices type sizes
+                            switch(Result->MeshType){
+                                case Mesh_Simple:{
+                                    ASSERT(Src->VertexTypeSize == sizeof(vertex_info));
+                                }break;
+                                
+                                case Mesh_Skinned:{
+                                    ASSERT(Src->VertexTypeSize == sizeof(vertex_skinned_info));
+                                }break;
+                            }
+                            
                         }break;
                         
                         case AssetType_Sound: {

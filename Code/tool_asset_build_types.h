@@ -1,0 +1,339 @@
+#ifndef TOOL_ASSET_BUILD_TYPES
+#define TOOL_ASSET_BUILD_TYPES
+
+#include "joy_asset_ids.h"
+#include "joy_math.h"
+
+#define Assert(cond) if(!(cond)){ *((int*)0) = 0;}
+#define ASSERT(cond) if(!(cond)){ *((int*)0) = 0;}
+
+#define ArrayCount(arr) (sizeof(arr) / sizeof((arr)[0]))
+#define InvalidCodePath Assert(!"Invalid code path!");
+
+#define INVALID_CODE_PATH Assert(!"Invalid code path!");
+#define ARRAY_COUNT(arr) (sizeof(arr) / sizeof((arr)[0]))
+
+#define Kilobytes(count) ((count) * 1000)
+#define Megabytes(count) ((count) * 1000000)
+#define Gigabytes(count) ((count) * 1000000000)
+
+#define Kibibytes(count) ((count) * 1024)
+#define Mibibytes(count) ((count) * 1024 * 1024)
+#define Gibibytes(count) ((count) * 1024 * 1024 * 1024)
+
+#define GlobalVariable static
+#define InternalFunction static
+#define LocalAsGlobal static
+
+#define GLOBAL_VARIABLE static
+#define INTERNAL_FUNCTION static
+#define LOCAL_AS_GLOBAL static
+
+#ifndef Min
+#define Min(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
+#ifndef Max
+#define Max(a, b) ((a) > (b) ? (a) : (b))
+#endif
+
+#ifndef Abs
+#define Abs(a) ((a) >= 0) ? (a) : -(a)
+#endif
+
+#define JOY_TRUE 1
+#define JOY_FALSE 0
+
+
+
+struct Loaded_Strings{
+    char** Strings;
+    int Count;
+};
+
+struct data_buffer {
+	u8* Data;
+	u64 Size;
+};
+
+
+struct tool_bmp_info{
+    void* Pixels;
+    int Width;
+    int Height;
+    int Pitch;
+    float WidthOverHeight;
+};
+
+struct tool_sound_info{
+    // NOTE(Dima): Left and Right channels
+    i16* Samples[2];
+    
+    int Channels;
+    int SampleCount;
+    int SamplesPerSec;
+};
+
+struct tool_glyph_info{
+    int Codepoint;
+    
+    int Width;
+    int Height;
+    
+    tool_bmp_info Bitmap;
+    
+    /*Theese are offset from glyph origin to top-left of bitmap*/
+	float XOffset;
+	float YOffset;
+	float Advance;
+	float LeftBearingX;
+};
+
+#define FONT_INFO_MAX_GLYPH_COUNT 256
+struct tool_font_info{
+    float AscenderHeight;
+	float DescenderHeight;
+	float LineGap;
+    
+    float* KerningPairs;
+    
+    u32 GlyphIDs[FONT_INFO_MAX_GLYPH_COUNT];
+    
+    tool_glyph_info Glyphs[FONT_INFO_MAX_GLYPH_COUNT];
+    int GlyphCount;
+    
+    int Codepoint2Glyph[FONT_INFO_MAX_GLYPH_COUNT];
+};
+
+enum Mesh_Type{
+    Mesh_Simple,
+    Mesh_Skinned,
+};
+
+struct vertex_info{
+    v3 P;
+    v2 UV;
+    v3 N;
+    v3 T;
+    v3 C;
+};
+
+struct vertex_skinned_info{
+    v3 P;
+    v2 UV;
+    v3 N;
+    v3 T;
+    v3 C;
+    float Weights[4];
+    u32 BoneIDs;
+};
+
+struct tool_mesh_info{
+    u32* Indices;
+    int IndicesCount;
+    
+    void* Vertices;
+    int VerticesCount;
+    
+    u32 MeshType;
+};
+
+
+struct game_asset_group_region {
+	u32 FirstAssetIndex;
+	u32 AssetCount;
+};
+
+struct game_asset_group{
+    game_asset_group_region Regions[ASSET_GROUP_REGIONS_COUNT];
+    int RegionsCount;
+};
+
+enum game_asset_tag_value_type{
+    GameAssetTagValue_Float,
+    GameAssetTagValue_Int,
+    GameAssetTagValue_Empty,
+};
+
+struct game_asset_tag {
+	u32 Type;
+    
+    u32 InTagArrayIndex;
+    
+	union {
+		float Value_Float;
+		int Value_Int;
+	};
+};
+
+struct game_asset_tag_hub{
+    public:
+    game_asset_tag Tags[MAX_TAGS_PER_ASSET];
+	u32 TagValueTypes[MAX_TAGS_PER_ASSET];
+    int TagCount;
+    
+    private:
+    game_asset_tag* FindTag(u32 TagType){
+        game_asset_tag* Result = 0;
+        
+        for (int TagIndex = 0;
+             TagIndex < TagCount;
+             TagIndex++)
+        {
+            game_asset_tag* Tag = &Tags[TagIndex];
+            if (Tag->Type == TagType) {
+                Result = Tag;
+                break;
+            }
+        }
+        
+        return(Result);
+    }
+    
+    game_asset_tag* AddTag(u32 TagType){
+        game_asset_tag* Result = FindTag(TagType);
+        
+        if(!Result && (TagCount < MAX_TAGS_PER_ASSET - 1)){
+            int ResultIndex = TagCount++;
+            Result = &Tags[ResultIndex];
+            Result->Type = TagType;
+            Result->InTagArrayIndex = ResultIndex;
+        }
+        
+        return(Result);
+    }
+    
+    public:
+    static game_asset_tag_hub Empty(){
+        game_asset_tag_hub Result = {};
+        
+        return(Result);
+    }
+    
+    game_asset_tag_hub& AddIntTag(u32 TagType, int Value){
+        game_asset_tag* Tag = AddTag(TagType);
+        
+        if(Tag){
+            TagValueTypes[Tag->InTagArrayIndex] = GameAssetTagValue_Int;
+            Tag->Value_Int = Value;
+        }
+        
+        return(*this);
+    }
+    
+    game_asset_tag_hub& AddFloatTag(u32 TagType, float Value){
+        game_asset_tag* Tag = AddTag(TagType);
+        
+        if(Tag){
+            TagValueTypes[Tag->InTagArrayIndex] = GameAssetTagValue_Float;
+            Tag->Value_Float = Value;
+        }
+        
+        return(*this);
+    }
+    
+    game_asset_tag_hub& AddEmptyTag(u32 TagType){
+        game_asset_tag* Tag = AddTag(TagType);
+        
+        if(Tag){
+            TagValueTypes[Tag->InTagArrayIndex] = GameAssetTagValue_Empty;
+            Tag->Value_Int = 1;
+        }
+        
+        return(*this);
+    }
+};
+
+struct game_asset {
+	u32 ID;
+    
+	u32 Type;
+    
+	game_asset_tag Tags[MAX_TAGS_PER_ASSET];
+	int TagCount;
+    
+	union {
+		tool_bmp_info* Bitmap;
+		tool_font_info* Font;
+		tool_sound_info* Sound;
+		tool_mesh_info* Mesh;
+		tool_glyph_info* Glyph;
+	};
+};
+
+/*
+ NOTE(dima): Asset sources
+*/
+enum bitmap_asset_load_flags{
+    BitmapLoad_BakeIcon = 1,
+};
+
+struct game_asset_source_bitmap {
+	char* Path;
+    tool_bmp_info* BitmapInfo;
+    u32 LoadFlags;
+};
+
+struct game_asset_source_mesh {
+	tool_mesh_info* MeshInfo;
+};
+
+struct game_asset_source_model {
+    // NOTE(Dima): Empty
+};
+
+struct game_asset_source_material{
+    // NOTE(Dima): Empty
+};
+
+struct game_asset_source_sound {
+	char* Path;
+    tool_sound_info* Sound;
+};
+
+struct game_asset_source_font {
+	tool_font_info* FontInfo;
+};
+
+struct game_asset_source_glyph {
+	tool_glyph_info* Glyph;
+};
+
+struct game_asset_source {
+	union {
+		game_asset_source_bitmap BitmapSource;
+		game_asset_source_sound SoundSource;
+		game_asset_source_font FontSource;
+		game_asset_source_glyph GlyphSource;
+		game_asset_source_mesh MeshSource;
+        game_asset_source_model ModelSource;
+        game_asset_source_material MaterialSource;
+    };
+};
+
+//NOTE(dima): Assets freeareas
+#define FREEAREA_SLOTS_COUNT 4
+struct game_asset_freearea {
+	void* Pointers[FREEAREA_SLOTS_COUNT];
+	int SetCount;
+};
+
+
+//NOTE(dima): Asset system
+#define TEMP_STORED_ASSET_COUNT 2048
+struct asset_system {
+	u32 AssetTypes[TEMP_STORED_ASSET_COUNT];
+	game_asset Assets[TEMP_STORED_ASSET_COUNT];
+	game_asset_source AssetSources[TEMP_STORED_ASSET_COUNT];
+	game_asset_freearea AssetFreeareas[TEMP_STORED_ASSET_COUNT];
+	asset_header FileHeaders[TEMP_STORED_ASSET_COUNT];
+    
+	game_asset_group AssetGroups[GameAsset_Count];
+    
+	u32 AssetCount;
+	game_asset_group* CurrentGroup;
+	game_asset* PrevAssetPointer;
+};
+
+
+#endif

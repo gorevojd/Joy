@@ -174,12 +174,4 @@ struct font_info{
     u8 Codepoint2Glyph[FONT_INFO_MAX_GLYPH_COUNT];
 };
 
-struct material_info{
-    
-};
-
-struct model_info{
-    
-};
-
 #endif

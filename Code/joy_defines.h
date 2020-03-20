@@ -81,5 +81,4 @@
     entry_ptr->##prev##->##next = entry_ptr->##next##;}
 
 
-
 #endif

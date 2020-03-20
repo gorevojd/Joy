@@ -32,10 +32,9 @@ enum asset_state{
 typedef u32 asset_id;
 
 #define ASSET_VALUE_MEMBER(data_type) data_type Data_##data_type
-#define ASSET_PTR_MEMBER(data_type) data_type* Ptr_##data_type
 #define GET_ASSET_VALUE_MEMBER(asset, data_type) ((asset)->Data_##data_type)
+#define ASSET_PTR_MEMBER(data_type) data_type* Ptr_##data_type
 #define GET_ASSET_PTR_MEMBER(asset, data_type) ((asset)->Ptr_##data_type)
-
 
 struct asset_material{
     asset_id Diffuse;
