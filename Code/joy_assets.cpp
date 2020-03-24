@@ -76,8 +76,112 @@ u32 GetFirst(assets* Assets, u32 Group){
     
     u32 Result = 0;
     
-    if(!DLIST_FREE_IS_EMPTY(Grp->Sentinel, Next)){
-        Result = Grp->Sentinel.Next->ID;
+    if(Grp->InGroupAssetCount){
+        Result = Grp->PointersToAssets[0]->ID;
+    }
+    
+    return(Result);
+}
+
+u32 GetRandom(assets* Assets, u32 Group){
+    asset_group* Grp = &Assets->Groups[Group];
+    
+    u32 Result = 0;
+    
+    if(Grp->InGroupAssetCount){
+        int RandomIndex = GetRandomIndex(&Assets->Random, 
+                                         Grp->InGroupAssetCount);
+        
+        Result = Grp->PointersToAssets[RandomIndex]->ID;
+    }
+    
+    return(Result);
+}
+
+u32 GetBestByTags(assets* Assets, 
+                  u32 Group, 
+                  u32* TagTypes, 
+                  asset_tag_value* TagValues, 
+                  int TagsCount)
+{
+    asset_group* Grp = &Assets->Groups[Group];
+    
+    u32 Result = 0;
+    
+    /*
+TODO(Dima): Ideas to make it faster:
+*/
+    
+    if(Grp->InGroupAssetCount){
+        int BestIndex = 0;
+        float BestWeight = 0.0f;
+        
+        for(int GrpAssetIndex = 0; 
+            GrpAssetIndex < Grp->InGroupAssetCount;
+            GrpAssetIndex++)
+        {
+            asset* Asset = Grp->PointersToAssets[GrpAssetIndex];
+            
+            b32 ShouldExitAssetLoop = JOY_FALSE;
+            
+            float Weight = 0.0f;
+            
+            // TODO(Dima): Speed up this part where we find corresponding tags
+            for(int MatchTagIndex = 0;
+                MatchTagIndex < TagsCount;
+                MatchTagIndex++)
+            {
+                asset_tag_value* Value = &TagValues[MatchTagIndex];
+                u32 TagType = TagTypes[MatchTagIndex];
+                
+                b32 ShouldExitMatchLoop = JOY_FALSE;
+                
+                for(int TagIndex = 0; TagIndex < Asset->TagCount; TagIndex++)
+                {
+                    asset_tag_header* Tag = &Asset->Tags[TagIndex];
+                    
+                    if(Tag->Type == TagType){
+                        // NOTE(Dima): We found needed tag
+                        switch(Tag->ValueType){
+                            case AssetTagValue_Float:{
+                                float Diff = abs(Tag->Value.Value_Float - Value->Value_Float);
+                                
+                                Weight += (1.0f - Diff);
+                            }break;
+                            
+                            case AssetTagValue_Int:{
+                                int Diff = Abs(Tag->Value.Value_Int - Value->Value_Int);
+                                
+                                Weight += 1.0f - ((float)(Diff) * 0.01f);
+                            }break;
+                            
+                            case AssetTagValue_Empty:{
+                                BestIndex = GrpAssetIndex;
+                                
+                                ShouldExitMatchLoop = JOY_TRUE;
+                                ShouldExitAssetLoop = JOY_TRUE;
+                                break;
+                            }break;
+                        }
+                    }
+                }
+                
+                if(ShouldExitMatchLoop){
+                    break;
+                }
+            }
+            
+            if(Weight > BestWeight){
+                BestWeight = Weight;
+                BestIndex = GrpAssetIndex;
+            }
+            
+            if(ShouldExitAssetLoop){
+                break;
+            }
+        }
+        
+        Result = Grp->PointersToAssets[BestIndex]->ID;
     }
     
     return(Result);
@@ -105,7 +209,14 @@ inline asset_file_source* AllocateFileSource(assets* Assets){
 }
 
 inline asset_id FileToIntegratedID(asset_file_source* Source, u32 FileID){
-    asset_id Result = FileID - 1 + Source->IntegrationBaseID;
+    asset_id Result;
+    
+    if(FileID){
+        Result = FileID - 1 + Source->IntegrationBaseID;
+    }
+    else{
+        Result = 0;
+    }
     
     return(Result);
 }
@@ -284,17 +395,17 @@ void LoadAsset(assets* Assets, asset* Asset, b32 Immediate){
             }
             else{
                 /*NOTE(Dima): If we can not get free memory slot 
-               to launch a load asset thread with it - we skip 
-              asset loading and assume that next time we will 
-            get it.
-               */
+                to launch a load asset thread with it - we skip 
+                asset loading and assume that next time we will 
+                get it.
+                */
             }
         }
     }
     else{
         /*NOTE(Dima): If Asset Load State was other value
         we skip loading
-       */
+        */
     }//State check
 }
 
@@ -317,6 +428,9 @@ void InitAssets(assets* Assets){
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // NOTE(Dima): Memory region is already initialized
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+    // NOTE(Dima): Init random generation
+    InitRandomGeneration(&Assets->Random, 123);
     
     // NOTE(Dima): Large atlas initialization
     Assets->MainLargeAtlas = InitAtlas(Assets->Memory, 1024);
@@ -390,18 +504,31 @@ void InitAssets(assets* Assets){
         Assert(FileVersion == EngineFileVersion);
         Assert(FileHeader.GroupsCount == GameAsset_Count);
         
+        // NOTE(Dima): Reading groups
         asset_file_group *FileGroups = PushArray(&AssetInitMem,
                                                  asset_file_group,
                                                  GameAsset_Count);
         
-        // NOTE(Dima): Reading groups
         Assert(FileHeader.GroupsByteOffset == sizeof(asset_file_header));
+        u32 GroupsByteSize = FileHeader.GroupsCount * sizeof(asset_file_group);
         b32 ReadGroupsResult = Platform.FileOffsetRead(FileFullPath,
                                                        FileHeader.GroupsByteOffset,
-                                                       sizeof(asset_file_group) * 
-                                                       FileHeader.GroupsCount,
+                                                       GroupsByteSize,
                                                        FileGroups);
         Assert(ReadGroupsResult);
+        
+        // NOTE(Dima): Reading groups regions
+        asset_file_group_region* Regions = PushArray(&AssetInitMem,
+                                                     asset_file_group_region,
+                                                     FileHeader.RegionsCount);
+        
+        Assert(FileHeader.GroupsRegionsByteOffset == sizeof(asset_file_header) + GroupsByteSize);
+        u32 RegionsByteSize = FileHeader.RegionsCount * sizeof(asset_file_group_region);
+        b32 ReadRegionsResult = Platform.FileOffsetRead(FileFullPath,
+                                                        FileHeader.GroupsRegionsByteOffset,
+                                                        RegionsByteSize,
+                                                        Regions);
+        Assert(ReadRegionsResult);
         
         // NOTE(Dima): Reading lines offsets
         u32 FileAssetCount = FileHeader.EffectiveAssetsCount;
@@ -456,10 +583,11 @@ void InitAssets(assets* Assets){
             
             // NOTE(Dima): Iterating through regions in file
             for(int RegionIndex = 0;
-                RegionIndex < FileGrp->Count;
+                RegionIndex < FileGrp->RegionCount;
                 RegionIndex++)
             {
-                asset_file_group_region* Reg = FileGrp->Regions + RegionIndex;
+                // NOTE(Dima): Getting right region from big file regions array
+                asset_file_group_region* Reg = Regions + FileGrp->FirstRegionIndex + RegionIndex;
                 
                 u32 FirstFileAssetIndex = Reg->FirstAssetIndex;
                 u32 OnePastLastFileAssetIndex = FirstFileAssetIndex + Reg->AssetCount;
@@ -489,6 +617,22 @@ void InitAssets(assets* Assets){
                     NewAsset->Header = AssetHeader;
                     NewAsset->FileSource = FileSource;
                     NewAsset->Type = AssetHeader.AssetType;
+                    NewAsset->TagCount = AssetHeader.TagCount;
+                    
+                    // NOTE(Dima): Reading tags
+                    if(AssetHeader.TagCount){
+                        u32 TagsSizeToRead = AssetHeader.TagCount * sizeof(asset_tag_header);
+                        if(TagsSizeToRead > sizeof(NewAsset->Tags)){
+                            TagsSizeToRead = sizeof(NewAsset->Tags);
+                            NewAsset->TagCount = MAX_TAGS_PER_ASSET;
+                        }
+                        
+                        b32 ReadTagsResult = Platform.FileOffsetRead(
+                            FileFullPath,
+                            LineOffset + AssetHeader.LineTagOffset,
+                            TagsSizeToRead,
+                            NewAsset->Tags);
+                    }
                     
                     DLIST_INSERT_BEFORE_SENTINEL(NewAsset, ToGroup->Sentinel, Next, Prev);
                     ToGroup->InGroupAssetCount++;
@@ -580,8 +724,6 @@ void InitAssets(assets* Assets){
                             Result->LeftBearingX = Src->LeftBearingX;
                         }break;
                     }
-                    
-                    //LoadAsset(Assets, NewAsset);
                 }
             }
         }
@@ -593,4 +735,22 @@ void InitAssets(assets* Assets){
     
     Free(&AssetInitMem);
     
+    // NOTE(Dima): Setting assets arrays
+    for(int GroupIndex = 0; 
+        GroupIndex < GameAsset_Count;
+        GroupIndex++)
+    {
+        asset_group* Group = &Assets->Groups[GroupIndex];
+        
+        Group->PointersToAssets = PushArray(Assets->Memory, 
+                                            asset*, 
+                                            Group->InGroupAssetCount);
+        
+        asset* At = Group->Sentinel.Next;
+        for(int Index = 0; Index < Group->InGroupAssetCount; Index++){
+            Group->PointersToAssets[Index] = At;
+            
+            At = At->Next;
+        }
+    }
 }

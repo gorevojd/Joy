@@ -650,7 +650,7 @@ void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
                 }
                 
                 glDisable(GL_DEPTH_TEST);
-                
+                //GlFreeMeshHandles(&Mesh->Handles);
             }break;
         }
         

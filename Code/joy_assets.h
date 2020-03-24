@@ -10,6 +10,7 @@
 #include "joy_platform.h"
 #include "joy_memory.h"
 #include "joy_engine.h"
+#include "joy_random.h"
 
 #include "joy_asset_ids.h"
 #include "joy_data_structures.h"
@@ -29,14 +30,22 @@ struct asset_file_source{
     asset_file_source* Prev;
 };
 
+#define MAX_TAGS_PER_ASSET 4
+
 struct asset{
     u32 ID;
     u32 Type;
     
     std::atomic_uint State;
     
+    asset_tag_header Tags[MAX_TAGS_PER_ASSET];
+    int TagCount;
+    
     // NOTE(Dima): Asset header
     asset_header Header;
+    
+    // NOTE(Dima): Find by tags context
+    float FindWeight;
     
     // NOTE(Dima): File asset source
     asset_file_source* FileSource;
@@ -77,6 +86,7 @@ struct asset_id_range{
 struct asset_group{
     int InGroupAssetCount;
     asset Sentinel;
+    asset** PointersToAssets;
 };
 
 #define MAX_ASSETS_IN_ASSET_BLOCK 4096
@@ -92,6 +102,8 @@ struct assets{
     mem_region* Memory;
     layered_mem LayeredMemory;
     task_data_pool LoadTasksPool;
+    
+    random_generation Random;
     
     Asset_Atlas MainLargeAtlas;
     
@@ -147,6 +159,12 @@ inline asset* GetAssetByID(assets* Assets, u32 ID){
 
 void InitAssets(assets* Assets);
 u32 GetFirst(assets* Assets, u32 Family);
+u32 GetRandom(assets* Assets, u32 Group);
+u32 GetBestByTags(assets* Assets, 
+                  u32 Group, 
+                  u32* TagTypes, 
+                  asset_tag_value* TagValues, 
+                  int TagsCount);
 void LoadAsset(assets* Assets, asset* Asset, b32 Immediate);
 
 #endif

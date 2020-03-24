@@ -19,6 +19,7 @@ game_asset_tag* AddTag(asset_system* System, u32 TagType);
 void AddFloatTag(asset_system* System, u32 TagType, float TagValue);
 void AddIntTag(asset_system* System, u32 TagType, int TagValue);
 void AddEmptyTag(asset_system* System, u32 TagType);
+void AddTagHubToAsset(asset_system* System, game_asset_tag_hub* TagHub);
 
 added_asset AddBitmapAsset(asset_system* System, 
                            char* Path, 

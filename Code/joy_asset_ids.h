@@ -115,23 +115,41 @@ struct asset_sound{
     int Channels;
 };
 
-#define MAX_TAGS_PER_ASSET 4
+union asset_tag_value {
+    float Value_Float;
+    int Value_Int;
+};
+
+enum asset_tag_value_type{
+    AssetTagValue_Empty,
+    AssetTagValue_Float,
+    AssetTagValue_Int,
+};
 
 struct asset_tag_header{
     u32 Type;
     
-    union {
-        float Value_Float;
-        int Value_Int;
-    };
+    u32 ValueType;
+    
+    asset_tag_value Value;
 };
 
+inline asset_tag_header TagHeader(u32 Type, u32 ValueType, asset_tag_value Value){
+    asset_tag_header Result;
+    
+    Result.Type = Type;
+    Result.ValueType = ValueType;
+    Result.Value = Value;
+    
+    return(Result);
+}
+
 struct asset_header{
-    asset_tag_header Tags[MAX_TAGS_PER_ASSET];
     u32 TagCount;
     
     u32 AssetType;
     
+    u32 LineTagOffset;
     u32 LineDataOffset;
     
     u32 TotalDataSize;
@@ -151,7 +169,7 @@ struct asset_header{
     };
 };
 
-#define ASSET_GROUP_REGIONS_COUNT 8
+//#define ASSET_GROUP_REGIONS_COUNT 8
 #define ASSET_FILE_VERSION_MAJOR 1
 #define ASSET_FILE_VERSION_MINOR 0
 
@@ -161,18 +179,14 @@ inline u32 GetVersionInt(int Major, int Minor){
     return(Result);
 }
 
-inline u32 GetLineOffsetForData(){
-    return(sizeof(asset_header));
-}
-
 struct asset_file_group_region{
     u32 FirstAssetIndex;
     u32 AssetCount;
 };
 
 struct asset_file_group{
-    asset_file_group_region Regions[ASSET_GROUP_REGIONS_COUNT];
-    int Count;
+    int FirstRegionIndex;
+    int RegionCount;
 };
 
 struct asset_file_header{
@@ -189,10 +203,18 @@ struct asset_file_header{
     */
     u32 GroupsCount;
     
+    /*
+    NOTE(Dima): Groups regions are written to file in one 
+    array. Each file group has first region index in that 
+    array and region count.
+    */
+    u32 RegionsCount;
+    
     // NOTE(Dima): Not counting zero asset
     u32 EffectiveAssetsCount;
     
     u32 GroupsByteOffset;
+    u32 GroupsRegionsByteOffset;
     u32 LinesOffsetsByteOffset;
     u32 AssetLinesByteOffset;
 };
@@ -206,6 +228,7 @@ enum asset_tag_type{
     AssetTag_FontType,
     AssetTag_LOD,
     AssetTag_Counter,
+    AssetTag_Size,
 };
 
 struct asset_tag{
@@ -218,27 +241,45 @@ struct asset_tag{
 };
 
 enum asset_group_type{
+    // NOTE(Dima): Bitmap array
     GameAsset_FadeoutBmps,
     
+    // NOTE(Dima): Icons for GUI
     GameAsset_CheckboxMark,
     GameAsset_ChamomileIcon,
     
+    // NOTE(Dima): Generated sounds
     GameAsset_SineTest,
     
+    // NOTE(Dima): Mesh primitives
     GameAsset_Cube,
     GameAsset_Plane,
     GameAsset_Sphere,
     GameAsset_Cylynder,
     
+    // NOTE(Dima): Meshes
+    GameAsset_Bathroom,
+    GameAsset_Heart,
+    GameAsset_KindPlane,
+    GameAsset_Podkova,
+    GameAsset_RubbishBin,
+    GameAsset_Snowman,
+    GameAsset_Stool,
+    GameAsset_Toilet,
+    GameAsset_Vase,
+    
+    // NOTE(Dima): Fonts
     GameAsset_LiberationMono,
     GameAsset_LilitaOne,
     GameAsset_Inconsolata,
     GameAsset_PFDIN,
     GameAsset_MollyJackFont,
     
+    // NOTE(Dima): Typed assets
     GameAsset_Type_Bitmap,
     GameAsset_Type_Font,
     GameAsset_Type_Glyph,
+    GameAsset_Type_Mesh,
     
     GameAsset_Count,
 };

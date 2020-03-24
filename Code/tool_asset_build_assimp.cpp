@@ -1,6 +1,51 @@
 #include "tool_asset_build_assimp.h"
 
-void LoadModelByASSIMP(char* FileName, u32 Flags) {
+/*
+This function should return the first index of Type textures that
+were pushed in array
+*/
+INTERNAL_FUNCTION int AiLoadMatTexturesForType(loaded_model* Model,
+                                               loaded_mat* OurMat,
+                                               loading_context* Ctx,
+                                               aiMaterial* Mat,
+                                               aiTextureType Type)
+{
+    int Result = -1;
+    
+    for(int TextureIndex = 0;
+        TextureIndex < Mat->GetTextureCount(Type);
+        TextureIndex++)
+    {
+        aiString TexturePath;
+        Mat->GetTexture(Type, TextureIndex, &TexturePath);
+        // TODO(Dima): Make sure that this is correct
+        std::string TexturePathNew(TexturePath.C_Str());
+        
+        auto* Mapping = &Ctx->PathToTextureMap;
+        
+        b32 NotLoaded = (Mapping->find(TexturePathNew) == Mapping->end());
+        if(NotLoaded){
+            loaded_mat_texture Tex;
+            Tex.Bmp = LoadBMP((char*)TexturePathNew.c_str());
+            Tex.AiType = Type;
+            
+            Mapping->insert(std::make_pair(TexturePathNew, Tex));
+        }
+        
+        // NOTE(Dima): If this is the first texture of type 
+        // NOTE(Dima): than return it
+        if(TextureIndex == 0){
+            Result = OurMat->BmpArray.size();
+        }
+        OurMat->BmpArray.push_back(TexturePathNew);
+    }
+    
+    return(Result);
+}
+
+loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, loading_context* LoadingCtx)
+{
+    loaded_model Result = {};
     
 	Assimp::Importer importer;
     
@@ -46,6 +91,29 @@ void LoadModelByASSIMP(char* FileName, u32 Flags) {
 		printf("Error while reading %s by ASSIMP\n", FileName);
 	}
     
+    //NOTE(Dima): Loading materials
+    for(int MatIndex = 0; MatIndex < scene->mNumMaterials;MatIndex++){
+        aiMaterial* AssimpMaterial = scene->mMaterials[MatIndex];
+        
+        loaded_mat NewMaterial = {};
+        
+        // NOTE(Dima): Loading textures for supported Assimp textures types
+        for(int TTypeIndex = 0;
+            TTypeIndex < ARRAY_COUNT(SupportedTexturesTypes);
+            TTypeIndex++)
+        {
+            NewMaterial.FirstIDInArray[TTypeIndex] = AiLoadMatTexturesForType(
+                &Result, 
+                &NewMaterial,
+                LoadingCtx, 
+                AssimpMaterial, 
+                SupportedTexturesTypes[TTypeIndex]);
+        }
+        
+        Result.Materials.push_back(NewMaterial);
+    }
+    
+    // NOTE(Dima): Loading meshes
 	int NumMeshes = scene->mNumMeshes;
 	for (int MeshIndex = 0; MeshIndex < NumMeshes; MeshIndex++) {
 		aiMesh* AssimpMesh = scene->mMeshes[MeshIndex];
@@ -105,7 +173,6 @@ void LoadModelByASSIMP(char* FileName, u32 Flags) {
 			Normals.push_back(N);
 		}
         
-		//TODO: Further processing of the meshes
 		tool_mesh_info Mesh = MakeMesh(
 			Vertices,
 			TexCoords,
@@ -115,7 +182,116 @@ void LoadModelByASSIMP(char* FileName, u32 Flags) {
 			Indices,
 			JoyShouldCalculateNormals,
 			JoyShouldCalculateTangents);
-	}
+        
+        Result.Meshes.push_back(Mesh);
+    }
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION void StoreLoadingContext(asset_system* System, 
+                                           loading_context* LoadingCtx)
+{
+    BeginAsset(System, GameAsset_Type_Bitmap);
+    
+    u32 FirstBmpID = 0;
+    int Index = 0;
+    for(auto it: LoadingCtx->PathToTextureMap){
+        added_asset Added = AddBitmapAssetManual(System, &it.second.Bmp);
+        
+        if(Index = 0){
+            FirstBmpID = Added.ID;
+        }
+    }
+    EndAsset(System);
+}
+
+INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
+                                       u32 AssetGroupID,
+                                       loaded_model* Model)
+{
+    BeginAsset(System, GameAsset_Type_Mesh);
+    for(auto it: Model->Meshes){
+        AddMeshAsset(System, &it);
+    }
+    EndAsset(System);
+    
+    BeginAsset(System, AssetGroupID);
+    
+    EndAsset(System);
+}
+
+INTERNAL_FUNCTION void WriteMeshes1(){
+    asset_system System_ = {};
+    asset_system* System = &System_;
+    InitAssetFile(System);
+    
+    loading_context LoadCtx = {};
+    
+    u32 DefaultFlags = 
+        AssimpLoadMesh_GenerateNormals |
+        AssimpLoadMesh_GenerateTangents;
+    // NOTE(Dima): Here load all models
+    
+    loaded_model BathroomModel = LoadModelByASSIMP(
+        "../Data/Models/Bathroom.fbx", 
+        DefaultFlags,
+        &LoadCtx);
+    
+    loaded_model HeartModel = LoadModelByASSIMP(
+        "../Data/Models/Heart.fbx",
+        DefaultFlags,
+        &LoadCtx);
+    
+    loaded_model KindPlaneModel = LoadModelByASSIMP(
+        "../Data/Models/KindPlane.fbx",
+        DefaultFlags, 
+        &LoadCtx);
+    
+    loaded_model PodkovaModel = LoadModelByASSIMP(
+        "../Data/Models/Podkova.fbx", DefaultFlags, 
+        &LoadCtx);
+    
+    loaded_model RBinBigModel = LoadModelByASSIMP(
+        "../Data/Models/RubbishBin.fbx", 
+        DefaultFlags, 
+        &LoadCtx);
+    
+    loaded_model SnowmanModel = LoadModelByASSIMP(
+        "../Data/Models/snowman.fbx", 
+        DefaultFlags, 
+        &LoadCtx);
+    
+    loaded_model StoolModel = LoadModelByASSIMP(
+        "../Data/Models/stool.fbx", 
+        DefaultFlags, 
+        &LoadCtx);
+    
+    loaded_model ToiletModel = LoadModelByASSIMP(
+        "../Data/Models/toilet.fbx", 
+        DefaultFlags, 
+        &LoadCtx);
+    
+    loaded_model VaseModel1 = LoadModelByASSIMP(
+        "../Data/Models/vaza1.fbx",
+        DefaultFlags,
+        &LoadCtx);
+    
+    // NOTE(Dima): Storing loading context
+    StoreLoadingContext(System, &LoadCtx);
+    
+    // NOTE(Dima): Here store all models in asset file
+    StoreModelAsset(System, GameAsset_Stool, &StoolModel);
+    StoreModelAsset(System, GameAsset_Bathroom, &BathroomModel);
+    StoreModelAsset(System, GameAsset_Heart, &HeartModel);
+    StoreModelAsset(System, GameAsset_KindPlane, &KindPlaneModel);
+    StoreModelAsset(System, GameAsset_Podkova, &PodkovaModel);
+    StoreModelAsset(System, GameAsset_RubbishBin, &RBinBigModel);
+    StoreModelAsset(System, GameAsset_Snowman, &SnowmanModel);
+    StoreModelAsset(System, GameAsset_Toilet, &ToiletModel);
+    StoreModelAsset(System, GameAsset_Vase, &VaseModel1);
+    
+    WriteAssetFile(System, "../Data/AssimpMeshes1.ja");
 }
 
 int main(int ArgsCount, char** Args){

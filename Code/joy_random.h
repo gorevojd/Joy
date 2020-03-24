@@ -549,21 +549,42 @@ XORShift32(random_generation* Gen) {
 	return(x);
 }
 
-inline float RandomUni(random_generation* Gen){
+inline u32 GetNextRandomFromTable(random_generation* Gen){
     u32 RandFromTable = RandomNumberTable[Gen->ArrayIndex % ArrayCount(RandomNumberTable)];
     
     ++Gen->ArrayIndex;
     
-    float Result = 
-		((float)RandFromTable - (float)MIN_RANDOM_NUMBER) * RANDOM_ONE_OVER_RANGE;
+    return(RandFromTable);
+}
+
+inline int GetRandomBetween(random_generation* Gen, int Min, int MaxIncl){
+    int Range = MaxIncl - Min + 1;
     
-	return(Result);
+    u32 RandFromTable = GetNextRandomFromTable(Gen);
+    int InRangeRand = RandFromTable % Range;
+    
+    return(Min + InRangeRand);
+}
+
+inline int GetRandomIndex(random_generation* Gen, int Count){
+    int Result = GetRandomBetween(Gen, 0, Count - 1);
+    
+    return(Result);
+}
+
+inline float RandomUni(random_generation* Gen){
+    u32 RandFromTable = GetNextRandomFromTable(Gen);
+    
+    float Result = 
+        ((float)RandFromTable - (float)MIN_RANDOM_NUMBER) * RANDOM_ONE_OVER_RANGE;
+    
+    return(Result);
 }
 
 inline float RandomBi(random_generation* Gen){
     float Result = RandomUni(Gen) * 2.0f - 1.0f;
     
-	return(Result);
+    return(Result);
 }
 
 inline float RandomUni(){

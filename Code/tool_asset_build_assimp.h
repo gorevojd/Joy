@@ -8,11 +8,48 @@
 #include <iostream>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <map>
+#include <string>
 
 #include <assimp/Importer.hpp>      // C++ importer interface
 #include <assimp/scene.h>           // Output data structure
 #include <assimp/postprocess.h>     // Post processing flags
+
+
+GLOBAL_VARIABLE aiTextureType SupportedTexturesTypes[] = {
+    aiTextureType_DIFFUSE,
+    aiTextureType_SPECULAR,
+    aiTextureType_AMBIENT,
+    aiTextureType_EMISSIVE,
+    aiTextureType_HEIGHT,
+    aiTextureType_NORMALS,
+    aiTextureType_SHININESS,
+    aiTextureType_OPACITY,
+    aiTextureType_DISPLACEMENT,
+    aiTextureType_LIGHTMAP,
+    aiTextureType_REFLECTION,
+};
+
+struct loaded_mat_texture{
+    aiTextureType AiType;
+    tool_bmp_info Bmp;
+};
+
+struct loaded_mat{
+    int FirstIDInArray[ArrayCount(SupportedTexturesTypes)];
+    
+    /*
+    I store here an array of paths to textures.
+    FirstIDInArray serves as mapping to get first ID texture
+    of specific texture type
+    */
+    std::vector<std::string> BmpArray;
+};
+
+struct loading_context{
+    std::unordered_map<std::string, loaded_mat_texture> PathToTextureMap;
+};
 
 inline m44 Assimp2JoyMatrix(const aiMatrix4x4& AssimpMatrix) {
 	m44 Result = {};
@@ -71,6 +108,11 @@ enum assimp_load_mesh_flags {
 	AssimpLoadMesh_GenerateNormals = 1,
 	AssimpLoadMesh_GenerateTangents = 2,
 	AssimpLoadMesh_GenerateSmoothNormals = 4,
+};
+
+struct loaded_model{
+    std::vector<tool_mesh_info> Meshes;
+    std::vector<loaded_mat> Materials;
 };
 
 #endif

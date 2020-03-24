@@ -126,12 +126,13 @@ struct test_game_mode_state{
 
 INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
                                                render_stack* Stack,
-                                               sphere_distribution* Distr, 
+                                               sphere_distribution* Distr,
+                                               u32 SphereID,
                                                v3 SphereCenter, 
                                                float SphereRad)
 {
     PushOrLoadMesh(Game->Assets, Stack, 
-                   GetFirst(Game->Assets, GameAsset_Sphere), 
+                   SphereID, 
                    SphereCenter, 
                    QuatI(), 
                    V3(SphereRad * 2.0f),
@@ -231,7 +232,7 @@ GAME_MODE_UPDATE(TestUpdate){
                         Width,
                         Height);
     
-    PushClearColor(Stack, V3(1.0f, 0.5f, 0.0f));
+    PushClearColor(Stack, V3(0.1f, 0.3f, 0.9f));
     
     char CameraInfo[256];
     stbsp_sprintf(CameraInfo, "P(x%.3f; y%.3f; z%.3f)", 
@@ -260,6 +261,47 @@ GAME_MODE_UPDATE(TestUpdate){
         GuiText(Game->Gui, "Right");
     }
     
+    static float FindSphereQuality = 0.5f;
+    GuiSliderFloat(Game->Gui, 
+                   &FindSphereQuality, 
+                   0.0f, 1.0f,
+                   "LOD");
+    
+    u32 FindTagTypes[1] = {AssetTag_LOD};
+    asset_tag_value FindTagValues[1] = {FindSphereQuality};
+    
+    u32 SphereID = GetBestByTags(Game->Assets,
+                                 GameAsset_Sphere,
+                                 FindTagTypes,
+                                 FindTagValues,
+                                 1);
+    
+    u32 CylID = GetBestByTags(Game->Assets,
+                              GameAsset_Cylynder,
+                              FindTagTypes,
+                              FindTagValues,
+                              1);
+    
+    int SphereLayers = 2;
+    int SphereLayerCount = 2;
+    v3 SphereStartP = V3(0.0f, 1.0f, -15.0f);
+    for(int LayerIndex = 0; LayerIndex < SphereLayers; LayerIndex++){
+        for(int InLayerIndex = 0;
+            InLayerIndex < SphereLayerCount;
+            InLayerIndex++)
+        {
+            v3 SphereP = SphereStartP + 
+                V3(0.0f, 1.2f, 0.0f) * LayerIndex + 
+                V3(1.2f, 0.0f, 0.0f) * InLayerIndex;
+            
+            
+            PushOrLoadMesh(Game->Assets, Stack, 
+                           SphereID,
+                           SphereP, QuatI(), V3(1.0f),
+                           ASSET_LOAD_DEFERRED);
+        }
+    }
+    
     PushOrLoadMesh(Game->Assets, Stack, 
                    GetFirst(Game->Assets, GameAsset_Cube),
                    V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
@@ -273,13 +315,21 @@ GAME_MODE_UPDATE(TestUpdate){
                    ASSET_LOAD_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Stack, 
-                   GetFirst(Game->Assets, GameAsset_Cylynder),
+                   CylID,
                    V3(-10.0f, 1.0f, 0.0f), 
                    Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), V3(2.0f),
                    ASSET_LOAD_DEFERRED);
     
+    
     PushOrLoadMesh(Game->Assets, Stack, 
-                   GetFirst(Game->Assets, GameAsset_Sphere),V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
+                   GetFirst(Game->Assets, GameAsset_Cylynder),
+                   V3(-13.0f, 1.0f, 0.0f),
+                   Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), 
+                   V3(1.0f), 
+                   ASSET_LOAD_DEFERRED);
+    
+    PushOrLoadMesh(Game->Assets, Stack, 
+                   SphereID,V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
                    QuatI(), V3(1.0f),
                    ASSET_LOAD_DEFERRED);
     
@@ -289,15 +339,20 @@ GAME_MODE_UPDATE(TestUpdate){
                    QuatI(), V3(100.0f),
                    ASSET_LOAD_DEFERRED);
     
+#if 0    
     ShowSphereDistributions(Game, Stack,
                             &State->SphereDistributionTrig,
+                            SphereID,
                             V3(0.0f, 10.0f, 0.0f),
                             2.0f);
     
     ShowSphereDistributions(Game, Stack,
                             &State->SphereDistributionFib,
+                            SphereID,
                             V3(10.0f, 10.0f, 0.0f),
                             2.0f);
+#endif
+    
 }
 
 // NOTE(Dima): MAIN MENU GAME MODE

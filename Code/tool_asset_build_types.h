@@ -4,6 +4,8 @@
 #include "joy_asset_ids.h"
 #include "joy_math.h"
 
+#include <vector>
+
 #define Assert(cond) if(!(cond)){ *((int*)0) = 0;}
 #define ASSERT(cond) if(!(cond)){ *((int*)0) = 0;}
 
@@ -145,18 +147,18 @@ struct game_asset_group_region {
 };
 
 struct game_asset_group{
-    game_asset_group_region Regions[ASSET_GROUP_REGIONS_COUNT];
-    int RegionsCount;
+    std::vector<game_asset_group_region> Regions;
 };
 
 enum game_asset_tag_value_type{
+    GameAssetTagValue_Empty,
     GameAssetTagValue_Float,
     GameAssetTagValue_Int,
-    GameAssetTagValue_Empty,
 };
 
 struct game_asset_tag {
 	u32 Type;
+    u32 ValueType;
     
     u32 InTagArrayIndex;
     
@@ -168,16 +170,15 @@ struct game_asset_tag {
 
 struct game_asset_tag_hub{
     public:
-    game_asset_tag Tags[MAX_TAGS_PER_ASSET];
-	u32 TagValueTypes[MAX_TAGS_PER_ASSET];
-    int TagCount;
+    std::vector<game_asset_tag> Tags;
+    std::vector<u32> TagValueTypes;
     
     private:
     game_asset_tag* FindTag(u32 TagType){
         game_asset_tag* Result = 0;
         
         for (int TagIndex = 0;
-             TagIndex < TagCount;
+             TagIndex < Tags.size();
              TagIndex++)
         {
             game_asset_tag* Tag = &Tags[TagIndex];
@@ -190,15 +191,19 @@ struct game_asset_tag_hub{
         return(Result);
     }
     
-    game_asset_tag* AddTag(u32 TagType){
+    game_asset_tag* AddTag(u32 TagType, u32 ValueType){
         game_asset_tag* Result = FindTag(TagType);
         
-        if(!Result && (TagCount < MAX_TAGS_PER_ASSET - 1)){
-            int ResultIndex = TagCount++;
-            Result = &Tags[ResultIndex];
-            Result->Type = TagType;
-            Result->InTagArrayIndex = ResultIndex;
-        }
+        game_asset_tag NewTag;
+        
+        NewTag.Type = TagType;
+        NewTag.InTagArrayIndex = Tags.size();
+        NewTag.ValueType = ValueType;
+        
+        Tags.push_back(NewTag);
+        TagValueTypes.push_back({});
+        
+        Result = &Tags[Tags.size() - 1];
         
         return(Result);
     }
@@ -211,7 +216,7 @@ struct game_asset_tag_hub{
     }
     
     game_asset_tag_hub& AddIntTag(u32 TagType, int Value){
-        game_asset_tag* Tag = AddTag(TagType);
+        game_asset_tag* Tag = AddTag(TagType, GameAssetTagValue_Int);
         
         if(Tag){
             TagValueTypes[Tag->InTagArrayIndex] = GameAssetTagValue_Int;
@@ -222,7 +227,7 @@ struct game_asset_tag_hub{
     }
     
     game_asset_tag_hub& AddFloatTag(u32 TagType, float Value){
-        game_asset_tag* Tag = AddTag(TagType);
+        game_asset_tag* Tag = AddTag(TagType, GameAssetTagValue_Float);
         
         if(Tag){
             TagValueTypes[Tag->InTagArrayIndex] = GameAssetTagValue_Float;
@@ -233,7 +238,7 @@ struct game_asset_tag_hub{
     }
     
     game_asset_tag_hub& AddEmptyTag(u32 TagType){
-        game_asset_tag* Tag = AddTag(TagType);
+        game_asset_tag* Tag = AddTag(TagType, GameAssetTagValue_Empty);
         
         if(Tag){
             TagValueTypes[Tag->InTagArrayIndex] = GameAssetTagValue_Empty;
@@ -249,8 +254,7 @@ struct game_asset {
     
 	u32 Type;
     
-	game_asset_tag Tags[MAX_TAGS_PER_ASSET];
-	int TagCount;
+	std::vector<game_asset_tag> Tags;
     
 	union {
 		tool_bmp_info* Bitmap;

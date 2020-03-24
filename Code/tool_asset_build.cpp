@@ -4,130 +4,51 @@
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
 
-INTERNAL_FUNCTION void WriteFontsChunk(tool_font_info** Fonts,
-                                       u32* FontsGroups,
-                                       game_asset_tag_hub* FontsTags,
-                                       int FontsCount, 
-                                       int ChunkIndex)
+INTERNAL_FUNCTION void StoreFontAsset(asset_system* System, 
+                                      u32 GameAssetGroup,
+                                      tool_font_info* Font, 
+                                      game_asset_tag_hub* TagHub)
 {
+    // NOTE(Dima): Adding glyphs
+    BeginAsset(System, GameAsset_Type_Glyph);
+    for (int GlyphIndex = 0;
+         GlyphIndex < Font->GlyphCount;
+         GlyphIndex++)
+    {
+        added_asset AddedGlyphAsset = AddGlyphAsset(System, &Font->Glyphs[GlyphIndex]);
+        
+        Font->GlyphIDs[GlyphIndex] = AddedGlyphAsset.ID;
+    }
+    EndAsset(System);
+    
+    BeginAsset(System, GameAssetGroup);
+    AddFontAsset(System, Font);
+    AddTagHubToAsset(System, TagHub);
+    EndAsset(System);
+}
+
+INTERNAL_FUNCTION void WriteFonts(){
     asset_system System_ = {};
     asset_system* System = &System_;
     InitAssetFile(System);
     
-    // NOTE(Dima): Adding glyphs
-    BeginAsset(System, GameAsset_Type_Glyph);
-    for (int FontIndex = 0;
-         FontIndex < FontsCount;
-         FontIndex++)
-    {
-        tool_font_info* Font = Fonts[FontIndex];
-        
-        for (int GlyphIndex = 0;
-             GlyphIndex < Font->GlyphCount;
-             GlyphIndex++)
-        {
-            added_asset AddedGlyphAsset = AddGlyphAsset(System, &Font->Glyphs[GlyphIndex]);
-            
-            Font->GlyphIDs[GlyphIndex] = AddedGlyphAsset.ID;
-        }
-    }
-    EndAsset(System);
-    
-    // NOTE(Dima): Adding fonts
-    for (int FontIndex = 0;
-         FontIndex < FontsCount;
-         FontIndex++)
-    {
-        tool_font_info* Font = Fonts[FontIndex];
-        game_asset_tag_hub* TagHub = FontsTags + FontIndex;
-        
-        BeginAsset(System, FontsGroups[FontIndex]);
-        // NOTE(Dima): Adding font asset
-        AddFontAsset(System, Font);
-        // NOTE(Dima): Adding font tags
-        for(int TagIndex = 0; 
-            TagIndex < TagHub->TagCount;
-            TagIndex++)
-        {
-            game_asset_tag* Tag = TagHub->Tags + TagIndex;
-            
-            switch(TagHub->TagValueTypes[TagIndex]){
-                case GameAssetTagValue_Float:{
-                    AddFloatTag(System, Tag->Type, Tag->Value_Float);
-                }break;
-                
-                case GameAssetTagValue_Int:{
-                    AddIntTag(System, Tag->Type, Tag->Value_Int);
-                }break;
-                
-                case GameAssetTagValue_Empty:{
-                    AddEmptyTag(System, Tag->Type);
-                }break;
-            }
-        }
-        EndAsset(System);
-    }
-    
-    // NOTE(Dima): Writing file
-    char OutFileName[256];
-    stbsp_sprintf(OutFileName, "../Data/Fonts%d.ja", ChunkIndex);
-    
-    WriteAssetFile(System, OutFileName);
-}
-
-INTERNAL_FUNCTION void WriteFonts(){
     tool_font_info LibMono = LoadFont("../Data/Fonts/LiberationMono-Regular.ttf", 16.0f, LoadFont_BakeShadow);
     tool_font_info Lilita = LoadFont("../Data/Fonts/LilitaOne.ttf", 20.0f, LoadFont_BakeShadow);
     tool_font_info Inconsolata = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 16.0f, LoadFont_BakeBlur);
     tool_font_info PFDIN = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 16.0f, LoadFont_BakeBlur);
     tool_font_info MollyJack = LoadFont("../Data/Fonts/MollyJack.otf", 40.0f, LoadFont_BakeBlur);
     
-    tool_font_info* Fonts[] = {
-        &LibMono,
-        &Lilita,
-        &Inconsolata,
-        &PFDIN,
-        &MollyJack,
-    };
+    game_asset_tag_hub HubRegular = game_asset_tag_hub::Empty().AddIntTag(AssetTag_FontType, AssetFontTypeTag_Regular);
+    game_asset_tag_hub HubBold = game_asset_tag_hub::Empty().AddIntTag(AssetTag_FontType, AssetFontTypeTag_Bold);
     
-    u32 Groups[] = {
-        GameAsset_LiberationMono,
-        GameAsset_LilitaOne,
-        GameAsset_Inconsolata,
-        GameAsset_PFDIN,
-        GameAsset_MollyJackFont,
-    };
+    StoreFontAsset(System, GameAsset_LiberationMono, &LibMono, &HubRegular);
+    StoreFontAsset(System, GameAsset_LilitaOne, &Lilita, &HubRegular);
+    StoreFontAsset(System, GameAsset_Inconsolata, &Inconsolata, &HubBold);
+    StoreFontAsset(System, GameAsset_PFDIN, &PFDIN, &HubRegular);
+    StoreFontAsset(System, GameAsset_MollyJackFont, &MollyJack, &HubRegular);
     
-    game_asset_tag_hub Tags[] = {
-        game_asset_tag_hub::Empty().AddIntTag(AssetTag_FontType, AssetFontTypeTag_Regular),
-        game_asset_tag_hub::Empty().AddIntTag(AssetTag_FontType, AssetFontTypeTag_Regular),
-        game_asset_tag_hub::Empty().AddIntTag(AssetTag_FontType, AssetFontTypeTag_Bold),
-        game_asset_tag_hub::Empty().AddIntTag(AssetTag_FontType, AssetFontTypeTag_Regular),
-        game_asset_tag_hub::Empty().AddIntTag(AssetTag_FontType, AssetFontTypeTag_Regular),
-    };
-    
-    int FontCount = ArrayCount(Fonts);
-    
-    int ChunkIndex = 0;
-    for(int FontIndex = 0;
-        FontIndex < FontCount;
-        FontIndex += ASSET_GROUP_REGIONS_COUNT,
-        ChunkIndex++)
-    {
-        tool_font_info** CurFontsChunk = &Fonts[FontIndex];
-        u32 * CurChunkGroups = Groups + FontIndex;
-        game_asset_tag_hub* CurChunkTagHub = Tags + FontIndex;
-        
-        int CurChunkSize = Min(FontCount - FontIndex, ASSET_GROUP_REGIONS_COUNT);
-        
-        if(CurChunkSize){
-            WriteFontsChunk(CurFontsChunk, 
-                            CurChunkGroups,
-                            CurChunkTagHub,
-                            CurChunkSize, 
-                            ChunkIndex);
-        }
-    }
+    // NOTE(Dima): Writing file
+    WriteAssetFile(System, "../Data/Fonts.ja");
 }
 
 INTERNAL_FUNCTION void WriteIcons(){
