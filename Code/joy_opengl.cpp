@@ -218,19 +218,19 @@ INTERNAL_FUNCTION inline void GlBindBufferAndFill(GLenum Target, GLenum Usage,
                                                   void* Data, size_t DataSize,
                                                   GLuint BufferName)
 {
+    glBindBuffer(Target, BufferName);
+    
     GLint CurrentBufSize;
     glGetBufferParameteriv(Target, 
                            GL_BUFFER_SIZE,
                            &CurrentBufSize);
     
-    glBindBuffer(Target, BufferName);
     if(DataSize > CurrentBufSize){
         // NOTE(Dima): Reallocating or initializing at the first time
-        glBufferData(Target, DataSize, Data, Usage);
+        glBufferData(Target, DataSize + Kilobytes(20), 0, Usage);
     }
-    else{
-        glBufferSubData(Target, 0, DataSize, Data);
-    }
+    
+    glBufferSubData(Target, 0, DataSize, Data);
 }
 
 INTERNAL_FUNCTION GLuint GlAllocateTexture(bmp_info* bmp){
@@ -307,6 +307,8 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
         
         GLuint VAO, VBO, EBO;
         
+        GLenum Err = glGetError();
+        
         glGenVertexArrays(1, &VAO);
         glGenBuffers(1, &VBO);
         glGenBuffers(1, &EBO);
@@ -331,6 +333,7 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
                             Mesh->IndicesCount * sizeof(u32),
                             EBO);
         
+        Err = glGetError();
         
         if(GlArrayIsValid(GL->SimpleShader.PAttrLoc)){
             glEnableVertexAttribArray(GL->SimpleShader.PAttrLoc);
@@ -367,12 +370,16 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
                                   Stride, GLGETOFFSET(11));
         }
         
+        Err = glGetError();
+        
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
         
         GlAddMeshHandle(Result, MeshHandle_VertexArray, VAO);
         GlAddMeshHandle(Result, MeshHandle_Buffer, VBO);
         GlAddMeshHandle(Result, MeshHandle_Buffer, EBO);
+        
+        Err = glGetError();
         
         Result->Allocated = JOY_TRUE;
     }
@@ -752,7 +759,6 @@ void GlOutputRender(gl_state* GL, render_state* Render){
         
         glBindVertexArray(GL->GuiGeomVAO);
         
-#if DEFERRED_GUI_GEOMETRY_RENDERING
 #if 1
         for(int ChunkIndex = 0;
             ChunkIndex < Render->GuiGeom.CurChunkIndex;
@@ -781,7 +787,6 @@ void GlOutputRender(gl_state* GL, render_state* Render){
         }
 #elif
         glDrawElements(GL_TRIANGLES, Render->GuiGeom.IndicesCount, GL_UNSIGNED_INT, 0);
-#endif
 #endif
         
         

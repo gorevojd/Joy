@@ -282,8 +282,8 @@ GAME_MODE_UPDATE(TestUpdate){
                               FindTagValues,
                               1);
     
-    int SphereLayers = 2;
-    int SphereLayerCount = 2;
+    int SphereLayers = 10;
+    int SphereLayerCount = 10;
     v3 SphereStartP = V3(0.0f, 1.0f, -15.0f);
     for(int LayerIndex = 0; LayerIndex < SphereLayers; LayerIndex++){
         for(int InLayerIndex = 0;
@@ -339,7 +339,6 @@ GAME_MODE_UPDATE(TestUpdate){
                    QuatI(), V3(100.0f),
                    ASSET_LOAD_DEFERRED);
     
-#if 0    
     ShowSphereDistributions(Game, Stack,
                             &State->SphereDistributionTrig,
                             SphereID,
@@ -351,8 +350,6 @@ GAME_MODE_UPDATE(TestUpdate){
                             SphereID,
                             V3(10.0f, 10.0f, 0.0f),
                             2.0f);
-#endif
-    
 }
 
 // NOTE(Dima): MAIN MENU GAME MODE

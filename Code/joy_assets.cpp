@@ -383,7 +383,6 @@ void LoadAsset(assets* Assets, asset* Asset, b32 Immediate){
                 // TODO(Dima): Change this
                 void* Data = malloc(DataSize);
                 
-                
                 CallbackData->Assets = Assets;
                 CallbackData->Asset = Asset;
                 CallbackData->LoadDest = Data;
