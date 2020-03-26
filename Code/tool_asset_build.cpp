@@ -99,7 +99,7 @@ INTERNAL_FUNCTION void WriteBitmapArray(){
     
     // NOTE(Dima): adding bitmap array
     BeginAsset(System, GameAsset_FadeoutBmps);
-    AddBitmapArray(System, FirstBitmapID, BitmapCount);
+    AddArrayAsset(System, FirstBitmapID, BitmapCount);
     EndAsset(System);
     
     WriteAssetFile(System, "../Data/BitmapsArray.ja");

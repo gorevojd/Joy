@@ -203,8 +203,12 @@ added_asset AddSoundAsset(asset_system* System,
 {
     added_asset Added = AddAsset(System, AssetType_Sound);
     
-    // NOTE(Dima): Setting source
+    
+    asset_header* FileHeader = Added.FileHeader;
     game_asset_source* Source = Added.Source;
+    
+    // NOTE(Dima): Setting source
+    
     Source->SoundSource.Path = Path;
     Source->SoundSource.Sound = 0;
     
@@ -216,8 +220,10 @@ added_asset AddSoundAssetManual(asset_system* System,
 {
     added_asset Added = AddAsset(System, AssetType_Sound);
     
-    // NOTE(Dima): Setting source
+    asset_header* FileHeader = Added.FileHeader;
     game_asset_source* Source = Added.Source;
+    
+    // NOTE(Dima): Setting source
     Source->SoundSource.Sound = Sound;
     Source->SoundSource.Path = 0;
     
@@ -376,16 +382,16 @@ added_asset AddGlyphAsset(asset_system* System,
     return(Result);
 }
 
-added_asset AddBitmapArray(asset_system* System, 
-                           u32 FirstBitmapID, 
-                           int Count)
+added_asset AddArrayAsset(asset_system* System, 
+                          u32 FirstID, 
+                          int Count)
 {
-    added_asset Added = AddAsset(System, AssetType_BitmapArray);
+    added_asset Added = AddAsset(System, AssetType_Array);
     
     asset_header* Header = Added.FileHeader;
     
-    Header->BmpArray.Count = Count;
-    Header->BmpArray.FirstBmpID = FirstBitmapID;
+    Header->Array.Count = Count;
+    Header->Array.FirstID = FirstID;
     
     return(Added);
 }
@@ -573,8 +579,13 @@ And forming group regions that are about to be written
                     Header->Sound.SamplesPerSec = Asset->Sound->SamplesPerSec;
                     Header->Sound.Channels = Asset->Sound->Channels;
                     
+                    u32 SamplesOfChannelSize = Asset->Sound->SampleCount * sizeof(i16);
+                    
+                    Header->Sound.DataOffsetToLeftChannel = 0;
+                    Header->Sound.DataOffsetToRightChannel = SamplesOfChannelSize;
+                    
                     // NOTE(Dima): Setting data size
-                    DataByteSize = Asset->Sound->SampleCount * Asset->Sound->Channels * sizeof(i16);
+                    DataByteSize = SamplesOfChannelSize * Asset->Sound->Channels;
                 }break;
                 
                 case AssetType_Font: {
@@ -800,6 +811,18 @@ And forming group regions that are about to be written
         fwrite(
             (u8*)FileData + GroupsRegionsByteOffset + GroupsRegionsSize, 
             AssetLinesBytesWritten, 1, fp);
+        
+        // NOTE(Dima): This should be done at the end
+        fseek(fp, 0, SEEK_END);
+        u32 ResultFileSizeKb = ftell(fp) / 1000;
+        int ResultAssetsCount = Header->EffectiveAssetsCount;
+        
+        printf("%s written. Total %ukb, %d assets\n", 
+               FileName, 
+               ResultFileSizeKb, 
+               ResultAssetsCount);
+        
+        fclose(fp);
     }
     else {
         INVALID_CODE_PATH;
@@ -811,5 +834,4 @@ And forming group regions that are about to be written
     
     free(AssetsLinesOffsets);
     
-    printf("File %s has been written...\n", FileName);
 }

@@ -374,9 +374,9 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     
     asset_id ArrID = GetFirst(Game->Assets, GameAsset_FadeoutBmps);
     asset* Asset = GetAssetByID(Game->Assets, ArrID);
-    ASSERT(Asset->Type == AssetType_BitmapArray);
+    ASSERT(Asset->Type == AssetType_Array);
     
-    bmp_array_info* Arr = GET_ASSET_PTR_MEMBER(Asset, bmp_array_info);
+    array_info* Arr = GET_ASSET_PTR_MEMBER(Asset, array_info);
     
     render_pass* Pass = BeginRenderPass(Game->Render);
     render_stack* Stack = RenderFindStack(Game->Render, "Main");

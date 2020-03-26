@@ -267,9 +267,9 @@ void LoadAssetDirectly(assets* Assets,
             asset_glyph* Src = &Header->Glyph;
         }break;
         
-        case AssetType_BitmapArray:{
-            bmp_array_info* Result = GET_ASSET_PTR_MEMBER(Asset, bmp_array_info);
-            asset_bitmap_array* Src = &Header->BmpArray;
+        case AssetType_Array:{
+            array_info* Result = GET_ASSET_PTR_MEMBER(Asset, array_info);
+            asset_array* Src = &Header->Array;
         }break;
         
         case AssetType_Mesh:{
@@ -277,11 +277,11 @@ void LoadAssetDirectly(assets* Assets,
             asset_mesh* Src = &Header->Mesh;
             
             // NOTE(Dima): Load mesh data
-            u32 VertSize = Header->Mesh.DataVerticesSize;
-            u32 IndiSize = Header->Mesh.DataIndicesSize;
+            u32 VertSize = Src->DataVerticesSize;
+            u32 IndiSize = Src->DataIndicesSize;
             
-            void* Vertices = (u8*)Data + Header->Mesh.DataOffsetToVertices;
-            u32* Indices = (u32*)((u8*)Data + Header->Mesh.DataOffsetToIndices);
+            void* Vertices = (u8*)Data + Src->DataOffsetToVertices;
+            u32* Indices = (u32*)((u8*)Data + Src->DataOffsetToIndices);
             
             Result->Vertices = Vertices;
             Result->Indices = Indices;
@@ -290,19 +290,22 @@ void LoadAssetDirectly(assets* Assets,
         case AssetType_Sound:{
             sound_info* Result = GET_ASSET_PTR_MEMBER(Asset, sound_info);
             asset_sound* Src = &Header->Sound;
+            
+            Result->Samples[0] = (i16*)((u8*)Data + Src->DataOffsetToLeftChannel);
+            Result->Samples[1] = (i16*)((u8*)Data + Src->DataOffsetToRightChannel);
         }break;
         
         case AssetType_Font:{
             font_info* Result = GET_ASSET_PTR_MEMBER(Asset, font_info);
             asset_font* Src = &Header->Font;
             
-            int* Mapping = (int*)((u8*)Data + Header->Font.DataOffsetToMapping);
-            float* KerningPairs = (float*)((u8*)Data + Header->Font.DataOffsetToKerning);
-            u32* GlyphIDs = (u32*)((u8*)Data + Header->Font.DataOffsetToIDs);
+            int* Mapping = (int*)((u8*)Data + Src->DataOffsetToMapping);
+            float* KerningPairs = (float*)((u8*)Data + Src->DataOffsetToKerning);
+            u32* GlyphIDs = (u32*)((u8*)Data + Src->DataOffsetToIDs);
             
-            u32 MappingSize = Header->Font.MappingSize;
-            u32 KerningSize = Header->Font.KerningSize;
-            u32 IDsSize = Header->Font.IDsSize;
+            u32 MappingSize = Src->MappingSize;
+            u32 KerningSize = Src->KerningSize;
+            u32 IDsSize = Src->IDsSize;
             
             ASSERT(MappingSize == sizeof(float) * FONT_INFO_MAX_GLYPH_COUNT);
             
@@ -311,7 +314,7 @@ void LoadAssetDirectly(assets* Assets,
             
             // NOTE(Dima): Fixing Glyph IDs
             for(int GlyphIndex = 0;
-                GlyphIndex < Header->Font.GlyphCount;
+                GlyphIndex < Src->GlyphCount;
                 GlyphIndex++)
             {
                 Result->GlyphIDs[GlyphIndex] = FileToIntegratedID(
@@ -326,6 +329,18 @@ void LoadAssetDirectly(assets* Assets,
             
             // NOTE(Dima): Setting kerning
             Result->KerningPairs = KerningPairs;
+        }break;
+        
+        case AssetType_Model:{
+            model_info* Result = GET_ASSET_PTR_MEMBER(Asset, model_info);
+            asset_model* Src = &Header->Model;
+            
+            // NOTE(Dima): Loading and storing model data
+            u32* MeshIDs = (u32*)((u8*)Data + Src->DataOffsetToMeshIDs);
+            u32* MaterialIDs = (u32*)((u8*)Data + Src->DataOffsetToMaterialIDs);
+            
+            Result->MeshIDs = MeshIDs;
+            Result->MaterialIDs = MaterialIDs;
         }break;
     }
     
@@ -659,11 +674,11 @@ void InitAssets(assets* Assets){
                             }
                         }break;
                         
-                        case AssetType_BitmapArray: {
-                            bmp_array_info* Result = ALLOC_ASS_PTR_MEMBER(bmp_array_info);
-                            asset_bitmap_array* Src = &AssetHeader.BmpArray;
+                        case AssetType_Array: {
+                            array_info* Result = ALLOC_ASS_PTR_MEMBER(array_info);
+                            asset_array* Src = &AssetHeader.Array;
                             
-                            Result->FirstBmpID = Src->FirstBmpID;
+                            Result->FirstID = Src->FirstID;
                             Result->Count = Src->Count;
                         }break;
                         
@@ -721,6 +736,18 @@ void InitAssets(assets* Assets){
                             Result->YOffset = Src->YOffset;
                             Result->Advance = Src->Advance;
                             Result->LeftBearingX = Src->LeftBearingX;
+                        }break;
+                        
+                        case AssetType_Material:{
+                            
+                        }break;
+                        
+                        case AssetType_Model:{
+                            model_info* Result = ALLOC_ASS_PTR_MEMBER(model_info);
+                            asset_model* Src = &AssetHeader.Model;
+                            
+                            Result->MeshCount = Src->MeshCount;
+                            Result->MaterialCount = Src->MaterialCount;
                         }break;
                     }
                 }

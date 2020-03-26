@@ -57,9 +57,9 @@ added_asset AddGlyphAssetInternal(asset_system* System,
 added_asset AddGlyphAsset(asset_system* System,
                           tool_glyph_info* Glyph);
 
-added_asset AddBitmapArray(asset_system* System, 
-                           u32 FirstBitmapID, 
-                           int Count);
+added_asset AddArrayAsset(asset_system* System, 
+                          u32 FirstID, 
+                          int Count);
 
 
 

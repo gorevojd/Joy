@@ -66,10 +66,11 @@ struct asset{
     union{
         ASSET_PTR_MEMBER(font_info);
         ASSET_PTR_MEMBER(bmp_info);
-        ASSET_PTR_MEMBER(bmp_array_info);
+        ASSET_PTR_MEMBER(array_info);
         ASSET_PTR_MEMBER(mesh_info);
         ASSET_PTR_MEMBER(glyph_info);
         ASSET_PTR_MEMBER(sound_info);
+        ASSET_PTR_MEMBER(model_info);
     };
 };
 

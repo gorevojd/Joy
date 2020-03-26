@@ -4,8 +4,8 @@
 #include "joy_types.h"
 #include "joy_math.h"
 
-struct bmp_array_info{
-    u32 FirstBmpID;
+struct array_info{
+    u32 FirstID;
     int Count;
 };
 

@@ -284,7 +284,8 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
                                        loaded_model* Model,
                                        model_loading_context* Context)
 {
-    tool_model_info ToolModel = LoadedToToolModelInfo(Model);
+    Model->ToolModelInfo = LoadedToToolModelInfo(Model);
+    tool_model_info* ToolModel = &Model->ToolModelInfo;
     
     BeginAsset(System, GameAsset_Type_Mesh);
     for(int MeshIndex = 0; 
@@ -292,7 +293,7 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
         MeshIndex++)
     {
         added_asset Added = AddMeshAsset(System, &Model->Meshes[MeshIndex]);
-        ToolModel.MeshIDs[MeshIndex] = Added.ID;
+        ToolModel->MeshIDs[MeshIndex] = Added.ID;
     }
     EndAsset(System);
     
@@ -301,7 +302,8 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
         MaterialIndex++)
     {
         loaded_mat* Material = &Model->Materials[MaterialIndex];
-        tool_material_info ToolMatInfo = LoadedToToolMaterialInfo(Material);
+        Material->ToolMaterialInfo = LoadedToToolMaterialInfo(Material);
+        tool_material_info* ToolMatInfo = &Material->ToolMaterialInfo;
         
         for(int TextureTypeIndex = 0;
             TextureTypeIndex < ArrayCount(SupportedTexturesTypes);
@@ -323,7 +325,7 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
                 u32 FirstIDInBitmaps = CorrespondingTexture.StoredBitmapID;
                 
                 // NOTE(Dima): Adding bitmap array to asset system
-                added_asset AddedArray = AddBitmapArray(System, FirstIDInBitmaps, Count);
+                added_asset AddedArray = AddArrayAsset(System, FirstIDInBitmaps, Count);
                 AddedArrayID = AddedArray.ID;
             }
             EndAsset(System);
@@ -331,18 +333,18 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
             // NOTE(Dima): Setting corresponding array id in material info
             int OurTextureType = ConvertAssimpToOurTextureType(
                 SupportedTexturesTypes[TextureTypeIndex]);
-            ToolMatInfo.BitmapArrayIDs[OurTextureType] = AddedArrayID;
+            ToolMatInfo->BitmapArrayIDs[OurTextureType] = AddedArrayID;
         }
         
         BeginAsset(System, GameAsset_Type_Material);
-        added_asset AddedMaterial = AddMaterialAsset(System, &ToolMatInfo);
+        added_asset AddedMaterial = AddMaterialAsset(System, ToolMatInfo);
         EndAsset(System);
         
-        ToolModel.MaterialIDs[MaterialIndex] = AddedMaterial.ID;
+        ToolModel->MaterialIDs[MaterialIndex] = AddedMaterial.ID;
     }
     
     BeginAsset(System, AssetGroupID);
-    AddModelAsset(System, &ToolModel);
+    AddModelAsset(System, ToolModel);
     EndAsset(System);
 }
 
@@ -366,6 +368,11 @@ INTERNAL_FUNCTION void StoreLoadingContext(asset_system* System,
         Source->LoadedModel = LoadModelByASSIMP(Source->Path,
                                                 Source->Flags,
                                                 LoadingCtx);
+        
+        StoreModelAsset(System, 
+                        Source->AssetGroup, 
+                        &Source->LoadedModel,
+                        LoadingCtx);
     }
 }
 

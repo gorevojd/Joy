@@ -8,7 +8,7 @@ enum asset_type{
     
     // NOTE(Dima): These are actual types
     AssetType_Bitmap,
-    AssetType_BitmapArray,
+    AssetType_Array,
     AssetType_Mesh,
     AssetType_Sound,
     AssetType_Font,
@@ -69,8 +69,8 @@ struct asset_bitmap{
     b32 BakeToAtlas;
 };
 
-struct asset_bitmap_array{
-    u32 FirstBmpID;
+struct asset_array{
+    u32 FirstID;
     int Count;
 };
 
@@ -123,6 +123,9 @@ struct asset_sound{
     int SampleCount;
     int SamplesPerSec;
     int Channels;
+    
+    u32 DataOffsetToLeftChannel;
+    u32 DataOffsetToRightChannel;
 };
 
 union asset_tag_value {
@@ -171,7 +174,7 @@ struct asset_header{
         asset_model Model;
         asset_material Material;
         asset_bitmap Bitmap;
-        asset_bitmap_array BmpArray;
+        asset_array Array;
         asset_glyph Glyph;
         asset_mesh Mesh;
         asset_font Font;

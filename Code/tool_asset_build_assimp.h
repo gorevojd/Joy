@@ -47,6 +47,8 @@ FirstIDInArray serves as mapping to get first ID texture
 of specific texture type
 */
     std::vector<std::string> TexturePathArray;
+    
+    tool_material_info ToolMaterialInfo;
 };
 
 enum assimp_load_mesh_flags {
@@ -58,6 +60,8 @@ enum assimp_load_mesh_flags {
 struct loaded_model{
     std::vector<tool_mesh_info> Meshes;
     std::vector<loaded_mat> Materials;
+    
+    tool_model_info ToolModelInfo;
 };
 
 struct load_model_source{
