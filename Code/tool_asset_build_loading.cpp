@@ -661,9 +661,9 @@ b32 CalculateTangents)
         
         // NOTE(Dima): Colors copying
         if(Colors.size() != VerticesCount){
-            DstVerts[Index0].C = V3(0.0f, 0.0f, 0.0f);
-            DstVerts[Index1].C = V3(0.0f, 0.0f, 0.0f);
-            DstVerts[Index2].C = V3(0.0f, 0.0f, 0.0f);
+            DstVerts[Index0].C = V3(1.0f, 1.0f, 1.0f);
+            DstVerts[Index1].C = V3(1.0f, 1.0f, 1.0f);
+            DstVerts[Index2].C = V3(1.0f, 1.0f, 1.0f);
         }
         else{
             DstVerts[Index0].C = Colors[Index0];

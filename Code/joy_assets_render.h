@@ -106,4 +106,33 @@ inline mesh_info* PushOrLoadMesh(assets* Assets,
     return(Mesh);
 }
 
+inline model_info* PushOrLoadModel(assets* Assets,
+                                   render_stack* Stack,
+                                   asset_id ModelID,
+                                   v3 P, quat R, v3 S,
+                                   b32 Immediate = JOY_FALSE)
+{
+    asset* Asset = GetAssetByID(Assets, ModelID);
+    ASSERT(Asset->Type == AssetType_Model);
+    
+    LoadAsset(Assets, Asset, Immediate);
+    
+    model_info* Model = 0;
+    if(PotentiallyLoadedAsset(Asset, Immediate)){
+        Model= GET_ASSET_PTR_MEMBER(Asset, model_info);
+        
+        for(int MeshIDIndex = 0; 
+            MeshIDIndex < Model->MeshCount;
+            MeshIDIndex++)
+        {
+            asset_id MeshID = Model->MeshIDs[MeshIDIndex];
+            
+            PushOrLoadMesh(Assets, Stack, MeshID, P, R, S);
+        }
+        
+    }
+    
+    return(Model);
+}
+
 #endif

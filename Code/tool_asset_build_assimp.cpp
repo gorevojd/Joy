@@ -133,16 +133,19 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
 		JoyShouldCalculateTangents = true;
 	}
     
-	if (Flags & AssimpLoadMesh_GenerateNormals) {
-		AssimpFlags |= aiProcess_GenNormals;
-	}
-	else {
-		JoyShouldCalculateNormals = true;
-	}
+    b32 InGenNorm = Flags & AssimpLoadMesh_GenerateNormals;
+    b32 InGenSmNorm = Flags & AssimpLoadMesh_GenerateSmoothNormals;
     
-	if (Flags & AssimpLoadMesh_GenerateSmoothNormals) {
-		AssimpFlags |= aiProcess_GenSmoothNormals;
-	}
+    if (InGenNorm || InGenSmNorm) 
+    {
+        if(InGenNorm){
+            AssimpFlags |= aiProcess_GenNormals;
+        }
+        else{
+            AssimpFlags |= aiProcess_GenSmoothNormals;
+        }
+        
+    }
 	else {
 		JoyShouldCalculateNormals = true;
 	}
@@ -215,7 +218,11 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
 			int ColorChannelIndex = 0;
             
 			for (int VIndex = 0; VIndex < AssimpMesh->mNumVertices; VIndex++) {
-				v4 Color = Assimp2JoyVector4(AssimpMesh->mColors[ColorChannelIndex][VIndex]);
+#if 0
+                v4 Color = Assimp2JoyVector4(AssimpMesh->mColors[ColorChannelIndex][VIndex]);
+#else
+                v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f);
+#endif
                 
 				Colors.push_back(Color.rgb);
 			}

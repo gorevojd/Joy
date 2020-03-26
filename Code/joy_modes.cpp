@@ -282,6 +282,8 @@ GAME_MODE_UPDATE(TestUpdate){
                               FindTagValues,
                               1);
     
+    u32 StoolID = GetFirst(Game->Assets, GameAsset_Stool);
+    
     int SphereLayers = 10;
     int SphereLayerCount = 10;
     v3 SphereStartP = V3(0.0f, 1.0f, -15.0f);
@@ -302,6 +304,69 @@ GAME_MODE_UPDATE(TestUpdate){
         }
     }
     
+    PushOrLoadModel(Game->Assets, Stack,
+                    GetFirst(Game->Assets, GameAsset_Stool),
+                    V3(10.0f, 0.0f, 10.0f),
+                    QuatI(), V3(1.0f),
+                    ASSET_LOAD_DEFERRED);
+    
+    
+    PushOrLoadModel(Game->Assets, Stack,
+                    GetFirst(Game->Assets, GameAsset_Bathroom),
+                    V3(5.0f, 0.0f, 10.0f),
+                    QuatI(), V3(1.0f),
+                    ASSET_LOAD_DEFERRED);
+    
+    
+    PushOrLoadModel(Game->Assets, Stack,
+                    GetFirst(Game->Assets, GameAsset_Heart),
+                    V3(0.0f, 0.0f, 10.0f),
+                    QuatI(), V3(1.0f),
+                    ASSET_LOAD_DEFERRED);
+    
+    
+    PushOrLoadModel(Game->Assets, Stack,
+                    GetFirst(Game->Assets, GameAsset_KindPlane),
+                    V3(-5.0f, 0.0f, 10.0f),
+                    QuatI(), V3(1.0f),
+                    ASSET_LOAD_DEFERRED);
+    
+    
+    PushOrLoadModel(Game->Assets, Stack,
+                    GetFirst(Game->Assets, GameAsset_Podkova),
+                    V3(-10.0f, 0.0f, 10.0f),
+                    QuatI(), V3(1.0f),
+                    ASSET_LOAD_DEFERRED);
+    
+    
+    PushOrLoadModel(Game->Assets, Stack,
+                    GetFirst(Game->Assets, GameAsset_RubbishBin),
+                    V3(-15.0f, 0.0f, 10.0f),
+                    QuatI(), V3(1.0f),
+                    ASSET_LOAD_DEFERRED);
+    
+    
+    PushOrLoadModel(Game->Assets, Stack,
+                    GetFirst(Game->Assets, GameAsset_Snowman),
+                    V3(-20.0f, 0.0f, 10.0f),
+                    QuatI(), V3(1.0f),
+                    ASSET_LOAD_DEFERRED);
+    
+    PushOrLoadModel(Game->Assets, Stack,
+                    GetFirst(Game->Assets, GameAsset_Toilet),
+                    V3(-25.0f, 0.0f, 10.0f),
+                    QuatI(), V3(1.0f),
+                    ASSET_LOAD_DEFERRED);
+    
+    
+    PushOrLoadModel(Game->Assets, Stack,
+                    GetFirst(Game->Assets, GameAsset_Vase),
+                    V3(-30.0f, 0.0f, 10.0f),
+                    QuatI(), V3(1.0f),
+                    ASSET_LOAD_DEFERRED);
+    
+    
+#if 0    
     PushOrLoadMesh(Game->Assets, Stack, 
                    GetFirst(Game->Assets, GameAsset_Cube),
                    V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
@@ -338,6 +403,7 @@ GAME_MODE_UPDATE(TestUpdate){
                    V3(0.0f, -1.0f, 0.0f), 
                    QuatI(), V3(100.0f),
                    ASSET_LOAD_DEFERRED);
+#endif
     
     ShowSphereDistributions(Game, Stack,
                             &State->SphereDistributionTrig,
