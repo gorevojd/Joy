@@ -264,6 +264,59 @@ added_asset AddMeshAsset(asset_system* System,
     return(Added);
 }
 
+added_asset AddMaterialAsset(asset_system* System, 
+                             tool_material_info* Material)
+{
+    added_asset Added = AddAsset(System, AssetType_Material);
+    
+    asset_header* FileHeader = Added.FileHeader;
+    game_asset_source* Source = Added.Source;
+    
+    // NOTE(Dima): Setting source
+    Source->MaterialSource.MaterialInfo = Material;
+    
+    // NOTE(Dima): Setting file header
+    asset_material* MatHeader = &FileHeader->Material;
+    
+    for(int BitmapArrayIndex = 0; 
+        BitmapArrayIndex < MaterialTexture_Count;
+        BitmapArrayIndex++)
+    {
+        MatHeader->BitmapArrayIDs[BitmapArrayIndex] = 
+            Material->BitmapArrayIDs[BitmapArrayIndex];
+    }
+    
+    return(Added);
+}
+
+added_asset AddModelAsset(asset_system* System, tool_model_info* Model){
+    added_asset Added = AddAsset(System, AssetType_Model);
+    
+    
+    asset_header* FileHeader = Added.FileHeader;
+    game_asset_source* Source = Added.Source;
+    
+    // NOTE(Dima): Setting source
+    Source->ModelSource.ModelInfo = Model;
+    
+    // NOTE(Dima): SEtting file header
+    asset_model* ModelHeader = &FileHeader->Model;
+    
+    ModelHeader->MeshCount = Model->MeshCount;
+    ModelHeader->MaterialCount = Model->MaterialCount;
+    
+    ModelHeader->SizeMeshIDs = sizeof(u32) * Model->MeshCount;
+    ModelHeader->SizeMaterialIDs = sizeof(u32) * Model->MaterialCount;
+    
+    ModelHeader->DataOffsetToMeshIDs = 0;
+    ModelHeader->DataOffsetToMaterialIDs = ModelHeader->SizeMeshIDs;
+    
+    AddFreeareaToAsset(System, Added.Asset, Model->MeshIDs);
+    AddFreeareaToAsset(System, Added.Asset, Model->MaterialIDs);
+    
+    return(Added);
+}
+
 added_asset AddFontAsset(
 asset_system* System,
 tool_font_info* FontInfo)
@@ -555,6 +608,14 @@ And forming group regions that are about to be written
                         Header->Mesh.DataVerticesSize + 
                         Header->Mesh.DataIndicesSize;
                 }break;
+                
+                case AssetType_Model:{
+                    Asset->Model = Source->ModelSource.ModelInfo;
+                    
+                    DataByteSize = 
+                        Header->Model.SizeMeshIDs + 
+                        Header->Model.SizeMaterialIDs;
+                }break;
             }
             
             //NOTE(dima): Forming header
@@ -601,8 +662,6 @@ And forming group regions that are about to be written
                 }break;
                 
                 case AssetType_Font: {
-                    // IMPORTANT(Dima): Order is important
-                    
                     // NOTE(Dima): FIRST - WRITING MAPPING
                     fwrite(
 						Asset->Font->Codepoint2Glyph,
@@ -639,6 +698,18 @@ And forming group regions that are about to be written
                         Header->Mesh.DataIndicesSize,
                         1, fp);
                 }break;
+                
+                case AssetType_Model:{
+                    // NOTE(Dima): Writing Mesh IDs
+                    fwrite(Asset->Model->MeshIDs,
+                           Header->Model.SizeMeshIDs,
+                           1, fp);
+                    
+                    // NOTE(Dima): Writing material IDs
+                    fwrite(Asset->Model->MaterialIDs,
+                           Header->Model.SizeMaterialIDs,
+                           1, fp);
+                }break;
             }
             
             //NOTE(dima): Freeing freareas
@@ -659,8 +730,6 @@ And forming group regions that are about to be written
     else {
         INVALID_CODE_PATH;
     }
-    
-    
     
     //NOTE(dima): Reading file contents
     void* FileData = 0;

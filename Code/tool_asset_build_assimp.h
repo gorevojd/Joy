@@ -16,7 +16,6 @@
 #include <assimp/scene.h>           // Output data structure
 #include <assimp/postprocess.h>     // Post processing flags
 
-
 GLOBAL_VARIABLE aiTextureType SupportedTexturesTypes[] = {
     aiTextureType_DIFFUSE,
     aiTextureType_SPECULAR,
@@ -29,26 +28,64 @@ GLOBAL_VARIABLE aiTextureType SupportedTexturesTypes[] = {
     aiTextureType_DISPLACEMENT,
     aiTextureType_LIGHTMAP,
     aiTextureType_REFLECTION,
+    aiTextureType_UNKNOWN,
 };
 
 struct loaded_mat_texture{
     aiTextureType AiType;
     tool_bmp_info Bmp;
+    u32 StoredBitmapID;
 };
 
 struct loaded_mat{
-    int FirstIDInArray[ArrayCount(SupportedTexturesTypes)];
+    int TextureFirstIndexOfTypeInArray[ArrayCount(SupportedTexturesTypes)];
+    int TextureCountOfType[ArrayCount(SupportedTexturesTypes)];
     
     /*
-    I store here an array of paths to textures.
-    FirstIDInArray serves as mapping to get first ID texture
-    of specific texture type
-    */
-    std::vector<std::string> BmpArray;
+I store here an array of paths to textures.
+FirstIDInArray serves as mapping to get first ID texture
+of specific texture type
+*/
+    std::vector<std::string> TexturePathArray;
 };
 
-struct loading_context{
+enum assimp_load_mesh_flags {
+	AssimpLoadMesh_GenerateNormals = 1,
+	AssimpLoadMesh_GenerateTangents = 2,
+	AssimpLoadMesh_GenerateSmoothNormals = 4,
+};
+
+struct loaded_model{
+    std::vector<tool_mesh_info> Meshes;
+    std::vector<loaded_mat> Materials;
+};
+
+struct load_model_source{
+    char* Path;
+    u32 AssetGroup;
+    u32 Flags;
+    
+    loaded_model LoadedModel;
+};
+
+inline load_model_source ModelSource(
+char* Path,
+u32 AssetGroup,
+u32 Flags)
+{
+    load_model_source Result = {};
+    
+    Result.Path = Path;
+    Result.AssetGroup = AssetGroup;
+    Result.Flags = Flags;
+    
+    return(Result);
+}
+
+struct model_loading_context{
     std::unordered_map<std::string, loaded_mat_texture> PathToTextureMap;
+    
+    std::vector<load_model_source> ModelSources;
 };
 
 inline m44 Assimp2JoyMatrix(const aiMatrix4x4& AssimpMatrix) {
@@ -103,16 +140,5 @@ inline v4 Assimp2JoyVector4(const aiColor4D& AssimpVector) {
     
 	return(Result);
 }
-
-enum assimp_load_mesh_flags {
-	AssimpLoadMesh_GenerateNormals = 1,
-	AssimpLoadMesh_GenerateTangents = 2,
-	AssimpLoadMesh_GenerateSmoothNormals = 4,
-};
-
-struct loaded_model{
-    std::vector<tool_mesh_info> Meshes;
-    std::vector<loaded_mat> Materials;
-};
 
 #endif

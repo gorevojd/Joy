@@ -144,6 +144,14 @@ struct mesh_info{
     mesh_handles Handles;
 };
 
+struct model_info{
+    u32* MeshIDs;
+    u32* MaterialIDs;
+    
+    u32 MeshCount;
+    u32 MaterialCount;
+};
+
 struct glyph_info{
     int Codepoint;
     

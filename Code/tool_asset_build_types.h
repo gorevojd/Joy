@@ -140,10 +140,21 @@ struct tool_mesh_info{
     u32 MeshType;
 };
 
+struct tool_model_info{
+    u32* MeshIDs;
+    u32* MaterialIDs;
+    
+    int MeshCount;
+    int MaterialCount;
+};
+
+struct tool_material_info{
+    u32 BitmapArrayIDs[MaterialTexture_Count];
+};
 
 struct game_asset_group_region {
-	u32 FirstAssetIndex;
-	u32 AssetCount;
+    u32 FirstAssetIndex;
+    u32 AssetCount;
 };
 
 struct game_asset_group{
@@ -157,15 +168,15 @@ enum game_asset_tag_value_type{
 };
 
 struct game_asset_tag {
-	u32 Type;
+    u32 Type;
     u32 ValueType;
     
     u32 InTagArrayIndex;
     
-	union {
-		float Value_Float;
-		int Value_Int;
-	};
+    union {
+        float Value_Float;
+        int Value_Int;
+    };
 };
 
 struct game_asset_tag_hub{
@@ -250,19 +261,21 @@ struct game_asset_tag_hub{
 };
 
 struct game_asset {
-	u32 ID;
+    u32 ID;
     
-	u32 Type;
+    u32 Type;
     
-	std::vector<game_asset_tag> Tags;
+    std::vector<game_asset_tag> Tags;
     
-	union {
-		tool_bmp_info* Bitmap;
-		tool_font_info* Font;
-		tool_sound_info* Sound;
-		tool_mesh_info* Mesh;
-		tool_glyph_info* Glyph;
-	};
+    union {
+        tool_bmp_info* Bitmap;
+        tool_font_info* Font;
+        tool_sound_info* Sound;
+        tool_mesh_info* Mesh;
+        tool_glyph_info* Glyph;
+        tool_model_info* Model;
+        tool_material_info* Material;
+    };
 };
 
 /*
@@ -273,43 +286,43 @@ enum bitmap_asset_load_flags{
 };
 
 struct game_asset_source_bitmap {
-	char* Path;
+    char* Path;
     tool_bmp_info* BitmapInfo;
     u32 LoadFlags;
 };
 
 struct game_asset_source_mesh {
-	tool_mesh_info* MeshInfo;
+    tool_mesh_info* MeshInfo;
 };
 
 struct game_asset_source_model {
-    // NOTE(Dima): Empty
+    tool_model_info* ModelInfo;
 };
 
 struct game_asset_source_material{
-    // NOTE(Dima): Empty
+    tool_material_info* MaterialInfo;
 };
 
 struct game_asset_source_sound {
-	char* Path;
+    char* Path;
     tool_sound_info* Sound;
 };
 
 struct game_asset_source_font {
-	tool_font_info* FontInfo;
+    tool_font_info* FontInfo;
 };
 
 struct game_asset_source_glyph {
-	tool_glyph_info* Glyph;
+    tool_glyph_info* Glyph;
 };
 
 struct game_asset_source {
-	union {
-		game_asset_source_bitmap BitmapSource;
-		game_asset_source_sound SoundSource;
-		game_asset_source_font FontSource;
-		game_asset_source_glyph GlyphSource;
-		game_asset_source_mesh MeshSource;
+    union {
+        game_asset_source_bitmap BitmapSource;
+        game_asset_source_sound SoundSource;
+        game_asset_source_font FontSource;
+        game_asset_source_glyph GlyphSource;
+        game_asset_source_mesh MeshSource;
         game_asset_source_model ModelSource;
         game_asset_source_material MaterialSource;
     };
@@ -318,25 +331,25 @@ struct game_asset_source {
 //NOTE(dima): Assets freeareas
 #define FREEAREA_SLOTS_COUNT 4
 struct game_asset_freearea {
-	void* Pointers[FREEAREA_SLOTS_COUNT];
-	int SetCount;
+    void* Pointers[FREEAREA_SLOTS_COUNT];
+    int SetCount;
 };
 
 
 //NOTE(dima): Asset system
 #define TEMP_STORED_ASSET_COUNT 2048
 struct asset_system {
-	u32 AssetTypes[TEMP_STORED_ASSET_COUNT];
-	game_asset Assets[TEMP_STORED_ASSET_COUNT];
-	game_asset_source AssetSources[TEMP_STORED_ASSET_COUNT];
-	game_asset_freearea AssetFreeareas[TEMP_STORED_ASSET_COUNT];
-	asset_header FileHeaders[TEMP_STORED_ASSET_COUNT];
+    u32 AssetTypes[TEMP_STORED_ASSET_COUNT];
+    game_asset Assets[TEMP_STORED_ASSET_COUNT];
+    game_asset_source AssetSources[TEMP_STORED_ASSET_COUNT];
+    game_asset_freearea AssetFreeareas[TEMP_STORED_ASSET_COUNT];
+    asset_header FileHeaders[TEMP_STORED_ASSET_COUNT];
     
-	game_asset_group AssetGroups[GameAsset_Count];
+    game_asset_group AssetGroups[GameAsset_Count];
     
-	u32 AssetCount;
-	game_asset_group* CurrentGroup;
-	game_asset* PrevAssetPointer;
+    u32 AssetCount;
+    game_asset_group* CurrentGroup;
+    game_asset* PrevAssetPointer;
 };
 
 

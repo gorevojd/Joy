@@ -13,14 +13,8 @@ enum asset_type{
     AssetType_Sound,
     AssetType_Font,
     AssetType_Glyph,
-    
-    // NOTE(Dima) These are fake types for fast access through macros
-    AssetType_Type_bmp_info = AssetType_Bitmap,
-    AssetType_Type_bmp_array_info = AssetType_BitmapArray,
-    AssetType_Type_mesh_info = AssetType_Mesh,
-    AssetType_Type_sound_info = AssetType_Sound,
-    AssetType_Type_font_info = AssetType_Font,
-    AssetType_Type_glyph_info = AssetType_Glyph,
+    AssetType_Model,
+    AssetType_Material,
 };
 
 enum asset_state{
@@ -36,20 +30,36 @@ typedef u32 asset_id;
 #define ASSET_PTR_MEMBER(data_type) data_type* Ptr_##data_type
 #define GET_ASSET_PTR_MEMBER(asset, data_type) ((asset)->Ptr_##data_type)
 
-struct asset_material{
-    asset_id Diffuse;
-    asset_id Specular;
-    asset_id Normal;
-    asset_id Emission;
+enum material_texture_type{
+    MaterialTexture_Diffuse,
+    MaterialTexture_Specular,
+    MaterialTexture_Ambient,
+    MaterialTexture_Emissive,
+    MaterialTexture_Height,
+    MaterialTexture_Normals,
+    MaterialTexture_Shininess,
+    MaterialTexture_Opacity,
+    MaterialTexture_Displacement,
+    MaterialTexture_Lightmap,
+    MaterialTexture_Reflection,
+    MaterialTexture_Unknown,
     
-    asset_id Albedo;
-    asset_id Roughness;
-    asset_id Metallic;
+    MaterialTexture_Count,
+};
+
+struct asset_material{
+    u32 BitmapArrayIDs[MaterialTexture_Count];
 };
 
 struct asset_model{
-    asset_id MeshID;
-    asset_id MaterialID;
+    int MeshCount;
+    int MaterialCount;
+    
+    u32 DataOffsetToMeshIDs;
+    u32 DataOffsetToMaterialIDs;
+    
+    u32 SizeMeshIDs;
+    u32 SizeMaterialIDs;
 };
 
 struct asset_bitmap{
@@ -280,6 +290,8 @@ enum asset_group_type{
     GameAsset_Type_Font,
     GameAsset_Type_Glyph,
     GameAsset_Type_Mesh,
+    GameAsset_Type_Material,
+    GameAsset_Type_BitmapArray,
     
     GameAsset_Count,
 };

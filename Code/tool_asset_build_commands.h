@@ -41,6 +41,12 @@ added_asset AddSoundAssetManual(asset_system* System,
 added_asset AddMeshAsset(asset_system* System, 
                          tool_mesh_info* Mesh);
 
+added_asset AddModelAsset(asset_system* System,
+                          tool_model_info* Model);
+
+added_asset AddMaterialAsset(asset_system* System, 
+                             tool_material_info* Material);
+
 added_asset AddFontAsset(asset_system* System,
                          tool_font_info* FontInfo);
 

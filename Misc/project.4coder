@@ -47,7 +47,36 @@ command_list = {
 			},
 		},
 	},
+
+
+	{
+		.name = "run_asset_build",
+		.out = "*run*",
+		.footer_panel = false,
+		.save_dirty_files = false,
+		.cursor_at_end = true,
+		.cmd = {
+			{
+				"..\\Build\\AssetBuilder.exe", .os = "win"
+			},
+		},
+	},
+
+	{
+		.name = "run_assimp_build",
+		.out = "*run*",
+		.footer_panel = false,
+		.save_dirty_files = false,
+		.cursor_at_end = true,
+		.cmd = {
+			{
+				"..\\Build\\AssimpBuilder.exe", .os = "win"
+			},
+		},
+	},
 };
 
 fkey_command[1] = "build";
 fkey_command[2] = "run";
+fkey_command[3] = "run_asset_build";
+fkey_command[4] = "run_assimp_build";
