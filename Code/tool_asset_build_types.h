@@ -46,7 +46,16 @@
 #define JOY_TRUE 1
 #define JOY_FALSE 0
 
-
+inline void CopyStringsSafe(char* Dst, int DstSize, char* Src){
+    if(Src){
+        int SpaceInDstAvailable = DstSize - 1;
+        while(*Src && SpaceInDstAvailable){
+            *Dst++ = *Src++;
+            SpaceInDstAvailable--;
+        }
+    }
+    *Dst = 0;
+}
 
 struct Loaded_Strings{
     char** Strings;
@@ -141,11 +150,21 @@ struct tool_mesh_info{
 };
 
 struct tool_model_info{
-    u32* MeshIDs;
-    u32* MaterialIDs;
+    std::vector<u32> MeshIDs;
+    std::vector<u32> MaterialIDs;
+    std::vector<u32> SkeletonIDs;
     
     int MeshCount;
     int MaterialCount;
+    int SkeletonCount;
+    
+    std::vector<node_info> Nodes;
+};
+
+struct tool_skeleton_info{
+    u32 CheckSum;
+    
+    std::vector<bone_info> Bones;
 };
 
 struct tool_material_info{
@@ -275,6 +294,7 @@ struct game_asset {
         tool_glyph_info* Glyph;
         tool_model_info* Model;
         tool_material_info* Material;
+        tool_skeleton_info* Skeleton;
     };
 };
 
@@ -297,6 +317,10 @@ struct game_asset_source_mesh {
 
 struct game_asset_source_model {
     tool_model_info* ModelInfo;
+};
+
+struct game_asset_source_skeleton{
+    tool_skeleton_info* SkeletonInfo;
 };
 
 struct game_asset_source_material{
@@ -325,6 +349,7 @@ struct game_asset_source {
         game_asset_source_mesh MeshSource;
         game_asset_source_model ModelSource;
         game_asset_source_material MaterialSource;
+        game_asset_source_skeleton SkeletonSource;
     };
 };
 

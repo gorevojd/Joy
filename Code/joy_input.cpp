@@ -42,26 +42,26 @@ INTERNAL_FUNCTION inline float GetMoveValueFromButtons(input_state* Input,
         if(ButIsDownOnController(Input, ControllerIndex, Button_Left))
         {
             MoveValue += 1.0f;
-            InternalGot = JOY_TRUE;
+            InternalGot = true;
         }
         
         if(ButIsDownOnController(Input, ControllerIndex, Button_Right))
         {
             MoveValue += -1.0f;
-            InternalGot = JOY_TRUE;
+            InternalGot = true;
         }
     }
     else if(Axis == MoveAxis_Vertical){
         if(ButIsDownOnController(Input, ControllerIndex, Button_Up))
         {
             MoveValue += 1.0f;
-            InternalGot = JOY_TRUE;
+            InternalGot = true;
         }
         
         if(ButIsDownOnController(Input, ControllerIndex, Button_Down))
         {
             MoveValue += -1.0f;
-            InternalGot = JOY_TRUE;
+            InternalGot = true;
         }
         
     }
@@ -69,26 +69,26 @@ INTERNAL_FUNCTION inline float GetMoveValueFromButtons(input_state* Input,
         if(ButIsDownOnController(Input, ControllerIndex, Button_MouseLeft))
         {
             MoveValue += 1.0f;
-            InternalGot = JOY_TRUE;
+            InternalGot = true;
         }
         
         if(ButIsDownOnController(Input, ControllerIndex, Button_MouseRight))
         {
             MoveValue += -1.0f;
-            InternalGot = JOY_TRUE;
+            InternalGot = true;
         }
     }
     else if(Axis == MoveAxis_MouseY){
         if(ButIsDownOnController(Input, ControllerIndex, Button_MouseUp))
         {
             MoveValue += 1.0f;
-            InternalGot = JOY_TRUE;
+            InternalGot = true;
         }
         
         if(ButIsDownOnController(Input, ControllerIndex, Button_MouseDown))
         {
             MoveValue += -1.0f;
-            InternalGot = JOY_TRUE;
+            InternalGot = true;
         }
     }
     
@@ -104,7 +104,7 @@ INTERNAL_FUNCTION inline float _GetMoveAxisOnController(input_state* Input, inpu
 {
     float Result = 0.0f;
     
-    b32 Got = JOY_FALSE;
+    b32 Got = false;
     
     if(!Cont){
         Cont = &Input->Controllers[ControllerIndex];
@@ -124,7 +124,7 @@ INTERNAL_FUNCTION inline float _GetMoveAxisOnController(input_state* Input, inpu
                     Result = PadStick->Direction.y * PadStick->Magnitude * Input->LeftStickMultiplier;
                 }
                 
-                b32 InternalGot = JOY_FALSE;
+                b32 InternalGot = false;
                 float MoveValue = GetMoveValueFromButtons(Input, 
                                                           ControllerIndex, 
                                                           Axis, 
@@ -133,7 +133,7 @@ INTERNAL_FUNCTION inline float _GetMoveAxisOnController(input_state* Input, inpu
                     Result = MoveValue;
                 }
                 
-                Got = JOY_TRUE;
+                Got = true;
             }break;
             
             case InputControllerSource_Keyboard:{
@@ -160,7 +160,7 @@ INTERNAL_FUNCTION inline float _GetMoveAxisOnController(input_state* Input, inpu
                         Result = -PadStick->Direction.y * PadStick->Magnitude * Input->RightStickMultiplier;
                     }
                     
-                    Got = JOY_TRUE;
+                    Got = true;
                 }
                 
             }break;
@@ -170,20 +170,20 @@ INTERNAL_FUNCTION inline float _GetMoveAxisOnController(input_state* Input, inpu
                 if((Axis == MoveAxis_MouseX) && (Abs(Input->MouseDeltaP.x) > 0.0f)){
                     Result = Input->MouseDeltaP.x;
                     
-                    Got = JOY_TRUE;
+                    Got = true;
                 }
                 else if((Axis == MoveAxis_MouseY) && (Abs(Input->MouseDeltaP.y) > 0.0f)){
                     Result = Input->MouseDeltaP.y;
                     
-                    Got = JOY_TRUE;
+                    Got = true;
                 }
                 
-                b32 InternalGot = JOY_FALSE;
+                b32 InternalGot = false;
                 float ButMove = GetMoveValueFromButtons(Input, ControllerIndex, Axis, &InternalGot);
                 
                 if(InternalGot){
                     Result += ButMove * Input->KeyboardMouseMultiplier;
-                    Got = JOY_TRUE;
+                    Got = true;
                 }
             }break;
         }
@@ -210,7 +210,7 @@ float GetMoveAxis(input_state* Input, u32 Axis){
     for(int ControllerIndex = 0; ControllerIndex < MAX_CONTROLLER_COUNT; ControllerIndex++){
         input_controller* Cont = &Input->Controllers[ControllerIndex];
         
-        b32 Got = JOY_FALSE;
+        b32 Got = false;
         float MoveValue = _GetMoveAxisOnController(Input, Cont, ControllerIndex, Axis, &Got);
         if(Got){
             Result = MoveValue;
@@ -223,7 +223,7 @@ float GetMoveAxis(input_state* Input, u32 Axis){
 
 void InitInput(input_state* Input)
 {
-    Input->CapturingMouse = JOY_TRUE;
+    Input->CapturingMouse = true;
     
     Input->LeftStickMultiplier = 1.0f;
     Input->RightStickMultiplier = 1.0f;

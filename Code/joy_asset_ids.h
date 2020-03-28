@@ -2,6 +2,8 @@
 #define JOY_ASSET_IDS_H
 
 #include "joy_types.h"
+#include "joy_math.h"
+#include "joy_asset_types_shared.h"
 
 enum asset_type{
     AssetType_None,
@@ -15,6 +17,7 @@ enum asset_type{
     AssetType_Glyph,
     AssetType_Model,
     AssetType_Material,
+    AssetType_Skeleton,
 };
 
 enum asset_state{
@@ -54,12 +57,27 @@ struct asset_material{
 struct asset_model{
     int MeshCount;
     int MaterialCount;
+    int SkeletonCount;
     
     u32 DataOffsetToMeshIDs;
     u32 DataOffsetToMaterialIDs;
+    u32 DataOffsetToSkeletonIDs;
     
     u32 SizeMeshIDs;
     u32 SizeMaterialIDs;
+    u32 SizeSkeletonIDs;
+    
+    int NodeCount;
+    u32 DataOffsetToNodes;
+    u32 SizeNodes;
+};
+
+struct asset_skeleton{
+    u32 CheckSum;
+    int BoneCount;
+    
+    u32 DataOffsetToBones;
+    u32 SizeBones;
 };
 
 struct asset_bitmap{
@@ -169,9 +187,11 @@ struct asset_header{
     u32 TotalTagsSize;
     
     u32 Pitch;
+    b32 ImmediateLoad;
     
     union{
         asset_model Model;
+        asset_skeleton Skeleton;
         asset_material Material;
         asset_bitmap Bitmap;
         asset_array Array;
@@ -271,6 +291,7 @@ enum asset_group_type{
     GameAsset_Cylynder,
     
     // NOTE(Dima): Meshes
+    GameAsset_Man,
     GameAsset_Bathroom,
     GameAsset_Heart,
     GameAsset_KindPlane,
@@ -295,6 +316,7 @@ enum asset_group_type{
     GameAsset_Type_Mesh,
     GameAsset_Type_Material,
     GameAsset_Type_BitmapArray,
+    GameAsset_Type_Skeleton,
     
     GameAsset_Count,
 };

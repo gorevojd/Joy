@@ -5,7 +5,6 @@
 #include "joy_gui.h"
 #include "joy_render.h"
 #include "joy_camera.h"
-#include "joy_data_structures.h"
 #include "joy_assets_render.h"
 #include "joy_random.h"
 
@@ -177,7 +176,7 @@ GAME_MODE_UPDATE(TestUpdate){
                                                                   SphereDistributionsmaxCount,
                                                                   State->SphereDistributionsFib);
         
-        State->Initialized = JOY_TRUE;
+        State->Initialized = true;
     }
     
     float DeltaTime = Game->Render->FrameInfo.dt;
@@ -304,6 +303,13 @@ GAME_MODE_UPDATE(TestUpdate){
         }
     }
     
+    
+    PushOrLoadModel(Game->Assets, Stack,
+                    GetFirst(Game->Assets, GameAsset_Man),
+                    V3(15.0f, 0.0f, 10.0f),
+                    QuatI(), V3(1.0f),
+                    ASSET_LOAD_DEFERRED);
+    
     PushOrLoadModel(Game->Assets, Stack,
                     GetFirst(Game->Assets, GameAsset_Stool),
                     V3(10.0f, 0.0f, 10.0f),
@@ -364,7 +370,6 @@ GAME_MODE_UPDATE(TestUpdate){
                     V3(-30.0f, 0.0f, 10.0f),
                     QuatI(), V3(1.0f),
                     ASSET_LOAD_DEFERRED);
-    
     
 #if 0    
     PushOrLoadMesh(Game->Assets, Stack, 
@@ -460,7 +465,7 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
         State->TimeSinceShow = 0.0f;
         State->ShowSpeed = 1.0f;
         
-        State->Initialized = JOY_TRUE;
+        State->Initialized = true;
     }
 #if 0    
     

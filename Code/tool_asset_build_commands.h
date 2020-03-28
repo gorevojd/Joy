@@ -4,6 +4,11 @@
 #include "tool_asset_build_types.h"
 #include "tool_asset_build_loading.h"
 
+enum{
+    Immediate_No,
+    Immediate_Yes,
+};
+
 struct added_asset {
 	game_asset* Asset;
 	game_asset_source* Source;
@@ -41,6 +46,9 @@ added_asset AddSoundAssetManual(asset_system* System,
 added_asset AddMeshAsset(asset_system* System, 
                          tool_mesh_info* Mesh);
 
+added_asset AddSkeletonAsset(asset_system* System,
+                             tool_skeleton_info* Skeleton);
+
 added_asset AddModelAsset(asset_system* System,
                           tool_model_info* Model);
 
@@ -60,7 +68,6 @@ added_asset AddGlyphAsset(asset_system* System,
 added_asset AddArrayAsset(asset_system* System, 
                           u32 FirstID, 
                           int Count);
-
 
 
 void InitAssetFile(asset_system* Assets);

@@ -296,7 +296,7 @@ INTERNAL_FUNCTION inline void GlFreeMeshHandles(mesh_handles* Handles){
         }
     }
     
-    Handles->Allocated = JOY_FALSE;
+    Handles->Allocated = false;
 }
 
 INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
@@ -381,7 +381,7 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
         
         Err = glGetError();
         
-        Result->Allocated = JOY_TRUE;
+        Result->Allocated = true;
     }
     
     return(Result);
@@ -617,7 +617,7 @@ void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
                     Min.x, Min.y, 0.0f, 0.0f, r, g, b, a,
                 };
                 
-                GlRenderGuiRect(GL, GL->GuiOrtho.e, JOY_TRUE, 
+                GlRenderGuiRect(GL, GL->GuiOrtho.e, true, 
                                 entry->Bitmap->Handle,
                                 RectArr, sizeof(RectArr));
                 

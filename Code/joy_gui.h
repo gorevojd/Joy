@@ -473,7 +473,7 @@ inline void GuiSetActive(gui_state* Gui, gui_interaction* interaction){
        interaction->Context.Priority >= Gui->ActiveInteraction.Priority)
     {
         Gui->ActiveInteraction = interaction->Context;
-        GuiSetHot(Gui, interaction, JOY_FALSE);
+        GuiSetHot(Gui, interaction, false);
     }
 }
 
@@ -506,12 +506,12 @@ inline void GuiGoToGrid(gui_state* Gui, char* GridName){
     
     u32 ID = StringHashFNV(GridName);
     
-    b32 FoundWithName = JOY_FALSE;
+    b32 FoundWithName = false;
     Gui_Element* AtGrid = Parent->childSentinel->Next;
     while(AtGrid != Parent->childSentinel){
         
         if(AtGrid->id == ID){
-            FoundWithName = JOY_TRUE;
+            FoundWithName = true;
             break;
         }
         
@@ -540,18 +540,18 @@ struct Gui_BoolInRect_Interaction : public gui_interaction{
         this->WasActiveInInteraction = 0;
         
         if(MouseInInteractiveArea(Gui, Rect)){
-            GuiSetHot(Gui, this, JOY_TRUE);
-            this->WasHotInInteraction = JOY_TRUE;
+            GuiSetHot(Gui, this, true);
+            this->WasHotInInteraction = true;
             
             if(KeyWentDown(Gui->FrameInfo.Input, MouseKey_Left)){
                 GuiSetActive(Gui, this);
                 *Value = !*Value;
-                this->WasActiveInInteraction = JOY_TRUE;
+                this->WasActiveInInteraction = true;
                 GuiReleaseInteraction(Gui, this);
             }
         }
         else{
-            GuiSetHot(Gui, this, JOY_FALSE);
+            GuiSetHot(Gui, this, false);
         }
     }
 };

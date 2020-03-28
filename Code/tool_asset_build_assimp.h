@@ -11,6 +11,7 @@
 #include <unordered_set>
 #include <map>
 #include <string>
+#include <queue>
 
 #include <assimp/Importer.hpp>      // C++ importer interface
 #include <assimp/scene.h>           // Output data structure
@@ -37,6 +38,24 @@ struct loaded_mat_texture{
     u32 StoredBitmapID;
 };
 
+struct loaded_node{
+    char Name[MAXLEN];
+    
+    aiNode* AssimpNode;
+    aiBone* AssimpBone;
+    
+    // NOTE(Dima): Not sure if i actually need it
+    m44 ToParent;
+    m44 ToWorld;
+    
+    // NOTE(Dima): If root than this is -1
+    int ParentIndex;
+    
+    // NOTE(Dima): Child data
+    int FirstChildIndex;
+    int ChildCount;
+};
+
 struct loaded_mat{
     int TextureFirstIndexOfTypeInArray[ArrayCount(SupportedTexturesTypes)];
     int TextureCountOfType[ArrayCount(SupportedTexturesTypes)];
@@ -52,14 +71,30 @@ of specific texture type
 };
 
 enum assimp_load_mesh_flags {
-	AssimpLoadMesh_GenerateNormals = 1,
-	AssimpLoadMesh_GenerateTangents = 2,
-	AssimpLoadMesh_GenerateSmoothNormals = 4,
+	AssimpLoadMesh_GenerateNormals = (1 << 0),
+	AssimpLoadMesh_GenerateTangents = (1 << 1),
+	AssimpLoadMesh_GenerateSmoothNormals = (1 << 2),
+    AssimpLoadMesh_ImportOnlyAnimation = (1 << 3),
+};
+
+struct loaded_mesh_slot{
+    tool_mesh_info Mesh;
+    b32 MeshLoaded;
+    
+    // NOTE(Dima): -1 if Non-skeleton mesh
+    int SkeletonIndex;
 };
 
 struct loaded_model{
-    std::vector<tool_mesh_info> Meshes;
+    // NOTE(Dima): These are will be stored
+    std::vector<loaded_mesh_slot> Meshes;
     std::vector<loaded_mat> Materials;
+    std::vector<tool_skeleton_info> Skeletons;
+    std::vector<loaded_node> Nodes;
+    
+    // NOTE(Dima): These are temporary
+    // NOTE(Dima): Mapping bone name to corresponding node in hierarchy
+    std::unordered_map<std::string, int> BoneNameToNode;
     
     tool_model_info ToolModelInfo;
 };
@@ -143,6 +178,21 @@ inline v4 Assimp2JoyVector4(const aiColor4D& AssimpVector) {
 	Result.w = AssimpVector.a;
     
 	return(Result);
+}
+
+inline u32 StringHashFNV(char* Name) {
+    u32 Result = 2166136261;
+    
+    char* At = Name;
+    while (*At) {
+        
+        Result *= 16777619;
+        Result ^= *At;
+        
+        At++;
+    }
+    
+    return(Result);
 }
 
 #endif

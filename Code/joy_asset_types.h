@@ -3,6 +3,7 @@
 
 #include "joy_types.h"
 #include "joy_math.h"
+#include "joy_asset_types_shared.h"
 
 struct array_info{
     u32 FirstID;
@@ -144,14 +145,6 @@ struct mesh_info{
     mesh_handles Handles;
 };
 
-struct model_info{
-    u32* MeshIDs;
-    u32* MaterialIDs;
-    
-    u32 MeshCount;
-    u32 MaterialCount;
-};
-
 struct glyph_info{
     int Codepoint;
     
@@ -180,6 +173,27 @@ struct font_info{
     int GlyphCount;
     
     u8 Codepoint2Glyph[FONT_INFO_MAX_GLYPH_COUNT];
+};
+
+struct skeleton_info{
+    u32 CheckSum;
+    
+    bone_info* Bones;
+    int BoneCount;
+};
+
+
+struct model_info{
+    u32* MeshIDs;
+    u32* MaterialIDs;
+    u32* SkeletonIDs;
+    
+    node_info* Nodes;
+    int NodeCount;
+    
+    int MeshCount;
+    int MaterialCount;
+    int SkeletonCount;
 };
 
 #endif

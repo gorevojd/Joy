@@ -378,7 +378,7 @@ inline b32 ButIsDown(input_state* Input, u32 ButType){
         input_controller* Cont = &Input->Controllers[ControllerIndex];
         
         if(ButIsDownOnController(Input, ControllerIndex, ButType)){
-            Result = JOY_TRUE;
+            Result = true;
             break;
         }
     }
@@ -396,7 +396,7 @@ inline b32 ButWentDown(input_state* Input, u32 ButType){
         input_controller* Cont = &Input->Controllers[ControllerIndex];
         
         if(ButWentDownOnController(Input, ControllerIndex, ButType)){
-            Result = JOY_TRUE;
+            Result = true;
             break;
         }
     }
@@ -414,7 +414,7 @@ inline b32 ButWentUp(input_state* Input, u32 ButType){
         input_controller* Cont = &Input->Controllers[ControllerIndex];
         
         if(ButWentUpOnController(Input, ControllerIndex, ButType)){
-            Result = JOY_TRUE;
+            Result = true;
             break;
         }
     }

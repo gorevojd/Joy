@@ -26,7 +26,11 @@ void EndAsset(asset_system* System) {
     System->PrevAssetPointer = 0;
 }
 
-INTERNAL_FUNCTION added_asset AddAsset(asset_system* System, u32 AssetType) {
+INTERNAL_FUNCTION added_asset AddAsset(
+asset_system* System, 
+u32 AssetType, 
+b32 ImmediateLoad) 
+{
     added_asset Result = {};
     
     // NOTE(Dima): Getting needed group and region;
@@ -161,7 +165,7 @@ void AddTagHubToAsset(asset_system* System, game_asset_tag_hub* TagHub){
 }
 
 added_asset AddBitmapAsset(asset_system* System, char* Path, u32 BitmapLoadFlags) {
-    added_asset Added = AddAsset(System, AssetType_Bitmap);
+    added_asset Added = AddAsset(System, AssetType_Bitmap, Immediate_No);
     
     // NOTE(Dima): Setting source
     game_asset_source* Source = Added.Source;
@@ -177,7 +181,7 @@ added_asset AddBitmapAssetManual(asset_system* System,
                                  tool_bmp_info* Bitmap, 
                                  u32 BitmapLoadFlags) 
 {
-    added_asset Added = AddAsset(System, AssetType_Bitmap);
+    added_asset Added = AddAsset(System, AssetType_Bitmap, Immediate_No);
     
     asset_header* FileHeader = Added.FileHeader;
     
@@ -201,7 +205,7 @@ added_asset AddIconAsset(asset_system* System,
 added_asset AddSoundAsset(asset_system* System, 
                           char* Path) 
 {
-    added_asset Added = AddAsset(System, AssetType_Sound);
+    added_asset Added = AddAsset(System, AssetType_Sound, Immediate_No);
     
     
     asset_header* FileHeader = Added.FileHeader;
@@ -218,7 +222,7 @@ added_asset AddSoundAsset(asset_system* System,
 added_asset AddSoundAssetManual(asset_system* System, 
                                 tool_sound_info* Sound)
 {
-    added_asset Added = AddAsset(System, AssetType_Sound);
+    added_asset Added = AddAsset(System, AssetType_Sound, Immediate_No);
     
     asset_header* FileHeader = Added.FileHeader;
     game_asset_source* Source = Added.Source;
@@ -234,7 +238,7 @@ added_asset AddSoundAssetManual(asset_system* System,
 added_asset AddMeshAsset(asset_system* System, 
                          tool_mesh_info* Mesh) 
 {
-    added_asset Added = AddAsset(System, AssetType_Mesh);
+    added_asset Added = AddAsset(System, AssetType_Mesh, Immediate_No);
     
     asset_header* FileHeader = Added.FileHeader;
     game_asset_source* Source = Added.Source;
@@ -273,7 +277,7 @@ added_asset AddMeshAsset(asset_system* System,
 added_asset AddMaterialAsset(asset_system* System, 
                              tool_material_info* Material)
 {
-    added_asset Added = AddAsset(System, AssetType_Material);
+    added_asset Added = AddAsset(System, AssetType_Material, Immediate_No);
     
     asset_header* FileHeader = Added.FileHeader;
     game_asset_source* Source = Added.Source;
@@ -296,8 +300,7 @@ added_asset AddMaterialAsset(asset_system* System,
 }
 
 added_asset AddModelAsset(asset_system* System, tool_model_info* Model){
-    added_asset Added = AddAsset(System, AssetType_Model);
-    
+    added_asset Added = AddAsset(System, AssetType_Model, Immediate_No);
     
     asset_header* FileHeader = Added.FileHeader;
     game_asset_source* Source = Added.Source;
@@ -310,15 +313,42 @@ added_asset AddModelAsset(asset_system* System, tool_model_info* Model){
     
     ModelHeader->MeshCount = Model->MeshCount;
     ModelHeader->MaterialCount = Model->MaterialCount;
+    ModelHeader->SkeletonCount = Model->SkeletonCount;
+    ModelHeader->NodeCount = Model->Nodes.size();
     
     ModelHeader->SizeMeshIDs = sizeof(u32) * Model->MeshCount;
     ModelHeader->SizeMaterialIDs = sizeof(u32) * Model->MaterialCount;
+    ModelHeader->SizeSkeletonIDs = sizeof(u32) * Model->SkeletonCount;
     
     ModelHeader->DataOffsetToMeshIDs = 0;
     ModelHeader->DataOffsetToMaterialIDs = ModelHeader->SizeMeshIDs;
+    ModelHeader->DataOffsetToSkeletonIDs = 
+        ModelHeader->DataOffsetToMaterialIDs + ModelHeader->SizeMaterialIDs;
     
-    AddFreeareaToAsset(System, Added.Asset, Model->MeshIDs);
-    AddFreeareaToAsset(System, Added.Asset, Model->MaterialIDs);
+    ModelHeader->NodeCount = Model->Nodes.size();
+    ModelHeader->DataOffsetToNodes = 
+        ModelHeader->DataOffsetToSkeletonIDs + ModelHeader->SizeSkeletonIDs;
+    ModelHeader->SizeNodes = sizeof(node_info) * Model->Nodes.size();
+    
+    return(Added);
+}
+
+added_asset AddSkeletonAsset(asset_system* System, tool_skeleton_info* Skeleton){
+    added_asset Added = AddAsset(System, AssetType_Skeleton, Immediate_No);
+    
+    asset_header* FileHeader = Added.FileHeader;
+    game_asset_source* Source = Added.Source;
+    
+    // NOTE(Dima): Setting source
+    Source->SkeletonSource.SkeletonInfo = Skeleton;
+    
+    // NOTE(Dima): Setting file header
+    asset_skeleton* SkHeader = &FileHeader->Skeleton;
+    
+    SkHeader->CheckSum = Skeleton->CheckSum;
+    SkHeader->BoneCount = Skeleton->Bones.size();
+    SkHeader->DataOffsetToBones = 0;
+    SkHeader->SizeBones = sizeof(bone_info) * Skeleton->Bones.size();
     
     return(Added);
 }
@@ -327,7 +357,7 @@ added_asset AddFontAsset(
 asset_system* System,
 tool_font_info* FontInfo)
 {
-    added_asset Added = AddAsset(System, AssetType_Font);
+    added_asset Added = AddAsset(System, AssetType_Font, Immediate_No);
     
     game_asset_source* Source = Added.Source;
     asset_header* Header = Added.FileHeader;
@@ -352,7 +382,7 @@ asset_system* System,
 tool_glyph_info* GlyphInfo, 
 u32 BitmapID)
 {
-    added_asset Added = AddAsset(System, AssetType_Glyph);
+    added_asset Added = AddAsset(System, AssetType_Glyph, Immediate_No);
     
     game_asset_source* Source = Added.Source;
     Source->GlyphSource.Glyph = GlyphInfo;
@@ -386,7 +416,7 @@ added_asset AddArrayAsset(asset_system* System,
                           u32 FirstID, 
                           int Count)
 {
-    added_asset Added = AddAsset(System, AssetType_Array);
+    added_asset Added = AddAsset(System, AssetType_Array, Immediate_No);
     
     asset_header* Header = Added.FileHeader;
     
@@ -625,7 +655,15 @@ And forming group regions that are about to be written
                     
                     DataByteSize = 
                         Header->Model.SizeMeshIDs + 
-                        Header->Model.SizeMaterialIDs;
+                        Header->Model.SizeMaterialIDs + 
+                        Header->Model.SizeSkeletonIDs + 
+                        Header->Model.SizeNodes;
+                }break;
+                
+                case AssetType_Skeleton:{
+                    Asset->Skeleton = Source->SkeletonSource.SkeletonInfo;
+                    
+                    DataByteSize = Header->Skeleton.SizeBones;
                 }break;
             }
             
@@ -711,15 +749,46 @@ And forming group regions that are about to be written
                 }break;
                 
                 case AssetType_Model:{
-                    // NOTE(Dima): Writing Mesh IDs
-                    fwrite(Asset->Model->MeshIDs,
-                           Header->Model.SizeMeshIDs,
-                           1, fp);
+                    asset_model* ModelH = &Header->Model;
                     
-                    // NOTE(Dima): Writing material IDs
-                    fwrite(Asset->Model->MaterialIDs,
-                           Header->Model.SizeMaterialIDs,
-                           1, fp);
+                    if(ModelH->MeshCount){
+                        // NOTE(Dima): Writing Mesh IDs
+                        fwrite(&Asset->Model->MeshIDs[0],
+                               Header->Model.SizeMeshIDs,
+                               1, fp);
+                    }
+                    
+                    if(ModelH->MaterialCount){
+                        // NOTE(Dima): Writing material IDs
+                        fwrite(&Asset->Model->MaterialIDs[0],
+                               Header->Model.SizeMaterialIDs,
+                               1, fp);
+                    }
+                    
+                    if(ModelH->SkeletonCount){
+                        // NOTE(Dima): Writing skeleton IDs
+                        fwrite(&Asset->Model->SkeletonIDs[0],
+                               Header->Model.SizeSkeletonIDs,
+                               1, fp);
+                    }
+                    
+                    if(ModelH->NodeCount){
+                        // NOTE(Dima): Writing nodes
+                        fwrite(&Asset->Model->Nodes[0],
+                               Header->Model.SizeNodes,
+                               1, fp);
+                    }
+                }break;
+                
+                case AssetType_Skeleton:{
+                    asset_skeleton* SkeletonH = &Header->Skeleton;
+                    
+                    if(SkeletonH->BoneCount){
+                        // NOTE(Dima): Writing skeleton bones
+                        fwrite(&Asset->Skeleton->Bones[0],
+                               Header->Skeleton.SizeBones,
+                               1, fp);
+                    }
                 }break;
             }
             

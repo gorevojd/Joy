@@ -74,7 +74,7 @@ struct gl_shader{
     }
     
     void SetM44(GLint Loc, float* Data){
-        glUniformMatrix4fv(Loc, 1, JOY_TRUE, Data);
+        glUniformMatrix4fv(Loc, 1, true, Data);
     }
 };
 

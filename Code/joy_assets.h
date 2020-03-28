@@ -13,13 +13,9 @@
 #include "joy_random.h"
 
 #include "joy_asset_ids.h"
-#include "joy_data_structures.h"
 
-#define ASSET_LOAD_IMMEDIATE JOY_TRUE
-#define ASSET_LOAD_DEFERRED JOY_FALSE
-
-#define ASSET_SHOULD_LOAD JOY_TRUE
-#define ASSET_SHOULD_NOT_LOAD JOY_FALSE
+#define ASSET_LOAD_IMMEDIATE true
+#define ASSET_LOAD_DEFERRED false
 
 struct asset_file_source{
     platform_file_desc FileDescription;
@@ -71,6 +67,7 @@ struct asset{
         ASSET_PTR_MEMBER(glyph_info);
         ASSET_PTR_MEMBER(sound_info);
         ASSET_PTR_MEMBER(model_info);
+        ASSET_PTR_MEMBER(skeleton_info);
     };
 };
 

@@ -38,9 +38,6 @@
 #define Abs(a) ((a) >= 0) ? (a) : -(a)
 #endif
 
-#define JOY_TRUE 1
-#define JOY_FALSE 0
-
 #define DLIST_REFLECT_PTRS(value, next, prev) {\
     (value).##next = &(value); \
     (value).##prev = &(value);}

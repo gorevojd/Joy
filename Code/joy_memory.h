@@ -80,7 +80,7 @@ inline void* PushSomeMem(mem_region* Region, size_t Size, size_t Align = 8){
     
     void* Result = 0;
     
-    b32 NeedNewBlock = JOY_FALSE;
+    b32 NeedNewBlock = false;
     
     size_t AlignedPos = 0;
     size_t NewUsedCount = 0;
@@ -97,12 +97,12 @@ inline void* PushSomeMem(mem_region* Region, size_t Size, size_t Align = 8){
             // NOTE(Dima): Need to allocate new block and set current
             // NOTE(Dima): block as old for new one.
             
-            NeedNewBlock = JOY_TRUE;
+            NeedNewBlock = true;
             
             // NOTE(Dima): Finding empty but not used blocks
             while(Region->Block->Next != 0){
                 if(Size <= Region->Block->Block.Total){
-                    NeedNewBlock = JOY_FALSE;
+                    NeedNewBlock = false;
                     
                     break;
                 }
@@ -115,7 +115,7 @@ inline void* PushSomeMem(mem_region* Region, size_t Size, size_t Align = 8){
         // NOTE(Dima): Need to allocate new block and set 
         // NOTE(Dima): old and next as zeroes.
         
-        NeedNewBlock = JOY_TRUE;
+        NeedNewBlock = true;
     }
     
     if(NeedNewBlock){

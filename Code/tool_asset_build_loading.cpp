@@ -586,7 +586,10 @@ b32 CalculateTangents)
     memset(Result.Vertices, 0, VertsSize);
     
     ASSERT(Positions.size());
-    ASSERT(TexCoords.size());
+    
+    if(TexCoords.size() == 0){
+        TexCoords.insert(TexCoords.begin(), Positions.size(), V2(0.0f, 0.0f));
+    }
     
     vertex_info* DstVerts = (vertex_info*)Result.Vertices;
     

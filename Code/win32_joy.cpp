@@ -12,8 +12,6 @@
 dima privet , kak dela? i tebia lybly
 */
 
-#include "joy_data_structures.h"
-
 GLOBAL_VARIABLE mem_region gMem = {};
 GLOBAL_VARIABLE win_state GlobalWin32;
 GLOBAL_VARIABLE b32 GlobalRunning;
@@ -1921,7 +1919,7 @@ Win32ProcessInput(input_state* Input)
         MouseActualDelta = CurMouseP - Input->MouseP;
     }
     else{
-        Input->NotFirstFrame = JOY_TRUE;
+        Input->NotFirstFrame = true;
     }
     
     // NOTE(Dima): Processing capturing mouse
@@ -1991,7 +1989,7 @@ Win32ProcessInput(input_state* Input)
         if(GetControlRes == ERROR_SUCCESS){
             // NOTE(Dima): Controller is connected
             XINPUT_GAMEPAD* XPad = &State.Gamepad;
-            Controller->IsConnected = JOY_TRUE;
+            Controller->IsConnected = true;
             
             // NOTE(Dima): Battery info getting
             XINPUT_BATTERY_INFORMATION BatteryInfo;
@@ -2065,7 +2063,7 @@ Win32ProcessInput(input_state* Input)
         }
         else {
             // NOTE(Dima): Controller is not connected
-            Controller->IsConnected = JOY_FALSE;
+            Controller->IsConnected = false;
         }
     }
     

@@ -24,7 +24,7 @@ inline bmp_info* PushOrLoadBitmap(assets* Assets,
                                   v2 P, v2 Dim,
                                   asset_id BmpID,
                                   v4 ModColor = V4(1.0f, 1.0f, 1.0f, 1.0f),
-                                  b32 Immediate = JOY_FALSE)
+                                  b32 Immediate = false)
 {
     asset* Asset = GetAssetByID(Assets, BmpID);
     ASSERT(Asset->Type == AssetType_Bitmap);
@@ -46,7 +46,7 @@ inline bmp_info* PushOrLoadGlyph(assets* Assets,
                                  v2 P, v2 Dim,
                                  asset_id BmpID, 
                                  v4 ModColor = V4(1.0f, 1.0f, 1.0f, 1.0f),
-                                 b32 Immediate = JOY_FALSE)
+                                 b32 Immediate = false)
 {
     asset* Asset = GetAssetByID(Assets, BmpID);
     ASSERT(Asset->Type == AssetType_Bitmap);
@@ -70,7 +70,7 @@ inline bmp_info* PushOrLoadGlyph(assets* Assets,
 
 inline font_info* PushOrLoadFont(assets* Assets,
                                  asset_id FontID,
-                                 b32 Immediate = JOY_FALSE)
+                                 b32 Immediate = false)
 {
     asset* Asset = GetAssetByID(Assets, FontID);
     ASSERT(Asset->Type == AssetType_Font);
@@ -85,11 +85,12 @@ inline font_info* PushOrLoadFont(assets* Assets,
     return(Font);
 }
 
+
 inline mesh_info* PushOrLoadMesh(assets* Assets, 
                                  render_stack* Stack,
                                  asset_id MeshID,
                                  v3 P, quat R, v3 S,
-                                 b32 Immediate = JOY_FALSE)
+                                 b32 Immediate = false)
 {
     asset* Asset = GetAssetByID(Assets, MeshID);
     ASSERT(Asset->Type == AssetType_Mesh);
@@ -106,11 +107,33 @@ inline mesh_info* PushOrLoadMesh(assets* Assets,
     return(Mesh);
 }
 
+inline mesh_info* PushOrLoadMesh(assets* Assets, 
+                                 render_stack* Stack,
+                                 asset_id MeshID,
+                                 m44 Transformation,
+                                 b32 Immediate = false)
+{
+    asset* Asset = GetAssetByID(Assets, MeshID);
+    ASSERT(Asset->Type == AssetType_Mesh);
+    
+    LoadAsset(Assets, Asset, Immediate);
+    
+    mesh_info* Mesh = 0;
+    if(PotentiallyLoadedAsset(Asset, Immediate)){
+        Mesh = GET_ASSET_PTR_MEMBER(Asset, mesh_info);
+        
+        
+        PushMesh(Stack, Mesh, Transformation);
+    }
+    
+    return(Mesh);
+}
+
 inline model_info* PushOrLoadModel(assets* Assets,
                                    render_stack* Stack,
                                    asset_id ModelID,
                                    v3 P, quat R, v3 S,
-                                   b32 Immediate = JOY_FALSE)
+                                   b32 Immediate = false)
 {
     asset* Asset = GetAssetByID(Assets, ModelID);
     ASSERT(Asset->Type == AssetType_Model);
@@ -121,6 +144,7 @@ inline model_info* PushOrLoadModel(assets* Assets,
     if(PotentiallyLoadedAsset(Asset, Immediate)){
         Model= GET_ASSET_PTR_MEMBER(Asset, model_info);
         
+#if 1        
         for(int MeshIDIndex = 0; 
             MeshIDIndex < Model->MeshCount;
             MeshIDIndex++)
@@ -129,8 +153,24 @@ inline model_info* PushOrLoadModel(assets* Assets,
             
             PushOrLoadMesh(Assets, Stack, MeshID, P, R, S);
         }
+#endif
         
+        m44 ModelToWorld = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
+        
+        for(int NodeIndex = 0;
+            NodeIndex < Model->NodeCount;
+            NodeIndex++)
+        {
+            node_info* Node = &Model->Nodes[NodeIndex];
+            
+            asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
+            
+            m44 Transformation = ScalingMatrix(V3(0.3f)) * Node->ToWorld * ModelToWorld;
+            
+            PushOrLoadMesh(Assets, Stack, CubeMeshID, Transformation);
+        }
     }
+    
     
     return(Model);
 }

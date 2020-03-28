@@ -40,7 +40,6 @@ ECHO *   JOY   *
 ECHO ***********
 
 set COMPILATION_FILES=..\Code\win32_joy.cpp
-set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_data_structures.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_sort.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_memory.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_render.cpp
@@ -50,7 +49,6 @@ set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_platform.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_render_blur.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_software_renderer.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_software_renderer_functions.cpp
-set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_asset_util.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_colors.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_opengl.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_audio.cpp

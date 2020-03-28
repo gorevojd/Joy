@@ -122,7 +122,7 @@ TODO(Dima): Ideas to make it faster:
         {
             asset* Asset = Grp->PointersToAssets[GrpAssetIndex];
             
-            b32 ShouldExitAssetLoop = JOY_FALSE;
+            b32 ShouldExitAssetLoop = false;
             
             float Weight = 0.0f;
             
@@ -134,7 +134,7 @@ TODO(Dima): Ideas to make it faster:
                 asset_tag_value* Value = &TagValues[MatchTagIndex];
                 u32 TagType = TagTypes[MatchTagIndex];
                 
-                b32 ShouldExitMatchLoop = JOY_FALSE;
+                b32 ShouldExitMatchLoop = false;
                 
                 for(int TagIndex = 0; TagIndex < Asset->TagCount; TagIndex++)
                 {
@@ -158,8 +158,8 @@ TODO(Dima): Ideas to make it faster:
                             case AssetTagValue_Empty:{
                                 BestIndex = GrpAssetIndex;
                                 
-                                ShouldExitMatchLoop = JOY_TRUE;
-                                ShouldExitAssetLoop = JOY_TRUE;
+                                ShouldExitMatchLoop = true;
+                                ShouldExitAssetLoop = true;
                                 break;
                             }break;
                         }
@@ -336,11 +336,40 @@ void LoadAssetDirectly(assets* Assets,
             asset_model* Src = &Header->Model;
             
             // NOTE(Dima): Loading and storing model data
-            u32* MeshIDs = (u32*)((u8*)Data + Src->DataOffsetToMeshIDs);
-            u32* MaterialIDs = (u32*)((u8*)Data + Src->DataOffsetToMaterialIDs);
+            Result->MeshIDs = 0;
+            if(Src->MeshCount){
+                u32* MeshIDs = (u32*)((u8*)Data + Src->DataOffsetToMeshIDs);
+                Result->MeshIDs = MeshIDs;
+            }
             
-            Result->MeshIDs = MeshIDs;
-            Result->MaterialIDs = MaterialIDs;
+            Result->Nodes = 0;
+            if(Src->NodeCount){
+                node_info* Nodes = (node_info*)((u8*)Data + Src->DataOffsetToNodes);
+                Result->Nodes = Nodes;
+            }
+            
+            Result->MaterialIDs = 0;
+            if(Src->MaterialCount){
+                u32* MaterialIDs = (u32*)((u8*)Data + Src->DataOffsetToMaterialIDs);
+                Result->MaterialIDs = MaterialIDs;
+            }
+            
+            Result->SkeletonIDs = 0;
+            if(Src->SkeletonCount){
+                u32* SkeletonIDs = (u32*)((u8*)Data + Src->DataOffsetToSkeletonIDs);
+                Result->SkeletonIDs = SkeletonIDs;
+            }
+        }break;
+        
+        case AssetType_Skeleton:{
+            skeleton_info* Result = GET_ASSET_PTR_MEMBER(Asset, skeleton_info);
+            asset_skeleton* Src = &Header->Skeleton;
+            
+            Result->Bones = 0;
+            if(Src->BoneCount){
+                bone_info* Bones = (bone_info*)((u8*)Data + Src->DataOffsetToBones);
+                Result->Bones = Bones;
+            }
         }break;
     }
     
@@ -654,7 +683,12 @@ void InitAssets(assets* Assets){
                     u32 DataOffsetInFile = LineOffset + AssetHeader.LineDataOffset;
                     NewAsset->OffsetToData = DataOffsetInFile;
                     
+                    // NOTE(Dima): If we should load asset immediately - do it
+                    if(AssetHeader.ImmediateLoad){
+                        LoadAsset(Assets, NewAsset, ASSET_LOAD_IMMEDIATE);
+                    }
 #define ALLOC_ASS_PTR_MEMBER(type) (type*)AllocateAssetType(Assets, NewAsset, (void**)&GET_ASSET_PTR_MEMBER(NewAsset, type), sizeof(type))
+                    
                     
                     // NOTE(Dima): Initializing assets
                     // NOTE(Dima): Loading description info from file headers
@@ -748,6 +782,17 @@ void InitAssets(assets* Assets){
                             
                             Result->MeshCount = Src->MeshCount;
                             Result->MaterialCount = Src->MaterialCount;
+                            Result->SkeletonCount = Src->SkeletonCount;
+                            Result->NodeCount = Src->NodeCount;
+                        }break;
+                        
+                        case AssetType_Skeleton:{
+                            skeleton_info* Result = ALLOC_ASS_PTR_MEMBER(skeleton_info);
+                            asset_skeleton* Src = &AssetHeader.Skeleton;
+                            
+                            Result->BoneCount = Src->BoneCount;
+                            
+                            // TODO(Dima): Use checksum later to load only not loaded skeletons
                         }break;
                     }
                 }

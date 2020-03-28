@@ -450,14 +450,21 @@ inline void PushGlyph(render_stack* Stack,
 
 inline void PushMesh(render_stack* Stack,
                      mesh_info* Mesh,
-                     v3 P,
-                     quat R,
-                     v3 S)
+                     m44 Transform)
 {
     render_entry_mesh* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Mesh, render_entry_mesh);
     
     entry->Mesh = Mesh;
-    entry->Transform = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
+    entry->Transform = Transform;
+}
+
+inline void PushMesh(render_stack* Stack,
+                     mesh_info* Mesh,
+                     v3 P,
+                     quat R,
+                     v3 S)
+{
+    PushMesh(Stack, Mesh, ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P));
 }
 
 inline void PushGuiChunk(render_stack* Stack, int ChunkIndex){
