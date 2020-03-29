@@ -1,5 +1,9 @@
 #include "tool_asset_build_assimp.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_STATIC
+#include "stb_image.h"
+
 inline int ConvertAssimpToOurTextureType(u32 Assimp){
     int Result = MaterialTexture_Unknown;
     
@@ -85,26 +89,68 @@ AiLoadMatTexturesForType(loaded_model* Model,
     {
         aiString TexturePath;
         Mat->GetTexture(Type, TextureIndex, &TexturePath);
-        // TODO(Dima): Make sure that this is correct
-        std::string TexturePathNew(TexturePath.C_Str());
         
-        auto* Mapping = &Ctx->PathToTextureMap;
+        mat_texture_source MatTexSource = {};
         
-        b32 NotLoaded = (Mapping->find(TexturePathNew) == Mapping->end());
-        if(NotLoaded){
-            loaded_mat_texture Tex;
-            Tex.Bmp = LoadBMP((char*)TexturePathNew.c_str());
-            Tex.AiType = Type;
+        const char* TexturePathSrc = TexturePath.C_Str(); 
+        if(TexturePathSrc[0] == '*'){
+            // NOTE(Dima): This is embeded texture index
+            char EmbedIndexString[64];
+            for(int i = 1; i < 64; i++){
+                
+                char NewChar = TexturePathSrc[i];
+                EmbedIndexString[i - 1] = NewChar;
+                
+                if(NewChar == 0){
+                    break;
+                }
+            }
             
-            Mapping->insert(std::make_pair(TexturePathNew, Tex));
+            int EmbedIndex = StringToInteger(EmbedIndexString);
+            
+            MatTexSource.IsEmbeded = true;
+            MatTexSource.EmbedIndex = EmbedIndex;
+        }
+        else{
+            // NOTE(Dima): This is normal texture path
+            std::string TexturePathNew(TexturePath.C_Str());
+            
+            // NOTE(Dima): Trying to find texture in embed mapping
+            // NOTE(Dima): If it exist there - than it's embeded texture
+            auto& TexNameToEmbedIndex = Model->TextureNameToEmbedIndex;
+            auto FindIt = TexNameToEmbedIndex.find(TexturePathNew);
+            
+            b32 IsEmbedTexture = (FindIt != TexNameToEmbedIndex.end());
+            
+            if(IsEmbedTexture){
+                int EmbedIndex = TexNameToEmbedIndex[TexturePathNew];
+                
+                MatTexSource.IsEmbeded = true;
+                MatTexSource.EmbedIndex = EmbedIndex;
+            }
+            else{
+                auto* Mapping = &Ctx->PathToTextureMap;
+                
+                b32 NotLoaded = (Mapping->find(TexturePathNew) == Mapping->end());
+                if(NotLoaded){
+                    loaded_mat_texture Tex;
+                    Tex.Bmp = LoadBMP((char*)TexturePathNew.c_str());
+                    
+                    Mapping->insert(std::make_pair(TexturePathNew, Tex));
+                }
+                
+                MatTexSource.IsEmbeded = false;
+                MatTexSource.Path = TexturePathNew;
+            }
         }
         
         // NOTE(Dima): If this is the first texture of type 
         // NOTE(Dima): than return it
         if(TextureIndex == 0){
-            Result.FirstID = OurMat->TexturePathArray.size();
+            Result.FirstID = OurMat->TextureSourceArray.size();
         }
-        OurMat->TexturePathArray.push_back(TexturePathNew);
+        
+        OurMat->TextureSourceArray.push_back(MatTexSource);
     }
     
     return(Result);
@@ -151,18 +197,18 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
 {
     loaded_model Result = {};
     
-	Assimp::Importer importer;
+    Assimp::Importer importer;
     
     // NOTE(Dima): Processing some flags
-	b32 JoyShouldCalculateNormals = 0;
-	b32 JoyShouldCalculateTangents = 0;
+    b32 JoyShouldCalculateNormals = 0;
+    b32 JoyShouldCalculateTangents = 0;
     
-	u64 AssimpFlags = 
+    u64 AssimpFlags = 
         aiProcess_OptimizeMeshes |
-		aiProcess_OptimizeGraph |
+        aiProcess_OptimizeGraph |
         aiProcess_Triangulate |
-		aiProcess_JoinIdenticalVertices |
-		aiProcess_SortByPType;
+        aiProcess_JoinIdenticalVertices |
+        aiProcess_SortByPType;
     
     b32 InGenTangents = Flags & AssimpLoadMesh_GenerateTangents;
     b32 InGenNorm = Flags & AssimpLoadMesh_GenerateNormals;
@@ -170,12 +216,12 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
     b32 InImportOnlyAnimation = Flags & AssimpLoadMesh_ImportOnlyAnimation;
     
     // NOTE(Dima): Generating tangents if needed
-	if (InGenTangents) {
-		AssimpFlags |= aiProcess_CalcTangentSpace;
-	}
-	else {
-		JoyShouldCalculateTangents = true;
-	}
+    if (InGenTangents) {
+        AssimpFlags |= aiProcess_CalcTangentSpace;
+    }
+    else {
+        JoyShouldCalculateTangents = true;
+    }
     
     // NOTE(Dima): Generating normals if needed
     if (InGenNorm || InGenSmNorm) 
@@ -188,27 +234,91 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         }
         
     }
-	else {
-		JoyShouldCalculateNormals = true;
-	}
+    else {
+        JoyShouldCalculateNormals = true;
+    }
     
     // NOTE(Dima): Reading scene
-	const aiScene* scene = importer.ReadFile(
+    const aiScene* scene = importer.ReadFile(
 		FileName,
 		AssimpFlags);
     
-	if (scene) {
-		printf("Loaded by ASSIMP: %s\n", FileName);
-	}
-	else {
-		printf("Error reading ASSIMP: %s\n", FileName);
-	}
+    if (scene) {
+        printf("Loaded by ASSIMP: %s\n", FileName);
+    }
+    else {
+        printf("Error reading ASSIMP: %s\n", FileName);
+    }
+    
+    // NOTE(Dima): Loading embeded textures
+    for(int EmbedIndex = 0;
+        EmbedIndex < scene->mNumTextures;
+        EmbedIndex++)
+    {
+        aiTexture* EmbedTexture = scene->mTextures[EmbedIndex];
+        
+        b32 IsCompressed = EmbedTexture->mHeight == 0;
+        
+        // NOTE(Dima): If texture is uncompressed, this vector will store packed pixels
+        std::vector<u32> OurColors;
+        
+        unsigned char* LoadFromData = 0;
+        u32 DataSize = 0;
+        if(IsCompressed){
+            DataSize = EmbedTexture->mWidth;
+            
+            LoadFromData = (unsigned char*)EmbedTexture->pcData;
+        }
+        else{
+            aiTexel* Texels = EmbedTexture->pcData;
+            int TexelsCount = EmbedTexture->mWidth * EmbedTexture->mHeight;
+            
+            // NOTE(Dima): Packing pixels
+            for(int TexelIndex = 0; 
+                TexelIndex < TexelsCount;
+                TexelIndex++)
+            {
+                aiTexel Texel = Texels[TexelIndex];
+                
+                aiColor4D AssimpColor = aiColor4D(Texel);
+                
+                v4 OurColor;
+                OurColor.r = AssimpColor.r;
+                OurColor.g = AssimpColor.g;
+                OurColor.b = AssimpColor.b;
+                OurColor.a = AssimpColor.a;
+                
+                u32 Packed = PackRGBA(OurColor);
+                OurColors.push_back(Packed);
+            }
+            
+            DataSize = TexelsCount * 4;
+            LoadFromData = (unsigned char*)(&OurColors[0]);
+        }
+        
+        loaded_mat_texture MatTexture;
+        MatTexture.Bmp = LoadFromDataBMP(LoadFromData, DataSize);
+        
+        std::string Name = std::string(EmbedTexture->mFilename.C_Str());
+        MatTexture.Name = Name;
+        
+        Result.TextureNameToEmbedIndex.insert({Name, EmbedIndex});
+        
+        Result.EmbededTextures.push_back(MatTexture);
+    }
     
     //NOTE(Dima): Loading materials
     for(int MatIndex = 0; MatIndex < scene->mNumMaterials;MatIndex++){
         aiMaterial* AssimpMaterial = scene->mMaterials[MatIndex];
-        
         loaded_mat NewMaterial = {};
+        
+        // NOTE(Dima): Getting material name
+        aiString AssimpMatName;
+        if(AssimpMaterial->Get(AI_MATKEY_NAME, AssimpMatName) == AI_SUCCESS){
+            CopyStringsSafe(NewMaterial.Name, 
+                            ARRAY_COUNT(NewMaterial.Name), 
+                            (char*)AssimpMatName.C_Str());
+        }
         
         // NOTE(Dima): Loading textures for supported Assimp textures types
         for(int TTypeIndex = 0;
@@ -233,7 +343,7 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
     assimp_node_traverse_entry FirstEntry = {};
     FirstEntry.Node = scene->mRootNode;
     FirstEntry.ParentIndex = -1;
-    FirstEntry.ToWorld = Assimp2JoyMatrix(scene->mRootNode->mTransformation);
+    FirstEntry.ToWorld = Transpose(Assimp2JoyMatrix(scene->mRootNode->mTransformation));
     std::queue<assimp_node_traverse_entry> NodeProcessQueue;
     NodeProcessQueue.push(FirstEntry);
     
@@ -256,9 +366,17 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         NewNode.ParentIndex = CurEntry.ParentIndex;
         NewNode.AssimpNode = CurNode;
         NewNode.AssimpBone = 0;
-        NewNode.ToParent = Assimp2JoyMatrix(CurNode->mTransformation);
+        NewNode.ToParent = Transpose(Assimp2JoyMatrix(CurNode->mTransformation));
         NewNode.ToWorld = NewNode.ToParent * CurEntry.ToWorld;
         strcpy(NewNode.Name, CurNode->mName.C_Str());
+        
+        // NOTE(Dima): Inserting all child nodes
+        for(int NodeMeshIndex = 0;
+            NodeMeshIndex < CurNode->mNumMeshes;
+            NodeMeshIndex++)
+        {
+            NewNode.MeshIndices.push_back(CurNode->mMeshes[NodeMeshIndex]);
+        }
         
         int ThisNodeIndex = Result.Nodes.size();
         
@@ -271,6 +389,7 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
             assimp_node_traverse_entry Entry = {};
             Entry.Node = CurNode->mChildren[ChildIndex];
             Entry.ParentIndex = ThisNodeIndex;
+            Entry.ToWorld = NewNode.ToWorld;
             
             NodeProcessQueue.push(Entry);
             
@@ -282,65 +401,65 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
     }
     
     // NOTE(Dima): Loading meshes
-	int NumMeshes = scene->mNumMeshes;
-	for (int MeshIndex = 0; MeshIndex < NumMeshes; MeshIndex++) {
-		aiMesh* AssimpMesh = scene->mMeshes[MeshIndex];
+    int NumMeshes = scene->mNumMeshes;
+    for (int MeshIndex = 0; MeshIndex < NumMeshes; MeshIndex++) {
+        aiMesh* AssimpMesh = scene->mMeshes[MeshIndex];
         
-		std::vector<v3> Vertices;
-		std::vector<v3> Normals;
-		std::vector<v2> TexCoords;
-		std::vector<v3> Tangents;
-		std::vector<v3> Colors;
-		std::vector<u32> Indices;
+        std::vector<v3> Vertices;
+        std::vector<v3> Normals;
+        std::vector<v2> TexCoords;
+        std::vector<v3> Tangents;
+        std::vector<v3> Colors;
+        std::vector<u32> Indices;
         
-		int NumColorChannels = AssimpMesh->GetNumColorChannels();
-		int NumUVChannels = AssimpMesh->GetNumUVChannels();
+        int NumColorChannels = AssimpMesh->GetNumColorChannels();
+        int NumUVChannels = AssimpMesh->GetNumUVChannels();
         
-		//NOTE(dima): Getting indices
-		for (int FaceIndex = 0; FaceIndex < AssimpMesh->mNumFaces; FaceIndex++) {
-			aiFace* AssimpFace = &AssimpMesh->mFaces[FaceIndex];
+        //NOTE(dima): Getting indices
+        for (int FaceIndex = 0; FaceIndex < AssimpMesh->mNumFaces; FaceIndex++) {
+            aiFace* AssimpFace = &AssimpMesh->mFaces[FaceIndex];
             
-			int NumberOfIndicesInPrimitive = AssimpFace->mNumIndices;
-			if (NumberOfIndicesInPrimitive == 3) {
-				Indices.push_back(AssimpFace->mIndices[0]);
-				Indices.push_back(AssimpFace->mIndices[1]);
-				Indices.push_back(AssimpFace->mIndices[2]);
-			}
-		}
+            int NumberOfIndicesInPrimitive = AssimpFace->mNumIndices;
+            if (NumberOfIndicesInPrimitive == 3) {
+                Indices.push_back(AssimpFace->mIndices[0]);
+                Indices.push_back(AssimpFace->mIndices[1]);
+                Indices.push_back(AssimpFace->mIndices[2]);
+            }
+        }
         
-		//NOTE(Dima): Getting colors
-		if (NumColorChannels) {
-			int ColorChannelIndex = 0;
+        //NOTE(Dima): Getting colors
+        if (NumColorChannels) {
+            int ColorChannelIndex = 0;
             
-			for (int VIndex = 0; VIndex < AssimpMesh->mNumVertices; VIndex++) {
+            for (int VIndex = 0; VIndex < AssimpMesh->mNumVertices; VIndex++) {
 #if 0
                 v4 Color = Assimp2JoyVector4(AssimpMesh->mColors[ColorChannelIndex][VIndex]);
 #else
                 v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f);
 #endif
                 
-				Colors.push_back(Color.rgb);
-			}
-		}
+                Colors.push_back(Color.rgb);
+            }
+        }
         
-		//NOTE(Dima): Getting UVs
-		if (NumUVChannels) {
-			int UVChannelIndex = 0;
+        //NOTE(Dima): Getting UVs
+        if (NumUVChannels) {
+            int UVChannelIndex = 0;
             
-			for (int VIndex = 0; VIndex < AssimpMesh->mNumVertices; VIndex++) {
-				v3 TexCoord = Assimp2JoyVector3(AssimpMesh->mTextureCoords[UVChannelIndex][VIndex]);
+            for (int VIndex = 0; VIndex < AssimpMesh->mNumVertices; VIndex++) {
+                v3 TexCoord = Assimp2JoyVector3(AssimpMesh->mTextureCoords[UVChannelIndex][VIndex]);
                 
-				TexCoords.push_back(V2(TexCoord.x, TexCoord.y));
-			}
-		}
+                TexCoords.push_back(V2(TexCoord.x, TexCoord.y));
+            }
+        }
         
-		//NOTE(dima): Getting normals, positions, tangents
-		for (int VIndex = 0; VIndex < AssimpMesh->mNumVertices; VIndex++) {
-			v3 P = Assimp2JoyVector3(AssimpMesh->mVertices[VIndex]);
-			v3 N = Assimp2JoyVector3(AssimpMesh->mNormals[VIndex]);
+        //NOTE(dima): Getting normals, positions, tangents
+        for (int VIndex = 0; VIndex < AssimpMesh->mNumVertices; VIndex++) {
+            v3 P = Assimp2JoyVector3(AssimpMesh->mVertices[VIndex]);
+            v3 N = Assimp2JoyVector3(AssimpMesh->mNormals[VIndex]);
             
-			Vertices.push_back(P);
-			Normals.push_back(N);
+            Vertices.push_back(P);
+            Normals.push_back(N);
             
             /*
             NOTE(dima): For some reason ASSIMP sometimes fails to generate tangents.
@@ -460,10 +579,10 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
                 loaded_node* CurNode = &Result.Nodes[CurrentIndex];
                 
                 /*
-NOTE(Dima): If this is bone than init it and add 
-               new child index to parent (if that parent exist of course 
-            in case of root bone);
-               */
+                NOTE(Dima): If this is bone than init it and add 
+                new child index to parent (if that parent exist of course 
+                in case of root bone);
+                */
                 
                 int NewParentIndex = BuildEntry.ParentBoneIndex;
                 if(BoneNames.find(std::string(CurNode->Name)) != BoneNames.end()){
@@ -508,8 +627,8 @@ NOTE(Dima): If this is bone than init it and add
             /*
             NOTE (Dima): Now when i have temp bones hierarchy I can just store 
             it in skeleton_bones array. For this purpose third (and hopefully last) 
-BFS loop will be created for walking through this temp hierarchy and 
-just setting needed data;
+            BFS loop will be created for walking through this temp hierarchy and 
+            just setting needed data;
             */
             tool_skeleton_info Skeleton;
             
@@ -538,7 +657,7 @@ just setting needed data;
                 NewBone.FirstChildIndex = EntriesPushedTotal;
                 NewBone.ChildCount = BoneChildren.size();
                 CopyStringsSafe(NewBone.Name, ARRAY_COUNT(NewBone.Name), CurNode->Name);
-                NewBone.InvBindPose = Assimp2JoyMatrix(CurNode->AssimpBone->mOffsetMatrix);
+                NewBone.InvBindPose = Transpose(Assimp2JoyMatrix(CurNode->AssimpBone->mOffsetMatrix));
                 
                 int ThisBoneIndex = Skeleton.Bones.size();
                 
@@ -603,15 +722,20 @@ INTERNAL_FUNCTION tool_model_info LoadedToToolModelInfo(loaded_model* Model){
     Result.MaterialIDs = std::vector<u32>();
     Result.SkeletonIDs = std::vector<u32>();
     
-    for(auto &Node: Model->Nodes){
-        node_info NewNode;
+    for(int NodeIndex = 0;
+        NodeIndex < Model->Nodes.size();
+        NodeIndex++)
+    {
+        loaded_node* Node = &Model->Nodes[NodeIndex];
+        tool_node_info NewNode;
         
-        CopyStringsSafe(NewNode.Name, ARRAY_COUNT(NewNode.Name), Node.Name);
-        NewNode.ToParent = Node.ToParent;
-        NewNode.ToWorld = Node.ToWorld;
-        NewNode.ParentIndex = Node.ParentIndex;
-        NewNode.FirstChildIndex = Node.FirstChildIndex;
-        NewNode.ChildCount = Node.ChildCount;
+        CopyStringsSafe(NewNode.Name, ARRAY_COUNT(NewNode.Name), Node->Name);
+        NewNode.ToParent = Node->ToParent;
+        NewNode.ToWorld = Node->ToWorld;
+        NewNode.ParentIndex = Node->ParentIndex;
+        NewNode.FirstChildIndex = Node->FirstChildIndex;
+        NewNode.ChildCount = Node->ChildCount;
+        NewNode.MeshIndices = Node->MeshIndices;
         
         Result.Nodes.push_back(NewNode);
     }
@@ -637,6 +761,31 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
     Model->ToolModelInfo = LoadedToToolModelInfo(Model);
     tool_model_info* ToolModel = &Model->ToolModelInfo;
     
+    // NOTE(Dima): Storing nodes
+    BeginAsset(System, GameAsset_Type_Node);
+    for(int NodeIndex = 0;
+        NodeIndex < ToolModel->Nodes.size();
+        NodeIndex++)
+    {
+        added_asset Added = AddNodeAsset(System, &ToolModel->Nodes[NodeIndex]);
+        ToolModel->StoredNodeIDs.push_back(Added.ID);
+    }
+    EndAsset(System);
+    
+    // NOTE(Dima): Storing embeded textures
+    BeginAsset(System, GameAsset_Type_Bitmap);
+    for(int EmbedIndex = 0;
+        EmbedIndex < Model->EmbededTextures.size();
+        EmbedIndex++)
+    {
+        loaded_mat_texture* MatTex = &Model->EmbededTextures[EmbedIndex];
+        
+        added_asset Added = AddBitmapAssetManual(System, &MatTex->Bmp);
+        MatTex->StoredBitmapID = Added.ID;
+    }
+    EndAsset(System);
+    
+    // NOTE(Dima): Storing meshes
     BeginAsset(System, GameAsset_Type_Mesh);
     for(int MeshIndex = 0; 
         MeshIndex < Model->Meshes.size(); 
@@ -647,6 +796,7 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
     }
     EndAsset(System);
     
+    // NOTE(Dima): Storing skeleton
     BeginAsset(System, GameAsset_Type_Skeleton);
     for(int SkeletonIndex = 0;
         SkeletonIndex < Model->Skeletons.size();
@@ -657,6 +807,7 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
     }
     EndAsset(System);
     
+    // NOTE(Dima): Storing materials
     for(int MaterialIndex = 0;
         MaterialIndex < Model->Materials.size();
         MaterialIndex++)
@@ -680,9 +831,17 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
             if(Count && (FirstIDInArray != -1)){
                 // NOTE(Dima): Getting first bitmap ID for bitmap array
                 // NOTE(Dima): A lot of lookups
-                std::string FirstTypeTexturePath = Material->TexturePathArray[FirstIDInArray];
-                loaded_mat_texture CorrespondingTexture = Context->PathToTextureMap[FirstTypeTexturePath];
-                u32 FirstIDInBitmaps = CorrespondingTexture.StoredBitmapID;
+                loaded_mat_texture* CorrespondingTexture = 0;
+                mat_texture_source* TexSource = &Material->TextureSourceArray[FirstIDInArray];
+                if(TexSource->IsEmbeded){
+                    CorrespondingTexture = &Model->EmbededTextures[TexSource->EmbedIndex];
+                }
+                else{
+                    std::string FirstTypeTexturePath = TexSource->Path;
+                    CorrespondingTexture = &Context->PathToTextureMap[FirstTypeTexturePath];
+                }
+                
+                u32 FirstIDInBitmaps = CorrespondingTexture->StoredBitmapID;
                 
                 // NOTE(Dima): Adding bitmap array to asset system
                 added_asset AddedArray = AddArrayAsset(System, FirstIDInBitmaps, Count);
@@ -703,6 +862,7 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
         ToolModel->MaterialIDs.push_back(AddedMaterial.ID);
     }
     
+    // NOTE(Dima): Storing actual model
     BeginAsset(System, AssetGroupID);
     AddModelAsset(System, ToolModel);
     EndAsset(System);
@@ -712,7 +872,7 @@ INTERNAL_FUNCTION void StoreLoadingContext(asset_system* System,
                                            model_loading_context* LoadingCtx)
 {
     BeginAsset(System, GameAsset_Type_Bitmap);
-    u32 FirstBmpID = 0;
+    // NOTE(Dima): Storing textures from loading context
     for(auto it: LoadingCtx->PathToTextureMap){
         added_asset AddedBitmap = AddBitmapAssetManual(System, &it.second.Bmp);
         it.second.StoredBitmapID = AddedBitmap.ID;

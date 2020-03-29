@@ -38,6 +38,7 @@ void CopyBitmapData(tool_bmp_info* dst, tool_bmp_info* src);
 // NOTE(Dima): Functions for loading stuff
 tool_sound_info LoadSound(char* FilePath);
 tool_bmp_info LoadBMP(char* filePath);
+tool_bmp_info LoadFromDataBMP(unsigned char* RawData, u32 RawDataSize);
 tool_font_info LoadFont(char* FilePath, float height, u32 Flags);
 Loaded_Strings LoadStringListFromFile(char* filePath);
 void FreeStringList(Loaded_Strings* list);

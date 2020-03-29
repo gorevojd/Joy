@@ -170,25 +170,18 @@ void DeallocateBitmap(tool_bmp_info* Buffer) {
 	}
 }
 
-tool_bmp_info LoadBMP(char* FilePath){
-    tool_bmp_info res = {};
+INTERNAL_FUNCTION tool_bmp_info LoadBMPInternal(unsigned char* Image,
+                                                int Width,
+                                                int Height)
+{
     
-    int width;
-    int height;
-    int Channels;
+    tool_bmp_info Result = {};
     
-    unsigned char* Image = stbi_load(
-        FilePath,
-        &width,
-        &height,
-        &Channels,
-        STBI_rgb_alpha);
-    
-    int pixelsCount = width * height;
+    int pixelsCount = Width * Height;
     int ImageSize = pixelsCount * 4;
     
     void* OurImageMem = malloc(ImageSize);
-    res = AllocateBitmapInternal(width, height, OurImageMem);
+    Result = AllocateBitmapInternal(Width, Height, OurImageMem);
     
     int pixelsCountForSIMD = pixelsCount & (~3);
     
@@ -223,7 +216,7 @@ tool_bmp_info LoadBMP(char* FilePath){
             _mm_or_si128(mmColorShifted_r, mmColorShifted_g),
             _mm_or_si128(mmColorShifted_b, mmColorShifted_a));
         
-        _mm_storeu_si128((__m128i*)((u32*)res.Pixels + PixelIndex), mmResult);
+        _mm_storeu_si128((__m128i*)((u32*)Result.Pixels + PixelIndex), mmResult);
     }
     
     for(PixelIndex;
@@ -239,7 +232,7 @@ tool_bmp_info LoadBMP(char* FilePath){
         
         u32 PackedColor = PackRGBA(Color);
         
-        *((u32*)res.Pixels + PixelIndex) = PackedColor;
+        *((u32*)Result.Pixels + PixelIndex) = PackedColor;
     }
 #else
     
@@ -260,12 +253,45 @@ tool_bmp_info LoadBMP(char* FilePath){
     }
 #endif
     
+    return(Result);
+}
+
+tool_bmp_info LoadBMP(char* FilePath){
+    int Width;
+    int Height;
+    int Channels;
+    
+    unsigned char* Image = stbi_load(
+        FilePath,
+        &Width,
+        &Height,
+        &Channels,
+        STBI_rgb_alpha);
+    
+    tool_bmp_info res = LoadBMPInternal(Image, Width, Height);
     
     stbi_image_free(Image);
     
     return(res);
 }
 
+tool_bmp_info LoadFromDataBMP(unsigned char* RawData, u32 RawDataSize){
+    int Width;
+    int Height;
+    int Channels;
+    
+    unsigned char* Image = stbi_load_from_memory(RawData, 
+                                                 RawDataSize, 
+                                                 &Width,
+                                                 &Height,
+                                                 &Channels,
+                                                 STBI_rgb_alpha);
+    
+    tool_bmp_info Result = LoadBMPInternal(Image, Width, Height);
+    stbi_image_free(Image);
+    
+    return(Result);
+}
 
 tool_sound_info LoadSound(char* FilePath){
     tool_sound_info Result = {};

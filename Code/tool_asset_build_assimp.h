@@ -33,9 +33,16 @@ GLOBAL_VARIABLE aiTextureType SupportedTexturesTypes[] = {
 };
 
 struct loaded_mat_texture{
-    aiTextureType AiType;
     tool_bmp_info Bmp;
     u32 StoredBitmapID;
+    
+    std::string Name;
+};
+
+struct mat_texture_source{
+    b32 IsEmbeded;
+    std::string Path;
+    int EmbedIndex;
 };
 
 struct loaded_node{
@@ -48,6 +55,8 @@ struct loaded_node{
     m44 ToParent;
     m44 ToWorld;
     
+    std::vector<int> MeshIndices;
+    
     // NOTE(Dima): If root than this is -1
     int ParentIndex;
     
@@ -57,6 +66,8 @@ struct loaded_node{
 };
 
 struct loaded_mat{
+    char Name[256];
+    
     int TextureFirstIndexOfTypeInArray[ArrayCount(SupportedTexturesTypes)];
     int TextureCountOfType[ArrayCount(SupportedTexturesTypes)];
     
@@ -65,7 +76,7 @@ I store here an array of paths to textures.
 FirstIDInArray serves as mapping to get first ID texture
 of specific texture type
 */
-    std::vector<std::string> TexturePathArray;
+    std::vector<mat_texture_source> TextureSourceArray;
     
     tool_material_info ToolMaterialInfo;
 };
@@ -91,6 +102,9 @@ struct loaded_model{
     std::vector<loaded_mat> Materials;
     std::vector<tool_skeleton_info> Skeletons;
     std::vector<loaded_node> Nodes;
+    
+    std::unordered_map<std::string, int> TextureNameToEmbedIndex;
+    std::vector<loaded_mat_texture> EmbededTextures;
     
     // NOTE(Dima): These are temporary
     // NOTE(Dima): Mapping bone name to corresponding node in hierarchy
@@ -178,21 +192,6 @@ inline v4 Assimp2JoyVector4(const aiColor4D& AssimpVector) {
 	Result.w = AssimpVector.a;
     
 	return(Result);
-}
-
-inline u32 StringHashFNV(char* Name) {
-    u32 Result = 2166136261;
-    
-    char* At = Name;
-    while (*At) {
-        
-        Result *= 16777619;
-        Result ^= *At;
-        
-        At++;
-    }
-    
-    return(Result);
 }
 
 #endif

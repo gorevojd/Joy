@@ -342,10 +342,10 @@ void LoadAssetDirectly(assets* Assets,
                 Result->MeshIDs = MeshIDs;
             }
             
-            Result->Nodes = 0;
+            Result->NodeIDs = 0;
             if(Src->NodeCount){
-                node_info* Nodes = (node_info*)((u8*)Data + Src->DataOffsetToNodes);
-                Result->Nodes = Nodes;
+                u32* NodeIDs = (u32*)((u8*)Data + Src->DataOffsetToNodeIDs);
+                Result->NodeIDs = NodeIDs;
             }
             
             Result->MaterialIDs = 0;
@@ -359,6 +359,25 @@ void LoadAssetDirectly(assets* Assets,
                 u32* SkeletonIDs = (u32*)((u8*)Data + Src->DataOffsetToSkeletonIDs);
                 Result->SkeletonIDs = SkeletonIDs;
             }
+        }break;
+        
+        case AssetType_Node:{
+            node_info* Result = GET_ASSET_PTR_MEMBER(Asset, node_info);
+            asset_node* Src = &Header->Node;
+            
+            Result->MeshIndices = 0;
+            if(Src->MeshCount){
+                int* MeshIndices = (int*)((u8*)Data + Src->DataOffsetToMeshIndices);
+                Result->MeshIndices = MeshIndices;
+            }
+            
+            char* Name = (char*)((u8*)Data + Src->DataOffsetToName);
+            m44* ToParent = (m44*)((u8*)Data + Src->DataOffsetToFirstMatrix);
+            m44* ToWorld = (m44*)((u8*)Data + Src->DataOffsetToSecondMatrix);
+            
+            CopyStringsSafe(Result->Name, sizeof(Result->Name), Name);
+            Result->ToParent = *ToParent;
+            Result->ToWorld = *ToWorld;
         }break;
         
         case AssetType_Skeleton:{
@@ -425,6 +444,7 @@ void LoadAsset(assets* Assets, asset* Asset, b32 Immediate){
                 // NOTE(Dima): Loading data
                 u32 DataSize = Header->TotalDataSize;
                 // TODO(Dima): Change this
+                // TODO(Dima): For small sizes use layered allocator
                 void* Data = malloc(DataSize);
                 
                 CallbackData->Assets = Assets;
@@ -784,6 +804,16 @@ void InitAssets(assets* Assets){
                             Result->MaterialCount = Src->MaterialCount;
                             Result->SkeletonCount = Src->SkeletonCount;
                             Result->NodeCount = Src->NodeCount;
+                        }break;
+                        
+                        case AssetType_Node:{
+                            node_info* Result = ALLOC_ASS_PTR_MEMBER(node_info);
+                            asset_node* Src = &AssetHeader.Node;
+                            
+                            Result->MeshCount = Src->MeshCount;
+                            Result->ParentIndex = Src->ParentIndex;
+                            Result->FirstChildIndex = Src->FirstChildIndex;
+                            Result->ChildCount = Src->ChildCount;
                         }break;
                         
                         case AssetType_Skeleton:{

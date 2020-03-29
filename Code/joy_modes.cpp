@@ -190,6 +190,10 @@ GAME_MODE_UPDATE(TestUpdate){
         CamSpeed *= 8.0f;
     }
     
+    if(KeyIsDown(Game->Input, Key_Space)){
+        CamSpeed *= 10.0f;
+    }
+    
     float DeltaMouseX = GetMoveAxis(Game->Input, MoveAxis_MouseX) * State->MouseSencitivity;
     float DeltaMouseY = GetMoveAxis(Game->Input, MoveAxis_MouseY) * State->MouseSencitivity;
     
@@ -370,6 +374,12 @@ GAME_MODE_UPDATE(TestUpdate){
                     V3(-30.0f, 0.0f, 10.0f),
                     QuatI(), V3(1.0f),
                     ASSET_LOAD_DEFERRED);
+    
+    PushOrLoadBitmap(Game->Assets, Stack,
+                     V2(0, 500),
+                     V2(100, 100),
+                     GetFirst(Game->Assets, GameAsset_Type_Bitmap));
+    
     
 #if 0    
     PushOrLoadMesh(Game->Assets, Stack, 

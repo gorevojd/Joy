@@ -68,6 +68,7 @@ struct asset{
         ASSET_PTR_MEMBER(sound_info);
         ASSET_PTR_MEMBER(model_info);
         ASSET_PTR_MEMBER(skeleton_info);
+        ASSET_PTR_MEMBER(node_info);
     };
 };
 

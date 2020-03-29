@@ -35,7 +35,7 @@ inline void CopyStrings(char* Dst, char* Src) {
 	*Dst = 0;
 }
 
-inline void CopyStrings(char* Dst, int DstSize, char* Src){
+inline void CopyStringsSafe(char* Dst, int DstSize, char* Src){
     if(Src){
         int SpaceInDstAvailable = DstSize - 1;
         while(*Src && SpaceInDstAvailable){

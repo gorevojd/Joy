@@ -3,6 +3,7 @@
 
 #include "joy_asset_ids.h"
 #include "joy_math.h"
+#include "joy_strings.h"
 
 #include <vector>
 
@@ -45,17 +46,6 @@
 
 #define JOY_TRUE 1
 #define JOY_FALSE 0
-
-inline void CopyStringsSafe(char* Dst, int DstSize, char* Src){
-    if(Src){
-        int SpaceInDstAvailable = DstSize - 1;
-        while(*Src && SpaceInDstAvailable){
-            *Dst++ = *Src++;
-            SpaceInDstAvailable--;
-        }
-    }
-    *Dst = 0;
-}
 
 struct Loaded_Strings{
     char** Strings;
@@ -149,6 +139,19 @@ struct tool_mesh_info{
     u32 MeshType;
 };
 
+struct tool_node_info{
+    char Name[256];
+    
+    std::vector<int> MeshIndices;
+    
+    m44 ToParent;
+    m44 ToWorld;
+    
+    int ParentIndex;
+    int FirstChildIndex;
+    int ChildCount;
+};
+
 struct tool_model_info{
     std::vector<u32> MeshIDs;
     std::vector<u32> MaterialIDs;
@@ -158,7 +161,8 @@ struct tool_model_info{
     int MaterialCount;
     int SkeletonCount;
     
-    std::vector<node_info> Nodes;
+    std::vector<u32> StoredNodeIDs;
+    std::vector<tool_node_info> Nodes;
 };
 
 struct tool_skeleton_info{
@@ -295,6 +299,7 @@ struct game_asset {
         tool_model_info* Model;
         tool_material_info* Material;
         tool_skeleton_info* Skeleton;
+        tool_node_info* Node;
     };
 };
 
@@ -317,6 +322,10 @@ struct game_asset_source_mesh {
 
 struct game_asset_source_model {
     tool_model_info* ModelInfo;
+};
+
+struct game_asset_source_node{
+    tool_node_info* NodeInfo;
 };
 
 struct game_asset_source_skeleton{
@@ -350,6 +359,7 @@ struct game_asset_source {
         game_asset_source_model ModelSource;
         game_asset_source_material MaterialSource;
         game_asset_source_skeleton SkeletonSource;
+        game_asset_source_node NodeSource;
     };
 };
 
@@ -359,7 +369,6 @@ struct game_asset_freearea {
     void* Pointers[FREEAREA_SLOTS_COUNT];
     int SetCount;
 };
-
 
 //NOTE(dima): Asset system
 #define TEMP_STORED_ASSET_COUNT 2048

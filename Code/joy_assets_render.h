@@ -129,6 +129,42 @@ inline mesh_info* PushOrLoadMesh(assets* Assets,
     return(Mesh);
 }
 
+inline skeleton_info* PushOrLoadSkeleton(
+assets* Assets,
+asset_id SkeletonID,
+b32 Immediate = false)
+{
+    asset* Asset = GetAssetByID(Assets, SkeletonID);
+    ASSERT(Asset->Type == AssetType_Skeleton);
+    
+    LoadAsset(Assets, Asset, Immediate);
+    
+    skeleton_info* Skeleton = 0;
+    if(PotentiallyLoadedAsset(Asset, Immediate)){
+        Skeleton = GET_ASSET_PTR_MEMBER(Asset, skeleton_info);
+    }
+    
+    return(Skeleton);
+}
+
+inline node_info* PushOrLoadNode(
+assets* Assets,
+asset_id NodeID,
+b32 Immediate = false)
+{
+    asset* Asset = GetAssetByID(Assets, NodeID);
+    ASSERT(Asset->Type == AssetType_Node);
+    
+    LoadAsset(Assets, Asset, Immediate);
+    
+    node_info* Node = 0;
+    if(PotentiallyLoadedAsset(Asset, Immediate)){
+        Node = GET_ASSET_PTR_MEMBER(Asset, node_info);
+    }
+    
+    return(Node);
+}
+
 inline model_info* PushOrLoadModel(assets* Assets,
                                    render_stack* Stack,
                                    asset_id ModelID,
@@ -144,33 +180,60 @@ inline model_info* PushOrLoadModel(assets* Assets,
     if(PotentiallyLoadedAsset(Asset, Immediate)){
         Model= GET_ASSET_PTR_MEMBER(Asset, model_info);
         
-#if 1        
-        for(int MeshIDIndex = 0; 
-            MeshIDIndex < Model->MeshCount;
-            MeshIDIndex++)
+        m44 ModelToWorld = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
+        
+#if 0        
+        for(int SkIndex = 0;
+            SkIndex < Model->SkeletonCount;
+            SkIndex++)
         {
-            asset_id MeshID = Model->MeshIDs[MeshIDIndex];
+            asset_id SkeletonID = Model->SkeletonIDs[SkIndex];
             
-            PushOrLoadMesh(Assets, Stack, MeshID, P, R, S);
+            skeleton_info* Skeleton = PushOrLoadSkeleton(Assets, SkeletonID);
+            
+            if(Skeleton){
+                asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
+                
+                for(int BoneIndex = 0;
+                    BoneIndex < Skeleton->BoneCount;
+                    BoneIndex++)
+                {
+                    bone_info* Bone = &Skeleton->Bones[BoneIndex];
+                    
+                    v4 BoneP = V4(0.0f, 0.0f, 0.0f, 1.0f) * Bone->InvBindPose * ModelToWorld;
+                    PushOrLoadMesh(Assets, Stack, CubeMeshID, BoneP.xyz, QuatI(), V3(0.3f), ASSET_LOAD_DEFERRED);
+                }
+            }
         }
 #endif
-        
-        m44 ModelToWorld = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
         
         for(int NodeIndex = 0;
             NodeIndex < Model->NodeCount;
             NodeIndex++)
         {
-            node_info* Node = &Model->Nodes[NodeIndex];
+            u32 NodeID = Model->NodeIDs[NodeIndex];
             
-            asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
+            node_info* Node = PushOrLoadNode(Assets, NodeID);
             
-            m44 Transformation = ScalingMatrix(V3(0.3f)) * Node->ToWorld * ModelToWorld;
-            
-            PushOrLoadMesh(Assets, Stack, CubeMeshID, Transformation);
+            if(Node){
+                asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
+                
+                m44 NodeTran = Node->ToWorld * ModelToWorld;
+                
+                for(int MeshIndex = 0; MeshIndex < Node->MeshCount; MeshIndex++){
+                    int MeshArrayIndex = Node->MeshIndices[MeshIndex];
+                    
+                    asset_id MeshID = Model->MeshIDs[MeshArrayIndex];
+                    
+                    PushOrLoadMesh(Assets, Stack, MeshID, NodeTran);
+                }
+                
+                m44 Tran = ScalingMatrix(V3(0.3f)) * NodeTran;
+                PushOrLoadMesh(Assets, Stack, CubeMeshID, Tran, ASSET_LOAD_DEFERRED);
+            }
         }
+        
     }
-    
     
     return(Model);
 }

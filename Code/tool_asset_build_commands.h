@@ -49,6 +49,8 @@ added_asset AddMeshAsset(asset_system* System,
 added_asset AddSkeletonAsset(asset_system* System,
                              tool_skeleton_info* Skeleton);
 
+added_asset AddNodeAsset(asset_system* System, tool_node_info* Node);
+
 added_asset AddModelAsset(asset_system* System,
                           tool_model_info* Model);
 

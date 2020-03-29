@@ -138,7 +138,7 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(gui_state* Gui,
             found = GuiAllocateElement(Gui);
             
             found->id = id;
-            CopyStrings(found->name, sizeof(found->name), name);
+            CopyStringsSafe(found->name, sizeof(found->name), name);
             
             found->parent = *cur;
             found->type = type;
@@ -381,7 +381,7 @@ void GuiBeginPage(gui_state* Gui, char* name){
     if(!foundPage){
         foundPage = PushStruct(Gui->Mem, Gui_Page);
         
-        CopyStrings(foundPage->name, sizeof(foundPage->name), name);
+        CopyStringsSafe(foundPage->name, sizeof(foundPage->name), name);
         foundPage->id = nameID;
         
         foundPage->Next = Gui->rootPage.Next;
@@ -933,7 +933,7 @@ void GuiBeginLayout(gui_state* Gui, char* name, u32 layoutType){
     if(!foundLayout){
         foundLayout = PushStruct(Gui->Mem, Gui_Layout);
         
-        CopyStrings(foundLayout->Name, sizeof(foundLayout->Name), name);
+        CopyStringsSafe(foundLayout->Name, sizeof(foundLayout->Name), name);
         foundLayout->ID = nameID;
         
         foundLayout->Next = Gui->rootLayout.Next;
@@ -1365,7 +1365,7 @@ void GuiTooltip(gui_state* Gui, char* tooltipText, v2 at){
     Assert(Gui->tooltipIndex < GUI_MAX_TOOLTIPS);
     Gui_Tooltip* ttip = &Gui->tooltips[Gui->tooltipIndex++];
     
-    CopyStrings(ttip->text, GUI_TOOLTIP_MAX_SIZE, tooltipText);
+    CopyStringsSafe(ttip->text, GUI_TOOLTIP_MAX_SIZE, tooltipText);
     ttip->at = at;
 }
 

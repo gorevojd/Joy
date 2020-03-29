@@ -15,6 +15,7 @@ enum asset_type{
     AssetType_Sound,
     AssetType_Font,
     AssetType_Glyph,
+    AssetType_Node,
     AssetType_Model,
     AssetType_Material,
     AssetType_Skeleton,
@@ -54,22 +55,38 @@ struct asset_material{
     u32 BitmapArrayIDs[MaterialTexture_Count];
 };
 
-struct asset_model{
+struct asset_node{
+    int ParentIndex;
+    int FirstChildIndex;
+    int ChildCount;
+    
+    u32 DataOffsetToMeshIndices;
+    u32 SizeMeshIndices;
+    u32 DataOffsetToFirstMatrix;
+    u32 DataOffsetToSecondMatrix;
+    
+    u32 DataOffsetToName;
+    u32 SizeName;
+    u32 OneMatrixSize;
+    
     int MeshCount;
-    int MaterialCount;
-    int SkeletonCount;
+};
+
+struct asset_model{
+    i16 MeshCount;
+    i16 MaterialCount;
+    i16 SkeletonCount;
+    i16 NodeCount;
     
     u32 DataOffsetToMeshIDs;
     u32 DataOffsetToMaterialIDs;
     u32 DataOffsetToSkeletonIDs;
+    u32 DataOffsetToNodeIDs;
     
     u32 SizeMeshIDs;
     u32 SizeMaterialIDs;
     u32 SizeSkeletonIDs;
-    
-    int NodeCount;
-    u32 DataOffsetToNodes;
-    u32 SizeNodes;
+    u32 SizeNodeIDs;
 };
 
 struct asset_skeleton{
@@ -199,6 +216,7 @@ struct asset_header{
         asset_mesh Mesh;
         asset_font Font;
         asset_sound Sound;
+        asset_node Node;
     };
 };
 
@@ -317,6 +335,7 @@ enum asset_group_type{
     GameAsset_Type_Material,
     GameAsset_Type_BitmapArray,
     GameAsset_Type_Skeleton,
+    GameAsset_Type_Node,
     
     GameAsset_Count,
 };

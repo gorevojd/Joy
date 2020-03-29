@@ -175,6 +175,20 @@ struct font_info{
     u8 Codepoint2Glyph[FONT_INFO_MAX_GLYPH_COUNT];
 };
 
+struct node_info{
+    char Name[256];
+    
+    int* MeshIndices;
+    int MeshCount;
+    
+    m44 ToParent;
+    m44 ToWorld;
+    
+    int ParentIndex;
+    int FirstChildIndex;
+    int ChildCount;
+};
+
 struct skeleton_info{
     u32 CheckSum;
     
@@ -182,18 +196,16 @@ struct skeleton_info{
     int BoneCount;
 };
 
-
 struct model_info{
     u32* MeshIDs;
     u32* MaterialIDs;
     u32* SkeletonIDs;
-    
-    node_info* Nodes;
-    int NodeCount;
+    u32* NodeIDs;
     
     int MeshCount;
     int MaterialCount;
     int SkeletonCount;
+    int NodeCount;
 };
 
 #endif
