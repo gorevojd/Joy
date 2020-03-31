@@ -3,7 +3,6 @@
 in Vertex_Shader_Out{
     vec3 WorldP;
     vec3 WorldN;
-    vec3 C;
     vec2 UV;
 } FsIn;
 
@@ -30,8 +29,7 @@ void main(){
     vec3 Ambient = vec3(AmbientFactor);
     
     vec3 ResultColor = vec3(0.0f, 0.0f, 0.0f);
-    ResultColor += Ambient + CalcDirLit(FragP, FragN, FsIn.C);
+    ResultColor += Ambient + CalcDirLit(FragP, FragN, vec3(1.0f, 1.0f, 1.0f));
     
     Color = vec4(ResultColor, 1.0f);
-    //Color = vec4(FsIn.C, 1.0f);
 }

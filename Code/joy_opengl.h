@@ -57,6 +57,10 @@ struct gl_shader{
         glUseProgram(ID);
     }
     
+    void SetBool(GLint Loc, b32 Value){
+        glUniform1i(Loc, Value);
+    }
+    
     void SetV3(GLint Loc, float x, float y, float z){
         glUniform3f(Loc, x, y, z);
     }
@@ -86,12 +90,15 @@ struct Gl_Simple_Shader : public gl_shader{
     GLint ModelLoc;
     GLint ViewLoc;
     GLint ProjectionLoc;
+    GLint HasSkinningLoc;
+    GLint BoneTransformsLoc;
     
     GLint PAttrLoc;
     GLint UVAttrLoc;
     GLint NAttrLoc;
     GLint TAttrLoc;
-    GLint CAttrLoc;
+    GLint WeightsAttrLoc;
+    GLint BoneIDsAttrLoc;
 };
 
 struct Gl_GuiRect_Shader : public gl_shader{

@@ -96,25 +96,10 @@ inline size_t GetComponentCount4VertLayout(u32 VertLayout){
 }
 #endif
 
-
-struct vertex_info{
-    v3 P;
-    v2 UV;
-    v3 N;
-    v3 T;
-    v3 C;
-};
-
-struct vertex_skinned_info{
-    v3 P;
-    v2 UV;
-    v3 N;
-    v3 T;
-    v3 C;
-};
-
 enum Mesh_Type{
+    // NOTE(Dima): PUVNT
     Mesh_Simple,
+    // NOTE(Dima): PUVN + BoneIDs + Weights
     Mesh_Skinned,
 };
 
@@ -137,10 +122,13 @@ struct mesh_info{
     u32* Indices;
     int IndicesCount;
     
+    b32 HasSkinning;
+    
     void* Vertices;
     int VerticesCount;
     
     u32 MeshType;
+    u32 VertexTypeSize;
     
     mesh_handles Handles;
 };
@@ -176,17 +164,10 @@ struct font_info{
 };
 
 struct node_info{
-    char Name[256];
+    node_shared_data* Shared;
     
-    int* MeshIndices;
+    u32* MeshIDs;
     int MeshCount;
-    
-    m44 ToParent;
-    m44 ToWorld;
-    
-    int ParentIndex;
-    int FirstChildIndex;
-    int ChildCount;
 };
 
 struct skeleton_info{
@@ -200,12 +181,15 @@ struct model_info{
     u32* MeshIDs;
     u32* MaterialIDs;
     u32* SkeletonIDs;
-    u32* NodeIDs;
+    node_info* Nodes;
+    u32* NodeMeshIDsStorage;
+    node_shared_data* NodesSharedDatas;
     
     int MeshCount;
     int MaterialCount;
     int SkeletonCount;
     int NodeCount;
+    int NodesMeshIDsStorageCount;
 };
 
 #endif

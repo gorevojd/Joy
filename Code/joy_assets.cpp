@@ -221,6 +221,18 @@ inline asset_id FileToIntegratedID(asset_file_source* Source, u32 FileID){
     return(Result);
 }
 
+inline void IntegrateIDs(asset_id* IDsToIntegrate, 
+                         int Count, 
+                         asset_file_source* Source)
+{
+    for(int Index = 0;
+        Index < Count;
+        Index++)
+    {
+        IDsToIntegrate[Index] = FileToIntegratedID(Source, IDsToIntegrate[Index]);
+    }
+}
+
 void* AllocateAssetType(assets* Assets, asset* Asset, void** Type, u32 AssetTypeSize){
     Asset->TypeMemEntry = AllocateMemLayerEntry(
         &Assets->LayeredMemory, AssetTypeSize);
@@ -340,44 +352,58 @@ void LoadAssetDirectly(assets* Assets,
             if(Src->MeshCount){
                 u32* MeshIDs = (u32*)((u8*)Data + Src->DataOffsetToMeshIDs);
                 Result->MeshIDs = MeshIDs;
+                
+                IntegrateIDs(Result->MeshIDs, Src->MeshCount, FileSource);
             }
             
-            Result->NodeIDs = 0;
-            if(Src->NodeCount){
-                u32* NodeIDs = (u32*)((u8*)Data + Src->DataOffsetToNodeIDs);
-                Result->NodeIDs = NodeIDs;
-            }
             
             Result->MaterialIDs = 0;
             if(Src->MaterialCount){
                 u32* MaterialIDs = (u32*)((u8*)Data + Src->DataOffsetToMaterialIDs);
                 Result->MaterialIDs = MaterialIDs;
+                
+                IntegrateIDs(Result->MaterialIDs, Src->MaterialCount, FileSource);
             }
             
             Result->SkeletonIDs = 0;
             if(Src->SkeletonCount){
                 u32* SkeletonIDs = (u32*)((u8*)Data + Src->DataOffsetToSkeletonIDs);
                 Result->SkeletonIDs = SkeletonIDs;
-            }
-        }break;
-        
-        case AssetType_Node:{
-            node_info* Result = GET_ASSET_PTR_MEMBER(Asset, node_info);
-            asset_node* Src = &Header->Node;
-            
-            Result->MeshIndices = 0;
-            if(Src->MeshCount){
-                int* MeshIndices = (int*)((u8*)Data + Src->DataOffsetToMeshIndices);
-                Result->MeshIndices = MeshIndices;
+                
+                IntegrateIDs(Result->SkeletonIDs, Src->SkeletonCount, FileSource);
             }
             
-            char* Name = (char*)((u8*)Data + Src->DataOffsetToName);
-            m44* ToParent = (m44*)((u8*)Data + Src->DataOffsetToFirstMatrix);
-            m44* ToWorld = (m44*)((u8*)Data + Src->DataOffsetToSecondMatrix);
+            Result->NodesSharedDatas = 0;
+            if(Src->NodeCount){
+                node_shared_data* NodesSharedDatas = (node_shared_data*)
+                    ((u8*)Data + Src->DataOffsetToNodesSharedDatas);
+                
+                Result->NodesSharedDatas = NodesSharedDatas;
+            }
             
-            CopyStringsSafe(Result->Name, sizeof(Result->Name), Name);
-            Result->ToParent = *ToParent;
-            Result->ToWorld = *ToWorld;
+            Result->NodeMeshIDsStorage = 0;
+            if(Src->NodesMeshIndicesStorageCount){
+                u32* MeshIndicesStorage = (u32*)((u8*)Data + Src->DataOffsetToNodesMeshIndicesStorage);
+                Result->NodeMeshIDsStorage = MeshIndicesStorage;
+                
+                IntegrateIDs(Result->NodeMeshIDsStorage, 
+                             Src->NodesMeshIndicesStorageCount,
+                             FileSource);
+                
+            }
+            
+            // NOTE(Dima): Final nodes setup
+            Result->Nodes = (node_info*)((u8*)Data + DataSize);
+            for(int NodeIndex = 0;
+                NodeIndex < Src->NodeCount;
+                NodeIndex++)
+            {
+                node_info* Node = &Result->Nodes[NodeIndex];
+                
+                Node->Shared = Result->NodesSharedDatas + NodeIndex;
+                Node->MeshIDs = &Result->NodeMeshIDsStorage[Node->Shared->NodeMeshIndexFirstInStorage];
+                Node->MeshCount = Node->Shared->NodeMeshIndexCountInStorage;
+            }
         }break;
         
         case AssetType_Skeleton:{
@@ -426,11 +452,18 @@ void LoadAsset(assets* Assets, asset* Asset, b32 Immediate){
     if(Asset->State.compare_exchange_weak(ExpectedPrevState, 
                                           AssetState_InProgress))
     {
+        // NOTE(Dima): Loading data
+        u32 DataSize = Header->TotalDataSize;
+        u32 DataSizeToAlloc = DataSize;
+        
+        // NOTE(Dima): Preallocating data for nodes
+        if(Asset->Type == AssetType_Model){
+            DataSizeToAlloc += sizeof(node_info) * Header->Model.NodeCount;
+        }
+        
         if(Immediate){
-            // NOTE(Dima): Loading data
-            u32 DataSize = Header->TotalDataSize;
             // TODO(Dima): Change this
-            void* Data = malloc(DataSize);
+            void* Data = malloc(DataSizeToAlloc);
             
             LoadAssetDirectly(Assets, Asset, Data, DataSize);
         }
@@ -445,7 +478,7 @@ void LoadAsset(assets* Assets, asset* Asset, b32 Immediate){
                 u32 DataSize = Header->TotalDataSize;
                 // TODO(Dima): Change this
                 // TODO(Dima): For small sizes use layered allocator
-                void* Data = malloc(DataSize);
+                void* Data = malloc(DataSizeToAlloc);
                 
                 CallbackData->Assets = Assets;
                 CallbackData->Asset = Asset;
@@ -703,10 +736,6 @@ void InitAssets(assets* Assets){
                     u32 DataOffsetInFile = LineOffset + AssetHeader.LineDataOffset;
                     NewAsset->OffsetToData = DataOffsetInFile;
                     
-                    // NOTE(Dima): If we should load asset immediately - do it
-                    if(AssetHeader.ImmediateLoad){
-                        LoadAsset(Assets, NewAsset, ASSET_LOAD_IMMEDIATE);
-                    }
 #define ALLOC_ASS_PTR_MEMBER(type) (type*)AllocateAssetType(Assets, NewAsset, (void**)&GET_ASSET_PTR_MEMBER(NewAsset, type), sizeof(type))
                     
                     
@@ -734,6 +763,7 @@ void InitAssets(assets* Assets){
                             
                             Result->FirstID = Src->FirstID;
                             Result->Count = Src->Count;
+                            
                         }break;
                         
                         case AssetType_Mesh: {
@@ -743,6 +773,8 @@ void InitAssets(assets* Assets){
                             Result->VerticesCount = Src->VerticesCount;
                             Result->IndicesCount = Src->IndicesCount;
                             Result->MeshType = Src->MeshType;
+                            Result->VertexTypeSize = Src->VertexTypeSize;
+                            Result->HasSkinning = Src->HasSkinning;
                             
                             // NOTE(Dima): Checking correctness of loaded vertices type sizes
                             switch(Result->MeshType){
@@ -764,6 +796,7 @@ void InitAssets(assets* Assets){
                             Result->SampleCount = Src->SampleCount;
                             Result->SamplesPerSec = Src->SamplesPerSec;
                             Result->Channels = Src->Channels;
+                            
                         }break;
                         
                         case AssetType_Font: {
@@ -774,6 +807,7 @@ void InitAssets(assets* Assets){
                             Result->DescenderHeight = Src->DescenderHeight;
                             Result->LineGap = Src->LineGap;
                             Result->GlyphCount = Src->GlyphCount;
+                            
                         }break;
                         
                         case AssetType_Glyph: {
@@ -804,16 +838,7 @@ void InitAssets(assets* Assets){
                             Result->MaterialCount = Src->MaterialCount;
                             Result->SkeletonCount = Src->SkeletonCount;
                             Result->NodeCount = Src->NodeCount;
-                        }break;
-                        
-                        case AssetType_Node:{
-                            node_info* Result = ALLOC_ASS_PTR_MEMBER(node_info);
-                            asset_node* Src = &AssetHeader.Node;
-                            
-                            Result->MeshCount = Src->MeshCount;
-                            Result->ParentIndex = Src->ParentIndex;
-                            Result->FirstChildIndex = Src->FirstChildIndex;
-                            Result->ChildCount = Src->ChildCount;
+                            Result->NodesMeshIDsStorageCount = Src->NodesMeshIndicesStorageCount;
                         }break;
                         
                         case AssetType_Skeleton:{
@@ -824,6 +849,11 @@ void InitAssets(assets* Assets){
                             
                             // TODO(Dima): Use checksum later to load only not loaded skeletons
                         }break;
+                    }
+                    
+                    // NOTE(Dima): If we should load asset immediately - do it
+                    if(AssetHeader.ImmediateLoad){
+                        LoadAsset(Assets, NewAsset, ASSET_LOAD_IMMEDIATE);
                     }
                 }
             }

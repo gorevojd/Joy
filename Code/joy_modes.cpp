@@ -287,6 +287,7 @@ GAME_MODE_UPDATE(TestUpdate){
     
     u32 StoolID = GetFirst(Game->Assets, GameAsset_Stool);
     
+    
     int SphereLayers = 10;
     int SphereLayerCount = 10;
     v3 SphereStartP = V3(0.0f, 1.0f, -15.0f);
@@ -381,7 +382,18 @@ GAME_MODE_UPDATE(TestUpdate){
                      GetFirst(Game->Assets, GameAsset_Type_Bitmap));
     
     
-#if 0    
+    ShowSphereDistributions(Game, Stack,
+                            &State->SphereDistributionTrig,
+                            SphereID,
+                            V3(0.0f, 10.0f, 0.0f),
+                            2.0f);
+    
+    ShowSphereDistributions(Game, Stack,
+                            &State->SphereDistributionFib,
+                            SphereID,
+                            V3(10.0f, 10.0f, 0.0f),
+                            2.0f);
+    
     PushOrLoadMesh(Game->Assets, Stack, 
                    GetFirst(Game->Assets, GameAsset_Cube),
                    V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
@@ -418,19 +430,6 @@ GAME_MODE_UPDATE(TestUpdate){
                    V3(0.0f, -1.0f, 0.0f), 
                    QuatI(), V3(100.0f),
                    ASSET_LOAD_DEFERRED);
-#endif
-    
-    ShowSphereDistributions(Game, Stack,
-                            &State->SphereDistributionTrig,
-                            SphereID,
-                            V3(0.0f, 10.0f, 0.0f),
-                            2.0f);
-    
-    ShowSphereDistributions(Game, Stack,
-                            &State->SphereDistributionFib,
-                            SphereID,
-                            V3(10.0f, 10.0f, 0.0f),
-                            2.0f);
 }
 
 // NOTE(Dima): MAIN MENU GAME MODE

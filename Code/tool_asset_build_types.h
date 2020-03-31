@@ -6,6 +6,7 @@
 #include "joy_strings.h"
 
 #include <vector>
+#include <unordered_map>
 
 #define Assert(cond) if(!(cond)){ *((int*)0) = 0;}
 #define ASSERT(cond) if(!(cond)){ *((int*)0) = 0;}
@@ -111,22 +112,15 @@ enum Mesh_Type{
     Mesh_Skinned,
 };
 
-struct vertex_info{
-    v3 P;
-    v2 UV;
-    v3 N;
-    v3 T;
-    v3 C;
+struct vertex_weight{
+    int BoneID;
+    float Weight;
 };
 
-struct vertex_skinned_info{
-    v3 P;
-    v2 UV;
-    v3 N;
-    v3 T;
-    v3 C;
-    float Weights[4];
-    u32 BoneIDs;
+struct vertex_weights{
+    std::vector<vertex_weight> Weights;
+    
+    float SumOfSquaredWeights;
 };
 
 struct tool_mesh_info{
@@ -136,20 +130,20 @@ struct tool_mesh_info{
     void* Vertices;
     int VerticesCount;
     
+    b32 HasSkinning;
+    u32 VertexTypeSize;
+    
     u32 MeshType;
 };
 
 struct tool_node_info{
-    char Name[256];
-    
+    // NOTE(Dima): Theese are indcies in array of meshes
     std::vector<int> MeshIndices;
     
-    m44 ToParent;
-    m44 ToWorld;
+    // NOTE(Dima): These are stored mesh IDs
+    std::vector<int> MeshIDs;
     
-    int ParentIndex;
-    int FirstChildIndex;
-    int ChildCount;
+    node_shared_data Shared;
 };
 
 struct tool_model_info{
@@ -161,14 +155,17 @@ struct tool_model_info{
     int MaterialCount;
     int SkeletonCount;
     
-    std::vector<u32> StoredNodeIDs;
     std::vector<tool_node_info> Nodes;
+    
+    std::vector<node_shared_data> NodesSharedDatas;
+    std::vector<u32> NodeMeshIndicesStorage;
 };
 
 struct tool_skeleton_info{
     u32 CheckSum;
     
     std::vector<bone_info> Bones;
+    std::unordered_map<std::string, int> BoneNameToBoneID;
 };
 
 struct tool_material_info{

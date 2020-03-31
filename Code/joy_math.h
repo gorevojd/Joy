@@ -124,13 +124,13 @@ typedef struct rc2{
 typedef union m33 {
     float e[9];
     float e2[3][3];
-    v3 rows[3];
+    v3 Rows[3];
 } m33;
 
 typedef union m44 {
 	float e[16];
     float e2[4][4];
-	v4 rows[4];
+	v4 Rows[4];
 #if JOY_ENABLE_SIMD_MATH
     __m128 mmRows[4];
 #endif
@@ -391,9 +391,9 @@ inline quat Quat(v3 Axis, float Angle){
 inline m33 M33I(){
     m33 res;
     
-    res.rows[0] = {1.0f, 0.0f, 0.0f};
-    res.rows[1] = {0.0f, 1.0f, 0.0f};
-    res.rows[2] = {0.0f, 0.0f, 1.0f};
+    res.Rows[0] = {1.0f, 0.0f, 0.0f};
+    res.Rows[1] = {0.0f, 1.0f, 0.0f};
+    res.Rows[2] = {0.0f, 0.0f, 1.0f};
     
     return(res);
 }
@@ -401,10 +401,10 @@ inline m33 M33I(){
 inline m44 M44I(){
     m44 res;
     
-    res.rows[0] = { 1.0f, 0.0f, 0.0f, 0.0f };
-    res.rows[1] = { 0.0f, 1.0f, 0.0f, 0.0f };
-    res.rows[2] = { 0.0f, 0.0f, 1.0f, 0.0f };
-    res.rows[3] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    res.Rows[0] = { 1.0f, 0.0f, 0.0f, 0.0f };
+    res.Rows[1] = { 0.0f, 1.0f, 0.0f, 0.0f };
+    res.Rows[2] = { 0.0f, 0.0f, 1.0f, 0.0f };
+    res.Rows[3] = { 0.0f, 0.0f, 0.0f, 1.0f };
     
     return(res);
 }
@@ -866,140 +866,171 @@ inline m44 InverseTranslationMatrix(v3 Translation){
 }
 
 inline m44 ScalingMatrix(v3 Scale) {
-	m44 Result = Identity();
-	
-    Result.e[0] = Scale.x;
-	Result.e[5] = Scale.y;
-	Result.e[10] = Scale.z;
+    m44 Result = Identity();
     
-	return(Result);
+    Result.e[0] = Scale.x;
+    Result.e[5] = Scale.y;
+    Result.e[10] = Scale.z;
+    
+    return(Result);
 }
 
 inline m44 ScalingMatrix(float Scale){
     m44 Result = Identity();
     
     Result.e[0] = Scale;
-	Result.e[5] = Scale;
-	Result.e[10] = Scale;
+    Result.e[5] = Scale;
+    Result.e[10] = Scale;
     
-	return(Result);
+    return(Result);
 }
 
 inline m44 Transpose(m44 M) {
-	m44 Result;
+    m44 Result;
     
-	for (int RowIndex = 0; RowIndex < 4; RowIndex++) {
-		for (int ColumtIndex = 0; ColumtIndex < 4; ColumtIndex++) {
-			Result.e[ColumtIndex * 4 + RowIndex] = M.e[RowIndex * 4 + ColumtIndex];
-		}
-	}
+#if JOY_ENABLE_SIMD_MATH
+    __m128 Tmp0, Tmp1, Tmp2, Tmp3;
     
-	return(Result);
+    Tmp0 = _mm_shuffle_ps(M.mmRows[0], M.mmRows[1], 0x44);
+    Tmp1 = _mm_shuffle_ps(M.mmRows[0], M.mmRows[1], 0xEE);
+    Tmp2 = _mm_shuffle_ps(M.mmRows[2], M.mmRows[3], 0x44);
+    Tmp3 = _mm_shuffle_ps(M.mmRows[2], M.mmRows[3], 0xEE);
+    
+    Result.mmRows[0] = _mm_shuffle_ps(Tmp0, Tmp2, 0x88);
+    Result.mmRows[1] = _mm_shuffle_ps(Tmp0, Tmp2, 0xDD);
+    Result.mmRows[2] = _mm_shuffle_ps(Tmp1, Tmp3, 0x88);
+    Result.mmRows[3] = _mm_shuffle_ps(Tmp1, Tmp3, 0xDD);
+#else
+    for (int RowIndex = 0; RowIndex < 4; RowIndex++) {
+        for (int ColumtIndex = 0; ColumtIndex < 4; ColumtIndex++) {
+            Result.e[ColumtIndex * 4 + RowIndex] = M.e[RowIndex * 4 + ColumtIndex];
+        }
+    }
+#endif
+    
+    return(Result);
 }
 
 inline m33 Transpose(m33 M){
     m33 Result = {};
     
-	for (int RowIndex = 0; RowIndex < 3; RowIndex++) {
-		for (int ColumtIndex = 0; ColumtIndex < 3; ColumtIndex++) {
-			Result.e[ColumtIndex * 3 + RowIndex] = M.e[RowIndex * 3 + ColumtIndex];
-		}
-	}
+    for (int RowIndex = 0; RowIndex < 3; RowIndex++) {
+        for (int ColumtIndex = 0; ColumtIndex < 3; ColumtIndex++) {
+            Result.e[ColumtIndex * 3 + RowIndex] = M.e[RowIndex * 3 + ColumtIndex];
+        }
+    }
+    
+    
+    
+    return(Result);
+}
+
+inline m44 InverseTransformMatrix(m44 Transformation){
+    // NOTE(Dima): Extracting translation
+    v4 Translation = Transformation.Rows[3];
+    
+    // NOTE(Dima): Setting last row to zero to leave only rotation and scaling
+    Transformation.Rows[3] = V4(0.0f, 0.0f, 0.0f, 1.0f);
+    
+    // NOTE(Dima): Inverting rotation and scale
+    Transformation = Transpose(Transformation);
+    
+    m44 Result = InverseTranslationMatrix(Translation.xyz) * Transformation;
     
     return(Result);
 }
 
 inline m44 PerspectiveProjection(int Width, int Height, float Far, float Near)
 {
-	m44 Result = {};
+    m44 Result = {};
     
-	float AspectRatio = (float)Width / (float)Height;
+    float AspectRatio = (float)Width / (float)Height;
     
-	float S = 1.0f / (Tan(45.0f * 0.5f * JOY_DEG2RAD));
-	float A = S / AspectRatio;
-	float B = S;
-	float OneOverFarMinusNear = 1.0f / (Far - Near);
-	Result.e[0] = A;
-	Result.e[5] = B;
-	Result.e[10] = -(Far + Near) * OneOverFarMinusNear;
-	Result.e[14] = -(2.0f * Far * Near) * OneOverFarMinusNear;
-	Result.e[11] = -1.0f;
+    float S = 1.0f / (Tan(45.0f * 0.5f * JOY_DEG2RAD));
+    float A = S / AspectRatio;
+    float B = S;
+    float OneOverFarMinusNear = 1.0f / (Far - Near);
+    Result.e[0] = A;
+    Result.e[5] = B;
+    Result.e[10] = -(Far + Near) * OneOverFarMinusNear;
+    Result.e[14] = -(2.0f * Far * Near) * OneOverFarMinusNear;
+    Result.e[11] = -1.0f;
     
-	return(Result);
+    return(Result);
 }
 
 inline m44 PerspectiveProjectionScreen(int Width, int Height, float Far, float Near){
     m44 Result = {};
     
     float MinusOneOverFarMinusNear = -1.0f / (Far - Near);
-	Result.e[0] = 2.0f * Near / (float)Width;
-	Result.e[5] = 2.0f * Near / (float)Height;
-	Result.e[8] = 1.0f;
-	Result.e[9] = 1.0f;
-	Result.e[10] = (Far + Near) * MinusOneOverFarMinusNear;
-	Result.e[11] = -1.0f;
-	Result.e[12] = 1.0f;
-	Result.e[13] = 1.0f;
-	Result.e[14] = (2.0f * Far * Near) * MinusOneOverFarMinusNear;
+    Result.e[0] = 2.0f * Near / (float)Width;
+    Result.e[5] = 2.0f * Near / (float)Height;
+    Result.e[8] = 1.0f;
+    Result.e[9] = 1.0f;
+    Result.e[10] = (Far + Near) * MinusOneOverFarMinusNear;
+    Result.e[11] = -1.0f;
+    Result.e[12] = 1.0f;
+    Result.e[13] = 1.0f;
+    Result.e[14] = (2.0f * Far * Near) * MinusOneOverFarMinusNear;
     
     return(Result);
 }
 
 inline m44 OrthographicProjection(int Width, int Height) {
-	m44 Result = {};
+    m44 Result = {};
     
-	Result.e[0] = 2.0f / (float)Width;
-	Result.e[12] = -1.0f;
-	Result.e[5] = 2.0f / (float)Height;
-	Result.e[13] = -1.0f;
-	Result.e[10] = 1.0f;
-	Result.e[15] = 1.0f;
+    Result.e[0] = 2.0f / (float)Width;
+    Result.e[12] = -1.0f;
+    Result.e[5] = 2.0f / (float)Height;
+    Result.e[13] = -1.0f;
+    Result.e[10] = 1.0f;
+    Result.e[15] = 1.0f;
     
-	return(Result);
+    return(Result);
 }
 
 inline m44 LookAt(v3 Pos, v3 TargetPos, v3 WorldUp) {
-	m44 Result;
+    m44 Result;
     
-	v3 Fwd = TargetPos - Pos;
-	Fwd = NOZ(Fwd);
+    v3 Fwd = TargetPos - Pos;
+    Fwd = NOZ(Fwd);
     
-	v3 Left = Normalize(Cross(WorldUp, Fwd));
-	v3 Up = Normalize(Cross(Fwd, Left));
+    v3 Left = Normalize(Cross(WorldUp, Fwd));
+    v3 Up = Normalize(Cross(Fwd, Left));
     
-	v3 Eye = Pos;
+    v3 Eye = Pos;
     
-	Result.e[0] = Left.x;
-	Result.e[1] = Up.x;
-	Result.e[2] = Fwd.x;
-	Result.e[3] = 0.0f;
+    Result.e[0] = Left.x;
+    Result.e[1] = Up.x;
+    Result.e[2] = Fwd.x;
+    Result.e[3] = 0.0f;
     
-	Result.e[4] = Left.y;
-	Result.e[5] = Up.y;
-	Result.e[6] = Fwd.y;
-	Result.e[7] = 0.0f;
+    Result.e[4] = Left.y;
+    Result.e[5] = Up.y;
+    Result.e[6] = Fwd.y;
+    Result.e[7] = 0.0f;
     
-	Result.e[8] = Left.z;
-	Result.e[9] = Up.z;
-	Result.e[10] = Fwd.z;
-	Result.e[11] = 0.0f;
+    Result.e[8] = Left.z;
+    Result.e[9] = Up.z;
+    Result.e[10] = Fwd.z;
+    Result.e[11] = 0.0f;
     
-	Result.e[12] = -Dot(Left, Eye);
-	Result.e[13] = -Dot(Up, Eye);
-	Result.e[14] = -Dot(Fwd, Eye);
-	Result.e[15] = 1.0f;
+    Result.e[12] = -Dot(Left, Eye);
+    Result.e[13] = -Dot(Up, Eye);
+    Result.e[14] = -Dot(Fwd, Eye);
+    Result.e[15] = 1.0f;
     
-	return(Result);
+    return(Result);
 }
 
 /*Conversions*/
 inline m44 MatrixFromRows(v4 R1, v4 R2, v4 R3, v4 R4){
     m44 res = {};
     
-    res.rows[0] = R1;
-    res.rows[1] = R2;
-    res.rows[2] = R3;
-    res.rows[3] = R4;
+    res.Rows[0] = R1;
+    res.Rows[1] = R2;
+    res.Rows[2] = R3;
+    res.Rows[3] = R4;
     
     return(res);
 }
@@ -1007,9 +1038,9 @@ inline m44 MatrixFromRows(v4 R1, v4 R2, v4 R3, v4 R4){
 inline m33 MatrixFromRows(v3 R1, v3 R2, v3 R3){
     m33 res = {};
     
-    res.rows[0] = R1;
-    res.rows[1] = R2;
-    res.rows[2] = R3;
+    res.Rows[0] = R1;
+    res.Rows[1] = R2;
+    res.Rows[2] = R3;
     
     return(res);
 }
@@ -1267,58 +1298,58 @@ inline v4 UnpackRGBA(uint32_t Color){
 
 /*Plane math*/
 inline v4 NormalizePlane(v4 Plane) {
-	float NormalLen = Magnitude(Plane.rgb);
+    float NormalLen = Magnitude(Plane.rgb);
     
-	v4 Result;
-	Result.A = Plane.A / NormalLen;
-	Result.B = Plane.B / NormalLen;
-	Result.C = Plane.C / NormalLen;
-	Result.D = Plane.D / NormalLen;
+    v4 Result;
+    Result.A = Plane.A / NormalLen;
+    Result.B = Plane.B / NormalLen;
+    Result.C = Plane.C / NormalLen;
+    Result.D = Plane.D / NormalLen;
     
-	return(Result);
+    return(Result);
 }
 
 inline float PlanePointTest(v4 Plane, v3 Point) {
-	float Res = Dot(Plane.ABC, Point) + Plane.D;
+    float Res = Dot(Plane.ABC, Point) + Plane.D;
     
-	return(Res);
+    return(Res);
 }
 
 /* Complex number math */
 inline Complex_Num operator+(Complex_Num a, Complex_Num b) {
-	Complex_Num res;
+    Complex_Num res;
     
-	res.re = a.re + b.re;
-	res.im = a.im + b.im;
+    res.re = a.re + b.re;
+    res.im = a.im + b.im;
     
-	return(res);
+    return(res);
 }
 
 inline Complex_Num operator-(Complex_Num a, Complex_Num b) {
-	Complex_Num res;
+    Complex_Num res;
     
-	res.re = a.re - b.re;
-	res.im = a.im - b.im;
+    res.re = a.re - b.re;
+    res.im = a.im - b.im;
     
-	return(res);
+    return(res);
 }
 
 inline Complex_Num operator*(Complex_Num a, Complex_Num b) {
-	Complex_Num res;
+    Complex_Num res;
     
-	res.re = a.re * b.re - a.im * b.im;
-	res.im = a.im * b.re + a.re * b.im;
+    res.re = a.re * b.re - a.im * b.im;
+    res.im = a.im * b.re + a.re * b.im;
     
-	return(res);
+    return(res);
 }
 
 inline Complex_Num operator*(Complex_Num a, float s) {
-	Complex_Num res;
+    Complex_Num res;
     
-	res.re = a.re * s;
-	res.im = a.im * s;
+    res.re = a.re * s;
+    res.im = a.im * s;
     
-	return(res);
+    return(res);
 }
 
 /* Rectangle math */
@@ -1423,17 +1454,17 @@ inline rc2 RectNormalizeSubpixel(rc2 A){
 }
 
 inline int BoxIntersectsWithBox(rc2 Box1, rc2 Box2) {
-	v2 Box1Dim = GetRectDim(Box1);
-	v2 Box2Dim = GetRectDim(Box2);
+    v2 Box1Dim = GetRectDim(Box1);
+    v2 Box2Dim = GetRectDim(Box2);
     
-	float DistBetweenCentersX = abs((Box1.min.x - Box2.min.x) * 2.0f + (Box1Dim.x - Box2Dim.x));
-	float DistBetweenCentersY = abs((Box1.min.y - Box2.min.y) * 2.0f + (Box1Dim.y - Box2Dim.y));
+    float DistBetweenCentersX = abs((Box1.min.x - Box2.min.x) * 2.0f + (Box1Dim.x - Box2Dim.x));
+    float DistBetweenCentersY = abs((Box1.min.y - Box2.min.y) * 2.0f + (Box1Dim.y - Box2Dim.y));
     
     int IntersectionHappens =
-		((DistBetweenCentersX < Box1Dim.x + Box2Dim.x) &&
+        ((DistBetweenCentersX < Box1Dim.x + Box2Dim.x) &&
          (DistBetweenCentersY < Box1Dim.y + Box2Dim.y));
     
-	return(IntersectionHappens);
+    return(IntersectionHappens);
 }
 
 // NOTE(Dima): Other math

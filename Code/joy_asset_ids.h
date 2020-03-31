@@ -15,7 +15,6 @@ enum asset_type{
     AssetType_Sound,
     AssetType_Font,
     AssetType_Glyph,
-    AssetType_Node,
     AssetType_Model,
     AssetType_Material,
     AssetType_Skeleton,
@@ -77,16 +76,19 @@ struct asset_model{
     i16 MaterialCount;
     i16 SkeletonCount;
     i16 NodeCount;
+    i16 NodesMeshIndicesStorageCount;
     
     u32 DataOffsetToMeshIDs;
     u32 DataOffsetToMaterialIDs;
     u32 DataOffsetToSkeletonIDs;
-    u32 DataOffsetToNodeIDs;
+    u32 DataOffsetToNodesSharedDatas;
+    u32 DataOffsetToNodesMeshIndicesStorage;
     
     u32 SizeMeshIDs;
     u32 SizeMaterialIDs;
     u32 SizeSkeletonIDs;
-    u32 SizeNodeIDs;
+    u32 SizeNodesSharedDatas;
+    u32 SizeNodesMeshIndicesStorage;
 };
 
 struct asset_skeleton{
@@ -143,6 +145,7 @@ struct asset_font{
 struct asset_mesh{
     u32 MeshType;
     u32 VertexTypeSize;
+    b32 HasSkinning;
     
     u32 VerticesCount;
     u32 IndicesCount;
@@ -335,7 +338,6 @@ enum asset_group_type{
     GameAsset_Type_Material,
     GameAsset_Type_BitmapArray,
     GameAsset_Type_Skeleton,
-    GameAsset_Type_Node,
     
     GameAsset_Count,
 };

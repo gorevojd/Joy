@@ -49,6 +49,7 @@ b32 ImmediateLoad)
     Result.Freearea = System->AssetFreeareas + AssetIndex;
     Result.FileHeader = System->FileHeaders + AssetIndex;
     Result.FileHeader->AssetType = AssetType;
+    Result.FileHeader->ImmediateLoad = ImmediateLoad;
     
     Result.Asset->ID = AssetIndex;
     Result.ID = AssetIndex;
@@ -247,22 +248,14 @@ added_asset AddMeshAsset(asset_system* System,
     Source->MeshSource.MeshInfo = Mesh;
     
     // NOTE(Dima): Setting file header
-    u32 VertexTypeSize = 0;
-    if (Mesh->MeshType == Mesh_Simple) {
-        FileHeader->Mesh.MeshType = Mesh_Simple;
-        VertexTypeSize = sizeof(vertex_info);
-    }
-    else if(Mesh->MeshType == Mesh_Skinned) {
-        FileHeader->Mesh.MeshType = Mesh_Skinned;
-        VertexTypeSize = sizeof(vertex_skinned_info);
-    }
-    
-    FileHeader->Mesh.VertexTypeSize = VertexTypeSize;
+    FileHeader->Mesh.MeshType = Mesh->MeshType;
+    FileHeader->Mesh.VertexTypeSize = Mesh->VertexTypeSize;
+    FileHeader->Mesh.HasSkinning = Mesh->HasSkinning;
     FileHeader->Mesh.IndicesCount = sizeof(u32);
     FileHeader->Mesh.IndicesCount = Mesh->IndicesCount;
     FileHeader->Mesh.VerticesCount = Mesh->VerticesCount;
     
-    FileHeader->Mesh.DataVerticesSize = FileHeader->Mesh.VertexTypeSize * Mesh->VerticesCount;
+    FileHeader->Mesh.DataVerticesSize = Mesh->VertexTypeSize * Mesh->VerticesCount;
     FileHeader->Mesh.DataIndicesSize = sizeof(u32) * Mesh->IndicesCount;
     
     FileHeader->Mesh.DataOffsetToVertices = 0;
@@ -315,47 +308,23 @@ added_asset AddModelAsset(asset_system* System, tool_model_info* Model){
     ModelHeader->MaterialCount = Model->MaterialCount;
     ModelHeader->SkeletonCount = Model->SkeletonCount;
     ModelHeader->NodeCount = Model->Nodes.size();
+    ModelHeader->NodesMeshIndicesStorageCount = Model->NodeMeshIndicesStorage.size();
     
     ModelHeader->SizeMeshIDs = sizeof(u32) * Model->MeshCount;
     ModelHeader->SizeMaterialIDs = sizeof(u32) * Model->MaterialCount;
     ModelHeader->SizeSkeletonIDs = sizeof(u32) * Model->SkeletonCount;
-    ModelHeader->SizeNodeIDs = sizeof(u32) * Model->StoredNodeIDs.size();
+    ModelHeader->SizeNodesSharedDatas = sizeof(node_shared_data) * Model->Nodes.size();
+    ModelHeader->SizeNodesMeshIndicesStorage = sizeof(u32) * Model->NodeMeshIndicesStorage.size();
     
     ModelHeader->DataOffsetToMeshIDs = 0;
     ModelHeader->DataOffsetToMaterialIDs = ModelHeader->SizeMeshIDs;
     ModelHeader->DataOffsetToSkeletonIDs = 
         ModelHeader->DataOffsetToMaterialIDs + ModelHeader->SizeMaterialIDs;
-    ModelHeader->DataOffsetToNodeIDs = 
+    ModelHeader->DataOffsetToNodesSharedDatas = 
         ModelHeader->DataOffsetToSkeletonIDs + ModelHeader->SizeSkeletonIDs;
-    
-    
-    return(Added);
-}
-
-added_asset AddNodeAsset(asset_system* System, tool_node_info* Node){
-    added_asset Added = AddAsset(System, AssetType_Node, Immediate_Yes);
-    
-    asset_header* FileHeader = Added.FileHeader;
-    game_asset_source* Source = Added.Source;
-    
-    // NOTE(Dima): Setting source
-    Source->NodeSource.NodeInfo = Node;
-    
-    asset_node* NodeH = &FileHeader->Node;
-    
-    NodeH->ParentIndex = Node->ParentIndex;
-    NodeH->FirstChildIndex = Node->FirstChildIndex;
-    NodeH->ChildCount = Node->ChildCount;
-    NodeH->MeshCount = Node->MeshIndices.size();
-    
-    NodeH->SizeName = sizeof(Node->Name);
-    NodeH->SizeMeshIndices = sizeof(int) * Node->MeshIndices.size();
-    NodeH->OneMatrixSize = sizeof(m44);
-    
-    NodeH->DataOffsetToMeshIndices = 0;
-    NodeH->DataOffsetToName = NodeH->SizeMeshIndices;
-    NodeH->DataOffsetToFirstMatrix = NodeH->DataOffsetToName + NodeH->SizeName;
-    NodeH->DataOffsetToSecondMatrix = NodeH->DataOffsetToFirstMatrix + NodeH->OneMatrixSize;
+    ModelHeader->DataOffsetToNodesMeshIndicesStorage = 
+        ModelHeader->DataOffsetToNodesSharedDatas + 
+        ModelHeader->SizeNodesSharedDatas;
     
     return(Added);
 }
@@ -684,16 +653,8 @@ And forming group regions that are about to be written
                         Header->Model.SizeMeshIDs + 
                         Header->Model.SizeMaterialIDs + 
                         Header->Model.SizeSkeletonIDs + 
-                        Header->Model.SizeNodeIDs;
-                }break;
-                
-                case AssetType_Node:{
-                    Asset->Node = Source->NodeSource.NodeInfo;
-                    
-                    DataByteSize = 
-                        Header->Node.SizeMeshIndices + 
-                        Header->Node.SizeName + 
-                        Header->Node.OneMatrixSize * 2;
+                        Header->Model.SizeNodesSharedDatas +
+                        Header->Model.SizeNodesMeshIndicesStorage;
                 }break;
                 
                 case AssetType_Skeleton:{
@@ -810,36 +771,16 @@ And forming group regions that are about to be written
                     
                     if(ModelH->NodeCount){
                         // NOTE(Dima): Writing nodes
-                        fwrite(&Asset->Model->StoredNodeIDs[0],
-                               ModelH->SizeNodeIDs,
-                               1, fp);
-                    }
-                }break;
-                
-                case AssetType_Node:{
-                    asset_node* NodeH = &Header->Node;
-                    
-                    if(NodeH->MeshCount){
-                        // NOTE(Dima): Writing mesh indices
-                        fwrite(&Asset->Node->MeshIndices[0],
-                               NodeH->SizeMeshIndices,
+                        fwrite(&Asset->Model->NodesSharedDatas[0],
+                               ModelH->SizeNodesSharedDatas,
                                1, fp);
                     }
                     
-                    // NOTE(Dima): Writing name
-                    fwrite(Asset->Node->Name,
-                           NodeH->SizeName,
-                           1, fp);
-                    
-                    // NOTE(Dima): Writing ToParent matrix;
-                    fwrite(&Asset->Node->ToParent,
-                           NodeH->OneMatrixSize,
-                           1, fp);
-                    
-                    // NOTE(Dima): Writing ToWorld matrix
-                    fwrite(&Asset->Node->ToWorld,
-                           NodeH->OneMatrixSize,
-                           1, fp);
+                    if(ModelH->NodesMeshIndicesStorageCount){
+                        fwrite(&Asset->Model->NodeMeshIndicesStorage[0],
+                               ModelH->SizeNodesMeshIndicesStorage,
+                               1, fp);
+                    }
                 }break;
                 
                 case AssetType_Skeleton:{

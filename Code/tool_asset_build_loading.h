@@ -43,13 +43,71 @@ tool_font_info LoadFont(char* FilePath, float height, u32 Flags);
 Loaded_Strings LoadStringListFromFile(char* filePath);
 void FreeStringList(Loaded_Strings* list);
 
+inline void* GetDstForVertexData(void* Verts, 
+                                 size_t VertexTypeSize,
+                                 int VertexIndex,
+                                 size_t Offset)
+{
+    void* DstData = (u8*)Verts + VertexTypeSize * VertexIndex + Offset;
+    
+    return(DstData);
+}
+
+
+inline void SetVertsMemberData_u32(void* Verts, 
+                                   size_t VertexTypeSize, 
+                                   int VertexIndex, 
+                                   size_t Offset, 
+                                   u32 Value)
+{
+    
+    u32* Dst = (u32*)GetDstForVertexData(Verts, VertexTypeSize, VertexIndex, Offset);
+    
+    *Dst = Value;
+}
+
+
+inline void SetVertsMemberData_v2(void* Verts, 
+                                  size_t VertexTypeSize, 
+                                  int VertexIndex, 
+                                  size_t Offset, 
+                                  v2 Value)
+{
+    
+    v2* Dst = (v2*)GetDstForVertexData(Verts, VertexTypeSize, VertexIndex, Offset);
+    
+    *Dst = Value;
+}
+
+inline void SetVertsMemberData_v3(void* Verts, 
+                                  size_t VertexTypeSize, 
+                                  int VertexIndex, 
+                                  size_t Offset, 
+                                  v3 Value)
+{
+    v3* Dst = (v3*)GetDstForVertexData(Verts, VertexTypeSize, VertexIndex, Offset);
+    
+    *Dst = Value;
+}
+
+inline void SetVertsMemberData_v4(void* Verts, 
+                                  size_t VertexTypeSize, 
+                                  int VertexIndex, 
+                                  size_t Offset, 
+                                  v4 Value)
+{
+    v4* Dst = (v4*)GetDstForVertexData(Verts, VertexTypeSize, VertexIndex, Offset);
+    
+    *Dst = Value;
+}
+
 tool_mesh_info MakeMesh(
 std::vector<v3>& Positions,
 std::vector<v2>& TexCoords,
 std::vector<v3>& Normals,
 std::vector<v3>& Tangents,
-std::vector<v3>& Colors,
 std::vector<u32> Indices,
+std::vector<vertex_weights> Weights,
 b32 CalculateNormals,
 b32 CalculateTangents);
 tool_mesh_info MakePlane();

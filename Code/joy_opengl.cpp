@@ -173,12 +173,15 @@ INTERNAL_FUNCTION Gl_Simple_Shader& GlLoadSimpleShader(gl_state* GL, char* PathV
     GLGETU(Model);
     GLGETU(View);
     GLGETU(Projection);
+    GLGETU(HasSkinning);
+    GLGETU(BoneTransforms);
     
     GLGETA(P);
     GLGETA(UV);
     GLGETA(N);
     GLGETA(T);
-    GLGETA(C);
+    GLGETA(Weights);
+    GLGETA(BoneIDs);
     
     return(Result);
 }
@@ -313,18 +316,13 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
         glGenBuffers(1, &VBO);
         glGenBuffers(1, &EBO);
         
-        u32 SizeOfVertexStruct = sizeof(vertex_info);
-        size_t Stride = sizeof(vertex_info);
-        if(Mesh->MeshType == Mesh_Skinned){
-            SizeOfVertexStruct = sizeof(vertex_skinned_info);
-            Stride = sizeof(vertex_skinned_info);
-        }
+        size_t Stride = Mesh->VertexTypeSize;
         
         glBindVertexArray(VAO);
         GlBindBufferAndFill(GL_ARRAY_BUFFER,
                             GL_STATIC_DRAW,
                             Mesh->Vertices,
-                            Mesh->VerticesCount * SizeOfVertexStruct,
+                            Mesh->VerticesCount * Stride,
                             VBO);
         
         GlBindBufferAndFill(GL_ELEMENT_ARRAY_BUFFER,
@@ -363,11 +361,21 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
                                   Stride,GLGETOFFSET(8));
         }
         
-        if(GlArrayIsValid(GL->SimpleShader.CAttrLoc)){
-            glEnableVertexAttribArray(GL->SimpleShader.CAttrLoc);
-            glVertexAttribPointer(GL->SimpleShader.CAttrLoc,
-                                  3, GL_FLOAT, GL_FALSE,
-                                  Stride, GLGETOFFSET(11));
+        if(Mesh->HasSkinning){
+            if(GlArrayIsValid(GL->SimpleShader.WeightsAttrLoc)){
+                glEnableVertexAttribArray(GL->SimpleShader.WeightsAttrLoc);
+                glVertexAttribPointer(GL->SimpleShader.WeightsAttrLoc,
+                                      4, GL_FLOAT, GL_FALSE,
+                                      Stride,GLGETOFFSET(11));
+            }
+            
+            
+            if(GlArrayIsValid(GL->SimpleShader.BoneIDsAttrLoc)){
+                glEnableVertexAttribArray(GL->SimpleShader.BoneIDsAttrLoc);
+                glVertexAttribIPointer(GL->SimpleShader.BoneIDsAttrLoc,
+                                       1, GL_UNSIGNED_INT,
+                                       Stride,GLGETOFFSET(15));
+            }
         }
         
         Err = glGetError();
@@ -635,26 +643,17 @@ void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
                 
                 glEnable(GL_DEPTH_TEST);
                 
-                switch(Mesh->MeshType){
-                    case Mesh_Simple:{
-                        GL->SimpleShader.Use();
-                        
-                        GL->SimpleShader.SetM44(GL->SimpleShader.ModelLoc,
-                                                entry->Transform.e);
-                        GL->SimpleShader.SetM44(GL->SimpleShader.ViewLoc,
-                                                Pass->View.e);
-                        GL->SimpleShader.SetM44(GL->SimpleShader.ProjectionLoc,
-                                                Pass->Projection.e);
-                        
-                        glBindVertexArray(Mesh->Handles.Handles[0]);
-                        glDrawElements(GL_TRIANGLES, Mesh->IndicesCount, GL_UNSIGNED_INT, 0);
-                        
-                    }break;
-                    
-                    case Mesh_Skinned:{
-                        
-                    }break;
-                }
+                GL->SimpleShader.Use();
+                
+                GL->SimpleShader.SetM44(GL->SimpleShader.ModelLoc,
+                                        entry->Transform.e);
+                GL->SimpleShader.SetM44(GL->SimpleShader.ViewLoc,
+                                        Pass->View.e);
+                GL->SimpleShader.SetM44(GL->SimpleShader.ProjectionLoc,
+                                        Pass->Projection.e);
+                
+                glBindVertexArray(Mesh->Handles.Handles[0]);
+                glDrawElements(GL_TRIANGLES, Mesh->IndicesCount, GL_UNSIGNED_INT, 0);
                 
                 glDisable(GL_DEPTH_TEST);
                 //GlFreeMeshHandles(&Mesh->Handles);

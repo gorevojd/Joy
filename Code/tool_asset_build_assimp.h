@@ -92,6 +92,8 @@ struct loaded_mesh_slot{
     tool_mesh_info Mesh;
     b32 MeshLoaded;
     
+    u32 StoredMeshID;
+    
     // NOTE(Dima): -1 if Non-skeleton mesh
     int SkeletonIndex;
 };
