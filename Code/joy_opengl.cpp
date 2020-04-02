@@ -175,6 +175,7 @@ INTERNAL_FUNCTION Gl_Simple_Shader& GlLoadSimpleShader(gl_state* GL, char* PathV
     GLGETU(Projection);
     GLGETU(HasSkinning);
     GLGETU(BoneTransforms);
+    GLGETU(PassedBonesCount);
     
     GLGETA(P);
     GLGETA(UV);
@@ -316,7 +317,7 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
         glGenBuffers(1, &VBO);
         glGenBuffers(1, &EBO);
         
-        size_t Stride = Mesh->VertexTypeSize;
+        size_t Stride = Mesh->TypeCtx.VertexTypeSize;
         
         glBindVertexArray(VAO);
         GlBindBufferAndFill(GL_ARRAY_BUFFER,
@@ -333,40 +334,42 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
         
         Err = glGetError();
         
+#define GLGETOFFSET(index) (GLvoid*)((index) * sizeof(GLfloat))
+        
         if(GlArrayIsValid(GL->SimpleShader.PAttrLoc)){
             glEnableVertexAttribArray(GL->SimpleShader.PAttrLoc);
             glVertexAttribPointer(GL->SimpleShader.PAttrLoc,
                                   3, GL_FLOAT, GL_FALSE,
-                                  Stride, GLGETOFFSET(0));
+                                  Stride, (void*)Mesh->TypeCtx.OffsetP);
         }
         
         if(GlArrayIsValid(GL->SimpleShader.UVAttrLoc)){
             glEnableVertexAttribArray(GL->SimpleShader.UVAttrLoc);
             glVertexAttribPointer(GL->SimpleShader.UVAttrLoc,
                                   2, GL_FLOAT, GL_FALSE,
-                                  Stride, GLGETOFFSET(3));
+                                  Stride, (void*)Mesh->TypeCtx.OffsetUV);
         }
         
         if(GlArrayIsValid(GL->SimpleShader.NAttrLoc)){
             glEnableVertexAttribArray(GL->SimpleShader.NAttrLoc);
             glVertexAttribPointer(GL->SimpleShader.NAttrLoc,
                                   3, GL_FLOAT, GL_FALSE,
-                                  Stride, GLGETOFFSET(5));
+                                  Stride, (void*)Mesh->TypeCtx.OffsetN);
         }
         
         if(GlArrayIsValid(GL->SimpleShader.TAttrLoc)){
             glEnableVertexAttribArray(GL->SimpleShader.TAttrLoc);
             glVertexAttribPointer(GL->SimpleShader.TAttrLoc,
                                   3, GL_FLOAT, GL_FALSE,
-                                  Stride,GLGETOFFSET(8));
+                                  Stride, (void*)Mesh->TypeCtx.OffsetT);
         }
         
-        if(Mesh->HasSkinning){
+        if(Mesh->TypeCtx.MeshType == Mesh_Skinned){
             if(GlArrayIsValid(GL->SimpleShader.WeightsAttrLoc)){
                 glEnableVertexAttribArray(GL->SimpleShader.WeightsAttrLoc);
                 glVertexAttribPointer(GL->SimpleShader.WeightsAttrLoc,
                                       4, GL_FLOAT, GL_FALSE,
-                                      Stride,GLGETOFFSET(11));
+                                      Stride, (void*)Mesh->TypeCtx.OffsetWeights);
             }
             
             
@@ -374,7 +377,7 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
                 glEnableVertexAttribArray(GL->SimpleShader.BoneIDsAttrLoc);
                 glVertexAttribIPointer(GL->SimpleShader.BoneIDsAttrLoc,
                                        1, GL_UNSIGNED_INT,
-                                       Stride,GLGETOFFSET(15));
+                                       Stride, (void*)Mesh->TypeCtx.OffsetBoneIDs);
             }
         }
         
@@ -651,6 +654,11 @@ void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
                                         Pass->View.e);
                 GL->SimpleShader.SetM44(GL->SimpleShader.ProjectionLoc,
                                         Pass->Projection.e);
+                GL->SimpleShader.SetBool(GL->SimpleShader.HasSkinningLoc,
+                                         Mesh->TypeCtx.MeshType == Mesh_Skinned);
+                
+                GL->SimpleShader.SetInt(GL->SimpleShader.PassedBonesCountLoc,
+                                        0);
                 
                 glBindVertexArray(Mesh->Handles.Handles[0]);
                 glDrawElements(GL_TRIANGLES, Mesh->IndicesCount, GL_UNSIGNED_INT, 0);

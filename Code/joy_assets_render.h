@@ -147,6 +147,41 @@ b32 Immediate = false)
     return(Skeleton);
 }
 
+inline animation_clip* PushOrLoadAnimation(assets* Assets,
+                                           asset_id AnimationID,
+                                           b32 Immediate)
+{
+    asset* Asset = GetAssetByID(Assets, AnimationID);
+    ASSERT(Asset->Type == AssetType_AnimationClip);
+    
+    LoadAsset(Assets, Asset, Immediate);
+    
+    animation_clip* Animation = 0;
+    if(PotentiallyLoadedAsset(Asset, Immediate)){
+        Animation = GET_ASSET_PTR_MEMBER(Asset, animation_clip);
+    }
+    
+    return(Animation);
+}
+
+
+inline node_animation* PushOrLoadNodeAnim(assets* Assets,
+                                          asset_id NodeAnimID,
+                                          b32 Immediate)
+{
+    asset* Asset = GetAssetByID(Assets, NodeAnimID);
+    ASSERT(Asset->Type == AssetType_NodeAnimation);
+    
+    LoadAsset(Assets, Asset, Immediate);
+    
+    node_animation* NodeAnim = 0;
+    if(PotentiallyLoadedAsset(Asset, Immediate)){
+        NodeAnim = GET_ASSET_PTR_MEMBER(Asset, node_animation);
+    }
+    
+    return(NodeAnim);
+}
+
 inline model_info* PushOrLoadModel(assets* Assets,
                                    render_stack* Stack,
                                    asset_id ModelID,
@@ -185,11 +220,18 @@ inline model_info* PushOrLoadModel(assets* Assets,
                         V4(0.0f, 0.0f, 0.0f, 1.0f) * 
                         InverseTransformMatrix(Bone->InvBindPose) * 
                         ModelToWorld;
-                    PushOrLoadMesh(Assets, Stack, CubeMeshID, BoneP.xyz, QuatI(), V3(0.1f), ASSET_LOAD_DEFERRED);
+                    
+                    PushOrLoadMesh(Assets, Stack, 
+                                   CubeMeshID, BoneP.xyz, 
+                                   QuatI(), V3(0.1f), 
+                                   ASSET_LOAD_DEFERRED);
                 }
             }
         }
         
+        //AnimateModel(Model);
+        
+#if 1        
         for(int NodeIndex = 0;
             NodeIndex < Model->NodeCount;
             NodeIndex++)
@@ -203,7 +245,10 @@ inline model_info* PushOrLoadModel(assets* Assets,
                 
                 PushOrLoadMesh(Assets, Stack, MeshID, NodeTran);
             }
+            
         }
+#endif
+        
     }
     
     return(Model);

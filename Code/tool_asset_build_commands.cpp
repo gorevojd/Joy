@@ -248,14 +248,12 @@ added_asset AddMeshAsset(asset_system* System,
     Source->MeshSource.MeshInfo = Mesh;
     
     // NOTE(Dima): Setting file header
-    FileHeader->Mesh.MeshType = Mesh->MeshType;
-    FileHeader->Mesh.VertexTypeSize = Mesh->VertexTypeSize;
-    FileHeader->Mesh.HasSkinning = Mesh->HasSkinning;
+    FileHeader->Mesh.TypeCtx = Mesh->TypeCtx;
     FileHeader->Mesh.IndicesCount = sizeof(u32);
     FileHeader->Mesh.IndicesCount = Mesh->IndicesCount;
     FileHeader->Mesh.VerticesCount = Mesh->VerticesCount;
     
-    FileHeader->Mesh.DataVerticesSize = Mesh->VertexTypeSize * Mesh->VerticesCount;
+    FileHeader->Mesh.DataVerticesSize = Mesh->TypeCtx.VertexTypeSize * Mesh->VerticesCount;
     FileHeader->Mesh.DataIndicesSize = sizeof(u32) * Mesh->IndicesCount;
     
     FileHeader->Mesh.DataOffsetToVertices = 0;
@@ -309,12 +307,14 @@ added_asset AddModelAsset(asset_system* System, tool_model_info* Model){
     ModelHeader->SkeletonCount = Model->SkeletonCount;
     ModelHeader->NodeCount = Model->Nodes.size();
     ModelHeader->NodesMeshIndicesStorageCount = Model->NodeMeshIndicesStorage.size();
+    ModelHeader->AnimationCount = Model->AnimationCount;
     
     ModelHeader->SizeMeshIDs = sizeof(u32) * Model->MeshCount;
     ModelHeader->SizeMaterialIDs = sizeof(u32) * Model->MaterialCount;
     ModelHeader->SizeSkeletonIDs = sizeof(u32) * Model->SkeletonCount;
     ModelHeader->SizeNodesSharedDatas = sizeof(node_shared_data) * Model->Nodes.size();
     ModelHeader->SizeNodesMeshIndicesStorage = sizeof(u32) * Model->NodeMeshIndicesStorage.size();
+    ModelHeader->SizeAnimationIDs = sizeof(u32) * Model->AnimationCount;
     
     ModelHeader->DataOffsetToMeshIDs = 0;
     ModelHeader->DataOffsetToMaterialIDs = ModelHeader->SizeMeshIDs;
@@ -325,6 +325,66 @@ added_asset AddModelAsset(asset_system* System, tool_model_info* Model){
     ModelHeader->DataOffsetToNodesMeshIndicesStorage = 
         ModelHeader->DataOffsetToNodesSharedDatas + 
         ModelHeader->SizeNodesSharedDatas;
+    ModelHeader->DataOffsetToAnimationIDs = 
+        ModelHeader->DataOffsetToNodesMeshIndicesStorage + 
+        ModelHeader->SizeNodesMeshIndicesStorage;
+    
+    return(Added);
+}
+
+added_asset AddNodeAnimationAsset(asset_system* System, tool_node_animation* NodeAnim)
+{
+    added_asset Added = AddAsset(System, AssetType_NodeAnimation, Immediate_No);
+    
+    asset_header* FileHeader = Added.FileHeader;
+    game_asset_source* Source = Added.Source;
+    
+    // NOTE(Dima): Setting source
+    Source->NodeAnimSource.NodeAnimInfo = NodeAnim;
+    
+    // NOTE(Dima): Setting file header
+    asset_node_animation* NodeAnimHeader = &FileHeader->NodeAnim;
+    
+    NodeAnimHeader->PositionKeysCount = NodeAnim->PositionKeys.size();
+    NodeAnimHeader->RotationKeysCount = NodeAnim->RotationKeys.size();
+    NodeAnimHeader->ScalingKeysCount = NodeAnim->ScalingKeys.size();
+    
+    NodeAnimHeader->SizePositionKeys = sizeof(animation_vector_key) * NodeAnim->PositionKeys.size();
+    NodeAnimHeader->SizeRotationKeys = sizeof(animation_quaternion_key) * NodeAnim->RotationKeys.size();
+    NodeAnimHeader->SizeScalingKeys = sizeof(animation_vector_key) * NodeAnim->ScalingKeys.size();
+    
+    NodeAnimHeader->DataOffsetToPositionKeys = 0;
+    NodeAnimHeader->DataOffsetToRotataionKeys = NodeAnimHeader->SizePositionKeys;
+    NodeAnimHeader->DataOffsetToScalingKeys = 
+        NodeAnimHeader->DataOffsetToRotataionKeys + NodeAnimHeader->SizeRotationKeys;
+    
+    NodeAnimHeader->NodeIndex = NodeAnim->NodeIndex;
+    
+    return(Added);
+}
+
+added_asset AddAnimationClipAsset(asset_system* System, tool_animation_info* Animation)
+{
+    added_asset Added = AddAsset(System, AssetType_AnimationClip, Immediate_No);
+    
+    asset_header* FileHeader = Added.FileHeader;
+    game_asset_source* Source = Added.Source;
+    
+    // NOTE(Dima): Setting source
+    Source->AnimationSource.AnimationInfo = Animation;
+    
+    // NOTE(Dima): Setting file header
+    asset_animation_clip* AnimationHeader = &FileHeader->AnimationClip;
+    
+    AnimationHeader->Duration = Animation->Duration;
+    AnimationHeader->TicksPerSecond = Animation->TicksPerSecond;
+    AnimationHeader->NodeAnimationIDsCount = Animation->NodeAnimations.size();
+    
+    AnimationHeader->DataOffsetToNodeAnimationIDs = 0;
+    AnimationHeader->SizeNodeAnimationIDs = sizeof(u32) * Animation->NodeAnimations.size();
+    
+    AnimationHeader->DataOffsetToName = AnimationHeader->SizeNodeAnimationIDs;
+    AnimationHeader->SizeName = sizeof(Animation->StoreName);
     
     return(Added);
 }
@@ -654,7 +714,24 @@ And forming group regions that are about to be written
                         Header->Model.SizeMaterialIDs + 
                         Header->Model.SizeSkeletonIDs + 
                         Header->Model.SizeNodesSharedDatas +
-                        Header->Model.SizeNodesMeshIndicesStorage;
+                        Header->Model.SizeNodesMeshIndicesStorage + 
+                        Header->Model.SizeAnimationIDs;
+                }break;
+                
+                case AssetType_AnimationClip:{
+                    Asset->Animation = Source->AnimationSource.AnimationInfo;
+                    
+                    DataByteSize = Header->AnimationClip.SizeNodeAnimationIDs +
+                        Header->AnimationClip.SizeName;
+                }break;
+                
+                case AssetType_NodeAnimation:{
+                    Asset->NodeAnim = Source->NodeAnimSource.NodeAnimInfo;
+                    
+                    DataByteSize = 
+                        Header->NodeAnim.SizePositionKeys + 
+                        Header->NodeAnim.SizeRotationKeys + 
+                        Header->NodeAnim.SizeScalingKeys;
                 }break;
                 
                 case AssetType_Skeleton:{
@@ -781,6 +858,52 @@ And forming group regions that are about to be written
                                ModelH->SizeNodesMeshIndicesStorage,
                                1, fp);
                     }
+                    
+                    if(ModelH->AnimationCount){
+                        fwrite(&Asset->Model->AnimationIDs[0],
+                               ModelH->SizeAnimationIDs,
+                               1, fp);
+                    }
+                }break;
+                
+                case AssetType_AnimationClip:{
+                    asset_animation_clip* AnimH = &Header->AnimationClip;
+                    
+                    if(AnimH->NodeAnimationIDsCount){
+                        fwrite(&Asset->Animation->NodeAnimationsStoredIDs[0],
+                               AnimH->SizeNodeAnimationIDs,
+                               1, fp);
+                    }
+                    
+                    if(AnimH->SizeName){
+                        fwrite(
+                            Asset->Animation->StoreName,
+                            AnimH->SizeName,
+                            1, fp);
+                    }
+                }break;
+                
+                case AssetType_NodeAnimation:{
+                    tool_node_animation* NodeAnim = Asset->NodeAnim;
+                    asset_node_animation* NodeAnimH = &Header->NodeAnim;
+                    
+                    if(NodeAnimH->PositionKeysCount){
+                        fwrite(&NodeAnim->PositionKeys[0],
+                               NodeAnimH->SizePositionKeys,
+                               1, fp);
+                    }
+                    
+                    if(NodeAnimH->RotationKeysCount){
+                        fwrite(&NodeAnim->RotationKeys[0],
+                               NodeAnimH->SizeRotationKeys,
+                               1, fp);
+                    }
+                    
+                    if(NodeAnimH->ScalingKeysCount){
+                        fwrite(&NodeAnim->ScalingKeys[0],
+                               NodeAnimH->SizeScalingKeys,
+                               1, fp);
+                    }
                 }break;
                 
                 case AssetType_Skeleton:{
@@ -792,6 +915,7 @@ And forming group regions that are about to be written
                                Header->Skeleton.SizeBones,
                                1, fp);
                     }
+                    
                 }break;
             }
             

@@ -373,6 +373,14 @@ void LoadAssetDirectly(assets* Assets,
                 IntegrateIDs(Result->SkeletonIDs, Src->SkeletonCount, FileSource);
             }
             
+            Result->AnimationIDs = 0;
+            if(Src->AnimationCount){
+                u32* AnimationIDs = (u32*)((u8*)Data + Src->DataOffsetToAnimationIDs);
+                Result->AnimationIDs = AnimationIDs;
+                
+                IntegrateIDs(Result->AnimationIDs, Src->AnimationCount, FileSource);
+            }
+            
             Result->NodesSharedDatas = 0;
             if(Src->NodeCount){
                 node_shared_data* NodesSharedDatas = (node_shared_data*)
@@ -389,7 +397,6 @@ void LoadAssetDirectly(assets* Assets,
                 IntegrateIDs(Result->NodeMeshIDsStorage, 
                              Src->NodesMeshIndicesStorageCount,
                              FileSource);
-                
             }
             
             // NOTE(Dima): Final nodes setup
@@ -403,6 +410,46 @@ void LoadAssetDirectly(assets* Assets,
                 Node->Shared = Result->NodesSharedDatas + NodeIndex;
                 Node->MeshIDs = &Result->NodeMeshIDsStorage[Node->Shared->NodeMeshIndexFirstInStorage];
                 Node->MeshCount = Node->Shared->NodeMeshIndexCountInStorage;
+            }
+        }break;
+        
+        case AssetType_NodeAnimation:{
+            node_animation* NodeAnim = GET_ASSET_PTR_MEMBER(Asset, node_animation);
+            asset_node_animation* Src = &Header->NodeAnim;
+            
+            animation_vector_key* PositionKeys = 0;
+            if(Src->PositionKeysCount){
+                PositionKeys = (animation_vector_key*)((u8*)Data + Src->DataOffsetToPositionKeys);
+                NodeAnim->PositionKeys = PositionKeys;
+            }
+            
+            animation_quaternion_key* RotationKeys = 0;
+            if(Src->RotationKeysCount){
+                RotationKeys = (animation_quaternion_key*)((u8*)Data + Src->DataOffsetToRotataionKeys);
+                NodeAnim->RotationKeys = RotationKeys;
+            }
+            
+            animation_vector_key* ScalingKeys = 0;
+            if(Src->ScalingKeysCount){
+                ScalingKeys = (animation_vector_key*)((u8*)Data + Src->DataOffsetToScalingKeys);
+                NodeAnim->ScalingKeys = ScalingKeys;
+            }
+        }break;
+        
+        case AssetType_AnimationClip:{
+            animation_clip* Clip = GET_ASSET_PTR_MEMBER(Asset, animation_clip);
+            asset_animation_clip* Src = &Header->AnimationClip;
+            
+            u32* NodeAnimationIDs = 0;
+            if(Src->NodeAnimationIDsCount){
+                NodeAnimationIDs = (u32*)((u8*)Data + Src->DataOffsetToNodeAnimationIDs);
+                Clip->NodeAnimationIDs = NodeAnimationIDs;
+                
+                IntegrateIDs(Clip->NodeAnimationIDs, Src->NodeAnimationIDsCount, FileSource);
+            }
+            
+            if(Src->SizeName){
+                Clip->Name = (char*)((u8*)Data + Src->DataOffsetToName);
             }
         }break;
         
@@ -772,18 +819,16 @@ void InitAssets(assets* Assets){
                             
                             Result->VerticesCount = Src->VerticesCount;
                             Result->IndicesCount = Src->IndicesCount;
-                            Result->MeshType = Src->MeshType;
-                            Result->VertexTypeSize = Src->VertexTypeSize;
-                            Result->HasSkinning = Src->HasSkinning;
+                            Result->TypeCtx = Src->TypeCtx;
                             
                             // NOTE(Dima): Checking correctness of loaded vertices type sizes
-                            switch(Result->MeshType){
+                            switch(Result->TypeCtx.MeshType){
                                 case Mesh_Simple:{
-                                    ASSERT(Src->VertexTypeSize == sizeof(vertex_info));
+                                    ASSERT(Src->TypeCtx.VertexTypeSize == sizeof(vertex_info));
                                 }break;
                                 
                                 case Mesh_Skinned:{
-                                    ASSERT(Src->VertexTypeSize == sizeof(vertex_skinned_info));
+                                    ASSERT(Src->TypeCtx.VertexTypeSize == sizeof(vertex_skinned_info));
                                 }break;
                             }
                             
@@ -839,6 +884,27 @@ void InitAssets(assets* Assets){
                             Result->SkeletonCount = Src->SkeletonCount;
                             Result->NodeCount = Src->NodeCount;
                             Result->NodesMeshIDsStorageCount = Src->NodesMeshIndicesStorageCount;
+                            Result->AnimationCount = Src->AnimationCount;
+                        }break;
+                        
+                        case AssetType_NodeAnimation:{
+                            node_animation* NodeAnim = ALLOC_ASS_PTR_MEMBER(node_animation);
+                            asset_node_animation* Src = &AssetHeader.NodeAnim;
+                            
+                            NodeAnim->PositionKeysCount = Src->PositionKeysCount;
+                            NodeAnim->RotationKeysCount = Src->RotationKeysCount;
+                            NodeAnim->ScalingKeysCount = Src->ScalingKeysCount;
+                            NodeAnim->NodeIndex = Src->NodeIndex;
+                        }break;
+                        
+                        case AssetType_AnimationClip:{
+                            animation_clip* Clip = ALLOC_ASS_PTR_MEMBER(animation_clip);
+                            asset_animation_clip* Src = &AssetHeader.AnimationClip;
+                            
+                            Clip->IsLooping = true;
+                            Clip->DurationTicks = Src->Duration;
+                            Clip->TicksPerSecond = Src->TicksPerSecond;
+                            Clip->NodeAnimationsCount = Src->NodeAnimationIDsCount;
                         }break;
                         
                         case AssetType_Skeleton:{

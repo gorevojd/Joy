@@ -15,8 +15,6 @@
 //#define GLGETP(index) gl->Programs[index]
 //#define GLGETPID(shader) gl->Programs[(shader).ProgramIndex].ID
 
-#define GLGETOFFSET(index) (GLvoid*)((index) * sizeof(GLfloat))
-
 inline b32 GlArrayIsValid(GLint Arr){
     b32 Result = 1;
     
@@ -61,6 +59,10 @@ struct gl_shader{
         glUniform1i(Loc, Value);
     }
     
+    void SetInt(GLint Loc, int Value){
+        glUniform1i(Loc, Value);
+    }
+    
     void SetV3(GLint Loc, float x, float y, float z){
         glUniform3f(Loc, x, y, z);
     }
@@ -92,6 +94,7 @@ struct Gl_Simple_Shader : public gl_shader{
     GLint ProjectionLoc;
     GLint HasSkinningLoc;
     GLint BoneTransformsLoc;
+    GLint PassedBonesCountLoc;
     
     GLint PAttrLoc;
     GLint UVAttrLoc;

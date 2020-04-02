@@ -19,8 +19,8 @@ GLOBAL_VARIABLE DSound_State GlobalDirectSound;
 GLOBAL_VARIABLE mem_region GlobalMem;
 GLOBAL_VARIABLE game_state* GlobalGame;
 
-GLOBAL_VARIABLE float Time = 0.0f;
-GLOBAL_VARIABLE float DeltaTime = 0.0f;
+GLOBAL_VARIABLE f64 Time = 0.0f;
+GLOBAL_VARIABLE f64 DeltaTime = 0.0f;
 
 #if DEBUG_ENABLED
 debug_record_table* GlobalRecordTable;
@@ -2522,13 +2522,12 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     
     GlobalRunning = 1;
     while(GlobalRunning){
-        
         // NOTE(Dima): Processing time
         LARGE_INTEGER LastFrameClockLI;
         QueryPerformanceCounter(&LastFrameClockLI);
         u64 ClocksElapsed4Frame = LastFrameClockLI.QuadPart - BeginClockLI.QuadPart;
         BeginClockLI.QuadPart = LastFrameClockLI.QuadPart;
-        DeltaTime = (float)((double)ClocksElapsed4Frame * GlobalWin32.OneOverPerformanceFreq);
+        DeltaTime = (double)ClocksElapsed4Frame * GlobalWin32.OneOverPerformanceFreq;
         Time += DeltaTime;
         
         // NOTE(Dima): Setting Frame info to Pass to game

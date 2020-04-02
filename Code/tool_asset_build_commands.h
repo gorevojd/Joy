@@ -52,6 +52,12 @@ added_asset AddSkeletonAsset(asset_system* System,
 added_asset AddModelAsset(asset_system* System,
                           tool_model_info* Model);
 
+added_asset AddNodeAnimationAsset(asset_system* System, 
+                                  tool_node_animation* NodeAnim);
+
+added_asset AddAnimationClipAsset(asset_system* System, 
+                                  tool_animation_info* Animation);
+
 added_asset AddMaterialAsset(asset_system* System, 
                              tool_material_info* Material);
 

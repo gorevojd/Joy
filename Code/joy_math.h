@@ -808,19 +808,39 @@ inline quat Inverse(quat Q){
 }
 
 inline quat Lerp(quat A, quat B, float t) {
-    quat res;
+    quat Result;
     
+    float OneMinusT = 1.0f - t;
     
+    Result.x = A.x * OneMinusT + B.x * t;
+    Result.y = A.y * OneMinusT + B.y * t;
+    Result.z = A.z * OneMinusT + B.z * t;
+    Result.w = A.w * OneMinusT + B.w * t;
     
-    return(res);
+    Result = Normalize(Result);
+    
+    return(Result);
 }
 
 inline quat Slerp(quat A, quat B, float t){
-    quat res;
+    A = Normalize(A);
+    B = Normalize(B);
     
+    float CosTheta = Dot(A, B);
+    float Theta = ACos(CosTheta);
     
+    float OneOverSinTheta = 1.0f / Sin(Theta);
+    float cA = OneOverSinTheta * Sin((1.0f - t) * Theta);
+    float cB = OneOverSinTheta * Sin(t * Theta);
     
-    return(res);
+    quat Result;
+    
+    Result.x = cA * A.x + cB * B.x;
+    Result.y = cA * A.y + cB * B.y;
+    Result.z = cA * A.z + cB * B.z;
+    Result.w = cA * A.w + cB * B.w;
+    
+    return(Result);
 }
 
 /*Matrix operations*/

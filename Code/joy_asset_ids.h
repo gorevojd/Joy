@@ -18,6 +18,8 @@ enum asset_type{
     AssetType_Model,
     AssetType_Material,
     AssetType_Skeleton,
+    AssetType_AnimationClip,
+    AssetType_NodeAnimation,
 };
 
 enum asset_state{
@@ -77,18 +79,21 @@ struct asset_model{
     i16 SkeletonCount;
     i16 NodeCount;
     i16 NodesMeshIndicesStorageCount;
+    i16 AnimationCount;
     
     u32 DataOffsetToMeshIDs;
     u32 DataOffsetToMaterialIDs;
     u32 DataOffsetToSkeletonIDs;
     u32 DataOffsetToNodesSharedDatas;
     u32 DataOffsetToNodesMeshIndicesStorage;
+    u32 DataOffsetToAnimationIDs;
     
     u32 SizeMeshIDs;
     u32 SizeMaterialIDs;
     u32 SizeSkeletonIDs;
     u32 SizeNodesSharedDatas;
     u32 SizeNodesMeshIndicesStorage;
+    u32 SizeAnimationIDs;
 };
 
 struct asset_skeleton{
@@ -97,6 +102,35 @@ struct asset_skeleton{
     
     u32 DataOffsetToBones;
     u32 SizeBones;
+};
+
+struct asset_animation_clip{
+    float Duration;
+    float TicksPerSecond;
+    
+    int NodeAnimationIDsCount;
+    
+    u32 DataOffsetToNodeAnimationIDs;
+    u32 SizeNodeAnimationIDs;
+    
+    u32 DataOffsetToName;
+    u32 SizeName;
+};
+
+struct asset_node_animation{
+    int PositionKeysCount;
+    int RotationKeysCount;
+    int ScalingKeysCount;
+    
+    u32 DataOffsetToPositionKeys;
+    u32 DataOffsetToRotataionKeys;
+    u32 DataOffsetToScalingKeys;
+    
+    u32 SizePositionKeys;
+    u32 SizeRotationKeys;
+    u32 SizeScalingKeys;
+    
+    u32 NodeIndex;
 };
 
 struct asset_bitmap{
@@ -143,9 +177,7 @@ struct asset_font{
 };
 
 struct asset_mesh{
-    u32 MeshType;
-    u32 VertexTypeSize;
-    b32 HasSkinning;
+    mesh_type_context TypeCtx;
     
     u32 VerticesCount;
     u32 IndicesCount;
@@ -220,6 +252,8 @@ struct asset_header{
         asset_font Font;
         asset_sound Sound;
         asset_node Node;
+        asset_animation_clip AnimationClip;
+        asset_node_animation NodeAnim;
     };
 };
 
@@ -338,6 +372,8 @@ enum asset_group_type{
     GameAsset_Type_Material,
     GameAsset_Type_BitmapArray,
     GameAsset_Type_Skeleton,
+    GameAsset_Type_AnimationClip,
+    GameAsset_Type_NodeAnim,
     
     GameAsset_Count,
 };

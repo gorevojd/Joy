@@ -104,13 +104,15 @@ struct loaded_model{
     std::vector<loaded_mat> Materials;
     std::vector<tool_skeleton_info> Skeletons;
     std::vector<loaded_node> Nodes;
+    std::vector<tool_animation_info> Animations;
     
     std::unordered_map<std::string, int> TextureNameToEmbedIndex;
     std::vector<loaded_mat_texture> EmbededTextures;
     
     // NOTE(Dima): These are temporary
-    // NOTE(Dima): Mapping bone name to corresponding node in hierarchy
-    std::unordered_map<std::string, int> BoneNameToNode;
+    
+    // NOTE(Dima): Mapping node name to corresponding node in hierarchy
+    std::unordered_map<std::string, int> NodeNameToNodeIndex;
     
     tool_model_info ToolModelInfo;
 };
@@ -194,6 +196,17 @@ inline v4 Assimp2JoyVector4(const aiColor4D& AssimpVector) {
 	Result.w = AssimpVector.a;
     
 	return(Result);
+}
+
+inline quat Assimp2JoyQuat(const aiQuaternion& AssimpQuat){
+    quat Result = {};
+    
+    Result.x = AssimpQuat.x;
+    Result.y = AssimpQuat.y;
+    Result.z = AssimpQuat.z;
+    Result.w = AssimpQuat.w;
+    
+    return(Result);
 }
 
 #endif

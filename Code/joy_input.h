@@ -277,8 +277,8 @@ struct input_state{
     char FrameInput[32];
     int FrameInputLen;
     
-    float Time;
-    float DeltaTime;
+    f64 Time;
+    f64 DeltaTime;
 };
 
 inline gamepad_controller* GetGamepad(input_state* Input, u32 GamepadIndex){

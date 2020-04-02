@@ -69,6 +69,8 @@ struct asset{
         ASSET_PTR_MEMBER(model_info);
         ASSET_PTR_MEMBER(skeleton_info);
         ASSET_PTR_MEMBER(node_info);
+        ASSET_PTR_MEMBER(node_animation);
+        ASSET_PTR_MEMBER(animation_clip);
     };
 };
 

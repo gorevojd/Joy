@@ -12,7 +12,7 @@ uniform mat4 View;
 uniform mat4 Projection;
 
 uniform bool HasSkinning;
-
+uniform int PassedBonesCount;
 uniform mat4 BoneTransforms[128];
 
 out Vertex_Shader_Out{
@@ -26,7 +26,7 @@ void main(){
     vec3 ModelSpaceN = N;
     
     // NOTE(Dima): Producing some skinning
-    if(HasSkinning){
+    if(HasSkinning && (PassedBonesCount > 0)){
         mat4 ResultTranMatrix = mat4(vec4(0.0f), vec4(0.0f), vec4(0.0f), vec4(0.0f));
         
         // NOTE(Dima): Iterating through weights and bones and apply to ResultTranMatrix

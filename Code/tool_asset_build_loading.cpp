@@ -583,6 +583,7 @@ v4 modulationColor)
 }
 
 
+
 // NOTE(Dima): MESH AND SOUND STUFF
 tool_mesh_info MakeMesh(
 std::vector<v3>& Positions,
@@ -600,30 +601,13 @@ b32 CalculateTangents)
     
     b32 HasSkinning = Weights.size() > 0;
     
-    u32 ResultMeshType = Mesh_Simple;
-    size_t VertexTypeSize = sizeof(vertex_info);
-    size_t OffsetP = offsetof(vertex_info, P);
-    size_t OffsetUV = offsetof(vertex_info, UV);
-    size_t OffsetN = offsetof(vertex_info, N);
-    size_t OffsetT = offsetof(vertex_info, T);
-    size_t OffsetWeights = 0;
-    size_t OffsetBoneIDs = 0;
+    mesh_type_context TypeCtx = MeshSimpleType();
     
     if(HasSkinning){
-        ResultMeshType = Mesh_Skinned;
-        ASSERT(Weights.size() == Positions.size());
-        VertexTypeSize = sizeof(vertex_skinned_info);
-        
-        OffsetP = offsetof(vertex_skinned_info, P);
-        OffsetUV = offsetof(vertex_skinned_info, UV);
-        OffsetN = offsetof(vertex_skinned_info, N);
-        OffsetT = offsetof(vertex_skinned_info, T);
-        OffsetWeights = offsetof(vertex_skinned_info, Weights);
-        OffsetBoneIDs = offsetof(vertex_skinned_info, BoneIDs);
+        TypeCtx = MeshSkinnedType();
     }
     
-    Result.HasSkinning = HasSkinning;
-    Result.VertexTypeSize = VertexTypeSize;
+    Result.TypeCtx = TypeCtx;
     Result.IndicesCount = Indices.size();
 	Result.Indices = (u32*)malloc(Indices.size() * sizeof(u32));
 	for (int IndexIndex = 0;
@@ -632,10 +616,9 @@ b32 CalculateTangents)
 	{
 		Result.Indices[IndexIndex] = Indices[IndexIndex];
 	}
-    
-    Result.MeshType = ResultMeshType;
-	Result.VerticesCount = VerticesCount;
-    size_t VertsSize = VertexTypeSize * VerticesCount;
+	
+    Result.VerticesCount = VerticesCount;
+    size_t VertsSize = TypeCtx.VertexTypeSize * VerticesCount;
 	Result.Vertices = malloc(VertsSize);
     memset(Result.Vertices, 0, VertsSize);
     
@@ -648,8 +631,8 @@ b32 CalculateTangents)
     void* DstVerts = (void*)Result.Vertices;
     
 #define SETM(index, member, type, value) SetVertsMemberData_##type(\
-    DstVerts,VertexTypeSize,\
-    index, Offset##member, value)
+    DstVerts, TypeCtx.VertexTypeSize,\
+    index, TypeCtx.Offset##member, value)
     
     for(int VertexIndex = 0;
         VertexIndex < VerticesCount;
@@ -664,7 +647,6 @@ b32 CalculateTangents)
             
             int WalkCount = CurWeights->Weights.size();
             
-#define MAX_WEIGHTS_PER_VERTEX 4
             if(WalkCount > MAX_WEIGHTS_PER_VERTEX){
                 // NOTE(Dima): Pick greatest 4 weights and put them in first 4 elements(unordered)
                 // NOTE(Dima): Simple selection sort
@@ -718,7 +700,7 @@ b32 CalculateTangents)
             v4 ResultWeights = V4(0.0f, 0.0f, 0.0f, 0.0f);
             
             for(int WeightIndex = 0;
-                WeightIndex < 4;
+                WeightIndex < MAX_WEIGHTS_PER_VERTEX;
                 WeightIndex++)
             {
                 vertex_weight W = CurWeights->Weights[WeightIndex];

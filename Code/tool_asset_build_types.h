@@ -107,10 +107,6 @@ struct tool_font_info{
     int Codepoint2Glyph[FONT_INFO_MAX_GLYPH_COUNT];
 };
 
-enum Mesh_Type{
-    Mesh_Simple,
-    Mesh_Skinned,
-};
 
 struct vertex_weight{
     int BoneID;
@@ -130,10 +126,7 @@ struct tool_mesh_info{
     void* Vertices;
     int VerticesCount;
     
-    b32 HasSkinning;
-    u32 VertexTypeSize;
-    
-    u32 MeshType;
+    mesh_type_context TypeCtx;
 };
 
 struct tool_node_info{
@@ -150,15 +143,39 @@ struct tool_model_info{
     std::vector<u32> MeshIDs;
     std::vector<u32> MaterialIDs;
     std::vector<u32> SkeletonIDs;
+    std::vector<u32> AnimationIDs;
     
     int MeshCount;
     int MaterialCount;
     int SkeletonCount;
+    int AnimationCount;
     
     std::vector<tool_node_info> Nodes;
     
     std::vector<node_shared_data> NodesSharedDatas;
     std::vector<u32> NodeMeshIndicesStorage;
+};
+
+struct tool_node_animation{
+    std::string NodeName;
+    
+    int NodeIndex;
+    
+    std::vector<animation_vector_key> PositionKeys;
+    std::vector<animation_quaternion_key> RotationKeys;
+    std::vector<animation_vector_key> ScalingKeys;
+};
+
+struct tool_animation_info{
+    float Duration;
+    float TicksPerSecond;
+    
+    std::string Name;
+    
+    char StoreName[1024];
+    
+    std::vector<tool_node_animation> NodeAnimations;
+    std::vector<u32> NodeAnimationsStoredIDs;
 };
 
 struct tool_skeleton_info{
@@ -297,6 +314,8 @@ struct game_asset {
         tool_material_info* Material;
         tool_skeleton_info* Skeleton;
         tool_node_info* Node;
+        tool_animation_info* Animation;
+        tool_node_animation* NodeAnim;
     };
 };
 
@@ -323,6 +342,14 @@ struct game_asset_source_model {
 
 struct game_asset_source_node{
     tool_node_info* NodeInfo;
+};
+
+struct game_asset_source_animation_clip{
+    tool_animation_info* AnimationInfo;
+};
+
+struct game_asset_source_node_anim{
+    tool_node_animation* NodeAnimInfo;
 };
 
 struct game_asset_source_skeleton{
@@ -357,6 +384,8 @@ struct game_asset_source {
         game_asset_source_material MaterialSource;
         game_asset_source_skeleton SkeletonSource;
         game_asset_source_node NodeSource;
+        game_asset_source_animation_clip AnimationSource;
+        game_asset_source_node_anim NodeAnimSource;
     };
 };
 

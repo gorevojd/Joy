@@ -96,13 +96,6 @@ inline size_t GetComponentCount4VertLayout(u32 VertLayout){
 }
 #endif
 
-enum Mesh_Type{
-    // NOTE(Dima): PUVNT
-    Mesh_Simple,
-    // NOTE(Dima): PUVN + BoneIDs + Weights
-    Mesh_Skinned,
-};
-
 enum mesh_handles_types{
     MeshHandle_None,
     MeshHandle_VertexArray,
@@ -122,13 +115,10 @@ struct mesh_info{
     u32* Indices;
     int IndicesCount;
     
-    b32 HasSkinning;
-    
     void* Vertices;
     int VerticesCount;
     
-    u32 MeshType;
-    u32 VertexTypeSize;
+    mesh_type_context TypeCtx;
     
     mesh_handles Handles;
 };
@@ -181,6 +171,7 @@ struct model_info{
     u32* MeshIDs;
     u32* MaterialIDs;
     u32* SkeletonIDs;
+    u32* AnimationIDs;
     node_info* Nodes;
     u32* NodeMeshIDsStorage;
     node_shared_data* NodesSharedDatas;
@@ -189,7 +180,32 @@ struct model_info{
     int MaterialCount;
     int SkeletonCount;
     int NodeCount;
+    int AnimationCount;
     int NodesMeshIDsStorageCount;
+};
+
+struct node_animation{
+    animation_vector_key* PositionKeys;
+    animation_quaternion_key* RotationKeys;
+    animation_vector_key* ScalingKeys;
+    
+    int PositionKeysCount;
+    int RotationKeysCount;
+    int ScalingKeysCount;
+    
+    int NodeIndex;
+};
+
+struct animation_clip{
+    float DurationTicks;
+    float TicksPerSecond;
+    
+    char* Name;
+    
+    b32 IsLooping;
+    
+    u32* NodeAnimationIDs;
+    int NodeAnimationsCount;
 };
 
 #endif

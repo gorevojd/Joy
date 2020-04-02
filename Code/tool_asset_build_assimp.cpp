@@ -157,7 +157,7 @@ AiLoadMatTexturesForType(loaded_model* Model,
 }
 
 INTERNAL_FUNCTION u32 
-CalculateCheckSumForSkeleton(tool_skeleton_info* Skeleton)
+CalculateCheckSumForSkeleton(loaded_model* Model, tool_skeleton_info* Skeleton)
 {
     u32 Result = 0;
     
@@ -167,7 +167,9 @@ CalculateCheckSumForSkeleton(tool_skeleton_info* Skeleton)
     {
         bone_info* Bone = &Skeleton->Bones[Index];
         
-        u32 ThisNameHash = StringHashFNV(Bone->Name);
+        loaded_node* Node = &Model->Nodes[Bone->NodeIndex];
+        
+        u32 ThisNameHash = StringHashFNV(Node->Name);
         
         Result += ThisNameHash * 23 * (Index + 1) + 7;
     }
@@ -380,6 +382,7 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         
         int ThisNodeIndex = Result.Nodes.size();
         
+        Result.NodeNameToNodeIndex.insert({std::string(NewNode.Name), ThisNodeIndex});
         Result.Nodes.push_back(NewNode);
         
         for(int ChildIndex = 0;
@@ -398,6 +401,86 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         
         // NOTE(Dima): Removing process element
         NodeProcessQueue.pop();
+    }
+    
+    // NOTE(Dima): Loading nodes animations
+    int AnimationsCount = scene->mNumAnimations;
+    for(int AnimIndex = 0;
+        AnimIndex < AnimationsCount;
+        AnimIndex++)
+    {
+        aiAnimation* AssimpAnim = scene->mAnimations[AnimIndex];
+        
+        tool_animation_info NewAnimation;
+        
+        NewAnimation.Name = std::string(AssimpAnim->mName.C_Str());
+        NewAnimation.Duration = AssimpAnim->mDuration;
+        NewAnimation.TicksPerSecond = AssimpAnim->mTicksPerSecond;
+        
+        for(int NodeAnimIndex = 0;
+            NodeAnimIndex < AssimpAnim->mNumChannels;
+            NodeAnimIndex++)
+        {
+            aiNodeAnim* AssimpNodeAnim = AssimpAnim->mChannels[NodeAnimIndex];
+            
+            tool_node_animation NewNodeAnim = {};
+            
+            // NOTE(Dima): Setting name
+            NewNodeAnim.NodeName = std::string(AssimpNodeAnim->mNodeName.C_Str());
+            
+            // NOTE(Dima): Finding node index in a mapping
+            auto FindIterator = Result.NodeNameToNodeIndex.find(NewNodeAnim.NodeName);
+            ASSERT(FindIterator != Result.NodeNameToNodeIndex.end());
+            NewNodeAnim.NodeIndex = FindIterator->second;
+            
+            // NOTE(Dima): Loading position keys
+            for(int KeyIndex = 0; 
+                KeyIndex < AssimpNodeAnim->mNumPositionKeys; 
+                KeyIndex++)
+            {
+                aiVectorKey* Key = &AssimpNodeAnim->mPositionKeys[KeyIndex];
+                
+                animation_vector_key NewKey = {};
+                NewKey.Value = Assimp2JoyVector3(Key->mValue);
+                NewKey.Time = Key->mTime;
+                
+                NewNodeAnim.PositionKeys.push_back(NewKey);
+            }
+            
+            // NOTE(Dima): Loading rotation keys
+            for(int KeyIndex = 0; 
+                KeyIndex < AssimpNodeAnim->mNumRotationKeys; 
+                KeyIndex++)
+            {
+                aiQuatKey* Key = &AssimpNodeAnim->mRotationKeys[KeyIndex];
+                
+                animation_quaternion_key NewKey = {};
+                NewKey.Value = Assimp2JoyQuat(Key->mValue);
+                NewKey.Time = Key->mTime;
+                
+                NewNodeAnim.RotationKeys.push_back(NewKey);
+            }
+            
+            // NOTE(Dima): Loading scaling keys
+            for(int KeyIndex = 0; 
+                KeyIndex < AssimpNodeAnim->mNumScalingKeys; 
+                KeyIndex++)
+            {
+                aiVectorKey* Key = &AssimpNodeAnim->mScalingKeys[KeyIndex];
+                
+                animation_vector_key NewKey = {};
+                NewKey.Value = Assimp2JoyVector3(Key->mValue);
+                NewKey.Time = Key->mTime;
+                
+                NewNodeAnim.ScalingKeys.push_back(NewKey);
+            }
+            
+            // NOTE(Dima): Pushing node animation to vector
+            NewAnimation.NodeAnimations.push_back(NewNodeAnim);
+        }
+        
+        // NOTE(Dima): Pushing animation to vector
+        Result.Animations.push_back(NewAnimation);
     }
     
     // NOTE(Dima): Loading meshes
@@ -432,11 +515,9 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
                     loaded_node* OurNode = &Result.Nodes[NodeIndex];
                     
                     if(strcmp(AssimpBone->mName.C_Str(), OurNode->Name) == 0){
-                        OurNode->AssimpBone = AssimpBone;
-                        
-                        Result.BoneNameToNode.insert({std::string(OurNode->Name), NodeIndex});
-                        
                         CorrespondingFound = true;
+                        
+                        OurNode->AssimpBone = AssimpBone;
                         
                         break;
                     }
@@ -569,15 +650,13 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
                 
                 // NOTE(Dima): Init new bone
                 bone_info NewBone;
-                
                 NewBone.ParentIndex = CurrentFront.ParentBoneIndex;
                 NewBone.FirstChildIndex = EntriesPushedTotal;
                 NewBone.ChildCount = BoneChildren.size();
-                CopyStringsSafe(NewBone.Name, ARRAY_COUNT(NewBone.Name), CurNode->Name);
-                
                 aiMatrix4x4 BindPoseMatrix = CurNode->AssimpBone->mOffsetMatrix;
                 BindPoseMatrix = BindPoseMatrix.Transpose();
                 NewBone.InvBindPose = Assimp2JoyMatrix(BindPoseMatrix);
+                NewBone.NodeIndex = TempBone->NodeIndex;
                 
                 int ThisBoneIndex = Skeleton.Bones.size();
                 
@@ -609,11 +688,13 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
             {
                 bone_info* Bone = &Skeleton.Bones[BoneIndex];
                 
-                Skeleton.BoneNameToBoneID.insert({std::string(Bone->Name), BoneIndex});
+                loaded_node* Node = &Result.Nodes[Bone->NodeIndex];
+                
+                Skeleton.BoneNameToBoneID.insert({Node->Name, BoneIndex});
             }
             
             // NOTE(Dima): Trying to find skeleton with same check sum in skeletons array
-            Skeleton.CheckSum = CalculateCheckSumForSkeleton(&Skeleton);
+            Skeleton.CheckSum = CalculateCheckSumForSkeleton(&Result, &Skeleton);
             
             for(int SkeletonIndex = 0;
                 SkeletonIndex < Result.Skeletons.size();
@@ -755,10 +836,12 @@ INTERNAL_FUNCTION tool_model_info LoadedToToolModelInfo(loaded_model* Model){
     Result.MeshCount = Model->Meshes.size();
     Result.MaterialCount = Model->Materials.size();
     Result.SkeletonCount = Model->Skeletons.size();
+    Result.AnimationCount = Model->Animations.size();
     
     Result.MeshIDs = std::vector<u32>();
     Result.MaterialIDs = std::vector<u32>();
     Result.SkeletonIDs = std::vector<u32>();
+    Result.AnimationIDs = std::vector<u32>();
     
     for(int NodeIndex = 0;
         NodeIndex < Model->Nodes.size();
@@ -812,6 +895,42 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
     }
     EndAsset(System);
     
+    BeginAsset(System, GameAsset_Type_NodeAnim);
+    for(int AnimIndex = 0;
+        AnimIndex < Model->Animations.size();
+        AnimIndex++)
+    {
+        tool_animation_info* Animation = &Model->Animations[AnimIndex];
+        
+        for(int NodeAnimIndex = 0;
+            NodeAnimIndex < Animation->NodeAnimations.size();
+            NodeAnimIndex++)
+        {
+            tool_node_animation* NodeAnim = &Animation->NodeAnimations[NodeAnimIndex];
+            
+            added_asset Added = AddNodeAnimationAsset(System, NodeAnim);
+            Animation->NodeAnimationsStoredIDs.push_back(Added.ID);
+        }
+    }
+    EndAsset(System);
+    
+    BeginAsset(System, GameAsset_Type_AnimationClip);
+    for(int AnimIndex = 0;
+        AnimIndex < Model->Animations.size();
+        AnimIndex++)
+    {
+        tool_animation_info* Animation = &Model->Animations[AnimIndex];
+        
+        CopyStringsSafe(Animation->StoreName, 
+                        sizeof(Animation->StoreName),
+                        (char*)Animation->Name.c_str());
+        
+        added_asset Added = AddAnimationClipAsset(System, Animation);
+        ToolModel->AnimationIDs.push_back(Added.ID);
+    }
+    ASSERT(ToolModel->AnimationCount == ToolModel->AnimationIDs.size());
+    EndAsset(System);
+    
     // NOTE(Dima): Storing meshes
     BeginAsset(System, GameAsset_Type_Mesh);
     for(int MeshIndex = 0; 
@@ -825,7 +944,6 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
         ToolModel->MeshIDs.push_back(Added.ID);
     }
     EndAsset(System);
-    
     
     // NOTE(Dima): Storing nodes
     for(int NodeIndex = 0;
