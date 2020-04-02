@@ -245,6 +245,8 @@ void AnimateModel(model_info* Model){
                                              NodeAnim->ScalingKeysCount,
                                              CurrentTick,
                                              V3(1.0f, 1.0f, 1.0f));
+            
+            
         }
     }
 }

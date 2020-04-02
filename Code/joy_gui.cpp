@@ -52,12 +52,12 @@ inline void GuiDeallocateWindow(gui_state* Gui, Gui_Window* todo){
     todo->PrevAlloc->NextAlloc = todo;
 }
 
-INTERNAL_FUNCTION inline void GuiRemoveElementFromList(Gui_Element* Elem){
+INTERNAL_FUNCTION inline void GuiRemoveElementFromList(gui_element* Elem){
     Elem->Next->Prev = Elem->Prev;
     Elem->Prev->Next = Elem->Next;
 }
 
-INTERNAL_FUNCTION inline void GuiDeallocateElement(gui_state* Gui, Gui_Element* elem)
+INTERNAL_FUNCTION inline void GuiDeallocateElement(gui_state* Gui, gui_element* elem)
 {
     // NOTE(Dima): Remove from Use list
     elem->NextAlloc->PrevAlloc = elem->PrevAlloc;
@@ -71,20 +71,20 @@ INTERNAL_FUNCTION inline void GuiDeallocateElement(gui_state* Gui, Gui_Element* 
     elem->PrevAlloc->NextAlloc = elem;
 }
 
-INTERNAL_FUNCTION Gui_Element* GuiAllocateElement(
+INTERNAL_FUNCTION gui_element* GuiAllocateElement(
 gui_state* Gui)
 {
-    Gui_Element* result = 0;
+    gui_element* result = 0;
     
     if(DLIST_FREE_IS_EMPTY(Gui->freeSentinel, NextAlloc)){
         const int count = 128;
-        Gui_Element* elemPoolArray = PushArray(Gui->Mem, Gui_Element, count);
+        gui_element* elemPoolArray = PushArray(Gui->Mem, gui_element, count);
         
         for(int index = 0; 
             index < count;
             index++)
         {
-            Gui_Element* elem = &elemPoolArray[index];
+            gui_element* elem = &elemPoolArray[index];
             
             DLIST_INSERT_BEFORE_SENTINEL(elem, Gui->freeSentinel, NextAlloc, PrevAlloc);
         }
@@ -103,29 +103,29 @@ gui_state* Gui)
     return(result);
 }
 
-INTERNAL_FUNCTION Gui_Element* GuiInitElement(gui_state* Gui,
-                                              char* name,
-                                              Gui_Element** cur,
+INTERNAL_FUNCTION gui_element* GuiInitElement(gui_state* Gui,
+                                              char* Name,
+                                              gui_element** cur,
                                               u32 type, 
                                               b32 initOpened)
 {
-    Gui_Element* result = 0;
+    gui_element* result = 0;
     
     // NOTE(Dima): Try find element in hierarchy
-    Gui_Element* childSentinel = (*cur)->childSentinel;
-    Gui_Element* at = 0;
-    Gui_Element* found = 0;
+    gui_element* childSentinel = (*cur)->childSentinel;
+    gui_element* at = 0;
+    gui_element* found = 0;
     if(childSentinel){
         at = childSentinel->Next;
         
-        u32 id = StringHashFNV(name);
-        u32 InTreeID = id;
+        u32 ID = StringHashFNV(Name);
+        u32 InTreeID = ID;
         if(at->parent){
-            InTreeID *= at->parent->id + 7853;
+            InTreeID *= at->parent->ID + 7853;
         }
         
         while(at != childSentinel){
-            if(id == at->id){
+            if(ID == at->ID){
                 found = at;
                 break;
             }
@@ -137,8 +137,8 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(gui_state* Gui,
         if(!found){
             found = GuiAllocateElement(Gui);
             
-            found->id = id;
-            CopyStringsSafe(found->name, sizeof(found->name), name);
+            found->ID = ID;
+            CopyStringsSafe(found->Name, sizeof(found->Name), Name);
             
             found->parent = *cur;
             found->type = type;
@@ -155,18 +155,18 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(gui_state* Gui,
             }
             else{
                 found->childSentinel = GuiAllocateElement(Gui);
-                Gui_Element* fcs = found->childSentinel;
+                gui_element* fcs = found->childSentinel;
                 fcs->Next = fcs;
                 fcs->Prev = fcs;
                 fcs->parent = found;
                 fcs->childSentinel = 0;
-                CopyStrings(fcs->name, "ChildrenSentinel");
-                fcs->id = StringHashFNV(fcs->name);
+                CopyStrings(fcs->Name, "ChildrenSentinel");
+                fcs->ID = StringHashFNV(fcs->Name);
                 fcs->type = GuiElement_ChildrenSentinel;
             }
             
             // NOTE(Dima): Initializing opened
-            found->opened = initOpened;
+            found->Opened = initOpened;
             
             // NOTE(Dima): Inserting to list
             found->Next = childSentinel->Next;
@@ -199,12 +199,12 @@ INTERNAL_FUNCTION Gui_Element* GuiInitElement(gui_state* Gui,
 }
 
 
-INTERNAL_FUNCTION Gui_Element* GuiBeginElement(gui_state* Gui,
+INTERNAL_FUNCTION gui_element* GuiBeginElement(gui_state* Gui,
                                                char* name,
                                                u32 type,
                                                b32 opened)
 {
-    Gui_Element* Result = GuiInitElement(Gui, 
+    gui_element* Result = GuiInitElement(Gui, 
                                          name, 
                                          &Gui->curElement, 
                                          type,
@@ -213,12 +213,12 @@ INTERNAL_FUNCTION Gui_Element* GuiBeginElement(gui_state* Gui,
     return(Result);
 }
 
-INTERNAL_FUNCTION b32 GuiElementOpenedInTree(Gui_Element* elem){
+INTERNAL_FUNCTION b32 GuiElementOpenedInTree(gui_element* elem){
     b32 Result = 1;
-    Gui_Element* at = elem->parent;
+    gui_element* at = elem->parent;
     
     while(at->parent != 0){
-        if(at->opened != 1){
+        if(at->Opened != 1){
             Result = 0;
             break;
         }
@@ -233,7 +233,7 @@ INTERNAL_FUNCTION void GuiEndElement(gui_state* Gui, u32 type)
 {
     ASSERT(Gui->curElement->type == type);
     
-    Gui_Element* TmpParent = Gui->curElement->parent;
+    gui_element* TmpParent = Gui->curElement->parent;
     int TmpCount = Gui->curElement->TmpCount;
     
     if(type == GuiElement_ChildrenSentinel ||
@@ -249,7 +249,7 @@ INTERNAL_FUNCTION void GuiEndElement(gui_state* Gui, u32 type)
 }
 
 INTERNAL_FUNCTION void GuiFreeElement(gui_state* Gui,
-                                      Gui_Element* elem)
+                                      gui_element* elem)
 {
     elem->NextAlloc->PrevAlloc = elem->PrevAlloc;
     elem->PrevAlloc->NextAlloc = elem->NextAlloc;
@@ -344,25 +344,25 @@ inline void GuiAddWindowToList(Gui_Window* window,
     window->Prev->Next = window;
 }
 
-INTERNAL_FUNCTION void GuiInitRoot(gui_state* Gui, Gui_Element** root){
+INTERNAL_FUNCTION void GuiInitRoot(gui_state* Gui, gui_element** root){
     
     (*root) = GuiAllocateElement(Gui);
     (*root)->Next = (*root);
     (*root)->Prev = (*root);
     (*root)->parent = 0;
     (*root)->type = GuiElement_Root;
-    CopyStrings((*root)->name, "RootElement!!!");
-    (*root)->id = StringHashFNV((*root)->name);
+    CopyStrings((*root)->Name, "RootElement!!!");
+    (*root)->ID = StringHashFNV((*root)->Name);
     
     (*root)->childCount = 0;
     (*root)->childSentinel = GuiAllocateElement(Gui);
-    Gui_Element* rcs = (*root)->childSentinel;
+    gui_element* rcs = (*root)->childSentinel;
     rcs->Next = rcs;
     rcs->Prev = rcs;
     rcs->parent = (*root);
     rcs->childSentinel = 0;
-    CopyStrings(rcs->name, "RootChildrenSentinel");
-    rcs->id = StringHashFNV(rcs->name);
+    CopyStrings(rcs->Name, "RootChildrenSentinel");
+    rcs->ID = StringHashFNV(rcs->Name);
     rcs->type = GuiElement_ChildrenSentinel;
 }
 
@@ -393,7 +393,7 @@ void GuiBeginPage(gui_state* Gui, char* name){
     }
     
     // NOTE(Dima): Init page element
-    Gui_Element* pageElem = GuiBeginElement(Gui, 
+    gui_element* pageElem = GuiBeginElement(Gui, 
                                             name,
                                             GuiElement_Page,
                                             true);
@@ -794,10 +794,10 @@ inline void GuiSnapInWindowRect(gui_state* Gui, v2* P, v2* Dim, u32 SnapType){
     }
 }
 
-INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 layoutType, Gui_Element* layoutElem){
+INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 layoutType, gui_element* LayoutElem){
     // NOTE(Dima): initializing references
-    layoutElem->Data.Layout.ref = layout;
-    layout->Elem = layoutElem;
+    LayoutElem->Data.Layout.ref = layout;
+    layout->Elem = LayoutElem;
     
     v2 popDim;
     if(!GuiPopDim(Gui, &popDim)){
@@ -806,7 +806,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
     
     // NOTE(Dima): Layout initializing
     layout->Type = layoutType;
-    if(!layoutElem->Data.IsInit){
+    if(!LayoutElem->Data.IsInit){
         layout->Start = V2(200.0f, 200.0f) * (Gui->layoutCount - 1);
         layout->At = layout->Start;
         // NOTE(Dima): Layout dimension should be set anyways
@@ -823,7 +823,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
             }break;
         }
         
-        layoutElem->Data.IsInit = true;
+        LayoutElem->Data.IsInit = true;
     }
     
     // NOTE(Dima): Recalculate window rect always for clipping GUI interactions
@@ -835,9 +835,11 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
     layout->AdvanceRememberStack[0].baseline = layout->Start.x;
     
     if(layoutType == GuiLayout_Window){
-        Gui_Empty_Interaction Interaction(layoutElem);
-        Interaction.SetPriority(GUI_PRIORITY_SMALL);
         
+        
+        gui_interaction Interaction = CreateInteraction(LayoutElem, 
+                                                        GuiInteraction_Empty,
+                                                        GuiPriority_Small);
 #if 1    
         
         GuiAnchor(Gui, "Anchor1", 
@@ -945,9 +947,9 @@ void GuiBeginLayout(gui_state* Gui, char* name, u32 layoutType){
     }
     
     // NOTE(Dima): Beginnning layout elem
-    Gui_Element* layoutElem = GuiBeginElement(Gui, name, GuiElement_Layout, true);
+    gui_element* LayoutElem = GuiBeginElement(Gui, name, GuiElement_Layout, true);
     
-    GuiInitLayout(Gui, foundLayout, layoutType, layoutElem);
+    GuiInitLayout(Gui, foundLayout, layoutType, LayoutElem);
 }
 
 void GuiEndLayout(gui_state* Gui){
@@ -1115,12 +1117,12 @@ void GuiFrameBegin(gui_state* Gui, gui_frame_info GuiFrameInfo){
                            V2(GuiFrameInfo.Width, GuiFrameInfo.Height)));
     
     // NOTE(Dima): Init root layout
-    Gui_Element* layoutElem = GuiBeginElement(Gui, 
+    gui_element* LayoutElem = GuiBeginElement(Gui, 
                                               Gui->rootLayout.Name, 
                                               GuiElement_Layout, 
                                               true);
     
-    GuiInitLayout(Gui, &Gui->rootLayout, GuiLayout_Layout, layoutElem);
+    GuiInitLayout(Gui, &Gui->rootLayout, GuiLayout_Layout, LayoutElem);
 }
 
 void GuiFrameEnd(gui_state* Gui){
@@ -1142,6 +1144,118 @@ void GuiFramePrepare4Render(gui_state* Gui){
     EndGuiChunk(Gui->Stack);
 }
 
+
+
+void GuiInteract(gui_state* Gui, 
+                 gui_interaction* Interaction)
+{
+    switch(Interaction->Type){
+        case GuiInteraction_Move:{
+            gui_interaction_data_move* MoveData = &Interaction->Data.Move;
+            
+            v2 PtrStartInAnchor = MoveData->PtrStartInAnchor;
+            rc2 AnchorRect = MoveData->AnchorRect;
+            v2 MouseP = Gui->FrameInfo.Input->MouseP;
+            
+            v2* OffsetInAnchor = MoveData->OffsetInAnchor;
+            v2* WorkPtr = MoveData->ChangePtr;
+            v2 ResizedRectMin = MoveData->ResizedRectMin;
+            
+            if(MouseInRect(Gui->Input, MoveData->AnchorRect)){
+                GuiSetHot(Gui, Interaction, true);
+                Interaction->WasHotInInteraction = true;
+                
+                if(KeyWentDown(Gui->Input, MouseKey_Left)){
+                    GuiSetActive(Gui, Interaction);
+                    Interaction->WasActiveInInteraction = true;
+                    
+                    *OffsetInAnchor = MouseP - AnchorRect.min;
+                }
+            }
+            else{
+                GuiSetHot(Gui, Interaction, false);
+            }
+            
+            v2 AnchorTargetMinP = MouseP - *OffsetInAnchor;
+            v2 TargetP = AnchorTargetMinP + PtrStartInAnchor;
+            v2 ResizedDim = TargetP - ResizedRectMin;
+            
+            if(GuiIsActive(Gui, Interaction)){
+                
+                switch (MoveData->MoveType) {
+                    case GuiMoveInteraction_Move:{
+                        *WorkPtr = TargetP;
+                    }break;
+                    
+                    case GuiMoveInteraction_Resize_Default: {
+                        *WorkPtr = ResizedDim;
+                        
+                        if (ResizedDim.x < MoveData->MinDim.x) {
+                            WorkPtr->x = MoveData->MinDim.x;
+                        }
+                        
+                        if (ResizedDim.y < MoveData->MinDim.y) {
+                            WorkPtr->y = MoveData->MinDim.y;
+                        }
+                    }break;
+                    
+                    case GuiMoveInteraction_Resize_Horizontal: {
+                        WorkPtr->x = ResizedDim.x;
+                        if (ResizedDim.x < MoveData->MinDim.x) {
+                            WorkPtr->x = MoveData->MinDim.x;
+                        }
+                    }break;
+                    
+                    case GuiMoveInteraction_Resize_Vertical: {
+                        WorkPtr->y = ResizedDim.y;
+                        if (ResizedDim.y < MoveData->MinDim.y) {
+                            WorkPtr->y = MoveData->MinDim.y;
+                        }
+                    }break;
+                    
+                    case GuiMoveInteraction_Resize_Proportional: {
+                        float WidthToHeight = WorkPtr->x / WorkPtr->y;
+                        WorkPtr->y = ResizedDim.y;
+                        WorkPtr->x = WorkPtr->y * WidthToHeight;
+                        
+                        if (ResizedDim.y < MoveData->MinDim.y) {
+                            WorkPtr->y = MoveData->MinDim.y;
+                            WorkPtr->x = WorkPtr->y * WidthToHeight;
+                        }
+                    }break;
+                }
+                
+                if(KeyWentUp(Gui->Input, MouseKey_Left)){
+                    GuiReleaseInteraction(Gui, Interaction);
+                    
+                    *OffsetInAnchor = {};
+                }
+            }
+        }break;
+        
+        case GuiInteraction_BoolInRect:{
+            gui_interaction_data_bool_in_rect* BoolInRect = &Interaction->Data.BoolInRect;
+            
+            if(MouseInInteractiveArea(Gui, BoolInRect->Rect)){
+                GuiSetHot(Gui, Interaction, true);
+                Interaction->WasHotInInteraction = true;
+                
+                if(KeyWentDown(Gui->FrameInfo.Input, MouseKey_Left)){
+                    *BoolInRect->Value = !*BoolInRect->Value;
+                    
+                    GuiSetActive(Gui, Interaction);
+                    Interaction->WasActiveInInteraction = true;
+                    
+                    GuiReleaseInteraction(Gui, Interaction);
+                }
+                
+            }
+            else{
+                GuiSetHot(Gui, Interaction, false);
+            }
+        }break;
+    }
+}
 
 // NOTE(Dima): Default advance type is Column advance
 inline void GuiPreAdvance(gui_state* Gui, Gui_Layout* layout){
@@ -1205,7 +1319,7 @@ void GuiBeginRow(gui_state* Gui){
     char name[64];
     stbsp_sprintf(name, "Row or Column: %d", Gui->curElement->childCount);
     
-    Gui_Element* elem = GuiBeginElement(Gui, name, GuiElement_RowColumn, true);
+    gui_element* elem = GuiBeginElement(Gui, name, GuiElement_RowColumn, true);
     if(GuiElementOpenedInTree(elem)){
         
         Gui_Layout* layout = GetParentLayout(Gui);
@@ -1221,7 +1335,7 @@ void GuiBeginColumn(gui_state* Gui){
     char name[64];
     stbsp_sprintf(name, "Row or Column: %d", Gui->curElement->childCount);
     
-    Gui_Element* elem = GuiBeginElement(Gui, name, GuiElement_RowColumn, true);
+    gui_element* elem = GuiBeginElement(Gui, name, GuiElement_RowColumn, true);
     if(GuiElementOpenedInTree(elem)){
         
         Gui_Layout* layout = GetParentLayout(Gui);
@@ -1372,11 +1486,11 @@ void GuiTooltip(gui_state* Gui, char* tooltipText, v2 at){
 void GuiAnchor(gui_state* Gui, 
                char* Name, 
                v2 Pos, v2 Dim, 
-               b32 Resize,
+               b32 IsResize,
                b32 Centered, 
                v2* RectP, v2* RectDim)
 {
-    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, false);
+    gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, false);
     Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
@@ -1404,55 +1518,31 @@ void GuiAnchor(gui_state* Gui,
         }
         v2* OffsetInAnchor = &elem->Data.Anchor.OffsetInAnchor;
         
-        gui_interaction* interaction = 0;
-        if(Resize){
-            Gui_Resize_Interaction ResizeInteraction(*RectP,
-                                                     RectDim,
-                                                     V2(50, 50),
-                                                     Gui_Resize_Interaction_Type::Default,
-                                                     elem);
-            ResizeInteraction.SetPriority(GUI_PRIORITY_HIGH);
-            interaction = &ResizeInteraction;
+        gui_interaction Interaction = CreateInteraction(elem, 
+                                                        GuiInteraction_Move,
+                                                        GuiPriority_Avg);
+        
+        gui_interaction_data_move* Move = &Interaction.Data.Move;
+        
+        Move->AnchorRect = WorkRect;
+        Move->OffsetInAnchor = OffsetInAnchor;
+        Move->PtrStartInAnchor = Pos - MinP;
+        
+        if(IsResize){
+            Move->ChangePtr = RectDim;
+            Move->MoveType = GuiMoveInteraction_Resize_Default;
+            Move->MinDim = V2(50, 50);
+            Move->ResizedRectMin = *RectP;
         }
         else{
-            Gui_Move_Interaction MoveInteraction(RectP,
-                                                 Gui_Move_Interaction_Type::Move,
-                                                 elem);
-            MoveInteraction.SetPriority(GUI_PRIORITY_HIGH);
-            interaction = &MoveInteraction;
+            Move->ChangePtr = RectP;
+            Move->MoveType = GuiMoveInteraction_Move;
         }
         
-        if(MouseInRect(Gui->Input, WorkRect)){
-            GuiSetHot(Gui, interaction, true);
-            
-            if(KeyWentDown(Gui->Input, MouseKey_Left)){
-                GuiSetActive(Gui, interaction);
-                
-                *OffsetInAnchor = MouseP - Pos;
-            }
-        }
-        else{
-            GuiSetHot(Gui, interaction, false);
-        }
-        
-        if(KeyWentUp(Gui->Input, MouseKey_Left)){
-            GuiReleaseInteraction(Gui, interaction);
-            
-            *OffsetInAnchor = {};
-        }
+        GuiInteract(Gui, &Interaction);
         
         v4 AnchorColor = GUI_GETCOLOR_COLSYS(Color_Orange);
-        
-        if(GuiIsActive(Gui, interaction)){
-            MouseP = MouseP - *OffsetInAnchor;
-            
-            ASSERT((interaction->InteractionType == GuiInteraction_Move) || 
-                   (interaction->InteractionType == GuiInteraction_Resize));
-            
-            interaction->OffsetInAnchor = *OffsetInAnchor;
-            
-            interaction->Interact(Gui);
-            
+        if(Interaction.WasActiveInInteraction){
             AnchorColor = GUI_GETCOLOR_COLSYS(Color_Blue);
         }
         
@@ -1463,7 +1553,7 @@ void GuiAnchor(gui_state* Gui,
 }
 
 void GuiBeginTree(gui_state* Gui, char* name){
-    Gui_Element* elem = GuiBeginElement(Gui, name, GuiElement_Item, false);
+    gui_element* elem = GuiBeginElement(Gui, name, GuiElement_Item, false);
     Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && PotentiallyVisibleSmall(layout))
@@ -1478,12 +1568,13 @@ void GuiBeginTree(gui_state* Gui, char* name){
         v4 oulineColor = GUI_GETCOLOR_COLSYS(Color_Red);
         
         GuiPushBut(Gui, textRc, PushBut_DefaultGrad, oulineColor);
-        if(elem->opened){
+        if(elem->Opened){
             GuiPushBut(Gui, textRc, PushBut_Outline, oulineColor);
         }
         
-        Gui_Empty_Interaction Interaction(elem);
-        Interaction.SetPriority(GUI_PRIORITY_AVG);
+        gui_interaction Interaction = CreateInteraction(elem, 
+                                                        GuiInteraction_Empty,
+                                                        GuiPriority_Avg);
         
         if(MouseInInteractiveArea(Gui, textRc)){
             GuiSetHot(Gui, &Interaction, true);
@@ -1493,7 +1584,7 @@ void GuiBeginTree(gui_state* Gui, char* name){
                 GuiSetActive(Gui, &Interaction);
                 GuiReleaseInteraction(Gui, &Interaction);
                 
-                elem->opened = !elem->opened;
+                elem->Opened = !elem->Opened;
             }
         }
         else{
@@ -1509,7 +1600,7 @@ void GuiEndTree(gui_state* Gui){
 }
 
 void GuiText(gui_state* Gui, char* text){
-    Gui_Element* elem = GuiBeginElement(Gui, text, GuiElement_TempItem, true);
+    gui_element* elem = GuiBeginElement(Gui, text, GuiElement_TempItem, true);
     Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
@@ -1527,7 +1618,7 @@ void GuiText(gui_state* Gui, char* text){
 b32 GuiButton(gui_state* Gui, char* buttonName){
     b32 result = 0;
     
-    Gui_Element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, true);
+    gui_element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, true);
     Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
@@ -1543,8 +1634,9 @@ b32 GuiButton(gui_state* Gui, char* buttonName){
         // NOTE(Dima): Event processing
         v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
         
-        Gui_Empty_Interaction Interaction(elem);
-        Interaction.SetPriority(GUI_PRIORITY_AVG);
+        gui_interaction Interaction = CreateInteraction(elem, 
+                                                        GuiInteraction_Empty,
+                                                        GuiPriority_Avg);
         
         if(MouseInInteractiveArea(Gui, textRc)){
             GuiSetHot(Gui, &Interaction, true);
@@ -1569,8 +1661,8 @@ b32 GuiButton(gui_state* Gui, char* buttonName){
     return(result);
 }
 
-void GuiBoolButton(gui_state* Gui, char* buttonName, b32* value){
-    Gui_Element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, true);
+void GuiBoolButton(gui_state* Gui, char* buttonName, b32* Value){
+    gui_element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, true);
     Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
@@ -1586,14 +1678,22 @@ void GuiBoolButton(gui_state* Gui, char* buttonName, b32* value){
         v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
         
         // NOTE(Dima): Event processing
-        if(value){
-            if(*value == 0){
+        if(Value){
+            if(*Value == 0){
                 textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundDisabled);
             }
             
-            Gui_BoolInRect_Interaction Interaction(value, textRc, elem);
-            Interaction.SetPriority(GUI_PRIORITY_AVG);
-            Interaction.Interact(Gui);
+            
+            gui_interaction Interaction = CreateInteraction(elem, 
+                                                            GuiInteraction_Empty,
+                                                            GuiPriority_Avg);
+            
+            gui_interaction_data_bool_in_rect* BoolInRect = &Interaction.Data.BoolInRect;
+            
+            BoolInRect->Value = Value;
+            BoolInRect->Rect = textRc;
+            
+            GuiInteract(Gui, &Interaction);
             
             if(Interaction.WasHotInInteraction){
                 textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
@@ -1608,8 +1708,8 @@ void GuiBoolButton(gui_state* Gui, char* buttonName, b32* value){
     GuiEndElement(Gui, GuiElement_Item);
 }
 
-void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value){
-    Gui_Element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, true);
+void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* Value){
+    gui_element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, true);
     Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
@@ -1631,8 +1731,8 @@ void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value){
         char buttonText[4];
         CopyStrings(buttonText, "ERR");
         v4 buttonTextC = GUI_GETCOLOR(GuiColor_ButtonForeground);
-        if(value){
-            if(*value){
+        if(Value){
+            if(*Value){
                 CopyStrings(buttonText, "ON");
             }
             else{
@@ -1641,9 +1741,17 @@ void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value){
                 CopyStrings(buttonText, "OFF");
             }
             
-            Gui_BoolInRect_Interaction Interaction(value, butRc, elem);
-            Interaction.SetPriority(GUI_PRIORITY_AVG);
-            Interaction.Interact(Gui);
+            
+            gui_interaction Interaction = CreateInteraction(elem, 
+                                                            GuiInteraction_Empty,
+                                                            GuiPriority_Avg);
+            
+            gui_interaction_data_bool_in_rect* BoolInRect = &Interaction.Data.BoolInRect;
+            
+            BoolInRect->Value = Value;
+            BoolInRect->Rect = NameRc;
+            
+            GuiInteract(Gui, &Interaction);
             
             if(Interaction.WasHotInInteraction){
                 buttonTextC = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
@@ -1658,8 +1766,8 @@ void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value){
     GuiEndElement(Gui, GuiElement_Item);
 }
 
-void GuiCheckbox(gui_state* Gui, char* name, b32* value){
-    Gui_Element* elem = GuiBeginElement(Gui, name, GuiElement_Item, true);
+void GuiCheckbox(gui_state* Gui, char* name, b32* Value){
+    gui_element* elem = GuiBeginElement(Gui, name, GuiElement_Item, true);
     Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
@@ -1677,11 +1785,19 @@ void GuiCheckbox(gui_state* Gui, char* name, b32* value){
         
         // NOTE(Dima): Event processing
         v4 backC = GUI_GETCOLOR(GuiColor_ButtonBackground);
-        if(value){
+        if(Value){
             
-            Gui_BoolInRect_Interaction Interaction(value, chkRect, elem);
-            Interaction.SetPriority(GUI_PRIORITY_AVG);
-            Interaction.Interact(Gui);
+            gui_interaction Interaction = CreateInteraction(elem, 
+                                                            GuiInteraction_Empty,
+                                                            GuiPriority_Avg);
+            
+            gui_interaction_data_bool_in_rect* BoolInRect = &Interaction.Data.BoolInRect;
+            
+            BoolInRect->Value = Value;
+            BoolInRect->Rect = chkRect;
+            
+            GuiInteract(Gui, &Interaction);
+            
             
             if(Interaction.WasHotInInteraction){
                 backC = GUI_GETCOLOR(GuiColor_ButtonBackgroundHot);
@@ -1690,7 +1806,7 @@ void GuiCheckbox(gui_state* Gui, char* name, b32* value){
         
         GuiPushBut(Gui, chkRect);
         
-        if(*value){
+        if(*Value){
             PushOrLoadGlyph(Gui->Assets, 
                             Gui->Stack,
                             chkRect.min, 
@@ -1717,7 +1833,7 @@ char* name,
 u32* ref, 
 u32 defaultId) 
 {
-    Gui_Element* element = GuiBeginElement(Gui, 
+    gui_element* element = GuiBeginElement(Gui, 
                                            name, 
                                            GuiElement_RadioGroup, 
                                            true);
@@ -1730,11 +1846,11 @@ u32 defaultId)
     }
 }
 
-INTERNAL_FUNCTION inline Gui_Element* 
-GuiFindRadioGroupParent(Gui_Element* curElement) {
-    Gui_Element* result = 0;
+INTERNAL_FUNCTION inline gui_element* 
+GuiFindRadioGroupParent(gui_element* curElement) {
+    gui_element* result = 0;
     
-    Gui_Element* at = curElement;
+    gui_element* at = curElement;
     while (at != 0) {
         if (at->type == GuiElement_RadioGroup) {
             result = at;
@@ -1749,8 +1865,8 @@ GuiFindRadioGroupParent(Gui_Element* curElement) {
 
 
 void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId) {
-    Gui_Element* radioBut = GuiBeginElement(Gui, name, GuiElement_Item, true);
-    Gui_Element* radioGroup = GuiFindRadioGroupParent(Gui->curElement);
+    gui_element* radioBut = GuiBeginElement(Gui, name, GuiElement_Item, true);
+    gui_element* radioGroup = GuiFindRadioGroupParent(Gui->curElement);
     Gui_Layout* layout = GetParentLayout(Gui);
     
     if (radioGroup && 
@@ -1779,8 +1895,10 @@ void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId) {
             textC = GUI_GETCOLOR(GuiColor_ButtonForegroundDisabled);
         }
         
-        Gui_Empty_Interaction Interaction(radioBut);
-        Interaction.SetPriority(GUI_PRIORITY_AVG);
+        gui_interaction Interaction = CreateInteraction(radioBut, 
+                                                        GuiInteraction_Empty,
+                                                        GuiPriority_Avg);
+        
         if (MouseInInteractiveArea(Gui, textRc)) {
             GuiSetHot(Gui, &Interaction, true);
             textC = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
@@ -1813,7 +1931,7 @@ void GuiEndRadioGroup(gui_state* Gui) {
 }
 
 void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 Style){
-    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, true);
+    gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, true);
     Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
@@ -1832,8 +1950,9 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
         
         char Buf[32];
         
-        Gui_Empty_Interaction Interaction(elem);
-        Interaction.SetPriority(GUI_PRIORITY_AVG);
+        gui_interaction Interaction = CreateInteraction(elem, 
+                                                        GuiInteraction_Empty,
+                                                        GuiPriority_Avg);
         
         if(MouseInInteractiveArea(Gui, SlideRc)){
             GuiSetHot(Gui, &Interaction, true);
@@ -1905,7 +2024,7 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
 }
 
 void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Name, u32 Style){
-    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, true);
+    gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, true);
     Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
@@ -1924,8 +2043,9 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
         
         char Buf[32];
         
-        Gui_Empty_Interaction Interaction(elem);
-        Interaction.SetPriority(GUI_PRIORITY_AVG);
+        gui_interaction Interaction = CreateInteraction(elem, 
+                                                        GuiInteraction_Empty,
+                                                        GuiPriority_Avg);
         
         if(MouseInInteractiveArea(Gui, SlideRc)){
             GuiSetHot(Gui, &Interaction, true);
@@ -1996,7 +2116,7 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
 }
 
 void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
-    Gui_Element* elem = GuiBeginElement(Gui, name, GuiElement_Item, true);
+    gui_element* elem = GuiBeginElement(Gui, name, GuiElement_Item, true);
     Gui_Layout* layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
@@ -2013,8 +2133,9 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
         
         int* CaretP = &elem->Data.InputText.CaretPos;
         
-        Gui_Empty_Interaction Interaction(elem);
-        Interaction.SetPriority(GUI_PRIORITY_AVG);
+        gui_interaction Interaction = CreateInteraction(elem, 
+                                                        GuiInteraction_Empty,
+                                                        GuiPriority_Avg);
         
         if(MouseInInteractiveArea(Gui, textRc)){
             GuiSetHot(Gui, &Interaction, true);
@@ -2162,7 +2283,7 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
     GuiEndElement(Gui, GuiElement_Item);
 }
 
-INTERNAL_FUNCTION inline rc2 GuiGetGridRect(float WeightForThis, Gui_Element* Parent){
+INTERNAL_FUNCTION inline rc2 GuiGetGridRect(float WeightForThis, gui_element* Parent){
     gui_grid_item* Item = &Parent->Data.GridItem;
     
     if(Item->LastSumWeightInChildren < 0.0001f){
@@ -2200,14 +2321,14 @@ INTERNAL_FUNCTION inline rc2 GuiGetGridRect(float WeightForThis, Gui_Element* Pa
 }
 
 INTERNAL_FUNCTION gui_grid_item* GuiGridItemInit(gui_state* Gui, 
-                                                 Gui_Element* elem, 
+                                                 gui_element* elem, 
                                                  u32 GridItemType, 
                                                  float Weight)
 {
     gui_grid_item* Item = &elem->Data.GridItem;
     switch(GridItemType){
         case GuiGridItem_GridHub:{
-            Gui_Element* Parent = Gui->CurrentGridHub;
+            gui_element* Parent = Gui->CurrentGridHub;
             ASSERT(Parent);
             // NOTE(Dima): Can spawn Grids only in Gridhubs
             ASSERT(Parent->Data.GridItem.Type == GuiGridItem_GridHub);
@@ -2226,26 +2347,26 @@ INTERNAL_FUNCTION gui_grid_item* GuiGridItemInit(gui_state* Gui,
                                           V2(Gui->FrameInfo.Width,
                                              Gui->FrameInfo.Height));
             
-            Gui_Element* Parent = Gui->CurrentGridHub;
+            gui_element* Parent = Gui->CurrentGridHub;
             ASSERT(Parent);
             // NOTE(Dima): Can spawn Grids only in Gridhubs
             ASSERT(Parent->Data.GridItem.Type == GuiGridItem_GridHub);
             
-            Gui_Element* AtGrid = Parent->childSentinel->Next;
+            gui_element* AtGrid = Parent->childSentinel->Next;
             
             gui_grid_item* HubItem = &Parent->Data.GridItem;
             
             // NOTE(Dima): If first element in grid hub -> set it's to active
             if(AtGrid->Prev == AtGrid->Next){
-                HubItem->ActiveID = StringHashFNV(elem->name);
+                HubItem->ActiveID = StringHashFNV(elem->Name);
             }
             
             while(AtGrid != Parent->childSentinel){
-                if(AtGrid->id == HubItem->ActiveID){
-                    AtGrid->opened = true;
+                if(AtGrid->ID == HubItem->ActiveID){
+                    AtGrid->Opened = true;
                 }
                 else{
-                    AtGrid->opened = false;
+                    AtGrid->Opened = false;
                 }
                 
                 AtGrid = AtGrid->Next;
@@ -2278,7 +2399,7 @@ void GuiGridHubBegin(gui_state* Gui){
     char name[64];
     stbsp_sprintf(name, "GridHub: %d", Gui->curElement->childCount);
     
-    Gui_Element* Elem = GuiBeginElement(Gui, name, 
+    gui_element* Elem = GuiBeginElement(Gui, name, 
                                         GuiElement_GridItem, 
                                         true);
     
@@ -2299,7 +2420,7 @@ void GuiGridHubEnd(gui_state* Gui){
 }
 
 void GuiGridBegin(gui_state* Gui, char* Name){
-    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
+    gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
     
     gui_grid_item* Item = GuiGridItemInit(Gui,
                                           elem,
@@ -2318,7 +2439,7 @@ void GuiGridBeginRow(gui_state* Gui, float Weight = 1.0f){
     char Name[64];
     stbsp_sprintf(Name, "Row: %d", Gui->curElement->TmpCount);
     
-    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
+    gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
     
     gui_grid_item* Item = GuiGridItemInit(Gui,
                                           elem,
@@ -2330,7 +2451,7 @@ void GuiGridBeginColumn(gui_state* Gui, float Weight = 1.0f){
     char Name[64];
     stbsp_sprintf(Name, "Column: %d", Gui->curElement->TmpCount);
     
-    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
+    gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
     
     gui_grid_item* Item = GuiGridItemInit(Gui,
                                           elem,
@@ -2353,7 +2474,7 @@ void GuiGridTileEmpty(gui_state* Gui, float Weight = 1.0f){
     char Name[64];
     stbsp_sprintf(Name, "EmptyTile: %d", Gui->curElement->TmpCount);
     
-    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
+    gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
     gui_grid_item* Item = GuiGridItemInit(Gui,
                                           elem,
                                           GuiGridItem_Item,
@@ -2365,7 +2486,7 @@ void GuiGridTileEmpty(gui_state* Gui, float Weight = 1.0f){
 b32 GuiGridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
     b32 Result = 0;
     
-    Gui_Element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
+    gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
     gui_grid_item* Item = GuiGridItemInit(Gui,
                                           elem,
                                           GuiGridItem_Item,
@@ -2385,8 +2506,9 @@ b32 GuiGridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
         v4 Color1;
         v4 Color2;
         
-        Gui_Empty_Interaction Interaction(elem);
-        Interaction.SetPriority(GUI_PRIORITY_AVG);
+        gui_interaction Interaction = CreateInteraction(elem, 
+                                                        GuiInteraction_Empty,
+                                                        GuiPriority_Avg);
         
         if(MouseInInteractiveArea(Gui, WorkRect)){
             GuiSetHot(Gui, &Interaction, true);

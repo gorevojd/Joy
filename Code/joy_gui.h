@@ -109,7 +109,7 @@ struct Gui_Layout{
     u32 ID;
     u32 Type;
     
-    struct Gui_Element* Elem;
+    struct gui_element* Elem;
     
     Gui_Layout* Next;
     Gui_Layout* Prev;
@@ -151,7 +151,7 @@ struct Gui_Page{
     char name[128];
     u32 id;
     
-    Gui_Element* elem;
+    gui_element* elem;
     
     Gui_Page* Next;
     Gui_Page* Prev;
@@ -180,7 +180,7 @@ struct gui_grid_item{
     b32 IsInit;
 };
 
-enum Gui_Element_Type{
+enum gui_element_type{
     GuiElement_None,
     
     GuiElement_Root,
@@ -195,8 +195,8 @@ enum Gui_Element_Type{
     GuiElement_GridItem,
 };
 
-struct Gui_Element{
-    char name[64];
+struct gui_element{
+    char Name[64];
     
     struct {
         union{
@@ -228,44 +228,65 @@ struct Gui_Element{
         b32 IsInit;
     }Data;
     
-    b32 opened;
+    b32 Opened;
     int TmpCount;
     
-    Gui_Element* parentInTree;
+    gui_element* parentInTree;
     
-    u32 id;
+    u32 ID;
     u32 type;
     
-    Gui_Element* Next;
-    Gui_Element* Prev;
+    gui_element* Next;
+    gui_element* Prev;
     
-    Gui_Element* NextAlloc;
-    Gui_Element* PrevAlloc;
+    gui_element* NextAlloc;
+    gui_element* PrevAlloc;
     
-    Gui_Element* parent;
-    Gui_Element* childSentinel;
+    gui_element* parent;
+    gui_element* childSentinel;
     int childCount;
 };
 
-
-
-enum Gui_Interaction_Type{
-    GuiInteraction_None,
-    GuiInteraction_Variable,
-    GuiInteraction_Move,
-    GuiInteraction_Resize,
-    GuiInteraction_BoolInRect,
+enum gui_interaction_type{
     GuiInteraction_Empty,
-    GuiInteraction_ChangeGrid,
+    
+    GuiInteraction_Move,
+    GuiInteraction_BoolInRect,
 };
 
 enum gui_priority_type{
-    GUI_PRIORITY_SUPER_SMALL,
-    GUI_PRIORITY_SMALL,
-    GUI_PRIORITY_AVG,
-    GUI_PRIORITY_HIGH,
-    GUI_PRIORITY_SUPER_HIGH,
-    GUI_PRIORITY_SUPER_PUPER_HIGH,
+    GuiPriority_SuperSmall,
+    GuiPriority_Small,
+    GuiPriority_Avg,
+    GuiPriority_High,
+    GuiPriority_SuperHigh,
+    GuiPriority_SuperPuperHigh,
+};
+
+enum gui_move_interaction_type{
+    GuiMoveInteraction_Move,
+    
+    GuiMoveInteraction_Resize_Default,
+    GuiMoveInteraction_Resize_Proportional,
+    GuiMoveInteraction_Resize_Horizontal,
+    GuiMoveInteraction_Resize_Vertical,
+};
+
+struct gui_interaction_data_bool_in_rect{
+    b32* Value;
+    rc2 Rect;
+};
+
+struct gui_interaction_data_move{
+    v2* ChangePtr;
+    v2 PtrStartInAnchor;
+    
+    v2* OffsetInAnchor;
+    rc2 AnchorRect;
+    
+    v2 ResizedRectMin;
+    v2 MinDim;
+    u32 MoveType;
 };
 
 struct gui_interaction_ctx{
@@ -275,40 +296,39 @@ struct gui_interaction_ctx{
 };
 
 struct gui_interaction{
-    Gui_Element* Owner;
-    u32 InteractionType;
+    gui_element* Owner;
+    u32 Type;
     
     gui_interaction_ctx Context;
     
     union{
-        v2 OffsetInAnchor;
-    };
+        gui_interaction_data_move Move;
+        gui_interaction_data_bool_in_rect BoolInRect;
+    } Data;
     
     b32 WasHotInInteraction;
     b32 WasActiveInInteraction;
-    
-    gui_interaction(u32 InteractionType, Gui_Element* Owner){
-        this->InteractionType = InteractionType;
-        this->Owner = Owner;
-        this->Context.ID = Owner->id;
-        this->Context.Name = Owner->name;
-        this->Context.Priority = GUI_PRIORITY_SMALL;
-        this->WasHotInInteraction = 0;
-        this->WasActiveInInteraction = 0;
-    }
-    
-    void SetPriority(u32 Priority){
-        this->Context.Priority = Priority;
-    }
-    
-    static gui_interaction_ctx NullInteraction(){
-        gui_interaction_ctx Result = {};
-        
-        return(Result);
-    }
-    
-    virtual void Interact(struct gui_state* Gui) = 0;
 };
+
+inline void SetInteractionPriority(gui_interaction* Interaction, u32 Priority){
+    Interaction->Context.Priority = Priority;
+}
+
+inline gui_interaction CreateInteraction(gui_element* Owner, 
+                                         u32 InteractionType,
+                                         u32 Priority = GuiPriority_Small)
+{
+    gui_interaction Result = {};
+    
+    Result.Owner = Owner;
+    Result.Type = InteractionType;
+    
+    Result.Context.ID = Owner->ID;
+    Result.Context.Name = Owner->Name;
+    Result.Context.Priority = Priority;
+    
+    return(Result);
+}
 
 struct gui_frame_info{
     render_stack* Stack;
@@ -350,10 +370,10 @@ struct gui_state{
     Gui_Layout rootLayout;
     int layoutCount;
     
-    Gui_Element* rootElement;
-    Gui_Element* curElement;
+    gui_element* rootElement;
+    gui_element* curElement;
     
-    Gui_Element* CurrentGridHub;
+    gui_element* CurrentGridHub;
     
     Gui_Window windowUseSentinel;
     Gui_Window windowFreeSentinel;
@@ -364,8 +384,8 @@ struct gui_state{
     Gui_Window* tempWindow2;
     
     int TotalAllocatedGuiElements;
-    Gui_Element freeSentinel;
-    Gui_Element useSentinel;
+    gui_element freeSentinel;
+    gui_element useSentinel;
     
 #define GUI_MAX_TOOLTIPS 256
     Gui_Tooltip tooltips[GUI_MAX_TOOLTIPS];
@@ -383,11 +403,11 @@ struct gui_state{
 };
 
 
-inline Gui_Element* 
-GuiFindElementOfTypeUpInTree(Gui_Element* curElement, u32 elementType) {
-    Gui_Element* result = 0;
+inline gui_element* 
+GuiFindElementOfTypeUpInTree(gui_element* curElement, u32 elementType) {
+    gui_element* result = 0;
     
-    Gui_Element* at = curElement;
+    gui_element* at = curElement;
     while (at != 0) {
         if (at->type == elementType) {
             result = at;
@@ -404,7 +424,7 @@ GuiFindElementOfTypeUpInTree(Gui_Element* curElement, u32 elementType) {
 inline Gui_Layout* GetParentLayout(gui_state* Gui){
     Gui_Layout* res = 0;
     
-    Gui_Element* layoutElem = GuiFindElementOfTypeUpInTree(
+    gui_element* layoutElem = GuiFindElementOfTypeUpInTree(
         Gui->curElement, 
         GuiElement_Layout);
     
@@ -456,7 +476,7 @@ inline void GuiSetHot(gui_state* Gui,
     }
     else{
         if(Gui->HotInteraction.ID == Interaction->Context.ID){
-            Gui->HotInteraction = gui_interaction::NullInteraction();
+            Gui->HotInteraction = {};
         }
     }
 }
@@ -480,26 +500,13 @@ inline void GuiSetActive(gui_state* Gui, gui_interaction* interaction){
 inline void GuiReleaseInteraction(gui_state* Gui, gui_interaction* interaction){
     if(interaction){
         if(GuiIsActive(Gui, interaction)){
-            Gui->ActiveInteraction = gui_interaction::NullInteraction();
+            Gui->ActiveInteraction = {};
         }
     }
 }
 
-
-struct Gui_Empty_Interaction : public gui_interaction{
-    Gui_Empty_Interaction(Gui_Element* Owner) : gui_interaction(GuiInteraction_Empty, Owner)
-    {
-        
-    }
-    
-    virtual void Interact(gui_state* Gui) override {
-        this->WasHotInInteraction = 0;
-        this->WasActiveInInteraction = 0;
-    }
-};
-
 inline void GuiGoToGrid(gui_state* Gui, char* GridName){
-    Gui_Element* Parent = Gui->CurrentGridHub;
+    gui_element* Parent = Gui->CurrentGridHub;
     ASSERT(Parent);
     // NOTE(Dima): Can call only when grid hub is current
     ASSERT(Parent->Data.GridItem.Type == GuiGridItem_GridHub);
@@ -507,10 +514,10 @@ inline void GuiGoToGrid(gui_state* Gui, char* GridName){
     u32 ID = StringHashFNV(GridName);
     
     b32 FoundWithName = false;
-    Gui_Element* AtGrid = Parent->childSentinel->Next;
+    gui_element* AtGrid = Parent->childSentinel->Next;
     while(AtGrid != Parent->childSentinel){
         
-        if(AtGrid->id == ID){
+        if(AtGrid->ID == ID){
             FoundWithName = true;
             break;
         }
@@ -522,145 +529,6 @@ inline void GuiGoToGrid(gui_state* Gui, char* GridName){
         Parent->Data.GridItem.NextActiveID = ID;
     }
 }
-
-struct Gui_BoolInRect_Interaction : public gui_interaction{
-    b32* Value;
-    rc2 Rect;
-    
-    Gui_BoolInRect_Interaction(b32* Value, rc2 Rect, Gui_Element* Owner) : 
-    gui_interaction(GuiInteraction_BoolInRect, Owner) 
-    {
-        this->Value = Value;
-        this->Rect = Rect;
-    }
-    
-    virtual void Interact(gui_state* Gui) override {
-        
-        this->WasHotInInteraction = 0;
-        this->WasActiveInInteraction = 0;
-        
-        if(MouseInInteractiveArea(Gui, Rect)){
-            GuiSetHot(Gui, this, true);
-            this->WasHotInInteraction = true;
-            
-            if(KeyWentDown(Gui->FrameInfo.Input, MouseKey_Left)){
-                GuiSetActive(Gui, this);
-                *Value = !*Value;
-                this->WasActiveInInteraction = true;
-                GuiReleaseInteraction(Gui, this);
-            }
-        }
-        else{
-            GuiSetHot(Gui, this, false);
-        }
-    }
-};
-
-enum class Gui_Resize_Interaction_Type{
-    None,
-    Default,
-    Proportional,
-    Horizontal,
-    Vertical,
-};
-
-struct Gui_Resize_Interaction : public gui_interaction{
-    v2* DimensionPtr;
-    v2 Position;
-    v2 MinDim;
-    Gui_Resize_Interaction_Type Type;
-    
-    Gui_Resize_Interaction(v2 Position, 
-                           v2* Dimension,
-                           v2 MinDim,
-                           Gui_Resize_Interaction_Type Type, 
-                           Gui_Element* Owner) : 
-    gui_interaction(GuiInteraction_Resize, Owner)
-    {
-        this->DimensionPtr = Dimension;
-        this->Type = Type;
-        this->MinDim = MinDim;
-        this->OffsetInAnchor = V2(0.0f, 0.0f);
-        this->Position = Position;
-    }
-    
-    virtual void Interact(gui_state* Gui) override {
-        v2 WorkRectP = this->Position;
-        v2 MouseP = Gui->FrameInfo.Input->MouseP - this->OffsetInAnchor;
-        
-        v2* WorkDim = this->DimensionPtr;
-        
-        switch (this->Type) {
-            case Gui_Resize_Interaction_Type::Default: {
-                *WorkDim = MouseP - WorkRectP;
-                
-                if (MouseP.x - WorkRectP.x < this->MinDim.x) {
-                    WorkDim->x = this->MinDim.x;
-                }
-                
-                if (MouseP.y - WorkRectP.y < this->MinDim.y) {
-                    WorkDim->y = this->MinDim.y;
-                }
-            }break;
-            
-            case Gui_Resize_Interaction_Type::Horizontal: {
-                if (MouseP.x - WorkRectP.x < this->MinDim.x) {
-                    WorkDim->x = this->MinDim.x;
-                }
-            }break;
-            
-            case Gui_Resize_Interaction_Type::Vertical: {
-                if (MouseP.y - WorkRectP.y < this->MinDim.y) {
-                    WorkDim->y = this->MinDim.y;
-                }
-            }break;
-            
-            case Gui_Resize_Interaction_Type::Proportional: {
-                float WidthToHeight = WorkDim->x / WorkDim->y;
-                WorkDim->y = MouseP.y - WorkRectP.y;
-                WorkDim->x = WorkDim->y * WidthToHeight;
-                
-                if (WorkDim->y < this->MinDim.y) {
-                    WorkDim->y = this->MinDim.y;
-                    WorkDim->x = WorkDim->y * WidthToHeight;
-                }
-            }break;
-        }
-    }
-};
-
-enum class Gui_Move_Interaction_Type{
-    None,
-    Move,
-};
-
-struct Gui_Move_Interaction : public gui_interaction{
-    v2* MovePosition;
-    Gui_Move_Interaction_Type Type;
-    
-    Gui_Move_Interaction(v2* MovePosition, 
-                         Gui_Move_Interaction_Type Type, 
-                         Gui_Element* Owner) : 
-    gui_interaction(GuiInteraction_Move, Owner)
-    {
-        this->Type = Type;
-        this->OffsetInAnchor = V2(0.0f, 0.0f);
-        this->MovePosition = MovePosition;
-    }
-    
-    virtual void Interact(gui_state* Gui) override {
-        v2* WorkP = this->MovePosition;
-        v2 MouseP = Gui->FrameInfo.Input->MouseP - this->OffsetInAnchor;
-        
-        switch (this->Type) {
-            case Gui_Move_Interaction_Type::Move: {
-                *WorkP = MouseP;
-            }break;
-        }
-    }
-};
-
-
 
 inline void GuiPushDim(gui_state* Gui, v2 dim){
     ASSERT(Gui->dimStackIndex < ARRAY_COUNT(Gui->dimStack));
