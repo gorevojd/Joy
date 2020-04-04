@@ -248,10 +248,10 @@ void* AllocateAssetType(assets* Assets, asset* Asset, void** Type, u32 AssetType
     return(Result);
 }
 
-void LoadAssetDirectly(assets* Assets, 
-                       asset* Asset, 
-                       void* Data, 
-                       u64 DataSize)
+void ImportAssetDirectly(assets* Assets, 
+                         asset* Asset, 
+                         void* Data, 
+                         u64 DataSize)
 {
     asset_header* Header = &Asset->Header;
     asset_file_source* FileSource = Asset->FileSource;
@@ -470,7 +470,7 @@ void LoadAssetDirectly(assets* Assets,
     Asset->State.store(AssetState_Loaded);
 }
 
-struct load_asset_callback_data{
+struct import_asset_callback_data{
     assets* Assets;
     asset* Asset;
     void* LoadDest;
@@ -478,20 +478,20 @@ struct load_asset_callback_data{
     task_data* Task;
 };
 
-PLATFORM_CALLBACK(LoadAssetCallback){
-    load_asset_callback_data* CallbackData = (load_asset_callback_data*)Data;
+PLATFORM_CALLBACK(ImportAssetCallback){
+    import_asset_callback_data* CallbackData = (import_asset_callback_data*)Data;
     
     void* DestData = CallbackData->LoadDest;
     u64 DataSize = CallbackData->LoadDestSize;
     asset* Asset = CallbackData->Asset;
     assets* Assets = CallbackData->Assets;
     
-    LoadAssetDirectly(Assets, Asset, DestData, DataSize);
+    ImportAssetDirectly(Assets, Asset, DestData, DataSize);
     
-    EndTaskData(&Assets->LoadTasksPool, CallbackData->Task);
+    EndTaskData(&Assets->ImportTasksPool, CallbackData->Task);
 }
 
-void LoadAsset(assets* Assets, asset* Asset, b32 Immediate){
+void ImportAsset(assets* Assets, asset* Asset, b32 Immediate){
     asset_header* Header = &Asset->Header;
     asset_file_source* FileSource = Asset->FileSource;
     
@@ -512,14 +512,14 @@ void LoadAsset(assets* Assets, asset* Asset, b32 Immediate){
             // TODO(Dima): Change this
             void* Data = malloc(DataSizeToAlloc);
             
-            LoadAssetDirectly(Assets, Asset, Data, DataSize);
+            ImportAssetDirectly(Assets, Asset, Data, DataSize);
         }
         else{
-            task_data* Task = BeginTaskData(&Assets->LoadTasksPool);
+            task_data* Task = BeginTaskData(&Assets->ImportTasksPool);
             
             if(Task){
-                load_asset_callback_data* CallbackData =
-                    (load_asset_callback_data*)Task->Block.Base;
+                import_asset_callback_data* CallbackData =
+                    (import_asset_callback_data*)Task->Block.Base;
                 
                 // NOTE(Dima): Loading data
                 u32 DataSize = Header->TotalDataSize;
@@ -534,7 +534,7 @@ void LoadAsset(assets* Assets, asset* Asset, b32 Immediate){
                 CallbackData->Task = Task;
                 
                 Platform.AddEntry(&Platform.lowPriorityQueue,
-                                  LoadAssetCallback, CallbackData);
+                                  ImportAssetCallback, CallbackData);
             }
             else{
                 /*NOTE(Dima): If we can not get free memory slot 
@@ -550,6 +550,69 @@ void LoadAsset(assets* Assets, asset* Asset, b32 Immediate){
         we skip loading
         */
     }//State check
+}
+
+
+bmp_info* LoadBmp(assets* Assets,
+                  u32 BmpID,
+                  b32 Immediate)
+{
+    bmp_info* Result = LOAD_ASSET(bmp_info, AssetType_Bitmap,
+                                  Assets, BmpID, Immediate);
+    
+    return(Result);
+}
+
+font_info* LoadFont(assets* Assets,
+                    u32 FontID,
+                    b32 Immediate)
+{
+    font_info* Result = LOAD_ASSET(font_info, AssetType_Font,
+                                   Assets, FontID, Immediate);
+    
+    return(Result);
+}
+
+
+mesh_info* LoadMesh(assets* Assets,
+                    u32 MeshID,
+                    b32 Immediate)
+{
+    mesh_info* Result = LOAD_ASSET(mesh_info, AssetType_Mesh,
+                                   Assets, MeshID, Immediate);
+    
+    return(Result);
+}
+
+model_info* LoadModel(assets* Assets,
+                      u32 ModelID,
+                      b32 Immediate)
+{
+    model_info* Result = LOAD_ASSET(model_info, AssetType_Model,
+                                    Assets, ModelID, Immediate);
+    
+    return(Result);
+}
+
+
+animation_clip* LoadAnimationClip(assets* Assets,
+                                  u32 AnimID,
+                                  b32 Immediate)
+{
+    animation_clip* Result = LOAD_ASSET(animation_clip, AssetType_AnimationClip,
+                                        Assets, AnimID, Immediate);
+    
+    return(Result);
+}
+
+node_animation* LoadNodeAnim(assets* Assets,
+                             u32 NodeAnimID,
+                             b32 Immediate)
+{
+    node_animation* Result = LOAD_ASSET(node_animation, AssetType_NodeAnimation,
+                                        Assets, NodeAnimID, Immediate);
+    
+    return(Result);
 }
 
 inline asset* AllocateAsset(assets* Assets, asset_file_source* FileSource, u32 FileID)
@@ -587,9 +650,9 @@ void InitAssets(assets* Assets){
                    LayersSizesCount);
     
     // NOTE(Dima): Init tasks datas pool
-    InitTaskDataPool(&Assets->LoadTasksPool, Assets->Memory,
+    InitTaskDataPool(&Assets->ImportTasksPool, Assets->Memory,
                      1024,
-                     sizeof(load_asset_callback_data));
+                     sizeof(import_asset_callback_data));
     
     // NOTE(Dima): Init asset files sources
     DLIST_REFLECT_PTRS(Assets->FileSourceUse, Next, Prev);
@@ -794,7 +857,7 @@ void InitAssets(assets* Assets){
                             asset_bitmap* Src = &AssetHeader.Bitmap;
                             
                             if(Src->BakeToAtlas){
-                                LoadAsset(Assets, NewAsset, ASSET_LOAD_IMMEDIATE);
+                                ImportAsset(Assets, NewAsset, ASSET_IMPORT_IMMEDIATE);
                                 bmp_info* Bmp = GET_ASSET_PTR_MEMBER(NewAsset, bmp_info);
                                 AddBitmapToAtlas(&Assets->MainLargeAtlas, Bmp);
                             }
@@ -919,7 +982,7 @@ void InitAssets(assets* Assets){
                     
                     // NOTE(Dima): If we should load asset immediately - do it
                     if(AssetHeader.ImmediateLoad){
-                        LoadAsset(Assets, NewAsset, ASSET_LOAD_IMMEDIATE);
+                        ImportAsset(Assets, NewAsset, ASSET_IMPORT_IMMEDIATE);
                     }
                 }
             }

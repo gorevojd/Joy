@@ -654,6 +654,7 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize);
 enum gui_slider_style{
     GuiSlider_Index,
     GuiSlider_Progress,
+    GuiSlider_ProgressNonModify,
 };
 
 void GuiSliderInt(gui_state* Gui, 

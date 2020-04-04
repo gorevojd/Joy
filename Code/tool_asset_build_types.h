@@ -187,6 +187,11 @@ struct tool_skeleton_info{
 
 struct tool_material_info{
     u32 BitmapArrayIDs[MaterialTexture_Count];
+    
+    u32 ColorDiffusePacked;
+    u32 ColorAmbientPacked;
+    u32 ColorSpecularPacked;
+    u32 ColorEmissivePacked;
 };
 
 struct game_asset_group_region {

@@ -322,6 +322,41 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
                             (char*)AssimpMatName.C_Str());
         }
         
+        v3 DiffuseColorVector = V3(1.0f, 1.0f, 1.0f);
+        aiColor3D AssimpDiffuseColor;
+        if(AssimpMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, AssimpDiffuseColor) == AI_SUCCESS){
+            DiffuseColorVector = Assimp2JoyColor3(AssimpDiffuseColor);
+        }
+        
+        v3 AmbientColorVector = V3(1.0f, 1.0f, 1.0f);
+        aiColor3D AssimpAmbientColor;
+        if(AssimpMaterial->Get(AI_MATKEY_COLOR_AMBIENT, AssimpAmbientColor) == AI_SUCCESS){
+            AmbientColorVector = Assimp2JoyColor3(AssimpAmbientColor);
+        }
+        
+        v3 SpecularColorVector = V3(1.0f, 1.0f, 1.0f);
+        aiColor3D AssimpSpecularColor;
+        if(AssimpMaterial->Get(AI_MATKEY_COLOR_SPECULAR, AssimpSpecularColor) == AI_SUCCESS){
+            SpecularColorVector = Assimp2JoyColor3(AssimpSpecularColor);
+        }
+        
+        
+        v3 EmissiveColorVector = V3(0.0f, 0.0f, 0.0f);
+        aiColor3D AssimpEmissiveColor;
+        if(AssimpMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, AssimpEmissiveColor) == AI_SUCCESS){
+            EmissiveColorVector = Assimp2JoyColor3(AssimpEmissiveColor);
+        }
+        
+        u32 DiffuseColor = PackRGB_R10G12B10(DiffuseColorVector);
+        u32 AmbientColor = PackRGB_R10G12B10(AmbientColorVector);
+        u32 SpecularColor = PackRGB_R10G12B10(SpecularColorVector);
+        u32 EmissiveColor = PackRGB_R10G12B10(EmissiveColorVector);
+        
+        NewMaterial.ColorDiffusePacked = DiffuseColor;
+        NewMaterial.ColorAmbientPacked = AmbientColor;
+        NewMaterial.ColorSpecularPacked = SpecularColor;
+        NewMaterial.ColorEmissivePacked = EmissiveColor;
+        
         // NOTE(Dima): Loading textures for supported Assimp textures types
         for(int TTypeIndex = 0;
             TTypeIndex < ARRAY_COUNT(SupportedTexturesTypes);
@@ -852,7 +887,6 @@ INTERNAL_FUNCTION tool_model_info LoadedToToolModelInfo(loaded_model* Model){
         
         CopyStringsSafe(NewNode.Shared.Name, ARRAY_COUNT(NewNode.Shared.Name), Node->Name);
         NewNode.Shared.ToParent = Node->ToParent;
-        NewNode.Shared.ToWorld = Node->ToWorld;
         NewNode.Shared.ParentIndex = Node->ParentIndex;
         NewNode.Shared.FirstChildIndex = Node->FirstChildIndex;
         NewNode.Shared.ChildCount = Node->ChildCount;
@@ -1093,8 +1127,20 @@ INTERNAL_FUNCTION void WriteMeshes1(){
         AssimpLoadMesh_GenerateTangents;
     
     // NOTE(Dima): Here load all models
+    AddModelSource(Ctx, ModelSource("../Data/Models/Animations/test.fbx",
+                                    GameAsset_Test,
+                                    DefaultFlags));
+    
+    AddModelSource(Ctx, ModelSource("../Data/Models/Animations/spider.fbx",
+                                    GameAsset_Spider,
+                                    DefaultFlags));
+    
     AddModelSource(Ctx, ModelSource("../Data/Models/Animations/Male_Casual.fbx",
                                     GameAsset_Man,
+                                    DefaultFlags));
+    
+    AddModelSource(Ctx, ModelSource("../Data/Models/Skyscraper/Skyscraper.fbx", 
+                                    GameAsset_Skyscraper,
                                     DefaultFlags));
     
     AddModelSource(Ctx, ModelSource("../Data/Models/Bathroom/Bathroom.fbx", 

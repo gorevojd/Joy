@@ -71,6 +71,11 @@ struct loaded_mat{
     int TextureFirstIndexOfTypeInArray[ArrayCount(SupportedTexturesTypes)];
     int TextureCountOfType[ArrayCount(SupportedTexturesTypes)];
     
+    u32 ColorDiffusePacked;
+    u32 ColorAmbientPacked;
+    u32 ColorSpecularPacked;
+    u32 ColorEmissivePacked;
+    
     /*
 I store here an array of paths to textures.
 FirstIDInArray serves as mapping to get first ID texture
@@ -166,6 +171,16 @@ inline m44 Assimp2JoyMatrix(const aiMatrix4x4& AssimpMatrix) {
 	Result.e[15] = AssimpMatrix.d4;
     
 	return(Result);
+}
+
+inline v3 Assimp2JoyColor3(const aiColor3D& AssimpColor){
+    v3 Result;
+    
+    Result.r = AssimpColor.r;
+    Result.g = AssimpColor.g;
+    Result.b = AssimpColor.b;
+    
+    return(Result);
 }
 
 inline v3 Assimp2JoyVector3(const aiVector3D& AssimpVector) {

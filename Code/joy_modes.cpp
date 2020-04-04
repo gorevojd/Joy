@@ -7,6 +7,7 @@
 #include "joy_camera.h"
 #include "joy_assets_render.h"
 #include "joy_random.h"
+#include "joy_animation.h"
 
 #define STB_SPRINTF_STATIC
 #define STB_SPRINTF_IMPLEMENTATION
@@ -120,6 +121,8 @@ struct test_game_mode_state{
     sphere_distribution SphereDistributionTrig;
     sphere_distribution SphereDistributionFib;
     
+    playing_animation PlayingAnim;
+    
     b32 Initialized;
 };
 
@@ -135,7 +138,7 @@ INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
                    SphereCenter, 
                    QuatI(), 
                    V3(SphereRad * 2.0f),
-                   ASSET_LOAD_DEFERRED);
+                   ASSET_IMPORT_DEFERRED);
     
     for(int SampleIndex = 0;
         SampleIndex < Distr->Count;
@@ -148,7 +151,7 @@ INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
                        TargetP, 
                        QuatI(), 
                        V3(0.05f),
-                       ASSET_LOAD_DEFERRED);
+                       ASSET_IMPORT_DEFERRED);
     }
     
 }
@@ -176,10 +179,12 @@ GAME_MODE_UPDATE(TestUpdate){
                                                                   SphereDistributionsmaxCount,
                                                                   State->SphereDistributionsFib);
         
+        State->PlayingAnim.AnimationID = 0;
+        
         State->Initialized = true;
     }
     
-    float DeltaTime = Game->Render->FrameInfo.dt;
+    f64 DeltaTime = Game->Render->FrameInfo.dt;
     
     // NOTE(Dima): Processing camera
     game_camera* Camera = &State->Camera;
@@ -246,6 +251,11 @@ GAME_MODE_UPDATE(TestUpdate){
     GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
     GuiText(Game->Gui, CameraInfo);
     
+    float SliderFloatValue = fmod(Game->Input->Time, 1.0f); 
+    GuiSliderFloat(Game->Gui, &SliderFloatValue, 0.0f, 1.0f, 
+                   "TempNonModifySlider", 
+                   GuiSlider_ProgressNonModify);
+    
     char MouseInfo[256];
     stbsp_sprintf(MouseInfo,
                   "Delta mouse X: %.2f", 
@@ -304,77 +314,178 @@ GAME_MODE_UPDATE(TestUpdate){
             PushOrLoadMesh(Game->Assets, Stack, 
                            SphereID,
                            SphereP, QuatI(), V3(1.0f),
-                           ASSET_LOAD_DEFERRED);
+                           ASSET_IMPORT_DEFERRED);
         }
     }
     
+    assets* Assets = Game->Assets;
     
+    model_info* Model = LoadModel(Game->Assets,
+                                  GetFirst(Game->Assets, GameAsset_Man),
+                                  ASSET_IMPORT_DEFERRED);
+    
+    
+    
+    if(Model){
+        v3 Pos = V3(15.0f, 0.0f, 30.0f);
+        quat Rot = QuatI();
+        v3 Scale = V3(1.0f);
+        
+        asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
+        
+        m44 ModelToWorld = ScalingMatrix(Scale) * RotationMatrix(Rot) * TranslationMatrix(Pos);
+        
+        for(int SkIndex = 0;
+            SkIndex < Model->SkeletonCount;
+            SkIndex++)
+        {
+            asset_id SkeletonID = Model->SkeletonIDs[SkIndex];
+            
+            skeleton_info* Skeleton = LOAD_ASSET(skeleton_info, 
+                                                 AssetType_Skeleton,
+                                                 Assets, SkeletonID,
+                                                 ASSET_IMPORT_DEFERRED);
+            
+            if(Skeleton){
+                
+                for(int BoneIndex = 0;
+                    BoneIndex < Skeleton->BoneCount;
+                    BoneIndex++)
+                {
+                    bone_info* Bone = &Skeleton->Bones[BoneIndex];
+                    
+                    v4 BoneP = 
+                        V4(0.0f, 0.0f, 0.0f, 1.0f) * 
+                        InverseTransformMatrix(Bone->InvBindPose) * 
+                        ModelToWorld;
+                    
+                    PushOrLoadMesh(Assets, Stack, 
+                                   CubeMeshID, BoneP.xyz, 
+                                   QuatI(), V3(0.1f), 
+                                   ASSET_IMPORT_DEFERRED);
+                }
+            }
+        }
+        
+#if 1        
+        for(int NodeIndex = 0;
+            NodeIndex < Model->NodeCount;
+            NodeIndex++)
+        {
+            node_info* Node = &Model->Nodes[NodeIndex];
+            
+            Node->CalculatedToParent = Node->Shared->ToParent;
+        }
+        
+        AnimateModel(Assets, Model, Game->Input->Time);
+        
+        for(int NodeIndex = 0;
+            NodeIndex < Model->NodeCount;
+            NodeIndex++)
+        {
+            node_info* Node = &Model->Nodes[NodeIndex];
+            
+            if(Node->Shared->ParentIndex != -1){
+                // NOTE(Dima): If is not root
+                node_info* ParentNode = &Model->Nodes[Node->Shared->ParentIndex];
+                
+                Node->CalculatedToModel = Node->CalculatedToParent* ParentNode->CalculatedToModel;
+            }
+            else{
+                Node->CalculatedToModel = Node->CalculatedToParent;
+            }
+            
+            m44 NodeTran = Node->CalculatedToModel * ModelToWorld;
+            
+            PushOrLoadMesh(Assets, Stack, 
+                           CubeMeshID, ScalingMatrix(V3(0.1f)) * NodeTran);
+            
+            for(int MeshIndex = 0; MeshIndex < Node->MeshCount; MeshIndex++){
+                asset_id MeshID = Node->MeshIDs[MeshIndex];
+                
+                PushOrLoadMesh(Assets, Stack, MeshID, NodeTran);
+            }
+        }
+#endif
+    }
+    
+    
+    
+    
+#if 0    
     PushOrLoadModel(Game->Assets, Stack,
                     GetFirst(Game->Assets, GameAsset_Man),
                     V3(15.0f, 0.0f, 10.0f),
                     QuatI(), V3(1.0f),
-                    ASSET_LOAD_DEFERRED);
+                    ASSET_IMPORT_DEFERRED);
+    
+    PushOrLoadModel(Game->Assets, Stack,
+                    GetFirst(Game->Assets, GameAsset_Skyscraper),
+                    V3(-50.0f, 0.0f, -50.0f),
+                    QuatI(), V3(10.0f),
+                    ASSET_IMPORT_DEFERRED);
     
     PushOrLoadModel(Game->Assets, Stack,
                     GetFirst(Game->Assets, GameAsset_Stool),
                     V3(10.0f, 0.0f, 10.0f),
                     QuatI(), V3(1.0f),
-                    ASSET_LOAD_DEFERRED);
+                    ASSET_IMPORT_DEFERRED);
     
     
     PushOrLoadModel(Game->Assets, Stack,
                     GetFirst(Game->Assets, GameAsset_Bathroom),
                     V3(5.0f, 0.0f, 10.0f),
                     QuatI(), V3(1.0f),
-                    ASSET_LOAD_DEFERRED);
+                    ASSET_IMPORT_DEFERRED);
     
     
     PushOrLoadModel(Game->Assets, Stack,
                     GetFirst(Game->Assets, GameAsset_Heart),
                     V3(0.0f, 0.0f, 10.0f),
                     QuatI(), V3(1.0f),
-                    ASSET_LOAD_DEFERRED);
+                    ASSET_IMPORT_DEFERRED);
     
     
     PushOrLoadModel(Game->Assets, Stack,
                     GetFirst(Game->Assets, GameAsset_KindPlane),
                     V3(-5.0f, 0.0f, 10.0f),
                     QuatI(), V3(1.0f),
-                    ASSET_LOAD_DEFERRED);
+                    ASSET_IMPORT_DEFERRED);
     
     
     PushOrLoadModel(Game->Assets, Stack,
                     GetFirst(Game->Assets, GameAsset_Podkova),
                     V3(-10.0f, 0.0f, 10.0f),
                     QuatI(), V3(1.0f),
-                    ASSET_LOAD_DEFERRED);
+                    ASSET_IMPORT_DEFERRED);
     
     
     PushOrLoadModel(Game->Assets, Stack,
                     GetFirst(Game->Assets, GameAsset_RubbishBin),
                     V3(-15.0f, 0.0f, 10.0f),
                     QuatI(), V3(1.0f),
-                    ASSET_LOAD_DEFERRED);
+                    ASSET_IMPORT_DEFERRED);
     
     
     PushOrLoadModel(Game->Assets, Stack,
                     GetFirst(Game->Assets, GameAsset_Snowman),
                     V3(-20.0f, 0.0f, 10.0f),
                     QuatI(), V3(1.0f),
-                    ASSET_LOAD_DEFERRED);
+                    ASSET_IMPORT_DEFERRED);
     
     PushOrLoadModel(Game->Assets, Stack,
                     GetFirst(Game->Assets, GameAsset_Toilet),
                     V3(-25.0f, 0.0f, 10.0f),
                     QuatI(), V3(1.0f),
-                    ASSET_LOAD_DEFERRED);
+                    ASSET_IMPORT_DEFERRED);
     
     
     PushOrLoadModel(Game->Assets, Stack,
                     GetFirst(Game->Assets, GameAsset_Vase),
                     V3(-30.0f, 0.0f, 10.0f),
                     QuatI(), V3(1.0f),
-                    ASSET_LOAD_DEFERRED);
+                    ASSET_IMPORT_DEFERRED);
+#endif
     
     PushOrLoadBitmap(Game->Assets, Stack,
                      V2(0, 500),
@@ -398,19 +509,19 @@ GAME_MODE_UPDATE(TestUpdate){
                    GetFirst(Game->Assets, GameAsset_Cube),
                    V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
                    QuatI(), V3(1.0f), 
-                   ASSET_LOAD_DEFERRED);
+                   ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Stack, 
                    GetFirst(Game->Assets, GameAsset_Cube),
                    V3(0.0f, 1.0f + Sin(Game->Input->Time * 3.0f) * 0.5f, 0.0f), 
                    QuatI(), V3(1.0f), 
-                   ASSET_LOAD_DEFERRED);
+                   ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Stack, 
                    CylID,
                    V3(-10.0f, 1.0f, 0.0f), 
                    Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), V3(2.0f),
-                   ASSET_LOAD_DEFERRED);
+                   ASSET_IMPORT_DEFERRED);
     
     
     PushOrLoadMesh(Game->Assets, Stack, 
@@ -418,18 +529,18 @@ GAME_MODE_UPDATE(TestUpdate){
                    V3(-13.0f, 1.0f, 0.0f),
                    Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), 
                    V3(1.0f), 
-                   ASSET_LOAD_DEFERRED);
+                   ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Stack, 
                    SphereID,V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
                    QuatI(), V3(1.0f),
-                   ASSET_LOAD_DEFERRED);
+                   ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Stack, 
                    GetFirst(Game->Assets, GameAsset_Plane),
                    V3(0.0f, -1.0f, 0.0f), 
                    QuatI(), V3(100.0f),
-                   ASSET_LOAD_DEFERRED);
+                   ASSET_IMPORT_DEFERRED);
 }
 
 // NOTE(Dima): MAIN MENU GAME MODE

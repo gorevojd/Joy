@@ -6,19 +6,6 @@
 #include "joy_render.h"
 #include "joy_assets.h"
 
-inline b32 AssetIsLoaded(asset* Asset){
-    b32 Result = Asset->State == AssetState_Loaded;
-    
-    return(Result);
-}
-
-
-inline b32 PotentiallyLoadedAsset(asset* Asset, b32 Immediate){
-    b32 Result = AssetIsLoaded(Asset) || Immediate;
-    
-    return(Result);
-}
-
 inline bmp_info* PushOrLoadBitmap(assets* Assets, 
                                   render_stack* Stack,
                                   v2 P, v2 Dim,
@@ -26,15 +13,9 @@ inline bmp_info* PushOrLoadBitmap(assets* Assets,
                                   v4 ModColor = V4(1.0f, 1.0f, 1.0f, 1.0f),
                                   b32 Immediate = false)
 {
-    asset* Asset = GetAssetByID(Assets, BmpID);
-    ASSERT(Asset->Type == AssetType_Bitmap);
+    bmp_info* Bmp = LoadBmp(Assets, BmpID, Immediate);
     
-    LoadAsset(Assets, Asset, Immediate);
-    
-    bmp_info* Bmp = 0; 
-    if(PotentiallyLoadedAsset(Asset, Immediate)){
-        Bmp = GET_ASSET_PTR_MEMBER(Asset, bmp_info);
-        
+    if(Bmp){
         PushBitmap(Stack, Bmp, P, Dim.y, ModColor);
     }
     
@@ -48,15 +29,9 @@ inline bmp_info* PushOrLoadGlyph(assets* Assets,
                                  v4 ModColor = V4(1.0f, 1.0f, 1.0f, 1.0f),
                                  b32 Immediate = false)
 {
-    asset* Asset = GetAssetByID(Assets, BmpID);
-    ASSERT(Asset->Type == AssetType_Bitmap);
+    bmp_info* Bmp = LoadBmp(Assets, BmpID, Immediate);
     
-    LoadAsset(Assets, Asset, Immediate);
-    
-    bmp_info* Bmp = 0;
-    if(PotentiallyLoadedAsset(Asset, Immediate)){
-        Bmp = GET_ASSET_PTR_MEMBER(Asset, bmp_info);
-        
+    if(Bmp){
         v2 MinUV = Bmp->MinUV;
         v2 MaxUV = Bmp->MaxUV;
         
@@ -68,39 +43,15 @@ inline bmp_info* PushOrLoadGlyph(assets* Assets,
     return(Bmp);
 }
 
-inline font_info* PushOrLoadFont(assets* Assets,
-                                 asset_id FontID,
-                                 b32 Immediate = false)
-{
-    asset* Asset = GetAssetByID(Assets, FontID);
-    ASSERT(Asset->Type == AssetType_Font);
-    
-    LoadAsset(Assets, Asset, Immediate);
-    
-    font_info* Font = 0;
-    if(PotentiallyLoadedAsset(Asset, Immediate)){
-        Font = GET_ASSET_PTR_MEMBER(Asset, font_info);
-    }
-    
-    return(Font);
-}
-
-
 inline mesh_info* PushOrLoadMesh(assets* Assets, 
                                  render_stack* Stack,
                                  asset_id MeshID,
                                  v3 P, quat R, v3 S,
                                  b32 Immediate = false)
 {
-    asset* Asset = GetAssetByID(Assets, MeshID);
-    ASSERT(Asset->Type == AssetType_Mesh);
+    mesh_info* Mesh = LoadMesh(Assets, MeshID, Immediate);
     
-    LoadAsset(Assets, Asset, Immediate);
-    
-    mesh_info* Mesh = 0;
-    if(PotentiallyLoadedAsset(Asset, Immediate)){
-        Mesh = GET_ASSET_PTR_MEMBER(Asset, mesh_info);
-        
+    if(Mesh){
         PushMesh(Stack, Mesh, P, R, S);
     }
     
@@ -113,143 +64,83 @@ inline mesh_info* PushOrLoadMesh(assets* Assets,
                                  m44 Transformation,
                                  b32 Immediate = false)
 {
-    asset* Asset = GetAssetByID(Assets, MeshID);
-    ASSERT(Asset->Type == AssetType_Mesh);
+    mesh_info* Mesh = LoadMesh(Assets, MeshID, Immediate);
     
-    LoadAsset(Assets, Asset, Immediate);
-    
-    mesh_info* Mesh = 0;
-    if(PotentiallyLoadedAsset(Asset, Immediate)){
-        Mesh = GET_ASSET_PTR_MEMBER(Asset, mesh_info);
-        
-        
+    if(Mesh){
         PushMesh(Stack, Mesh, Transformation);
     }
     
     return(Mesh);
 }
 
-inline skeleton_info* PushOrLoadSkeleton(
-assets* Assets,
-asset_id SkeletonID,
-b32 Immediate = false)
+inline model_info* PushModel(assets* Assets,
+                             render_stack* Stack,
+                             model_info* Model,
+                             v3 P, quat R, v3 S)
 {
-    asset* Asset = GetAssetByID(Assets, SkeletonID);
-    ASSERT(Asset->Type == AssetType_Skeleton);
+    m44 ModelToWorld = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
     
-    LoadAsset(Assets, Asset, Immediate);
-    
-    skeleton_info* Skeleton = 0;
-    if(PotentiallyLoadedAsset(Asset, Immediate)){
-        Skeleton = GET_ASSET_PTR_MEMBER(Asset, skeleton_info);
-    }
-    
-    return(Skeleton);
-}
-
-inline animation_clip* PushOrLoadAnimation(assets* Assets,
-                                           asset_id AnimationID,
-                                           b32 Immediate)
-{
-    asset* Asset = GetAssetByID(Assets, AnimationID);
-    ASSERT(Asset->Type == AssetType_AnimationClip);
-    
-    LoadAsset(Assets, Asset, Immediate);
-    
-    animation_clip* Animation = 0;
-    if(PotentiallyLoadedAsset(Asset, Immediate)){
-        Animation = GET_ASSET_PTR_MEMBER(Asset, animation_clip);
-    }
-    
-    return(Animation);
-}
-
-
-inline node_animation* PushOrLoadNodeAnim(assets* Assets,
-                                          asset_id NodeAnimID,
-                                          b32 Immediate)
-{
-    asset* Asset = GetAssetByID(Assets, NodeAnimID);
-    ASSERT(Asset->Type == AssetType_NodeAnimation);
-    
-    LoadAsset(Assets, Asset, Immediate);
-    
-    node_animation* NodeAnim = 0;
-    if(PotentiallyLoadedAsset(Asset, Immediate)){
-        NodeAnim = GET_ASSET_PTR_MEMBER(Asset, node_animation);
-    }
-    
-    return(NodeAnim);
-}
-
-inline model_info* PushOrLoadModel(assets* Assets,
-                                   render_stack* Stack,
-                                   asset_id ModelID,
-                                   v3 P, quat R, v3 S,
-                                   b32 Immediate = false)
-{
-    asset* Asset = GetAssetByID(Assets, ModelID);
-    ASSERT(Asset->Type == AssetType_Model);
-    
-    LoadAsset(Assets, Asset, Immediate);
-    
-    model_info* Model = 0;
-    if(PotentiallyLoadedAsset(Asset, Immediate)){
-        Model= GET_ASSET_PTR_MEMBER(Asset, model_info);
+    for(int SkIndex = 0;
+        SkIndex < Model->SkeletonCount;
+        SkIndex++)
+    {
+        asset_id SkeletonID = Model->SkeletonIDs[SkIndex];
         
-        m44 ModelToWorld = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
+        skeleton_info* Skeleton = LOAD_ASSET(skeleton_info, 
+                                             AssetType_Skeleton,
+                                             Assets, SkeletonID,
+                                             ASSET_IMPORT_DEFERRED);
         
-        for(int SkIndex = 0;
-            SkIndex < Model->SkeletonCount;
-            SkIndex++)
-        {
-            asset_id SkeletonID = Model->SkeletonIDs[SkIndex];
+        if(Skeleton){
+            asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
             
-            skeleton_info* Skeleton = PushOrLoadSkeleton(Assets, SkeletonID);
-            
-            if(Skeleton){
-                asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
+            for(int BoneIndex = 0;
+                BoneIndex < Skeleton->BoneCount;
+                BoneIndex++)
+            {
+                bone_info* Bone = &Skeleton->Bones[BoneIndex];
                 
-                for(int BoneIndex = 0;
-                    BoneIndex < Skeleton->BoneCount;
-                    BoneIndex++)
-                {
-                    bone_info* Bone = &Skeleton->Bones[BoneIndex];
-                    
-                    v4 BoneP = 
-                        V4(0.0f, 0.0f, 0.0f, 1.0f) * 
-                        InverseTransformMatrix(Bone->InvBindPose) * 
-                        ModelToWorld;
-                    
-                    PushOrLoadMesh(Assets, Stack, 
-                                   CubeMeshID, BoneP.xyz, 
-                                   QuatI(), V3(0.1f), 
-                                   ASSET_LOAD_DEFERRED);
-                }
+                v4 BoneP = 
+                    V4(0.0f, 0.0f, 0.0f, 1.0f) * 
+                    InverseTransformMatrix(Bone->InvBindPose) * 
+                    ModelToWorld;
+                
+                PushOrLoadMesh(Assets, Stack, 
+                               CubeMeshID, BoneP.xyz, 
+                               QuatI(), V3(0.1f), 
+                               ASSET_IMPORT_DEFERRED);
             }
         }
-        
-        //AnimateModel(Model);
-        
+    }
+    
 #if 1        
-        for(int NodeIndex = 0;
-            NodeIndex < Model->NodeCount;
-            NodeIndex++)
-        {
-            node_info* Node = &Model->Nodes[NodeIndex];
+    for(int NodeIndex = 0;
+        NodeIndex < Model->NodeCount;
+        NodeIndex++)
+    {
+        node_info* Node = &Model->Nodes[NodeIndex];
+        
+        Node->CalculatedToParent = Node->Shared->ToParent;
+        if(Node->Shared->ParentIndex != -1){
+            // NOTE(Dima): If is not root
+            node_info* ParentNode = &Model->Nodes[Node->Shared->ParentIndex];
             
-            m44 NodeTran = Node->Shared->ToWorld * ModelToWorld;
-            
-            for(int MeshIndex = 0; MeshIndex < Node->MeshCount; MeshIndex++){
-                asset_id MeshID = Node->MeshIDs[MeshIndex];
-                
-                PushOrLoadMesh(Assets, Stack, MeshID, NodeTran);
-            }
-            
+            Node->CalculatedToModel = Node->CalculatedToParent* ParentNode->CalculatedToModel;
         }
-#endif
+        else{
+            Node->CalculatedToModel = Node->CalculatedToParent;
+        }
+        
+        m44 NodeTran = Node->CalculatedToModel * ModelToWorld;
+        
+        for(int MeshIndex = 0; MeshIndex < Node->MeshCount; MeshIndex++){
+            asset_id MeshID = Node->MeshIDs[MeshIndex];
+            
+            PushOrLoadMesh(Assets, Stack, MeshID, NodeTran);
+        }
         
     }
+#endif
     
     return(Model);
 }

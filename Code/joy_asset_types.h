@@ -158,6 +158,9 @@ struct node_info{
     
     u32* MeshIDs;
     int MeshCount;
+    
+    m44 CalculatedToParent;
+    m44 CalculatedToModel;
 };
 
 struct skeleton_info{

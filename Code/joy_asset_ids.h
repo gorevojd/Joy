@@ -30,10 +30,8 @@ enum asset_state{
 
 typedef u32 asset_id;
 
-#define ASSET_VALUE_MEMBER(data_type) data_type Data_##data_type
-#define GET_ASSET_VALUE_MEMBER(asset, data_type) ((asset)->Data_##data_type)
 #define ASSET_PTR_MEMBER(data_type) data_type* Ptr_##data_type
-#define GET_ASSET_PTR_MEMBER(asset, data_type) ((asset)->Ptr_##data_type)
+#define GET_ASSET_PTR_MEMBER(asset, data_type) ((asset)->Data.Ptr_##data_type)
 
 enum material_texture_type{
     MaterialTexture_Diffuse,
@@ -54,6 +52,12 @@ enum material_texture_type{
 
 struct asset_material{
     u32 BitmapArrayIDs[MaterialTexture_Count];
+    
+    // NOTE(Dima): These are packed R10 G12 B10
+    u32 ColorDiffuse;
+    u32 ColorAmbient;
+    u32 ColorSpecular;
+    u32 ColorEmissive;
 };
 
 struct asset_node{
@@ -138,6 +142,7 @@ struct asset_bitmap{
     u32 Height;
     
     b32 BakeToAtlas;
+    
 };
 
 struct asset_array{
@@ -345,8 +350,13 @@ enum asset_group_type{
     GameAsset_Sphere,
     GameAsset_Cylynder,
     
-    // NOTE(Dima): Meshes
+    // NOTE(Dima): Animations
+    GameAsset_Test,
     GameAsset_Man,
+    GameAsset_Spider,
+    
+    // NOTE(Dima): Meshes
+    GameAsset_Skyscraper,
     GameAsset_Bathroom,
     GameAsset_Heart,
     GameAsset_KindPlane,

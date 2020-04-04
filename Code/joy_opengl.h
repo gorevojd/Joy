@@ -96,6 +96,11 @@ struct Gl_Simple_Shader : public gl_shader{
     GLint BoneTransformsLoc;
     GLint PassedBonesCountLoc;
     
+    GLint AlbedoLoc;
+    GLint NormalsLoc;
+    GLint NormalsIsSetLoc;
+    GLint AlbedoIsSetLoc;
+    
     GLint PAttrLoc;
     GLint UVAttrLoc;
     GLint NAttrLoc;

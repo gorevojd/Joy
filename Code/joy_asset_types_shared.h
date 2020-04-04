@@ -86,7 +86,6 @@ struct node_shared_data{
     char Name[256];
     
     m44 ToParent;
-    m44 ToWorld;
     
     int ParentIndex;
     int FirstChildIndex;

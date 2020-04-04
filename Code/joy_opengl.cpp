@@ -177,6 +177,11 @@ INTERNAL_FUNCTION Gl_Simple_Shader& GlLoadSimpleShader(gl_state* GL, char* PathV
     GLGETU(BoneTransforms);
     GLGETU(PassedBonesCount);
     
+    GLGETU(Albedo);
+    GLGETU(Normals);
+    GLGETU(AlbedoIsSet);
+    GLGETU(NormalsIsSet);
+    
     GLGETA(P);
     GLGETA(UV);
     GLGETA(N);
@@ -648,6 +653,7 @@ void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
                 
                 GL->SimpleShader.Use();
                 
+                // NOTE(Dima): Setting VS uniforms
                 GL->SimpleShader.SetM44(GL->SimpleShader.ModelLoc,
                                         entry->Transform.e);
                 GL->SimpleShader.SetM44(GL->SimpleShader.ViewLoc,
@@ -659,6 +665,23 @@ void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
                 
                 GL->SimpleShader.SetInt(GL->SimpleShader.PassedBonesCountLoc,
                                         0);
+                
+                // NOTE(Dima): Setting FS uniforms
+                b32 AlbedoIsSet = false;
+                b32 NormalsIsSet = false;
+                
+                GL->SimpleShader.SetBool(GL->SimpleShader.AlbedoIsSetLoc, AlbedoIsSet);
+                GL->SimpleShader.SetBool(GL->SimpleShader.NormalsIsSetLoc, NormalsIsSet);
+                
+#if 0                
+                glUniform1i(GL->SimpleShader.AlbedoLoc, 0);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, ???);
+                
+                glUniform1i(GL->SimpleShader.NormalsLoc, 1);
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, ???);
+#endif
                 
                 glBindVertexArray(Mesh->Handles.Handles[0]);
                 glDrawElements(GL_TRIANGLES, Mesh->IndicesCount, GL_UNSIGNED_INT, 0);

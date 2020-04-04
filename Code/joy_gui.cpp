@@ -418,11 +418,11 @@ assets* Assets)
     Gui->Assets = Assets;
     
     // NOTE(Dima): Getting IDs for needed assets
-    Gui->MainFontID = GetFirst(Assets, GameAsset_Inconsolata);
+    Gui->MainFontID = GetFirst(Assets, GameAsset_LiberationMono);
     Gui->TileFontID = GetFirst(Assets, GameAsset_MollyJackFont);
     
-    Gui->MainFont = PushOrLoadFont(Assets, Gui->MainFontID, ASSET_LOAD_IMMEDIATE);
-    Gui->TileFont = PushOrLoadFont(Assets, Gui->TileFontID, ASSET_LOAD_IMMEDIATE);
+    Gui->MainFont = LoadFont(Assets, Gui->MainFontID, ASSET_IMPORT_IMMEDIATE);
+    Gui->TileFont = LoadFont(Assets, Gui->TileFontID, ASSET_IMPORT_IMMEDIATE);
     
     Gui->CheckboxMarkID = GetFirst(Assets, GameAsset_CheckboxMark);
     Gui->ChamomileID = GetFirst(Assets, GameAsset_ChamomileIcon);
@@ -1542,7 +1542,7 @@ void GuiAnchor(gui_state* Gui,
         GuiInteract(Gui, &Interaction);
         
         v4 AnchorColor = GUI_GETCOLOR_COLSYS(Color_Orange);
-        if(Interaction.WasActiveInInteraction){
+        if(Interaction.WasHotInInteraction){
             AnchorColor = GUI_GETCOLOR_COLSYS(Color_Blue);
         }
         
@@ -1965,7 +1965,7 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
             GuiSetHot(Gui, &Interaction, false);
         }
         
-        if(GuiIsActive(Gui, &Interaction)){
+        if(GuiIsActive(Gui, &Interaction) && (Style != GuiSlider_ProgressNonModify)){
             float MousePercentage = Clamp01((Gui->Input->MouseP.x - SlideRc.min.x) / SlideRcWidth);
             
             float FloatedValue = Min + (float)((Max - Min) * MousePercentage);
@@ -1982,7 +1982,7 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
         if(Value){
             float ValuePercentage = (float)(*Value - Min) / (float)(Max - Min);
             
-            if(Style == GuiSlider_Progress){
+            if((Style == GuiSlider_Progress) || (Style == GuiSlider_ProgressNonModify)){
                 rc2 FillRc;
                 FillRc.min = SlideRc.min;
                 FillRc.max = V2(SlideRc.min.x + SlideRcWidth * ValuePercentage, SlideRc.max.y);
@@ -2058,7 +2058,7 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
             GuiSetHot(Gui, &Interaction, false);
         }
         
-        if(GuiIsActive(Gui, &Interaction)){
+        if(GuiIsActive(Gui, &Interaction) && (Style != GuiSlider_ProgressNonModify)){
             float MousePercentage = Clamp01((Gui->Input->MouseP.x - SlideRc.min.x) / SlideRcWidth);
             *Value = Min + (Max - Min) * MousePercentage;
             
@@ -2071,7 +2071,7 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
         if(Value){
             float ValuePercentage = (*Value - Min) / (Max - Min);
             
-            if(Style == GuiSlider_Progress){
+            if((Style == GuiSlider_Progress) || (Style == GuiSlider_ProgressNonModify)){
                 rc2 FillRc;
                 FillRc.min = SlideRc.min;
                 FillRc.max = V2(SlideRc.min.x + SlideRcWidth * ValuePercentage, SlideRc.max.y);
@@ -2092,7 +2092,6 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
                                 Gui->ChamomileID,
                                 V4(1.0f, 1.0f, 1.0f, 1.0f));
             }
-            
             
             stbsp_sprintf(Buf, "%.3f", *Value);
         }

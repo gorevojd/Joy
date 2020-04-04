@@ -1080,15 +1080,15 @@ inline m33 Quat2M33(quat Q){
     float xw = Q.x * Q.w;
     
     res.e[0] = 1.0f - 2.0f * (y2 + z2);
-    res.e[1] = 2.0f * (xy - zw);
-    res.e[2] = 2.0f * (xz + yw);
+    res.e[1] = 2.0f * (xy + zw);
+    res.e[2] = 2.0f * (xz - yw);
     
-    res.e[3] = 2.0f * (xy + zw);
+    res.e[3] = 2.0f * (xy - zw);
     res.e[4] = 1.0f - 2.0f * (x2 + z2);
-    res.e[5] = 2.0f * (yz - xw);
+    res.e[5] = 2.0f * (yz + xw);
     
-    res.e[6] = 2.0f * (xz - yw);
-    res.e[7] = 2.0f * (yz + xw);
+    res.e[6] = 2.0f * (xz + yw);
+    res.e[7] = 2.0f * (yz - xw);
     res.e[8] = 1.0f - 2.0f * (x2 + y2);
     
     return(res);
@@ -1097,9 +1097,9 @@ inline m33 Quat2M33(quat Q){
 inline m44 Quat2M44(quat Q){
     m44 res = {};
     
-    float x2 = Q.x * Q.x;
-    float y2 = Q.y * Q.y;
-    float z2 = Q.z * Q.z;
+    float xx = Q.x * Q.x;
+    float yy = Q.y * Q.y;
+    float zz = Q.z * Q.z;
     
     float xy = Q.x * Q.y;
     float zw = Q.z * Q.w;
@@ -1108,19 +1108,19 @@ inline m44 Quat2M44(quat Q){
     float yz = Q.y * Q.z;
     float xw = Q.x * Q.w;
     
-    res.e[0] = 1.0f - 2.0f * (y2 + z2);
-    res.e[1] = 2.0f * (xy - zw);
-    res.e[2] = 2.0f * (xz + yw);
+    res.e[0] = 1.0f - 2.0f * (yy + zz);
+    res.e[1] = 2.0f * (xy + zw);
+    res.e[2] = 2.0f * (xz - yw);
     res.e[3] = 0.0f;
     
-    res.e[4] = 2.0f * (xy + zw);
-    res.e[5] = 1.0f - 2.0f * (x2 + z2);
-    res.e[6] = 2.0f * (yz - xw);
+    res.e[4] = 2.0f * (xy - zw);
+    res.e[5] = 1.0f - 2.0f * (xx + zz);
+    res.e[6] = 2.0f * (yz + xw);
     res.e[7] = 0.0f;
     
-    res.e[8] = 2.0f * (xz - yw);
-    res.e[9] = 2.0f * (yz + xw);
-    res.e[10] = 1.0f - 2.0f * (x2 + y2);
+    res.e[8] = 2.0f * (xz + yw);
+    res.e[9] = 2.0f * (yz - xw);
+    res.e[10] = 1.0f - 2.0f * (xx + yy);
     res.e[11] = 0.0f;
     
     res.e[12] = 0.0f;
@@ -1135,6 +1135,8 @@ inline m44 RotationMatrix(quat Q){
     return(Quat2M44(Q));
 }
 
+
+#if 0
 inline v3 GetQuatLeft(quat Q){
     
     float x2 = Q.x * Q.x;
@@ -1161,7 +1163,6 @@ inline v3 GetQuatUp(quat Q){
     float y2 = Q.y * Q.y;
     float z2 = Q.z * Q.z;
     
-    float xy = Q.x * Q.y;
     float zw = Q.z * Q.w;
     float xz = Q.x * Q.z;
     float yw = Q.y * Q.w;
@@ -1176,7 +1177,6 @@ inline v3 GetQuatUp(quat Q){
     
     return(Result);
 }
-
 
 inline v3 GetQuatFront(quat Q){
     float x2 = Q.x * Q.x;
@@ -1198,6 +1198,7 @@ inline v3 GetQuatFront(quat Q){
     
     return(Result);
 }
+#endif
 
 inline quat QuatFrom2DArray(float A[3][3]){
     quat res;
@@ -1206,27 +1207,27 @@ inline quat QuatFrom2DArray(float A[3][3]){
     if( Trace > 0 ) {// I changed M_EPSILON to 0
         float S = 0.5f / sqrtf(Trace + 1.0f);
         res.w = 0.25f / S;
-        res.x = ( A[2][1] - A[1][2] ) * S;
-        res.y = ( A[0][2] - A[2][0] ) * S;
-        res.z = ( A[1][0] - A[0][1] ) * S;
+        res.x = ( A[1][2] - A[2][1] ) * S;
+        res.y = ( A[2][0] - A[0][2] ) * S;
+        res.z = ( A[0][1] - A[1][0] ) * S;
     } else {
         if ( A[0][0] > A[1][1] && A[0][0] > A[2][2] ) {
             float S = 2.0f * sqrtf( 1.0f + A[0][0] - A[1][1] - A[2][2]);
-            res.w = (A[2][1] - A[1][2] ) / S;
+            res.w = (A[1][2] - A[2][1] ) / S;
             res.x = 0.25f * S;
-            res.y = (A[0][1] + A[1][0] ) / S;
-            res.z = (A[0][2] + A[2][0] ) / S;
+            res.y = (A[1][0] + A[0][1] ) / S;
+            res.z = (A[2][0] + A[0][2] ) / S;
         } else if (A[1][1] > A[2][2]) {
             float S = 2.0f * sqrtf( 1.0f + A[1][1] - A[0][0] - A[2][2]);
-            res.w = (A[0][2] - A[2][0] ) / S;
-            res.x = (A[0][1] + A[1][0] ) / S;
+            res.w = (A[2][0] - A[0][2] ) / S;
+            res.x = (A[1][0] + A[0][1] ) / S;
             res.y = 0.25f * S;
-            res.z = (A[1][2] + A[2][1] ) / S;
+            res.z = (A[2][1] + A[1][2] ) / S;
         } else {
             float S = 2.0f * sqrtf( 1.0f + A[2][2] - A[0][0] - A[1][1] );
-            res.w = (A[1][0] - A[0][1] ) / S;
-            res.x = (A[0][2] + A[2][0] ) / S;
-            res.y = (A[1][2] + A[2][1] ) / S;
+            res.w = (A[0][1] - A[1][0] ) / S;
+            res.x = (A[2][0] + A[0][2] ) / S;
+            res.y = (A[2][1] + A[1][2] ) / S;
             res.z = 0.25f * S;
         }
     }
@@ -1314,6 +1315,25 @@ inline v4 UnpackRGBA(uint32_t Color){
     res.a = (float)((Color >> 24) & 0xFF) * JOY_ONE_OVER_255;
     
     return(res);
+}
+
+inline uint32_t PackRGB_R10G12B10(v3 Color){
+    uint32_t Result = 
+        ((uint32_t)(Color.r * 1023.0f + 0.5f)) |
+        ((uint32_t)((Color.g * 4095.0f + 0.5f)) << 10) |
+        ((uint32_t)((Color.b * 1023.0f + 0.5f)) << 22);
+    
+    return(Result);
+}
+
+inline v3 UnpackRGB_R10G12B10(uint32_t Color){
+    v3 Result;
+    
+    Result.r = (float)((Color & 1023) / 1023.0f);
+    Result.g = (float)(((Color >> 10) & 4095) / 4095.0f);
+    Result.b = (float)(((Color >> 22) & 1023) / 1023.0f);
+    
+    return(Result);
 }
 
 /*Plane math*/

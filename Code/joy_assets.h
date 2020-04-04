@@ -14,8 +14,8 @@
 
 #include "joy_asset_ids.h"
 
-#define ASSET_LOAD_IMMEDIATE true
-#define ASSET_LOAD_DEFERRED false
+#define ASSET_IMPORT_IMMEDIATE true
+#define ASSET_IMPORT_DEFERRED false
 
 struct asset_file_source{
     platform_file_desc FileDescription;
@@ -47,7 +47,7 @@ struct asset{
     asset_file_source* FileSource;
     u32 OffsetToData;
     
-    void* TempData;
+    //void* TempData;
     
     // NOTE(Dima): Asset data memory entry
     mem_entry* DataMemoryEntry;
@@ -71,7 +71,7 @@ struct asset{
         ASSET_PTR_MEMBER(node_info);
         ASSET_PTR_MEMBER(node_animation);
         ASSET_PTR_MEMBER(animation_clip);
-    };
+    }Data;
 };
 
 struct added_asset{
@@ -102,7 +102,7 @@ struct asset_block{
 struct assets{
     mem_region* Memory;
     layered_mem LayeredMemory;
-    task_data_pool LoadTasksPool;
+    task_data_pool ImportTasksPool;
     
     random_generation Random;
     
@@ -145,6 +145,12 @@ inline u32 RestoreAssetID(u32 BlockIndex, u32 InBlockIndex){
     return(Result);
 }
 
+inline b32 PotentiallyLoadedAsset(asset* Asset, b32 Immediate){
+    b32 Result = (Asset->State == AssetState_Loaded) || Immediate;
+    
+    return(Result);
+}
+
 inline asset* GetAssetByID(assets* Assets, u32 ID){
     
     parsed_asset_id ParsedID = ParseAssetID(ID);
@@ -166,6 +172,52 @@ u32 GetBestByTags(assets* Assets,
                   u32* TagTypes, 
                   asset_tag_value* TagValues, 
                   int TagsCount);
-void LoadAsset(assets* Assets, asset* Asset, b32 Immediate);
+void ImportAsset(assets* Assets, asset* Asset, b32 Immediate);
+
+
+inline void* LoadAssetTypeInternal(assets* Assets, 
+                                   asset_id ID, 
+                                   u32 CompareAssetType,
+                                   b32 Immediate)
+{
+    asset* Asset = GetAssetByID(Assets, ID);
+    ASSERT(Asset->Type == CompareAssetType);
+    
+    ImportAsset(Assets, Asset, Immediate);
+    
+    void* Result = 0;
+    if(PotentiallyLoadedAsset(Asset, Immediate)){
+        Result = (void*)(*((size_t*)(&Asset->Data)));
+    }
+    
+    return(Result);
+}
+
+#define LOAD_ASSET(data_type, type, assets, id, immediate) \
+(data_type*)LoadAssetTypeInternal(assets, id, type, immediate)
+
+bmp_info* LoadBmp(assets* Assets,
+                  u32 BmpID,
+                  b32 Immediate);
+
+font_info* LoadFont(assets* Assets,
+                    u32 FontID,
+                    b32 Immediate);
+
+mesh_info* LoadMesh(assets* Assets,
+                    u32 MeshID,
+                    b32 Immediate);
+
+model_info* LoadModel(assets* Assets,
+                      u32 ModelID,
+                      b32 Immediate);
+
+animation_clip* LoadAnimationClip(assets* Assets,
+                                  u32 AnimID,
+                                  b32 Immediate);
+
+node_animation* LoadNodeAnim(assets* Assets,
+                             u32 NodeAnimID,
+                             b32 Immediate);
 
 #endif

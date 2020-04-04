@@ -8,6 +8,12 @@ in Vertex_Shader_Out{
 
 out vec4 Color;
 
+uniform sampler2D Albedo;
+uniform sampler2D Normals;
+
+uniform bool AlbedoIsSet;
+uniform bool NormalsIsSet;
+
 vec3 CalcDirLit(vec3 FragP, vec3 FragN, vec3 FragC){
     vec3 DirLitDir = vec3(0.5f, -0.5f, -0.5f);
     DirLitDir = normalize(DirLitDir);

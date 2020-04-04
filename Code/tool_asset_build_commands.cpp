@@ -287,6 +287,11 @@ added_asset AddMaterialAsset(asset_system* System,
             Material->BitmapArrayIDs[BitmapArrayIndex];
     }
     
+    MatHeader->ColorDiffuse = Material->ColorDiffusePacked;
+    MatHeader->ColorSpecular = Material->ColorSpecularPacked;
+    MatHeader->ColorAmbient = Material->ColorAmbientPacked;
+    MatHeader->ColorEmissive = Material->ColorEmissivePacked;
+    
     return(Added);
 }
 
