@@ -2559,13 +2559,7 @@ void GuiTest(gui_state* Gui, float deltaTime){
     
     char FPSBuf[64];
     stbsp_sprintf(FPSBuf, "FPS %.2f, delta time(sec) %.3f", 1.0f / deltaTime, deltaTime);
-    
-    static int lastFrameEntryCount = 0;
-    static int lastFrameBytesUsed = 0;
-    char StackInfo[256];
-    stbsp_sprintf(StackInfo, "EntryCount: %d; BytesUsed: %d;", 
-                  lastFrameEntryCount, 
-                  lastFrameBytesUsed);
+    GuiText(Gui, FPSBuf);
     
     char InterInfo[256];
     stbsp_sprintf(InterInfo, "Hot Interaction ID: %u Name: \"%s\" Priority: %u", 
@@ -2629,8 +2623,6 @@ void GuiTest(gui_state* Gui, float deltaTime){
     //GuiUpdateWindows(Gui);
     GuiBeginTree(Gui, "Some text");
     GuiText(Gui, "Hello world");
-    GuiText(Gui, FPSBuf);
-    GuiText(Gui, StackInfo);
     GuiText(Gui, "I love Kate");
     GuiText(Gui, "I wish joy and happiness for everyone");
     char GuiTmpText[64];
@@ -2869,7 +2861,4 @@ void GuiTest(gui_state* Gui, float deltaTime){
     GuiTooltip(Gui, "Hello world!", input->MouseP);
     
     GuiEndLayout(Gui);
-    
-    lastFrameBytesUsed = renderStack->MemBlock.Used;
-    lastFrameEntryCount = renderStack->EntryCount;
 }

@@ -251,7 +251,8 @@ void* AllocateAssetType(assets* Assets, asset* Asset, void** Type, u32 AssetType
 void ImportAssetDirectly(assets* Assets, 
                          asset* Asset, 
                          void* Data, 
-                         u64 DataSize)
+                         u64 DataSize,
+                         mem_region* TempStorageBlock)
 {
     asset_header* Header = &Asset->Header;
     asset_file_source* FileSource = Asset->FileSource;
@@ -343,6 +344,8 @@ void ImportAssetDirectly(assets* Assets,
             Result->KerningPairs = KerningPairs;
         }break;
         
+#define GET_DATA(type, offset) (type*)((u8*)Data + (offset))
+        
         case AssetType_Model:{
             model_info* Result = GET_ASSET_PTR_MEMBER(Asset, model_info);
             asset_model* Src = &Header->Model;
@@ -350,7 +353,7 @@ void ImportAssetDirectly(assets* Assets,
             // NOTE(Dima): Loading and storing model data
             Result->MeshIDs = 0;
             if(Src->MeshCount){
-                u32* MeshIDs = (u32*)((u8*)Data + Src->DataOffsetToMeshIDs);
+                u32* MeshIDs = GET_DATA(u32, Src->DataOffsetToMeshIDs);
                 Result->MeshIDs = MeshIDs;
                 
                 IntegrateIDs(Result->MeshIDs, Src->MeshCount, FileSource);
@@ -359,7 +362,7 @@ void ImportAssetDirectly(assets* Assets,
             
             Result->MaterialIDs = 0;
             if(Src->MaterialCount){
-                u32* MaterialIDs = (u32*)((u8*)Data + Src->DataOffsetToMaterialIDs);
+                u32* MaterialIDs = GET_DATA(u32, Src->DataOffsetToMaterialIDs);
                 Result->MaterialIDs = MaterialIDs;
                 
                 IntegrateIDs(Result->MaterialIDs, Src->MaterialCount, FileSource);
@@ -367,7 +370,7 @@ void ImportAssetDirectly(assets* Assets,
             
             Result->SkeletonIDs = 0;
             if(Src->SkeletonCount){
-                u32* SkeletonIDs = (u32*)((u8*)Data + Src->DataOffsetToSkeletonIDs);
+                u32* SkeletonIDs = GET_DATA(u32, Src->DataOffsetToSkeletonIDs);
                 Result->SkeletonIDs = SkeletonIDs;
                 
                 IntegrateIDs(Result->SkeletonIDs, Src->SkeletonCount, FileSource);
@@ -375,7 +378,7 @@ void ImportAssetDirectly(assets* Assets,
             
             Result->AnimationIDs = 0;
             if(Src->AnimationCount){
-                u32* AnimationIDs = (u32*)((u8*)Data + Src->DataOffsetToAnimationIDs);
+                u32* AnimationIDs = GET_DATA(u32, Src->DataOffsetToAnimationIDs);
                 Result->AnimationIDs = AnimationIDs;
                 
                 IntegrateIDs(Result->AnimationIDs, Src->AnimationCount, FileSource);
@@ -383,15 +386,14 @@ void ImportAssetDirectly(assets* Assets,
             
             Result->NodesSharedDatas = 0;
             if(Src->NodeCount){
-                node_shared_data* NodesSharedDatas = (node_shared_data*)
-                    ((u8*)Data + Src->DataOffsetToNodesSharedDatas);
+                node_shared_data* NodesSharedDatas = GET_DATA(node_shared_data, Src->DataOffsetToNodesSharedDatas);
                 
                 Result->NodesSharedDatas = NodesSharedDatas;
             }
             
             Result->NodeMeshIDsStorage = 0;
             if(Src->NodesMeshIndicesStorageCount){
-                u32* MeshIndicesStorage = (u32*)((u8*)Data + Src->DataOffsetToNodesMeshIndicesStorage);
+                u32* MeshIndicesStorage = GET_DATA(u32, Src->DataOffsetToNodesMeshIndicesStorage);
                 Result->NodeMeshIDsStorage = MeshIndicesStorage;
                 
                 IntegrateIDs(Result->NodeMeshIDsStorage, 
@@ -417,39 +419,53 @@ void ImportAssetDirectly(assets* Assets,
             node_animation* NodeAnim = GET_ASSET_PTR_MEMBER(Asset, node_animation);
             asset_node_animation* Src = &Header->NodeAnim;
             
-            animation_vector_key* PositionKeys = 0;
+            NodeAnim->PositionKeysValues = 0;
+            NodeAnim->PositionKeysTimes = 0;
             if(Src->PositionKeysCount){
-                PositionKeys = (animation_vector_key*)((u8*)Data + Src->DataOffsetToPositionKeys);
-                NodeAnim->PositionKeys = PositionKeys;
+                v3* PositionKeysValues = GET_DATA(v3, Src->DataOffsetToPositionKeysValues);
+                float* PositionKeysTimes = GET_DATA(float, Src->DataOffsetToPositionKeysTimes);
+                
+                NodeAnim->PositionKeysValues = PositionKeysValues;
+                NodeAnim->PositionKeysTimes = PositionKeysTimes;
             }
             
-            animation_quaternion_key* RotationKeys = 0;
+            
+            NodeAnim->RotationKeysValues = 0;
+            NodeAnim->RotationKeysTimes = 0;
             if(Src->RotationKeysCount){
-                RotationKeys = (animation_quaternion_key*)((u8*)Data + Src->DataOffsetToRotataionKeys);
-                NodeAnim->RotationKeys = RotationKeys;
+                quat* RotationKeysValues = GET_DATA(quat, Src->DataOffsetToRotationKeysValues);
+                float* RotationKeysTimes = GET_DATA(float, Src->DataOffsetToRotationKeysTimes);
+                
+                NodeAnim->RotationKeysValues = RotationKeysValues;
+                NodeAnim->RotationKeysTimes = RotationKeysTimes;
             }
             
-            animation_vector_key* ScalingKeys = 0;
+            NodeAnim->ScalingKeysValues = 0;
+            NodeAnim->ScalingKeysTimes = 0;
             if(Src->ScalingKeysCount){
-                ScalingKeys = (animation_vector_key*)((u8*)Data + Src->DataOffsetToScalingKeys);
-                NodeAnim->ScalingKeys = ScalingKeys;
+                v3* ScalingKeysValues = GET_DATA(v3, Src->DataOffsetToScalingKeysValues);
+                float* ScalingKeysTimes = GET_DATA(float, Src->DataOffsetToScalingKeysTimes);
+                
+                NodeAnim->ScalingKeysValues = ScalingKeysValues;
+                NodeAnim->ScalingKeysTimes = ScalingKeysTimes;
             }
+            
         }break;
         
         case AssetType_AnimationClip:{
             animation_clip* Clip = GET_ASSET_PTR_MEMBER(Asset, animation_clip);
             asset_animation_clip* Src = &Header->AnimationClip;
             
-            u32* NodeAnimationIDs = 0;
+            Clip->NodeAnimationIDs = 0;
             if(Src->NodeAnimationIDsCount){
-                NodeAnimationIDs = (u32*)((u8*)Data + Src->DataOffsetToNodeAnimationIDs);
+                u32* NodeAnimationIDs = GET_DATA(u32, Src->DataOffsetToNodeAnimationIDs);
                 Clip->NodeAnimationIDs = NodeAnimationIDs;
                 
                 IntegrateIDs(Clip->NodeAnimationIDs, Src->NodeAnimationIDsCount, FileSource);
             }
             
             if(Src->SizeName){
-                Clip->Name = (char*)((u8*)Data + Src->DataOffsetToName);
+                Clip->Name = GET_DATA(char, Src->DataOffsetToName);
             }
         }break;
         
@@ -459,7 +475,7 @@ void ImportAssetDirectly(assets* Assets,
             
             Result->Bones = 0;
             if(Src->BoneCount){
-                bone_info* Bones = (bone_info*)((u8*)Data + Src->DataOffsetToBones);
+                bone_info* Bones = GET_DATA(bone_info, Src->DataOffsetToBones);
                 Result->Bones = Bones;
             }
         }break;
@@ -486,7 +502,9 @@ PLATFORM_CALLBACK(ImportAssetCallback){
     asset* Asset = CallbackData->Asset;
     assets* Assets = CallbackData->Assets;
     
-    ImportAssetDirectly(Assets, Asset, DestData, DataSize);
+    mem_region TempRegion = CreateInRestOfRegion(&CallbackData->Task->Region);
+    
+    ImportAssetDirectly(Assets, Asset, DestData, DataSize, &TempRegion);
     
     EndTaskData(&Assets->ImportTasksPool, CallbackData->Task);
 }
@@ -512,17 +530,21 @@ void ImportAsset(assets* Assets, asset* Asset, b32 Immediate){
             // TODO(Dima): Change this
             void* Data = malloc(DataSizeToAlloc);
             
-            ImportAssetDirectly(Assets, Asset, Data, DataSize);
+            // NOTE(Dima): As this pool is only for main thread - 
+            // we should always get the task memory
+            task_data* TempTask = BeginTaskData(&Assets->ImportTaskPoolMainThread);
+            Assert(TempTask);
+            
+            ImportAssetDirectly(Assets, Asset, Data, DataSize, &TempTask->Region);
+            
+            EndTaskData(&Assets->ImportTaskPoolMainThread, TempTask);
         }
         else{
             task_data* Task = BeginTaskData(&Assets->ImportTasksPool);
             
             if(Task){
-                import_asset_callback_data* CallbackData =
-                    (import_asset_callback_data*)Task->Block.Base;
+                import_asset_callback_data* CallbackData = PushStruct(&Task->Region, import_asset_callback_data);
                 
-                // NOTE(Dima): Loading data
-                u32 DataSize = Header->TotalDataSize;
                 // TODO(Dima): Change this
                 // TODO(Dima): For small sizes use layered allocator
                 void* Data = malloc(DataSizeToAlloc);
@@ -642,17 +664,25 @@ void InitAssets(assets* Assets){
     Assets->MainLargeAtlas = InitAtlas(Assets->Memory, 1024);
     
     // NOTE(Dima): Init asset layered memory to allocate asset types
-    u32 LayersSizes[] = {64, 128, 256, 512, 1024};
+    u32 LayersSizes[] = {64, 128, 256, 512, 1024, 2048, 4096};
     u32 LayersSizesCount = ARRAY_COUNT(LayersSizes);
     InitLayeredMem(&Assets->LayeredMemory, 
                    Assets->Memory, 
                    LayersSizes, 
                    LayersSizesCount);
     
-    // NOTE(Dima): Init tasks datas pool
-    InitTaskDataPool(&Assets->ImportTasksPool, Assets->Memory,
-                     1024,
-                     sizeof(import_asset_callback_data));
+    // NOTE(Dima): Init tasks datas pools
+    mi SizeForAssetImport = Kilobytes(256);
+    
+    InitTaskDataPool(&Assets->ImportTaskPoolMainThread, 
+                     Assets->Memory,
+                     1,
+                     SizeForAssetImport);
+    
+    InitTaskDataPool(&Assets->ImportTasksPool, 
+                     Assets->Memory,
+                     4,
+                     SizeForAssetImport);
     
     // NOTE(Dima): Init asset files sources
     DLIST_REFLECT_PTRS(Assets->FileSourceUse, Next, Prev);

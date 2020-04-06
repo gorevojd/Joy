@@ -8,7 +8,7 @@ struct task_data{
     task_data* Next;
     task_data* Prev;
     
-    mem_block Block;
+    mem_region Region;
 };
 
 struct task_data_pool{

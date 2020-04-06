@@ -348,22 +348,37 @@ added_asset AddNodeAnimationAsset(asset_system* System, tool_node_animation* Nod
     Source->NodeAnimSource.NodeAnimInfo = NodeAnim;
     
     // NOTE(Dima): Setting file header
-    asset_node_animation* NodeAnimHeader = &FileHeader->NodeAnim;
+    asset_node_animation* Head = &FileHeader->NodeAnim;
     
-    NodeAnimHeader->PositionKeysCount = NodeAnim->PositionKeys.size();
-    NodeAnimHeader->RotationKeysCount = NodeAnim->RotationKeys.size();
-    NodeAnimHeader->ScalingKeysCount = NodeAnim->ScalingKeys.size();
+    Assert(NodeAnim->PositionValues.size() == NodeAnim->PositionTimes.size());
+    Assert(NodeAnim->RotationValues.size() == NodeAnim->RotationTimes.size());
+    Assert(NodeAnim->ScalingValues.size() == NodeAnim->ScalingTimes.size());
     
-    NodeAnimHeader->SizePositionKeys = sizeof(animation_vector_key) * NodeAnim->PositionKeys.size();
-    NodeAnimHeader->SizeRotationKeys = sizeof(animation_quaternion_key) * NodeAnim->RotationKeys.size();
-    NodeAnimHeader->SizeScalingKeys = sizeof(animation_vector_key) * NodeAnim->ScalingKeys.size();
+    Head->PositionKeysCount = NodeAnim->PositionValues.size();
+    Head->RotationKeysCount = NodeAnim->RotationValues.size();
+    Head->ScalingKeysCount = NodeAnim->ScalingValues.size();
     
-    NodeAnimHeader->DataOffsetToPositionKeys = 0;
-    NodeAnimHeader->DataOffsetToRotataionKeys = NodeAnimHeader->SizePositionKeys;
-    NodeAnimHeader->DataOffsetToScalingKeys = 
-        NodeAnimHeader->DataOffsetToRotataionKeys + NodeAnimHeader->SizeRotationKeys;
+    Head->SizePositionKeysValues = sizeof(v3) * Head->PositionKeysCount;
+    Head->SizeRotationKeysValues = sizeof(quat) * Head->RotationKeysCount;
+    Head->SizeScalingKeysValues = sizeof(v3) * Head->ScalingKeysCount;
     
-    NodeAnimHeader->NodeIndex = NodeAnim->NodeIndex;
+    Head->SizePositionKeysTimes = sizeof(float) * Head->PositionKeysCount;
+    Head->SizeRotationKeysTimes = sizeof(float) * Head->RotationKeysCount;
+    Head->SizeScalingKeysTimes = sizeof(float) * Head->ScalingKeysCount;
+    
+    Head->DataOffsetToPositionKeysValues = 0;
+    Head->DataOffsetToRotationKeysValues = 
+        Head->DataOffsetToRotationKeysValues + Head->SizePositionKeysValues;
+    Head->DataOffsetToScalingKeysValues = 
+        Head->DataOffsetToRotationKeysValues + Head->SizeRotationKeysValues;
+    Head->DataOffsetToPositionKeysTimes = 
+        Head->DataOffsetToScalingKeysValues + Head->SizeScalingKeysValues;
+    Head->DataOffsetToRotationKeysTimes = 
+        Head->DataOffsetToPositionKeysTimes + Head->SizePositionKeysTimes;
+    Head->DataOffsetToScalingKeysTimes = 
+        Head->DataOffsetToRotationKeysTimes + Head->SizeRotationKeysTimes;
+    
+    Head->NodeIndex = NodeAnim->NodeIndex;
     
     return(Added);
 }
@@ -734,9 +749,12 @@ And forming group regions that are about to be written
                     Asset->NodeAnim = Source->NodeAnimSource.NodeAnimInfo;
                     
                     DataByteSize = 
-                        Header->NodeAnim.SizePositionKeys + 
-                        Header->NodeAnim.SizeRotationKeys + 
-                        Header->NodeAnim.SizeScalingKeys;
+                        Header->NodeAnim.SizePositionKeysValues + 
+                        Header->NodeAnim.SizeRotationKeysValues + 
+                        Header->NodeAnim.SizeScalingKeysValues +
+                        Header->NodeAnim.SizePositionKeysTimes +
+                        Header->NodeAnim.SizeRotationKeysTimes +
+                        Header->NodeAnim.SizeScalingKeysTimes;
                 }break;
                 
                 case AssetType_Skeleton:{
@@ -892,23 +910,44 @@ And forming group regions that are about to be written
                     tool_node_animation* NodeAnim = Asset->NodeAnim;
                     asset_node_animation* NodeAnimH = &Header->NodeAnim;
                     
+                    // NOTE(Dima): Writing values
                     if(NodeAnimH->PositionKeysCount){
-                        fwrite(&NodeAnim->PositionKeys[0],
-                               NodeAnimH->SizePositionKeys,
+                        fwrite(&NodeAnim->PositionValues[0],
+                               NodeAnimH->SizePositionKeysValues,
                                1, fp);
                     }
                     
                     if(NodeAnimH->RotationKeysCount){
-                        fwrite(&NodeAnim->RotationKeys[0],
-                               NodeAnimH->SizeRotationKeys,
+                        fwrite(&NodeAnim->RotationValues[0],
+                               NodeAnimH->SizeRotationKeysValues,
                                1, fp);
                     }
                     
                     if(NodeAnimH->ScalingKeysCount){
-                        fwrite(&NodeAnim->ScalingKeys[0],
-                               NodeAnimH->SizeScalingKeys,
+                        fwrite(&NodeAnim->ScalingValues[0],
+                               NodeAnimH->SizeScalingKeysValues,
                                1, fp);
                     }
+                    
+                    // NOTE(Dima): Writing times
+                    if(NodeAnimH->PositionKeysCount){
+                        fwrite(&NodeAnim->PositionTimes[0],
+                               NodeAnimH->SizePositionKeysTimes,
+                               1, fp);
+                    }
+                    
+                    if(NodeAnimH->RotationKeysCount){
+                        fwrite(&NodeAnim->RotationTimes[0],
+                               NodeAnimH->SizeRotationKeysTimes,
+                               1, fp);
+                    }
+                    
+                    if(NodeAnimH->ScalingKeysCount){
+                        fwrite(&NodeAnim->ScalingTimes[0],
+                               NodeAnimH->SizeScalingKeysTimes,
+                               1, fp);
+                    }
+                    
                 }break;
                 
                 case AssetType_Skeleton:{

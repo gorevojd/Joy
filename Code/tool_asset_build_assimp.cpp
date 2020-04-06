@@ -475,11 +475,8 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
             {
                 aiVectorKey* Key = &AssimpNodeAnim->mPositionKeys[KeyIndex];
                 
-                animation_vector_key NewKey = {};
-                NewKey.Value = Assimp2JoyVector3(Key->mValue);
-                NewKey.Time = Key->mTime;
-                
-                NewNodeAnim.PositionKeys.push_back(NewKey);
+                NewNodeAnim.PositionValues.push_back(Assimp2JoyVector3(Key->mValue));
+                NewNodeAnim.PositionTimes.push_back(Key->mTime);
             }
             
             // NOTE(Dima): Loading rotation keys
@@ -489,11 +486,8 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
             {
                 aiQuatKey* Key = &AssimpNodeAnim->mRotationKeys[KeyIndex];
                 
-                animation_quaternion_key NewKey = {};
-                NewKey.Value = Assimp2JoyQuat(Key->mValue);
-                NewKey.Time = Key->mTime;
-                
-                NewNodeAnim.RotationKeys.push_back(NewKey);
+                NewNodeAnim.RotationValues.push_back(Assimp2JoyQuat(Key->mValue));
+                NewNodeAnim.RotationTimes.push_back(Key->mTime);
             }
             
             // NOTE(Dima): Loading scaling keys
@@ -503,11 +497,8 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
             {
                 aiVectorKey* Key = &AssimpNodeAnim->mScalingKeys[KeyIndex];
                 
-                animation_vector_key NewKey = {};
-                NewKey.Value = Assimp2JoyVector3(Key->mValue);
-                NewKey.Time = Key->mTime;
-                
-                NewNodeAnim.ScalingKeys.push_back(NewKey);
+                NewNodeAnim.ScalingValues.push_back(Assimp2JoyVector3(Key->mValue));
+                NewNodeAnim.ScalingTimes.push_back(Key->mTime);
             }
             
             // NOTE(Dima): Pushing node animation to vector

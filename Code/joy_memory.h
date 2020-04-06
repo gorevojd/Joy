@@ -4,13 +4,15 @@
 #include "joy_defines.h"
 #include "joy_platform.h"
 #include "joy_types.h"
+
 #include <stdint.h>
 #include <string.h>
 
-// TODO(Dima): Add minimum block size param to allocation function
-
 struct mem_region{
     mem_block_entry* Block;
+    
+    b32 CreatedInsideBlock;
+    mem_block CreationBlock;
     
     u32 GrowSize;
 };
@@ -75,24 +77,142 @@ struct mem_box{
     mem_box* NextBox;
 };
 
-#define MINIMUM_MEMORY_REGION_SIZE Mibibytes(1)
-inline void* PushSomeMem(mem_region* Region, size_t Size, size_t Align = 8){
+inline void InitMemoryBlock(mem_block* Block, void* Base, mi Size){
+    Block->Base = Base;
+    Block->Used = 0;
+    Block->Total = Size;
+}
+
+inline mem_block InitMemoryBlock(void* Base, mi Size){
+    mem_block Block;
     
+    Block.Base = Base;
+    Block.Used = 0;
+    Block.Total = Size;
+    
+    return(Block);
+}
+
+inline mi HowMuchLeft(mem_block* Block){
+    mi Result = Block->Total - Block->Used;
+    
+    return(Result);
+}
+
+inline mi HowMuchLeft(mem_region* Region){
+    
+    mi Result = 0;
+    
+    if(Region->CreatedInsideBlock){
+        Result = HowMuchLeft(&Region->CreationBlock);
+    }
+    else{
+        if(Region->Block){
+            Result = HowMuchLeft(&Region->Block->Block);
+        }
+        else{
+            Result = 0;
+        }
+    }
+    
+    return(Result);
+}
+
+inline mi AdvancePointerToAlign(void* Address, int Align){
+    mi BeforeAlign = (mi)Address;
+    mi AlignedPos = (BeforeAlign + Align - 1) & (~(Align - 1));
+    
+    return(AlignedPos);
+}
+
+inline mem_region CreateInsideBlock(void* Base, mi Size){
+    mem_region Result = {};
+    
+    Result.CreatedInsideBlock = true;
+    
+    Result.CreationBlock.Base = Base;
+    Result.CreationBlock.Used = 0;
+    Result.CreationBlock.Total = Size;
+    
+    return(Result);
+}
+
+inline mem_block* GetRegionBlock(mem_region* Region){
+    mem_block* Block = 0;
+    
+    if(Region->CreatedInsideBlock){
+        Block = &Region->CreationBlock;
+    }
+    else{
+        if(Region->Block){
+            Block = &Region->Block->Block;
+        }
+        else{
+            // NOTE(Dima): Need to allocate new block and set 
+            // NOTE(Dima): old and next as zeroes.
+            
+            Block = 0;
+        }
+    }
+    
+    return(Block);
+}
+
+inline void* GetRegionBase(mem_region* Region){
+    mem_block* Block = GetRegionBlock(Region);
+    
+    void* Base = 0;
+    if(Block){
+        Base = Block->Base;
+    }
+    
+    return(Base);
+}
+
+inline mem_region CreateInRestOfRegion(mem_region* Region, mi Align = 8){
+    mi LeftInRegion = HowMuchLeft(Region);
+    void* Base = GetRegionBase(Region);
+    
+    Assert(Base);
+    
+    mi NewBaseRaw = AdvancePointerToAlign(Base, Align);
+    void* NewBase = (void*)NewBaseRaw;
+    
+    mi AdvancedByAlign = NewBaseRaw - (mi)Base;
+    mi ActualLeft = LeftInRegion - AdvancedByAlign;
+    
+    Assert(ActualLeft > 0);
+    
+    mem_region Result = CreateInsideBlock(NewBase, ActualLeft);
+    
+    return(Result);
+}
+
+#define MINIMUM_MEMORY_REGION_SIZE Mibibytes(1)
+inline void* PushSomeMem(mem_region* Region, mi Size, mi Align = 8){
     void* Result = 0;
     
     b32 NeedNewBlock = false;
+    mem_block* Block = GetRegionBlock(Region);
     
-    size_t AlignedPos = 0;
-    size_t NewUsedCount = 0;
+    mi InitBlockUsed = 0;
+    mi InitBlockBase = 0;
+    if(Block == 0){
+        NeedNewBlock = true;
+    }
+    else{
+        InitBlockUsed = Block->Used;
+        InitBlockBase = (mi)Block->Base;
+    }
     
-    if(Region->Block){
-        size_t BeforeAlign = (size_t)Region->Block->Block.Base + Region->Block->Block.Used;
-        AlignedPos = (BeforeAlign + Align - 1) & (~(Align - 1));
-        size_t AdvancedByAlign = AlignedPos - BeforeAlign;
-        
-        size_t ToAllocateSize = AdvancedByAlign + Size;
-        NewUsedCount = Region->Block->Block.Used + ToAllocateSize;
-        
+    mi BeforeAlign = InitBlockBase + InitBlockUsed;
+    mi AlignedPos = (BeforeAlign + Align - 1) & (~(Align - 1));
+    mi AdvancedByAlign = AlignedPos - BeforeAlign;
+    
+    mi ToAllocateSize = AdvancedByAlign + Size;
+    mi NewUsedCount = InitBlockUsed + ToAllocateSize;
+    
+    if((Region->CreatedInsideBlock == false) && Region->Block){
         if(NewUsedCount > Region->Block->Block.Total){
             // NOTE(Dima): Need to allocate new block and set current
             // NOTE(Dima): block as old for new one.
@@ -111,14 +231,10 @@ inline void* PushSomeMem(mem_region* Region, size_t Size, size_t Align = 8){
             }
         }
     }
-    else{
-        // NOTE(Dima): Need to allocate new block and set 
-        // NOTE(Dima): old and next as zeroes.
-        
-        NeedNewBlock = true;
-    }
     
     if(NeedNewBlock){
+        Assert(Region->CreatedInsideBlock == false);
+        
         // NOTE(Dima): Calculate this if we need to allocate new block
         size_t NewBlockSize;
         
@@ -149,59 +265,66 @@ inline void* PushSomeMem(mem_region* Region, size_t Size, size_t Align = 8){
     }
     else{
         // NOTE(Dima): Everything is OK. We can allocate here
-        Assert(NewUsedCount <= Region->Block->Block.Total);
+        Assert(NewUsedCount <= Block->Total);
         
         Result = (void*)AlignedPos;
-        Region->Block->Block.Used = NewUsedCount;
+        Block->Used = NewUsedCount;
     }
-    
-    
-    return(Result);
-}
-
-inline mem_block PushSplit(mem_region* Region, mi Size)
-{
-    mem_block Result;
-    
-    Result.Base = PushSomeMem(Region, Size);
-    Result.Total = Size;
-    Result.Used = 0;
     
     return(Result);
 }
 
 // NOTE(Dima): This function deallocates all region
 inline void Free(mem_region* Region){
-    while(Region->Block){
-        mem_block_entry* OldBlock = Region->Block->Old;
-        
-        Platform.MemFree(Region->Block);
-        
-        Region->Block = OldBlock;
-        
-        if(Region->Block){
-            Region->Block->Next = 0;
-        }
+    if(Region->CreatedInsideBlock){
+        Region->CreationBlock.Used = 0;
     }
-    
-    Region->Block = 0;
+    else{
+        while(Region->Block){
+            mem_block_entry* OldBlock = Region->Block->Old;
+            
+            Platform.MemFree(Region->Block);
+            
+            Region->Block = OldBlock;
+            
+            if(Region->Block){
+                Region->Block->Next = 0;
+            }
+        }
+        
+        Region->Block = 0;
+    }
 }
 
 // NOTE(Dima): This function frees all region but not deallocates 
 // NOTE(Dima): its blocks but just zeroes them
 inline void FreeNoDealloc(mem_region* Region){
-    mem_block_entry* LastValid = Region->Block;
-    
-    while(Region->Block){
-        Platform.MemZero(Region->Block);
-        Region->Block->Block.Used = 0;
-        
-        LastValid = Region->Block;
-        
-        Region->Block = Region->Block->Old;
+    if(Region->CreatedInsideBlock){
+        Region->CreationBlock.Used = 0;
     }
+    else{
+        mem_block_entry* LastValid = Region->Block;
+        
+        while(Region->Block){
+            Platform.MemZero(Region->Block);
+            Region->Block->Block.Used = 0;
+            
+            LastValid = Region->Block;
+            
+            Region->Block = Region->Block->Old;
+        }
+        
+        Region->Block = LastValid;
+    }
+}
+
+inline mem_region PushSplit(mem_region* Region, mi Size)
+{
+    void* ResultBase = PushSomeMem(Region, Size);
     
-    Region->Block = LastValid;
+    mem_region Result = CreateInsideBlock(ResultBase, Size);
+    
+    return(Result);
 }
 
 #define PushMemoryStruct(region, type, name, region_member_name) \

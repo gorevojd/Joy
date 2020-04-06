@@ -9,8 +9,8 @@
 #include "stb_sprintf.h"
 
 void SoftwareRenderStackToOutput(render_stack* stack, bmp_info* buf, rc2 clipRect){
-    u8* at = (u8*)stack->MemBlock.Base;
-	u8* stackEnd = (u8*)stack->MemBlock.Base + stack->MemBlock.Used;
+    u8* at = (u8*)stack->MemRegion.CreationBlock.Base;
+	u8* stackEnd = (u8*)stack->MemRegion.CreationBlock.Base + stack->MemRegion.CreationBlock.Used;
     
 	while (at < stackEnd) {
         render_entry_header* header = (render_entry_header*)at;

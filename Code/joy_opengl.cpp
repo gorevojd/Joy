@@ -588,8 +588,8 @@ INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, bmp_info* bmp){
 }
 
 void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
-    u8* at = (u8*)Stack->MemBlock.Base;
-    u8* StackEnd = (u8*)Stack->MemBlock.Base + Stack->MemBlock.Used;
+    u8* at = (u8*)Stack->MemRegion.CreationBlock.Base;
+    u8* StackEnd = (u8*)Stack->MemRegion.CreationBlock.Base + Stack->MemRegion.CreationBlock.Used;
     
     while (at < StackEnd) {
         render_entry_header* Header = (render_entry_header*)at;

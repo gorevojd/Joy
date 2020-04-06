@@ -42,22 +42,6 @@ struct mem_block_entry{
     mem_block_entry* Next;
 };
 
-inline void InitMemoryBlock(mem_block* Block, void* Base, mi Size){
-    Block->Base = Base;
-    Block->Used = 0;
-    Block->Total = Size;
-}
-
-inline mem_block InitMemoryBlock(void* Base, mi Size){
-    mem_block Block;
-    
-    Block.Base = Base;
-    Block.Used = 0;
-    Block.Total = Size;
-    
-    return(Block);
-}
-
 inline int SafeTruncateToUInt(float Value){
     int Result = (int)(Value + 0.5f);
     

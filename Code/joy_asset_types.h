@@ -188,9 +188,14 @@ struct model_info{
 };
 
 struct node_animation{
-    animation_vector_key* PositionKeys;
-    animation_quaternion_key* RotationKeys;
-    animation_vector_key* ScalingKeys;
+    float* PositionKeysTimes;
+    v3* PositionKeysValues;
+    
+    float* RotationKeysTimes;
+    quat* RotationKeysValues;
+    
+    float* ScalingKeysTimes;
+    v3* ScalingKeysValues;
     
     int PositionKeysCount;
     int RotationKeysCount;

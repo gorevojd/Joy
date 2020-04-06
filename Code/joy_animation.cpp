@@ -1,8 +1,8 @@
 #include "joy_animation.h"
 
-INTERNAL_FUNCTION int FindPrevFrameIndexForVectorKey(animation_vector_key* Keys, 
-                                                     int KeysCount, 
-                                                     f32 CurTickTime)
+INTERNAL_FUNCTION int FindPrevFrameIndexForKey(float* Times, 
+                                               int KeysCount, 
+                                               f32 CurTickTime)
 {
     int Result = -1;
     
@@ -10,9 +10,9 @@ INTERNAL_FUNCTION int FindPrevFrameIndexForVectorKey(animation_vector_key* Keys,
         KeyIndex < KeysCount;
         KeyIndex++)
     {
-        animation_vector_key* Key = &Keys[KeyIndex];
+        float Time = Times[KeyIndex];
         
-        if(Key->Time > CurTickTime){
+        if(Time > CurTickTime){
             Result = KeyIndex - 1;
             
             break;
@@ -26,34 +26,69 @@ INTERNAL_FUNCTION int FindPrevFrameIndexForVectorKey(animation_vector_key* Keys,
     return(Result);
 }
 
-INTERNAL_FUNCTION int FindPrevFrameIndexForQuatKey(animation_quaternion_key* Keys,
-                                                   int KeysCount,
-                                                   f32 CurTickTime)
+struct find_anim_deltas_ctx{
+    int PrevKeyIndex;
+    int NextKeyIndex;
+    float t;
+};
+
+INTERNAL_FUNCTION find_anim_deltas_ctx
+FindAnimDeltas(animation_clip* Animation,
+               float* Times,
+               int KeysCount,
+               f32 CurTickTime)
 {
-    int Result = -1;
+    find_anim_deltas_ctx Result = {};
     
-    for(int KeyIndex = 0;
-        KeyIndex < KeysCount;
-        KeyIndex++)
+    // NOTE(Dima): Finding frame index before CurTickTime
+    int FoundPrevIndex = FindPrevFrameIndexForKey(Times,
+                                                  KeysCount,
+                                                  CurTickTime);
+    
+    int LastFrameIndex = KeysCount - 1;
+    
+    // NOTE(Dima): If not last key frame
+    float PrevKeyTime = Times[FoundPrevIndex];
+    
+    int NextKeyIndex;
+    f32 TickDistance = 0.0f;
+    
+    // NOTE(Dima): If found frame is not last
+    if(FoundPrevIndex != LastFrameIndex)
     {
-        animation_quaternion_key* Key = &Keys[KeyIndex];
+        NextKeyIndex = FoundPrevIndex + 1;
+        float NextKeyTime = Times[NextKeyIndex];
         
-        if(Key->Time > CurTickTime){
-            Result = KeyIndex - 1;
+        TickDistance = NextKeyTime - PrevKeyTime;
+    }
+    else{
+        if(Animation->IsLooping){
+            NextKeyIndex = 0;
             
-            break;
+            TickDistance = Animation->DurationTicks - PrevKeyTime + 1.0f;
+        }
+        else{
+            // NOTE(Dima): If animation is not looping - set next key to previous to make
+            // NOTE(Dima): sure transform stays the same
+            NextKeyIndex = FoundPrevIndex;
+            
+            TickDistance = 1.0f;
         }
     }
     
-    if(Result == -1){
-        Result = KeysCount - 1;
-    }
+    // NOTE(Dima): Lerping
+    f32 t = (CurTickTime - PrevKeyTime) / TickDistance;
+    
+    Result.PrevKeyIndex = FoundPrevIndex;
+    Result.NextKeyIndex = NextKeyIndex;
+    Result.t = t;
     
     return(Result);
 }
 
 INTERNAL_FUNCTION v3 GetAnimatedVector(animation_clip* Animation,
-                                       animation_vector_key* Keys,
+                                       v3* Values,
+                                       float* Times,
                                        int KeysCount,
                                        f32 CurTickTime,
                                        v3 DefaultValue)
@@ -62,56 +97,23 @@ INTERNAL_FUNCTION v3 GetAnimatedVector(animation_clip* Animation,
     
     // NOTE(Dima): Loading first frame's values
     if(KeysCount){
-        Result = Keys[0].Value;
-        
-        // NOTE(Dima): Finding frame index before CurTickTime
-        int FoundPrevIndex = FindPrevFrameIndexForVectorKey(Keys,
+        find_anim_deltas_ctx AnimDeltasCtx = FindAnimDeltas(Animation,
+                                                            Times,
                                                             KeysCount,
                                                             CurTickTime);
         
-        int LastFrameIndex = KeysCount - 1;
+        v3 PrevValue = Values[AnimDeltasCtx.PrevKeyIndex];
+        v3 NextValue = Values[AnimDeltasCtx.NextKeyIndex];
         
-        // NOTE(Dima): If not last key frame
-        animation_vector_key* PrevKey = &Keys[FoundPrevIndex];
-        
-        animation_vector_key* NextKey = 0;
-        f32 TickDistance = 0.0f;
-        
-        // NOTE(Dima): If found frame is not last
-        if(FoundPrevIndex != LastFrameIndex)
-        {
-            NextKey = &Keys[FoundPrevIndex + 1];
-            
-            TickDistance = NextKey->Time - PrevKey->Time;
-        }
-        else{
-            if(Animation->IsLooping){
-                NextKey = &Keys[0];
-                
-                TickDistance = Animation->DurationTicks - PrevKey->Time + 1.0f;
-                
-                ASSERT(NextKey && (TickDistance > 0.0f));
-            }
-            else{
-                // NOTE(Dima): If animation is not looping - set next key to previous to make
-                // NOTE(Dima): sure transform stays the same
-                NextKey = PrevKey;
-                
-                TickDistance = 1.0f;
-            }
-        }
-        
-        // NOTE(Dima): Lerping
-        f32 t = (CurTickTime - PrevKey->Time) / TickDistance;
-        
-        Result = Lerp(PrevKey->Value, NextKey->Value, t);
+        Result = Lerp(PrevValue, NextValue, AnimDeltasCtx.t);
     }
     
     return(Result);
 }
 
 INTERNAL_FUNCTION quat GetAnimatedQuat(animation_clip* Animation,
-                                       animation_quaternion_key* Keys,
+                                       quat* Values,
+                                       float* Times,
                                        int KeysCount,
                                        f32 CurTickTime,
                                        quat DefaultValue){
@@ -119,51 +121,15 @@ INTERNAL_FUNCTION quat GetAnimatedQuat(animation_clip* Animation,
     
     // NOTE(Dima): Loading first frame's values
     if(KeysCount){
-        Result = Keys[0].Value;
+        find_anim_deltas_ctx AnimDeltasCtx = FindAnimDeltas(Animation,
+                                                            Times,
+                                                            KeysCount,
+                                                            CurTickTime);
         
-        // NOTE(Dima): Finding frame index before CurTickTime
-        int FoundPrevIndex = FindPrevFrameIndexForQuatKey(Keys,
-                                                          KeysCount,
-                                                          CurTickTime);
+        quat PrevValue = Values[AnimDeltasCtx.PrevKeyIndex];
+        quat NextValue = Values[AnimDeltasCtx.NextKeyIndex];
         
-        int LastFrameIndex = KeysCount - 1;
-        
-        // NOTE(Dima): If not last key frame
-        animation_quaternion_key* PrevKey = &Keys[FoundPrevIndex];
-        
-        animation_quaternion_key* NextKey = 0;
-        f32 TickDistance = 0.0f;
-        
-        // NOTE(Dima): If found frame is not last
-        if(FoundPrevIndex != LastFrameIndex)
-        {
-            NextKey = &Keys[FoundPrevIndex + 1];
-            
-            TickDistance = NextKey->Time - PrevKey->Time;
-        }
-        else{
-            if(Animation->IsLooping){
-                NextKey = &Keys[0];
-                
-                TickDistance = Animation->DurationTicks - PrevKey->Time + 1.0f;
-                
-                ASSERT(NextKey && (TickDistance > 0.0f));
-            }
-            else{
-                // NOTE(Dima): If animation is not looping - set next key to previous to make
-                // NOTE(Dima): sure transform stays the same
-                NextKey = PrevKey;
-                
-                TickDistance = 1.0f;
-            }
-        }
-        
-        // NOTE(Dima): Lerping
-        f32 t = (CurTickTime - PrevKey->Time) / TickDistance;
-        
-        ASSERT(t >= 0 && t <= 1);
-        
-        Result = Lerp(PrevKey->Value, NextKey->Value, t);
+        Result = Lerp(PrevValue, NextValue, AnimDeltasCtx.t);
     }
     
     return(Result);
@@ -198,20 +164,24 @@ void AnimateModel(assets* Assets,
             if(Animation->IsLooping && (Animation->DurationTicks > 0.0f)){
                 CurrentTick = fmod(CurrentTick, Animation->DurationTicks);
             }
+            
             v3 AnimatedP = GetAnimatedVector(Animation,
-                                             NodeAnim->PositionKeys,
+                                             NodeAnim->PositionKeysValues,
+                                             NodeAnim->PositionKeysTimes,
                                              NodeAnim->PositionKeysCount,
                                              CurrentTick,
                                              V3(0.0f, 0.0f, 0.0f));
             
             quat AnimatedR = GetAnimatedQuat(Animation,
-                                             NodeAnim->RotationKeys,
+                                             NodeAnim->RotationKeysValues,
+                                             NodeAnim->RotationKeysTimes,
                                              NodeAnim->RotationKeysCount,
                                              CurrentTick,
                                              QuatI());
             
             v3 AnimatedS = GetAnimatedVector(Animation,
-                                             NodeAnim->ScalingKeys,
+                                             NodeAnim->ScalingKeysValues,
+                                             NodeAnim->ScalingKeysTimes,
                                              NodeAnim->ScalingKeysCount,
                                              CurrentTick,
                                              V3(1.0f, 1.0f, 1.0f));

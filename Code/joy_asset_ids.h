@@ -126,13 +126,21 @@ struct asset_node_animation{
     int RotationKeysCount;
     int ScalingKeysCount;
     
-    u32 DataOffsetToPositionKeys;
-    u32 DataOffsetToRotataionKeys;
-    u32 DataOffsetToScalingKeys;
+    u32 DataOffsetToPositionKeysValues;
+    u32 DataOffsetToRotationKeysValues;
+    u32 DataOffsetToScalingKeysValues;
     
-    u32 SizePositionKeys;
-    u32 SizeRotationKeys;
-    u32 SizeScalingKeys;
+    u32 DataOffsetToPositionKeysTimes;
+    u32 DataOffsetToRotationKeysTimes;
+    u32 DataOffsetToScalingKeysTimes;
+    
+    u32 SizePositionKeysValues;
+    u32 SizeRotationKeysValues;
+    u32 SizeScalingKeysValues;
+    
+    u32 SizePositionKeysTimes;
+    u32 SizeRotationKeysTimes;
+    u32 SizeScalingKeysTimes;
     
     u32 NodeIndex;
 };

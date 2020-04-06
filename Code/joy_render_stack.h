@@ -31,7 +31,7 @@ struct render_stack{
     struct render_state* Render;
     Asset_Atlas* CurAtlas;
     
-    mem_block MemBlock;
+    mem_region MemRegion;
     int EntryCount;
 };
 
@@ -100,22 +100,10 @@ struct render_entry_gui_chunk{
 
 #pragma pack(pop)
 
-inline void* RenderPushMem(render_stack* stack, mi size, mi align = 8){
-    mi beforeAlign = (mi)stack->MemBlock.Base + stack->MemBlock.Used;
-    mi alignedPos = (beforeAlign + align - 1) & (~(align - 1));
-    mi advancedByAlign = alignedPos - beforeAlign;
+inline void* RenderPushMem(render_stack* Stack, mi Size, mi Align = 8){
+    void* Result = PushSomeMem(&Stack->MemRegion, Size, Align);
     
-    mi toAllocateSize = advancedByAlign + size;
-    mi newUsedCount = stack->MemBlock.Used + toAllocateSize;
-    
-    void* result = 0;
-    
-    Assert(newUsedCount <= stack->MemBlock.Total);
-    
-    result = (void*)alignedPos;
-    stack->MemBlock.Used= newUsedCount;
-    
-    return(result);
+    return(Result);
 }
 
 inline void* RenderPushEntryToStack(render_stack* stack, u32 sizeOfType, u32 typeEnum) {

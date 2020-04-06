@@ -61,31 +61,31 @@ void RenderPassSetCamera(render_pass* Pass, m44 Projection, m44 View,
 	}
 }
 
-INTERNAL_FUNCTION void InitRenderStack(render_stack* stack, 
+INTERNAL_FUNCTION void InitRenderStack(render_stack* Stack, 
                                        render_state* render,
                                        char* Name, 
-                                       void* mem4stack, 
-                                       mi size)
+                                       void* MemoryForStack, 
+                                       mi Size)
 {
-    *stack = {};
+    *Stack = {};
     
-    stack->Render = render;
-    stack->MemBlock = InitMemoryBlock(mem4stack, size);
-    CopyStrings(stack->Name, Name);
+    Stack->Render = render;
+    Stack->MemRegion = CreateInsideBlock(MemoryForStack, Size);
+    CopyStrings(Stack->Name, Name);
     
-    stack->EntryCount = 0;
+    Stack->EntryCount = 0;
 }
 
-INTERNAL_FUNCTION inline void RenderStackBeginFrame(render_stack* stack){
-    stack->MemBlock.Used = 0;
-    stack->EntryCount = 0;
+INTERNAL_FUNCTION inline void RenderStackBeginFrame(render_stack* Stack){
+    Stack->MemRegion.CreationBlock.Used = 0;
+    Stack->EntryCount = 0;
     
-    stack->CurAtlas = 0;
+    Stack->CurAtlas = 0;
     
-    stack->IsSoftwareRenderer = (stack->Render->RendererType == Renderer_Software);
+    Stack->IsSoftwareRenderer = (Stack->Render->RendererType == Renderer_Software);
 }
 
-INTERNAL_FUNCTION inline void RenderStackEndFrame(render_stack* stack){
+INTERNAL_FUNCTION inline void RenderStackEndFrame(render_stack* Stack){
     
 }
 

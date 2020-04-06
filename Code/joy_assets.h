@@ -102,7 +102,9 @@ struct asset_block{
 struct assets{
     mem_region* Memory;
     layered_mem LayeredMemory;
+    
     task_data_pool ImportTasksPool;
+    task_data_pool ImportTaskPoolMainThread;
     
     random_generation Random;
     

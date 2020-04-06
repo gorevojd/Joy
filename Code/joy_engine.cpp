@@ -13,6 +13,8 @@ task_data* BeginTaskData(task_data_pool* Pool)
         DLIST_REMOVE_ENTRY(Result, Next, Prev);
         DLIST_INSERT_BEFORE_SENTINEL(Result, Pool->UseSentinel, Next, Prev);
         
+        Free(&Result->Region);
+        
         --Pool->FreeTasksCount;
     }
     Platform.UnlockMutex(&Pool->Mutex);
@@ -27,6 +29,8 @@ void EndTaskData(task_data_pool* Pool, task_data* Task)
     DLIST_REMOVE_ENTRY(Task, Next, Prev);
     DLIST_INSERT_BEFORE_SENTINEL(Task, Pool->FreeSentinel, Next, Prev);
     ++Pool->FreeTasksCount;
+    
+    Free(&Task->Region);
     
     Platform.UnlockMutex(&Pool->Mutex);
 }
@@ -55,7 +59,7 @@ void InitTaskDataPool(task_data_pool* Pool,
     {
         task_data* Task = PoolArray + NewIndex;
         
-        Task->Block = PushSplit(Region, OneSize);
+        Task->Region = PushSplit(Region, OneSize);
         
         DLIST_INSERT_BEFORE_SENTINEL(Task, 
                                      Pool->FreeSentinel, 

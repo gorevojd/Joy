@@ -161,9 +161,13 @@ struct tool_node_animation{
     
     int NodeIndex;
     
-    std::vector<animation_vector_key> PositionKeys;
-    std::vector<animation_quaternion_key> RotationKeys;
-    std::vector<animation_vector_key> ScalingKeys;
+    std::vector<v3> PositionValues;
+    std::vector<quat> RotationValues;
+    std::vector<v3> ScalingValues;
+    
+    std::vector<float> PositionTimes;
+    std::vector<float> RotationTimes;
+    std::vector<float> ScalingTimes;
 };
 
 struct tool_animation_info{
