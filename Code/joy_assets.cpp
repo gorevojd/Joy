@@ -564,6 +564,8 @@ void ImportAsset(assets* Assets, asset* Asset, b32 Immediate){
                 asset loading and assume that next time we will 
                 get it.
                 */
+                
+                Asset->State.store(AssetState_Unloaded);
             }
         }
     }

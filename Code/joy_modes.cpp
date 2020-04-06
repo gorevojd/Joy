@@ -403,7 +403,8 @@ GAME_MODE_UPDATE(TestUpdate){
             for(int MeshIndex = 0; MeshIndex < Node->MeshCount; MeshIndex++){
                 asset_id MeshID = Node->MeshIDs[MeshIndex];
                 
-                PushOrLoadMesh(Assets, Stack, MeshID, NodeTran);
+                PushOrLoadMesh(Assets, Stack, MeshID, NodeTran,
+                               ASSET_IMPORT_DEFERRED);
             }
         }
 #endif
