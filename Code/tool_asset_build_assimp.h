@@ -98,18 +98,17 @@ struct loaded_mesh_slot{
     b32 MeshLoaded;
     
     u32 StoredMeshID;
-    
-    // NOTE(Dima): -1 if Non-skeleton mesh
-    int SkeletonIndex;
 };
 
 struct loaded_model{
     // NOTE(Dima): These are will be stored
     std::vector<loaded_mesh_slot> Meshes;
     std::vector<loaded_mat> Materials;
-    std::vector<tool_skeleton_info> Skeletons;
     std::vector<loaded_node> Nodes;
     std::vector<tool_animation_info> Animations;
+    
+    tool_skeleton_info Skeleton;
+    b32 HasSkeleton;
     
     std::unordered_map<std::string, int> TextureNameToEmbedIndex;
     std::vector<loaded_mat_texture> EmbededTextures;

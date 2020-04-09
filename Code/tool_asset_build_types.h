@@ -142,12 +142,12 @@ struct tool_node_info{
 struct tool_model_info{
     std::vector<u32> MeshIDs;
     std::vector<u32> MaterialIDs;
-    std::vector<u32> SkeletonIDs;
     std::vector<u32> AnimationIDs;
+    
+    u32 SkeletonID;
     
     int MeshCount;
     int MaterialCount;
-    int SkeletonCount;
     int AnimationCount;
     
     std::vector<tool_node_info> Nodes;
@@ -186,7 +186,6 @@ struct tool_skeleton_info{
     u32 CheckSum;
     
     std::vector<bone_info> Bones;
-    std::unordered_map<std::string, int> BoneNameToBoneID;
 };
 
 struct tool_material_info{

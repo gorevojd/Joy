@@ -60,10 +60,10 @@ void RenderRGBA2BGRA(bmp_info* buf, rc2 clipRect){
 	int MinY = 0;
 	int MaxY = buf->Height;
     
-    MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
+    MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
     
 	for (u32 DestY = MinY; DestY < MaxY; DestY++) {
 		for (u32 DestX = MinX; DestX < MaxX; DestX++) {
@@ -96,10 +96,10 @@ void RenderRGBA2BGRASSE(bmp_info* buf, rc2 clipRect) {
 	__m128 mmOneOver255 = _mm_set1_ps(1.0f / 255.0f);
     
     
-	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
     
 	__m128i mmMaxX = _mm_set1_epi32(MaxX);
 	__m128 mmMaxXF = _mm_cvtepi32_ps(mmMaxX);
@@ -156,10 +156,10 @@ void RenderClear(bmp_info* buf, v3 Color, rc2 clipRect) {
 	int MinY = 0;
 	int MaxY = buf->Height;
     
-	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
     
 	for (u32 DestY = MinY; DestY < MaxY; DestY++) {
 		for (u32 DestX = MinX; DestX < MaxX; DestX++) {
@@ -180,10 +180,10 @@ void RenderClearSSE(bmp_info* buf, v3 Color, rc2 clipRect) {
 	int MinY = 0;
 	int MaxY = buf->Height;
     
-	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
     
 	__m128i mmMaxX = _mm_set1_epi32(MaxX);
 	__m128 mmMaxXF = _mm_cvtepi32_ps(mmMaxX);
@@ -236,7 +236,7 @@ void RenderClearSSE(bmp_info* buf, v3 Color, rc2 clipRect) {
 
 void RenderGradientHorz(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect){
 	
-    v2 P = rect.min;
+    v2 P = rect.Min;
     v2 Dim = GetRectDim(rect);
     
     int InitX = floorf(P.x);
@@ -259,10 +259,10 @@ void RenderGradientHorz(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipR
 	MinY = Clamp(MinY, 0, buf->Height);
 	MaxY = Clamp(MaxY, 0, buf->Height);
     
-	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
     
 	float OneOverWidth = 1.0f / (float)SaveDimX;
 	float OneOverHeight = 1.0f / (float)SaveDimY;
@@ -289,7 +289,7 @@ void RenderGradientHorz(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipR
 }
 
 void RenderGradientHorzSSE(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect) {
-    v2 P = rect.min;
+    v2 P = rect.Min;
     v2 Dim = GetRectDim(rect);
     
     int InitX = floorf(P.x);
@@ -312,10 +312,10 @@ void RenderGradientHorzSSE(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 cl
 	MinY = Clamp(MinY, 0, buf->Height);
 	MaxY = Clamp(MaxY, 0, buf->Height);
     
-	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
     
     __m128i mmMinX = _mm_set1_epi32(MinX);
     __m128i mmMinY = _mm_set1_epi32(MinY);
@@ -382,7 +382,7 @@ void RenderGradientHorzSSE(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 cl
 
 void RenderGradientVert(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect){
 	
-    v2 P = rect.min;
+    v2 P = rect.Min;
     v2 Dim = GetRectDim(rect);
     
     int InitX = floorf(P.x);
@@ -405,10 +405,10 @@ void RenderGradientVert(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipR
 	MinY = Clamp(MinY, 0, buf->Height);
 	MaxY = Clamp(MaxY, 0, buf->Height);
     
-	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
     
     
 	float OneOverWidth = 1.0f / (float)SaveDimX;
@@ -434,7 +434,7 @@ void RenderGradientVert(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipR
 }
 
 void RenderGradientVertSSE(bmp_info* buf, rc2 rect, v3 color1, v3 color2, rc2 clipRect) {
-    v2 P = rect.min;
+    v2 P = rect.Min;
     v2 Dim = GetRectDim(rect);
     
     int InitX = floorf(P.x);
@@ -457,10 +457,10 @@ void RenderGradientVertSSE(bmp_info* buf, rc2 rect, v3 color1, v3 color2, rc2 cl
 	MinY = Clamp(MinY, 0, buf->Height);
 	MaxY = Clamp(MaxY, 0, buf->Height);
     
-	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
     
     __m128i mmMinX = _mm_set1_epi32(MinX);
     __m128i mmMinY = _mm_set1_epi32(MinY);
@@ -586,10 +586,10 @@ rc2 clipRect)
 	MinY = Clamp(MinY, 0, buf->Height);
 	MaxY = Clamp(MaxY, 0, buf->Height);
     
-	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
     
 	__m128i mmMaxX = _mm_set1_epi32(MaxX);
 	__m128 mmMaxXF = _mm_cvtepi32_ps(mmMaxX);
@@ -796,10 +796,10 @@ rc2 clipRect)
 	MinY = Clamp(MinY, 0, buf->Height);
 	MaxY = Clamp(MaxY, 0, buf->Height);
     
-	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
     
 	float SourceWidth = bitmap->Width;
 	float SourceHeight = bitmap->Height;
@@ -911,10 +911,10 @@ rc2 clipRect)
 	MinY = Clamp(MinY, 0, buf->Height);
 	MaxY = Clamp(MaxY, 0, buf->Height);
     
-	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
     
 	/*Clamping incoming color*/
 	modulationColor01.r = Clamp01(modulationColor01.r);
@@ -971,10 +971,10 @@ rc2 clipRect)
 	MinY = Clamp(MinY, 0, buf->Height);
 	MaxY = Clamp(MaxY, 0, buf->Height);
     
-	MinX = Clamp(MinX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MinY = Clamp(MinY, (int)clipRect.min.y, (int)clipRect.max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.min.x, (int)clipRect.max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.min.y, (int)clipRect.max.y);
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
     
 	__m128 mmOne = _mm_set1_ps(1.0f);
 	__m128 mmZero = _mm_set1_ps(0.0f);
@@ -994,7 +994,7 @@ rc2 clipRect)
 	mmModColor_b = _mm_min_ps(_mm_max_ps(mmModColor_b, mmZero), mmOne);
 	mmModColor_a = _mm_min_ps(_mm_max_ps(mmModColor_a, mmZero), mmOne);
     
-	/*Premultiplying incoming color with it alpha*/
+	/*Premultiplying incomig color with it alpha*/
 	mmModColor_r = _mm_mul_ps(_mm_mul_ps(mmModColor_r, mmModColor_a), mm255);
 	mmModColor_g = _mm_mul_ps(_mm_mul_ps(mmModColor_g, mmModColor_a), mm255);
 	mmModColor_b = _mm_mul_ps(_mm_mul_ps(mmModColor_b, mmModColor_a), mm255);

@@ -273,6 +273,7 @@ struct input_state{
     
     b32 CapturingMouse;
     b32 NotFirstFrame;
+    b32 QuitRequested;
     
     char FrameInput[32];
     int FrameInputLen;
@@ -426,10 +427,10 @@ inline b32 MouseInRect(input_state* input, rc2 rect) {
     b32 res = 0;
     
     res =
-        (input->MouseP.x >= rect.min.x) &&
-        (input->MouseP.y >= rect.min.y) &&
-        (input->MouseP.x <= rect.max.x) &&
-        (input->MouseP.y <= rect.max.y);
+        (input->MouseP.x >= rect.Min.x) &&
+        (input->MouseP.y >= rect.Min.y) &&
+        (input->MouseP.x <= rect.Max.x) &&
+        (input->MouseP.y <= rect.Max.y);
     
     return(res);
 }
@@ -438,8 +439,8 @@ inline b32 MouseInRect(input_state* input, v2 P, v2 Dim) {
     b32 res = 0;
     
     rc2 rect;
-    rect.min = P;
-    rect.max = P + Dim;
+    rect.Min = P;
+    rect.Max = P + Dim;
     
     res = MouseInRect(input, rect);
     
@@ -471,7 +472,6 @@ inline b32 MouseRightWentDownInRect(input_state* input, rc2 rect) {
 }
 
 void InitInput(input_state* Input);
-void InputUpdate(input_state* Input);
 
 v3 GetMoveVector(input_state* Input, int ControllerIndex);
 

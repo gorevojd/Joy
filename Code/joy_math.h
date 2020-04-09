@@ -34,16 +34,16 @@ struct Euler_Angles{
 };
 
 //NOTE(dima): Structures
-typedef union v2 {
+union v2 {
 	struct {
 		float x;
 		float y;
 	};
     
 	float e[2];
-} v2;
+};
 
-typedef union v3 {
+union v3 {
 	struct {
 		union{
             struct{
@@ -68,9 +68,9 @@ typedef union v3 {
 	};
     
 	float e[3];
-} v3;
+};
 
-typedef union v4 {
+union v4 {
 	struct {
 		union {
 			struct {
@@ -114,29 +114,34 @@ typedef union v4 {
 	};
     
 	float e[4];
-} v4;
+};
 
-typedef struct rc2{
-    v2 min;
-    v2 max;
-} rc2;
+struct rc2{
+    v2 Min;
+    v2 Max;
+};
 
-typedef union m33 {
+struct rc3{
+    v3 Min;
+    v3 Max;
+};
+
+union m33 {
     float e[9];
     float e2[3][3];
     v3 Rows[3];
-} m33;
+};
 
-typedef union m44 {
+union m44 {
 	float e[16];
     float e2[4][4];
 	v4 Rows[4];
 #if JOY_ENABLE_SIMD_MATH
     __m128 mmRows[4];
 #endif
-} m44;
+};
 
-typedef union quat {
+union quat {
 	struct {
 		struct {
 			union {
@@ -152,7 +157,7 @@ typedef union quat {
 	};
     
 	v4 xyzw;
-} quat;
+};
 
 //NOTE(dima): Helper functions
 inline float CopySign(float Val1, float Val2){
@@ -679,11 +684,21 @@ inline float Magnitude(v3 A) { return(Sqrt(Dot(A, A))); }
 inline float Magnitude(v4 A) { return(Sqrt(Dot(A, A))); }
 inline float Magnitude(quat A) { return(Sqrt(Dot(A, A))); }
 
+inline float Length(v2 A) { return(Sqrt(Dot(A, A))); }
+inline float Length(v3 A) { return(Sqrt(Dot(A, A))); }
+inline float Length(v4 A) { return(Sqrt(Dot(A, A))); }
+inline float Length(quat A) { return(Sqrt(Dot(A, A))); }
+
 /*Squared magnitude*/
 inline float SqMagnitude(v2 A) { return(Dot(A, A)); }
 inline float SqMagnitude(v3 A) { return(Dot(A, A)); }
 inline float SqMagnitude(v4 A) { return(Dot(A, A)); }
 inline float SqMagnitude(quat A) { return(Dot(A, A)); }
+
+inline float LengthSq(v2 A) { return(Sqrt(Dot(A, A))); }
+inline float LengthSq(v3 A) { return(Sqrt(Dot(A, A))); }
+inline float LengthSq(v4 A) { return(Sqrt(Dot(A, A))); }
+inline float LengthSq(quat A) { return(Sqrt(Dot(A, A))); }
 
 /*v2 operator overloading*/
 inline v2 operator+(v2 A) { return(A); }
@@ -1136,7 +1151,6 @@ inline m44 RotationMatrix(quat Q){
 }
 
 
-#if 0
 inline v3 GetQuatLeft(quat Q){
     
     float x2 = Q.x * Q.x;
@@ -1163,6 +1177,7 @@ inline v3 GetQuatUp(quat Q){
     float y2 = Q.y * Q.y;
     float z2 = Q.z * Q.z;
     
+    float xy = Q.x * Q.y;
     float zw = Q.z * Q.w;
     float xz = Q.x * Q.z;
     float yw = Q.y * Q.w;
@@ -1198,7 +1213,6 @@ inline v3 GetQuatFront(quat Q){
     
     return(Result);
 }
-#endif
 
 inline quat QuatFrom2DArray(float A[3][3]){
     quat res;
@@ -1396,59 +1410,91 @@ inline Complex_Num operator*(Complex_Num a, float s) {
 inline rc2 RcMinMax(v2 Min, v2 Max){
     rc2 res;
     
-    res.min = Min;
-    res.max = Max;
+    res.Min = Min;
+    res.Max = Max;
     
     return(res);
+}
+
+inline rc3 RcMinMax(v3 Min, v3 Max){
+    rc3 Result;
+    
+    Result.Min = Min;
+    Result.Max = Max;
+    
+    return(Result);
 }
 
 inline rc2 RcMinDim(v2 Min, v2 Dim){
     rc2 res;
     
-    res.min = Min;
-    res.max = Min + Dim;
+    res.Min = Min;
+    res.Max = Min + Dim;
     
     return(res);
+}
+
+inline rc3 RcMinDim(v3 Min, v3 Dim){
+    rc3 Result;
+    
+    Result.Min = Min;
+    Result.Max = Min + Dim;
+    
+    return(Result);
 }
 
 inline v2 GetRectDim(rc2 A){
-    v2 res = V2(abs(A.max.x - A.min.x),
-                abs(A.max.y - A.min.y));
+    v2 res = V2(abs(A.Max.x - A.Min.x),
+                abs(A.Max.y - A.Min.y));
     
     return(res);
 }
 
+inline v3 GetRectDim(rc3 A){
+    v3 Result = V3(abs(A.Max.x - A.Min.x),
+                   abs(A.Max.y - A.Min.y),
+                   abs(A.Max.z - A.Min.z));
+    
+    return(Result);
+}
+
 inline float GetRectWidth(rc2 A){
-    float res = A.max.x - A.min.x;
+    float res = A.Max.x - A.Min.x;
     
     return(res);
 }
 
 inline float GetRectHeight(rc2 A){
-    float res = A.max.y - A.min.y;
+    float res = A.Max.y - A.Min.y;
     
     return(res);
 }
 
 inline v2 GetRectCenter(rc2 A){
-    v2 res = A.min + GetRectDim(A) * 0.5f;
+    v2 res = A.Min + GetRectDim(A) * 0.5f;
     
     return(res);
 }
 
+inline v3 GetRectCenter(rc3 A){
+    v3 Result = A.Min + GetRectDim(A) * 0.5f;
+    
+    return(Result);
+}
+
 inline v2 ClampInRect(v2 P, rc2 A){
     v2 res;
-    res.x = Clamp(P.x, A.min.x, A.max.x);
-    res.y = Clamp(P.y, A.min.y, A.max.y);
+    res.x = Clamp(P.x, A.Min.x, A.Max.x);
+    res.y = Clamp(P.y, A.Min.y, A.Max.y);
     return(res);
 }
 
 inline rc2 GetBoundingRect(rc2 A, rc2 B){
     rc2 res;
-    res.min.x = JOY_MATH_MIN(A.min.x, B.min.x);
-    res.min.y = JOY_MATH_MIN(A.min.y, B.min.y);
-    res.max.x = JOY_MATH_MAX(A.max.x, B.max.x);
-    res.max.y = JOY_MATH_MAX(A.max.y, B.max.y);
+    res.Min.x = JOY_MATH_MIN(A.Min.x, B.Min.x);
+    res.Min.y = JOY_MATH_MIN(A.Min.y, B.Min.y);
+    res.Max.x = JOY_MATH_MAX(A.Max.x, B.Max.x);
+    res.Max.y = JOY_MATH_MAX(A.Max.y, B.Max.y);
     return(res);
 }
 
@@ -1457,10 +1503,10 @@ inline rc2 GrowRectByScale(rc2 A, v2 Scale){
     v2 NewDim;
     NewDim.x = RectDim.x * Scale.x;
     NewDim.y = RectDim.y * Scale.y;
-    v2 Center = A.min + RectDim * 0.5f;
+    v2 Center = A.Min + RectDim * 0.5f;
     rc2 res;
-    res.min = Center - NewDim * 0.5f;
-    res.max = res.min + NewDim;
+    res.Min = Center - NewDim * 0.5f;
+    res.Max = res.Min + NewDim;
     return(res);
 }
 
@@ -1468,27 +1514,27 @@ inline rc2 GrowRectByScaledValue(rc2 A, v2 Value, float Scale){
     rc2 res;
     
     v2 ValueScaled = Value * Scale;
-    res.min.x = A.min.x - ValueScaled.x;
-    res.min.y = A.min.y - ValueScaled.y;
-    res.max.x = A.max.x + ValueScaled.x;
-    res.max.y = A.max.y + ValueScaled.y;
+    res.Min.x = A.Min.x - ValueScaled.x;
+    res.Min.y = A.Min.y - ValueScaled.y;
+    res.Max.x = A.Max.x + ValueScaled.x;
+    res.Max.y = A.Max.y + ValueScaled.y;
     
     return(res);
 }
 
 inline rc2 GrowRectByPixels(rc2 A, int PixelsCount){
     rc2 res = A;
-    res.min -= V2(PixelsCount, PixelsCount);
-    res.max += V2(PixelsCount, PixelsCount);
+    res.Min -= V2(PixelsCount, PixelsCount);
+    res.Max += V2(PixelsCount, PixelsCount);
     return(res);
 }
 
 #define JOY_MATH_RCNORMSUBPX_VAL(v) v = (int)(v + 0.5f);
 inline rc2 RectNormalizeSubpixel(rc2 A){
-    JOY_MATH_RCNORMSUBPX_VAL(A.min.x);
-    JOY_MATH_RCNORMSUBPX_VAL(A.min.y);
-    JOY_MATH_RCNORMSUBPX_VAL(A.max.x);
-    JOY_MATH_RCNORMSUBPX_VAL(A.max.y);
+    JOY_MATH_RCNORMSUBPX_VAL(A.Min.x);
+    JOY_MATH_RCNORMSUBPX_VAL(A.Min.y);
+    JOY_MATH_RCNORMSUBPX_VAL(A.Max.x);
+    JOY_MATH_RCNORMSUBPX_VAL(A.Max.y);
     
     return(A);
 }
@@ -1497,8 +1543,8 @@ inline int BoxIntersectsWithBox(rc2 Box1, rc2 Box2) {
     v2 Box1Dim = GetRectDim(Box1);
     v2 Box2Dim = GetRectDim(Box2);
     
-    float DistBetweenCentersX = abs((Box1.min.x - Box2.min.x) * 2.0f + (Box1Dim.x - Box2Dim.x));
-    float DistBetweenCentersY = abs((Box1.min.y - Box2.min.y) * 2.0f + (Box1Dim.y - Box2Dim.y));
+    float DistBetweenCentersX = abs((Box1.Min.x - Box2.Min.x) * 2.0f + (Box1Dim.x - Box2Dim.x));
+    float DistBetweenCentersY = abs((Box1.Min.y - Box2.Min.y) * 2.0f + (Box1Dim.y - Box2Dim.y));
     
     int IntersectionHappens =
         ((DistBetweenCentersX < Box1Dim.x + Box2Dim.x) &&
@@ -1537,10 +1583,10 @@ inline rc2 BottomLeftToTopLeftRectange(rc2 Rect, float ScreenHeight)
 {
     rc2 Result = {};
     
-    Result.min.x = Rect.min.x;
-    Result.max.x = Rect.max.x;
-    Result.min.y = ScreenHeight - Rect.max.y;
-    Result.max.y = ScreenHeight - Rect.min.y;
+    Result.Min.x = Rect.Min.x;
+    Result.Max.x = Rect.Max.x;
+    Result.Min.y = ScreenHeight - Rect.Max.y;
+    Result.Max.y = ScreenHeight - Rect.Min.y;
     
     return(Result);
 }

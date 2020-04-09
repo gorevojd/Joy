@@ -214,6 +214,10 @@ model_info* LoadModel(assets* Assets,
                       u32 ModelID,
                       b32 Immediate);
 
+skeleton_info* LoadSkeleton(assets* Assets,
+                            u32 SkeletonID,
+                            b32 Immediate);
+
 animation_clip* LoadAnimationClip(assets* Assets,
                                   u32 AnimID,
                                   b32 Immediate);

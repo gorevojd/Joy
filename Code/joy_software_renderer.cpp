@@ -179,8 +179,8 @@ void RenderMultithreaded(platform_job_queue* queue, render_stack* stack, bmp_inf
             shouldExit = 1;
         }
         
-        rect.min = V2(0.0f, curH);
-        rect.max = V2(buf->Width, maxH);
+        rect.Min = V2(0.0f, curH);
+        rect.Max = V2(buf->Width, maxH);
         
         Render_Queue_Work_Data* workData = &works[i];
         workData->buf = buf;
@@ -223,8 +223,8 @@ void RenderMultithreadedRGBA2BGRA(platform_job_queue* queue, bmp_info* buf) {
             shouldExit = 1;
         }
         
-        rect.min = V2(0.0f, currentH);
-        rect.max = V2(buf->Width, maxH);
+        rect.Min = V2(0.0f, currentH);
+        rect.Max = V2(buf->Width, maxH);
         
         Render_Queue_rgba2bgra_Work* workData = &works[i];
         workData->buf = buf;

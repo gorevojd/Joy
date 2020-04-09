@@ -14,8 +14,13 @@ struct playing_animation{
     b32 IsLooping;
 };
 
-void AnimateModel(assets* Assets,
-                  model_info* Model, 
-                  f64 CurrentTime);
+void UpdateModelAnimation(assets* Assets,
+                          model_info* Model, 
+                          animation_clip* Animation,
+                          f64 CurrentTime);
+
+int UpdateModelBoneTransforms(model_info* Model, 
+                              skeleton_info* Skeleton,
+                              m44* BoneTransformMatrices);
 
 #endif

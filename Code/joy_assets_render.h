@@ -80,15 +80,11 @@ inline model_info* PushModel(assets* Assets,
 {
     m44 ModelToWorld = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
     
-    for(int SkIndex = 0;
-        SkIndex < Model->SkeletonCount;
-        SkIndex++)
+    if(Model->HasSkeleton)
     {
-        asset_id SkeletonID = Model->SkeletonIDs[SkIndex];
-        
         skeleton_info* Skeleton = LOAD_ASSET(skeleton_info, 
                                              AssetType_Skeleton,
-                                             Assets, SkeletonID,
+                                             Assets, Model->SkeletonID,
                                              ASSET_IMPORT_DEFERRED);
         
         if(Skeleton){

@@ -647,6 +647,34 @@ b32 CalculateTangents)
             
             int WalkCount = CurWeights->Weights.size();
             
+#if 0            
+            // NOTE(Dima): Calculating squared sums
+            float SumOfSquaredWeights = 0.0f;
+            for(int WeitEntryIndex = 0;
+                WeitEntryIndex < WalkCount;
+                WeitEntryIndex++)
+            {
+                vertex_weight* CurWeit = &CurWeights->Weights[WeitEntryIndex];
+                
+                SumOfSquaredWeights += CurWeit->Weight * CurWeit->Weight;
+            }
+            
+            // NOTE(Dima): Actual normalizing
+            float OneOverNorm = 1.0f / Sqrt(SumOfSquaredWeights);
+            CurWeights->SumOfSquaredWeights = 0;
+            
+            for(int WeitEntryIndex = 0;
+                WeitEntryIndex < WalkCount;
+                WeitEntryIndex++)
+            {
+                vertex_weight* CurWeit = &CurWeights->Weights[WeitEntryIndex];
+                
+                CurWeit->Weight *= OneOverNorm;
+                CurWeights->SumOfSquaredWeights += (CurWeit->Weight * CurWeit->Weight);
+            }
+#endif
+            
+            
             if(WalkCount > MAX_WEIGHTS_PER_VERTEX){
                 // NOTE(Dima): Pick greatest 4 weights and put them in first 4 elements(unordered)
                 // NOTE(Dima): Simple selection sort
@@ -663,36 +691,11 @@ b32 CalculateTangents)
                     }
                     
                     if(CurWeights->Weights[MaxIndex].Weight > CurWeights->Weights[i].Weight){
-                        std::swap(CurWeights->Weights[MaxIndex].Weight, CurWeights->Weights[i].Weight);
+                        std::swap(CurWeights->Weights[MaxIndex], CurWeights->Weights[i]);
                     }
                 }
                 
                 WalkCount = MAX_WEIGHTS_PER_VERTEX;
-            }
-            
-            // NOTE(Dima): Calculating squared sums
-            float SumOfSquaredWeights = 0.0f;
-            for(int WeitEntryIndex = 0;
-                WeitEntryIndex < WalkCount;
-                WeitEntryIndex++)
-            {
-                vertex_weight* CurWeit = &CurWeights->Weights[WeitEntryIndex];
-                
-                SumOfSquaredWeights += CurWeit->Weight * CurWeit->Weight;;
-            }
-            
-            // NOTE(Dima): Actual normalizing
-            float OneOverNorm = 1.0f / Sqrt(SumOfSquaredWeights);
-            CurWeights->SumOfSquaredWeights = 0;
-            
-            for(int WeitEntryIndex = 0;
-                WeitEntryIndex < WalkCount;
-                WeitEntryIndex++)
-            {
-                vertex_weight* CurWeit = &CurWeights->Weights[WeitEntryIndex];
-                
-                CurWeit->Weight *= OneOverNorm;
-                CurWeights->SumOfSquaredWeights += (CurWeit->Weight * CurWeit->Weight);
             }
             
             // NOTE(Dima): Setting resulted values
@@ -700,7 +703,7 @@ b32 CalculateTangents)
             v4 ResultWeights = V4(0.0f, 0.0f, 0.0f, 0.0f);
             
             for(int WeightIndex = 0;
-                WeightIndex < MAX_WEIGHTS_PER_VERTEX;
+                WeightIndex < WalkCount;
                 WeightIndex++)
             {
                 vertex_weight W = CurWeights->Weights[WeightIndex];
@@ -1526,7 +1529,7 @@ float* GaussianBox)
                 v4 FromColor = UnpackRGBA(*FromPix);
                 
                 v4 resColor = FromColor;
-                if (resColor.a < 0.15f) {
+                if (resColor.a < 0.05f) {
                     resColor.a = 0.0f;
                 }
                 else{

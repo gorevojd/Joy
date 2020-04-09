@@ -436,14 +436,6 @@ assets* Assets)
     CopyStrings(Gui->rootLayout.Name, "RootLayout");
     Gui->rootLayout.ID = StringHashFNV(Gui->rootLayout.Name);
     
-    // NOTE(Dima): Init dim stack
-    for(int dimIndex = 0; dimIndex < ARRAY_COUNT(Gui->dimStack); dimIndex++){
-        Gui->dimStack[dimIndex] = {};
-    }
-    Gui->dimStackIndex = 0;
-    Gui->inPushBlock = 0;
-    
-    
     // NOTE(Dima): Init pages
     Gui->pageCount = 1;
     Gui->rootPage = {};
@@ -489,13 +481,14 @@ assets* Assets)
     Gui->colors[GuiColor_Hot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
     Gui->colors[GuiColor_Active] = GUI_GETCOLOR_COLSYS(Color_Red);
     
-    Gui->colors[GuiColor_ButtonBackground] = GUI_GETCOLOR_COLSYS(Color_PrettyBlue);
-    Gui->colors[GuiColor_ButtonBackgroundHot] = GUI_GETCOLOR_COLSYS(Color_Cyan);
+    Gui->colors[GuiColor_ButtonBackground] = GUI_GETCOLOR_COLSYS(ColorExt_DarkGreen);
+    Gui->colors[GuiColor_ButtonBackgroundHot] = GUI_GETCOLOR_COLSYS(Color_Blue);
     Gui->colors[GuiColor_ButtonForeground] = GUI_GETCOLOR_COLSYS(Color_White);
     Gui->colors[GuiColor_ButtonForegroundHot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
     Gui->colors[GuiColor_ButtonForegroundDisabled] = Gui->colors[GuiColor_ButtonForeground] * 0.75f;
-    Gui->colors[GuiColor_ButtonGrad1] = GUI_GETCOLOR_COLSYS(Color_PrettyBlue);
-    Gui->colors[GuiColor_ButtonGrad2] = GUI_GETCOLOR_COLSYS(Color_Blue);
+    Gui->colors[GuiColor_ButtonGrad1] = GUI_GETCOLOR_COLSYS(ColorExt_DarkGreen);
+    Gui->colors[GuiColor_ButtonGrad2] = GUI_GETCOLOR_COLSYS(ColorExt_DarkGreen);
+    Gui->colors[GuiColor_SliderValue] = GUI_GETCOLOR_COLSYS(Color_DarkMagenta);
     
     Gui->windowAlpha = 0.85f;
     Gui->colors[GuiColor_WindowBackground] = V4(0.0f, 0.0f, 0.0f, Gui->windowAlpha);
@@ -553,7 +546,8 @@ rc2 PrintTextInternal(font_info* Font,
                     
                 }
                 
-                curP.x += ((float)Glyph->Advance * Scale);
+                //curP.x += ((float)Glyph->Advance * Scale);
+                curP.x += ((float)(Glyph->Advance - 0.5f) * Scale);
             }
             
         }
@@ -570,10 +564,10 @@ rc2 PrintTextInternal(font_info* Font,
         }
     }
     
-    txtRc.min.x = p.x;
-    txtRc.min.y = p.y - Font->AscenderHeight * Scale;
-    txtRc.max.x = curP.x;
-    txtRc.max.y = curP.y - Font->DescenderHeight * Scale;
+    txtRc.Min.x = p.x;
+    txtRc.Min.y = p.y - Font->AscenderHeight * Scale;
+    txtRc.Max.x = curP.x;
+    txtRc.Max.y = curP.y - Font->DescenderHeight * Scale;
     
     return(txtRc);
 }
@@ -607,7 +601,7 @@ inline v2 GetCenteredTextOffset(font_info* font, float TextDimX, rc2 Rect, float
     float LineDimY = GetLineAdvance(font, Scale);
     float LineDelta = (font->AscenderHeight + font->LineGap) * Scale - LineDimY * 0.5f;
     
-    v2 CenterRc = Rect.min + GetRectDim(Rect) * 0.5f;
+    v2 CenterRc = Rect.Min + GetRectDim(Rect) * 0.5f;
     
     v2 TargetP = V2(CenterRc.x - TextDimX * 0.5f, CenterRc.y + LineDelta);
     return(TargetP);
@@ -730,8 +724,8 @@ struct GuiSnapInWindowResult{
 GuiSnapInWindowResult GuiSnapInWindowRect(rc2 WindowRect, u32 SnapType){
     GuiSnapInWindowResult result;
     
-    v2 Min = WindowRect.min;
-    v2 Max = WindowRect.max;
+    v2 Min = WindowRect.Min;
+    v2 Max = WindowRect.Max;
     
     v2 WindowDim = GetRectDim(WindowRect);
     v2 WindowHalfDim = WindowDim * 0.5f;
@@ -782,7 +776,7 @@ inline void GuiSnapInWindowRect(gui_state* Gui, v2* P, v2* Dim, u32 SnapType){
     rc2 WindowRc = RcMinDim(V2(0.0f, 0.0f), V2(Gui->Width, Gui->Height));
     GuiSnapInWindowResult Res = GuiSnapInWindowRect(WindowRc, SnapType);
     
-    v2 ResultP = Res.result.min;
+    v2 ResultP = Res.result.Min;
     v2 ResultDim = GetRectDim(Res.result);
     
     if(P){
@@ -794,15 +788,29 @@ inline void GuiSnapInWindowRect(gui_state* Gui, v2* P, v2* Dim, u32 SnapType){
     }
 }
 
-INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 layoutType, gui_element* LayoutElem){
+inline void GuiGrowWindowRect(v2* P, v2* Dim, int PixelsGrow){
+    rc2 CurRc = RcMinDim(*P, *Dim);
+    
+    rc2 NewRc = GrowRectByPixels(CurRc, PixelsGrow);
+    v2 NewDim = GetRectDim(NewRc);
+    
+    NewDim.x = Max(NewDim.x, 40.0f);
+    NewDim.y = Max(NewDim.y, 40.0f);
+    
+    *P = NewRc.Min;
+    *Dim = NewDim;
+}
+
+INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, 
+                                     Gui_Layout* layout, 
+                                     u32 layoutType, 
+                                     gui_element* LayoutElem)
+{
     // NOTE(Dima): initializing references
     LayoutElem->Data.Layout.ref = layout;
     layout->Elem = LayoutElem;
     
-    v2 popDim;
-    if(!GuiPopDim(Gui, &popDim)){
-        popDim = V2(640, 480);
-    }
+    v2 popDim = V2(640, 480);
     
     // NOTE(Dima): Layout initializing
     layout->Type = layoutType;
@@ -864,7 +872,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
         
         PushRect(Gui->Stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
         
-        v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
+        v4 outlineColor = GUI_GETCOLOR_COLSYS(Color_White);
         if(MouseInInteractiveArea(Gui, windowRc)){
             GuiSetHot(Gui, &Interaction, true);
             if(GuiIsHot(Gui, &Interaction)){
@@ -908,6 +916,14 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, Gui_Layout* layout, u32 lay
             
             if(KeyWentDown(Gui->Input, MouseKey_Right)){
                 GuiSnapInWindowRect(Gui, &layout->Start, &layout->Dim, GuiWindowSnap_CenterHalf);
+            }
+            
+            if(KeyWentDown(Gui->Input, Key_Add)){
+                GuiGrowWindowRect(&layout->Start, &layout->Dim, 20);
+            }
+            
+            if(KeyWentDown(Gui->Input, Key_Subtract)){
+                GuiGrowWindowRect(&layout->Start, &layout->Dim, -20);
             }
         }
         
@@ -1003,7 +1019,7 @@ INTERNAL_FUNCTION void GuiSplitWindow(gui_state* Gui,
 
 INTERNAL_FUNCTION void GuiUpdateWindow(gui_state* Gui, Gui_Window* window){
     
-    window->layout.Start = window->rect.min;
+    window->layout.Start = window->rect.Min;
     
     if(window->visible){
         
@@ -1020,7 +1036,7 @@ INTERNAL_FUNCTION void GuiUpdateWindow(gui_state* Gui, Gui_Window* window){
                 // NOTE(Dima): Processing snapping
                 v2 windowDim = GetRectDim(windowRc);
                 v2 windowHalfDim = windowDim * 0.5f;
-                v2 windowCenter = windowRc.min + windowHalfDim;
+                v2 windowCenter = windowRc.Min + windowHalfDim;
                 
                 v2 MouseP = Gui->Input->MouseP;
                 MouseP = ClampInRect(MouseP, windowRc);
@@ -1032,30 +1048,30 @@ INTERNAL_FUNCTION void GuiUpdateWindow(gui_state* Gui, Gui_Window* window){
                 absDiff.x = Abs(absDiff.x);
                 absDiff.y = Abs(absDiff.y);
                 
-                float maxAbsDiff = 0.35f;
+                float MaxAbsDiff = 0.35f;
                 u32 snapType = GuiWindowSnap_Whole;
                 if(diffRelative.x < 0){
-                    if(absDiff.x > maxAbsDiff){
-                        maxAbsDiff = absDiff.x;
+                    if(absDiff.x > MaxAbsDiff){
+                        MaxAbsDiff = absDiff.x;
                         snapType = GuiWindowSnap_Left;
                     }
                 }
                 else{
-                    if(absDiff.x > maxAbsDiff){
-                        maxAbsDiff = absDiff.x;
+                    if(absDiff.x > MaxAbsDiff){
+                        MaxAbsDiff = absDiff.x;
                         snapType = GuiWindowSnap_Right;
                     }
                 }
                 
                 if(diffRelative.y < 0){
-                    if(absDiff.y > maxAbsDiff){
-                        maxAbsDiff = absDiff.y;
+                    if(absDiff.y > MaxAbsDiff){
+                        MaxAbsDiff = absDiff.y;
                         snapType = GuiWindowSnap_Top;
                     }
                 }
                 else{
-                    if(absDiff.y > maxAbsDiff){
-                        maxAbsDiff = absDiff.y;
+                    if(absDiff.y > MaxAbsDiff){
+                        MaxAbsDiff = absDiff.y;
                         snapType = GuiWindowSnap_Bottom;
                     }
                 }
@@ -1105,11 +1121,6 @@ void GuiFrameBegin(gui_state* Gui, gui_frame_info GuiFrameInfo){
     Gui->Stack = Gui->FrameInfo.Stack;
     Gui->Width = Gui->FrameInfo.Width;
     Gui->Height = Gui->FrameInfo.Height;
-    
-    // NOTE(Dima): Init dim stack
-    // NOTE(Dima): Init dim stack
-    Gui->dimStackIndex = 0;
-    Gui->inPushBlock = 0;
     
     // NOTE(Dima): Beginning GUI chunk
     BeginGuiChunk(GuiFrameInfo.Stack, 
@@ -1169,7 +1180,7 @@ void GuiInteract(gui_state* Gui,
                     GuiSetActive(Gui, Interaction);
                     Interaction->WasActiveInInteraction = true;
                     
-                    *OffsetInAnchor = MouseP - AnchorRect.min;
+                    *OffsetInAnchor = MouseP - AnchorRect.Min;
                 }
             }
             else{
@@ -1279,8 +1290,8 @@ inline void GuiPostAdvance(gui_state* Gui, Gui_Layout* layout, rc2 ElementRect){
     
     float RememberValue = ctx->rememberValue;
     
-    float toX = ElementRect.max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f;
-    float toY = ElementRect.max.y + GetLineAdvance(Gui->MainFont, Gui->fontScale) * 0.15f;
+    float toX = ElementRect.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f;
+    float toY = ElementRect.Max.y + GetLineAdvance(Gui->MainFont, Gui->fontScale) * 0.15f;
     
     if(rowStarted){
         layout->At.x = toX;
@@ -1414,7 +1425,8 @@ enum Push_But_Type{
 
 INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui, 
                                   rc2 rect, 
-                                  u32 type = PushBut_DefaultGrad, v4 Color = V4(0.0f, 0.0f, 0.0f, 1.0f),
+                                  u32 type = PushBut_DefaultBack, 
+                                  v4 Color1 = V4(0.0f, 0.0f, 0.0f, 1.0f),
                                   v4 Color2 = V4(0.0f, 0.0f, 0.0f, 1.0f))
 {
     
@@ -1424,12 +1436,12 @@ INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui,
         }break;
         
         case PushBut_Color:{
-            PushRect(Gui->Stack, rect, Color);
+            PushRect(Gui->Stack, rect, Color1);
         }break;
         
         case PushBut_Grad:{
             PushGradient(Gui->Stack, rect, 
-                         Color, Color2, 
+                         Color1, Color2, 
                          RenderEntryGradient_Vertical);
         }break;
         
@@ -1450,12 +1462,12 @@ INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui,
         }break;
         
         case PushBut_Outline:{
-            PushRectOutline(Gui->Stack, rect, 2, Color);
+            PushRectOutline(Gui->Stack, rect, 2, Color1);
         }break;
         
         case PushBut_RectAndOutline:{
             PushRect(Gui->Stack, rect, GUI_GETCOLOR(GuiColor_ButtonBackground));
-            PushRectOutline(Gui->Stack, rect, 1, Color);
+            PushRectOutline(Gui->Stack, rect, 1, Color1);
         }break;
     }
 }
@@ -1563,11 +1575,12 @@ void GuiBeginTree(gui_state* Gui, char* name){
         GuiPreAdvance(Gui, layout);
         
         rc2 textRc = GetTextRect(Gui, name, layout->At);
+        textRc = GetTxtElemRect(Gui, layout, textRc);
         
-        v4 textColor = GUI_GETCOLOR_COLSYS(Color_ToxicGreen);
-        v4 oulineColor = GUI_GETCOLOR_COLSYS(Color_Red);
+        v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
+        v4 oulineColor = GUI_GETCOLOR(GuiColor_Active);
         
-        GuiPushBut(Gui, textRc, PushBut_DefaultGrad, oulineColor);
+        GuiPushBut(Gui, textRc);
         if(elem->Opened){
             GuiPushBut(Gui, textRc, PushBut_Outline, oulineColor);
         }
@@ -1590,7 +1603,8 @@ void GuiBeginTree(gui_state* Gui, char* name){
         else{
             GuiSetHot(Gui, &Interaction, false);
         }
-        PrintText(Gui, name, layout->At, textColor);
+        
+        PrintTextCenteredInRect(Gui, name, textRc, 1.0f, textColor);
         
         GuiPostAdvance(Gui, layout, textRc);
     }
@@ -1615,6 +1629,50 @@ void GuiText(gui_state* Gui, char* text){
     GuiEndElement(Gui, GuiElement_TempItem);
 }
 
+b32 GuiLinkButton(gui_state* Gui, char* buttonName){
+    b32 result = 0;
+    
+    gui_element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, true);
+    Gui_Layout* layout = GetParentLayout(Gui);
+    
+    if(GuiElementOpenedInTree(elem) && 
+       PotentiallyVisibleSmall(layout))
+    {
+        GuiPreAdvance(Gui, layout);
+        
+        // NOTE(Dima): Printing button and text
+        rc2 textRc = GetTextRect(Gui, buttonName, layout->At);
+        
+        // NOTE(Dima): Event processing
+        v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
+        
+        gui_interaction Interaction = CreateInteraction(elem, 
+                                                        GuiInteraction_Empty,
+                                                        GuiPriority_Avg);
+        
+        if(MouseInInteractiveArea(Gui, textRc)){
+            GuiSetHot(Gui, &Interaction, true);
+            textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
+            
+            if(KeyWentDown(Gui->Input, MouseKey_Left)){
+                GuiSetActive(Gui, &Interaction);
+                GuiReleaseInteraction(Gui, &Interaction);
+                result = 1;
+            }
+        }
+        else{
+            GuiSetHot(Gui, &Interaction, false);
+        }
+        
+        PrintTextCenteredInRect(Gui, buttonName, textRc, 1.0f, textColor);
+        
+        GuiPostAdvance(Gui, layout, textRc);
+    }
+    GuiEndElement(Gui, GuiElement_Item);
+    
+    return(result);
+}
+
 b32 GuiButton(gui_state* Gui, char* buttonName){
     b32 result = 0;
     
@@ -1628,7 +1686,7 @@ b32 GuiButton(gui_state* Gui, char* buttonName){
         
         // NOTE(Dima): Printing button and text
         rc2 textRc = GetTextRect(Gui, buttonName, layout->At);
-        textRc = GetTxtElemRect(Gui, layout, textRc, V2(4.0f, 3.0f));
+        textRc = GetTxtElemRect(Gui, layout, textRc);
         GuiPushBut(Gui, textRc);
         
         // NOTE(Dima): Event processing
@@ -1672,7 +1730,7 @@ void GuiBoolButton(gui_state* Gui, char* buttonName, b32* Value){
         
         // NOTE(Dima): Printing button and text
         rc2 textRc = GetTextRect(Gui, buttonName, layout->At);
-        textRc = GetTxtElemRect(Gui, layout, textRc, V2(4.0f, 3.0f));
+        textRc = GetTxtElemRect(Gui, layout, textRc);
         GuiPushBut(Gui, textRc);
         
         v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
@@ -1685,7 +1743,7 @@ void GuiBoolButton(gui_state* Gui, char* buttonName, b32* Value){
             
             
             gui_interaction Interaction = CreateInteraction(elem, 
-                                                            GuiInteraction_Empty,
+                                                            GuiInteraction_BoolInRect,
                                                             GuiPriority_Avg);
             
             gui_interaction_data_bool_in_rect* BoolInRect = &Interaction.Data.BoolInRect;
@@ -1718,13 +1776,13 @@ void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* Value){
         GuiPreAdvance(Gui, layout);
         
         // NOTE(Dima): Button printing
-        rc2 butRc = GetTextRect(Gui, "OFF", layout->At);
-        butRc = GetTxtElemRect(Gui, layout, butRc, V2(4.0f, 3.0f));
-        GuiPushBut(Gui, butRc);
+        rc2 ButRc = GetTextRect(Gui, "OFF", layout->At);
+        ButRc = GetTxtElemRect(Gui, layout, ButRc);
+        GuiPushBut(Gui, ButRc);
         
         // NOTE(Dima): Button name text printing
-        float nameStartY = GetCenteredTextOffsetY(Gui->MainFont, butRc, Gui->fontScale);
-        v2 nameStart = V2(butRc.max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, nameStartY);
+        float nameStartY = GetCenteredTextOffsetY(Gui->MainFont, ButRc, Gui->fontScale);
+        v2 nameStart = V2(ButRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, nameStartY);
         rc2 NameRc = PrintText(Gui, buttonName, nameStart, GUI_GETCOLOR(GuiColor_Text));
         
         // NOTE(Dima): Event processing
@@ -1743,13 +1801,13 @@ void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* Value){
             
             
             gui_interaction Interaction = CreateInteraction(elem, 
-                                                            GuiInteraction_Empty,
+                                                            GuiInteraction_BoolInRect,
                                                             GuiPriority_Avg);
             
             gui_interaction_data_bool_in_rect* BoolInRect = &Interaction.Data.BoolInRect;
             
             BoolInRect->Value = Value;
-            BoolInRect->Rect = NameRc;
+            BoolInRect->Rect = GetBoundingRect(ButRc, NameRc);
             
             GuiInteract(Gui, &Interaction);
             
@@ -1758,9 +1816,9 @@ void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* Value){
             }
         }
         
-        PrintTextCenteredInRect(Gui, buttonText, butRc, 1.0f, buttonTextC);
+        PrintTextCenteredInRect(Gui, buttonText, ButRc, 1.0f, buttonTextC);
         
-        rc2 AdvanceRect = GetBoundingRect(butRc, NameRc);
+        rc2 AdvanceRect = GetBoundingRect(ButRc, NameRc);
         GuiPostAdvance(Gui, layout, AdvanceRect);
     }
     GuiEndElement(Gui, GuiElement_Item);
@@ -1779,16 +1837,16 @@ void GuiCheckbox(gui_state* Gui, char* name, b32* Value){
         // NOTE(Dima): Checkbox rendering
         float chkSize = GetLineAdvance(Gui->MainFont, Gui->fontScale);
         rc2 chkRect;
-        chkRect.min = V2(layout->At.x, layout->At.y - GetScaledAscender(Gui->MainFont, Gui->fontScale));
-        chkRect.max = chkRect.min + V2(chkSize, chkSize);
-        chkRect = GetTxtElemRect(Gui, layout, chkRect, V2(2.0f, 2.0f));
+        chkRect.Min = V2(layout->At.x, layout->At.y - GetScaledAscender(Gui->MainFont, Gui->fontScale));
+        chkRect.Max = chkRect.Min + V2(chkSize, chkSize);
+        chkRect = GetTxtElemRect(Gui, layout, chkRect);
         
         // NOTE(Dima): Event processing
         v4 backC = GUI_GETCOLOR(GuiColor_ButtonBackground);
         if(Value){
             
             gui_interaction Interaction = CreateInteraction(elem, 
-                                                            GuiInteraction_Empty,
+                                                            GuiInteraction_BoolInRect,
                                                             GuiPriority_Avg);
             
             gui_interaction_data_bool_in_rect* BoolInRect = &Interaction.Data.BoolInRect;
@@ -1797,7 +1855,6 @@ void GuiCheckbox(gui_state* Gui, char* name, b32* Value){
             BoolInRect->Rect = chkRect;
             
             GuiInteract(Gui, &Interaction);
-            
             
             if(Interaction.WasHotInInteraction){
                 backC = GUI_GETCOLOR(GuiColor_ButtonBackgroundHot);
@@ -1809,7 +1866,7 @@ void GuiCheckbox(gui_state* Gui, char* name, b32* Value){
         if(*Value){
             PushOrLoadGlyph(Gui->Assets, 
                             Gui->Stack,
-                            chkRect.min, 
+                            chkRect.Min, 
                             GetRectDim(chkRect),
                             Gui->CheckboxMarkID,
                             V4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -1817,7 +1874,7 @@ void GuiCheckbox(gui_state* Gui, char* name, b32* Value){
         
         // NOTE(Dima): Button name text printing
         float nameStartY = GetCenteredTextOffsetY(Gui->MainFont, chkRect, Gui->fontScale);
-        v2 nameStart = V2(chkRect.max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, nameStartY);
+        v2 nameStart = V2(chkRect.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, nameStartY);
         rc2 nameRc = PrintText(Gui, name, nameStart, GUI_GETCOLOR(GuiColor_Text));
         
         rc2 advanceRect = GetBoundingRect(chkRect, nameRc);
@@ -1882,7 +1939,7 @@ void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId) {
         
         // NOTE(Dima): Printing button and text
         rc2 textRc = GetTextRect(Gui, name, layout->At);
-        textRc = GetTxtElemRect(Gui, layout, textRc, V2(4.0f, 3.0f));
+        textRc = GetTxtElemRect(Gui, layout, textRc);
         GuiPushBut(Gui, textRc);
         
         v4 textC;
@@ -1942,8 +1999,8 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
         rc2 SlideRc = GetTextRect(Gui, 
                                   "                ", 
                                   layout->At);
-        SlideRc = GetTxtElemRect(Gui, layout, SlideRc, V2(4.0f, 4.0f));
-        GuiPushBut(Gui, SlideRc, PushBut_Color, V4(0.05f, 0.05f, 0.1f, 1.0f));
+        SlideRc = GetTxtElemRect(Gui, layout, SlideRc);
+        GuiPushBut(Gui, SlideRc);
         
         float SlideRcWidth = GetRectWidth(SlideRc);
         float SlideRcHeight = GetRectHeight(SlideRc);
@@ -1966,7 +2023,7 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
         }
         
         if(GuiIsActive(Gui, &Interaction) && (Style != GuiSlider_ProgressNonModify)){
-            float MousePercentage = Clamp01((Gui->Input->MouseP.x - SlideRc.min.x) / SlideRcWidth);
+            float MousePercentage = Clamp01((Gui->Input->MouseP.x - SlideRc.Min.x) / SlideRcWidth);
             
             float FloatedValue = Min + (float)((Max - Min) * MousePercentage);
             
@@ -1984,21 +2041,21 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
             
             if((Style == GuiSlider_Progress) || (Style == GuiSlider_ProgressNonModify)){
                 rc2 FillRc;
-                FillRc.min = SlideRc.min;
-                FillRc.max = V2(SlideRc.min.x + SlideRcWidth * ValuePercentage, SlideRc.max.y);
+                FillRc.Min = SlideRc.Min;
+                FillRc.Max = V2(SlideRc.Min.x + SlideRcWidth * ValuePercentage, SlideRc.Max.y);
                 
-                GuiPushBut(Gui, FillRc, PushBut_Color, V4(1.0f, 0.3f, 0.1f, 1.0f));
+                GuiPushBut(Gui, FillRc, PushBut_Color, GUI_GETCOLOR(GuiColor_SliderValue));
             }
             else if(Style == GuiSlider_Index){
-                float HotRectCenterX = SlideRc.min.x + SlideRcWidth * ValuePercentage;
+                float HotRectCenterX = SlideRc.Min.x + SlideRcWidth * ValuePercentage;
                 float HotRectDimX = SlideRcHeight;
                 
-                rc2 HotRect = RcMinDim(V2(HotRectCenterX - HotRectDimX * 0.5f, SlideRc.min.y), 
+                rc2 HotRect = RcMinDim(V2(HotRectCenterX - HotRectDimX * 0.5f, SlideRc.Min.y), 
                                        V2(HotRectDimX, HotRectDimX));
                 
                 PushOrLoadGlyph(Gui->Assets,
                                 Gui->Stack,
-                                HotRect.min,
+                                HotRect.Min,
                                 GetRectDim(HotRect),
                                 Gui->ChamomileID,
                                 V4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -2012,7 +2069,7 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
         PrintTextCenteredInRect(Gui, Buf, SlideRc, 1.0f, textC);
         
         float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, SlideRc, Gui->fontScale);
-        v2 NameStart = V2(SlideRc.max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, NameStartY);
+        v2 NameStart = V2(SlideRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, NameStartY);
         
         rc2 NameRc = PrintText(Gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
         
@@ -2035,8 +2092,8 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
         rc2 SlideRc = GetTextRect(Gui, 
                                   "                ", 
                                   layout->At);
-        SlideRc = GetTxtElemRect(Gui, layout, SlideRc, V2(4.0f, 4.0f));
-        GuiPushBut(Gui, SlideRc, PushBut_Color, V4(0.05f, 0.05f, 0.1f, 1.0f));
+        SlideRc = GetTxtElemRect(Gui, layout, SlideRc);
+        GuiPushBut(Gui, SlideRc);
         
         float SlideRcWidth = GetRectWidth(SlideRc);
         float SlideRcHeight = GetRectHeight(SlideRc);
@@ -2059,7 +2116,7 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
         }
         
         if(GuiIsActive(Gui, &Interaction) && (Style != GuiSlider_ProgressNonModify)){
-            float MousePercentage = Clamp01((Gui->Input->MouseP.x - SlideRc.min.x) / SlideRcWidth);
+            float MousePercentage = Clamp01((Gui->Input->MouseP.x - SlideRc.Min.x) / SlideRcWidth);
             *Value = Min + (Max - Min) * MousePercentage;
             
             
@@ -2073,21 +2130,21 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
             
             if((Style == GuiSlider_Progress) || (Style == GuiSlider_ProgressNonModify)){
                 rc2 FillRc;
-                FillRc.min = SlideRc.min;
-                FillRc.max = V2(SlideRc.min.x + SlideRcWidth * ValuePercentage, SlideRc.max.y);
+                FillRc.Min = SlideRc.Min;
+                FillRc.Max = V2(SlideRc.Min.x + SlideRcWidth * ValuePercentage, SlideRc.Max.y);
                 
-                GuiPushBut(Gui, FillRc, PushBut_Color, V4(1.0f, 0.3f, 0.1f, 1.0f));
+                GuiPushBut(Gui, FillRc, PushBut_Color, GUI_GETCOLOR(GuiColor_SliderValue));
             }
             else if(Style == GuiSlider_Index){
-                float HotRectCenterX = SlideRc.min.x + SlideRcWidth * ValuePercentage;
+                float HotRectCenterX = SlideRc.Min.x + SlideRcWidth * ValuePercentage;
                 float HotRectDimX = SlideRcHeight;
                 
-                rc2 HotRect = RcMinDim(V2(HotRectCenterX - HotRectDimX * 0.5f, SlideRc.min.y), 
+                rc2 HotRect = RcMinDim(V2(HotRectCenterX - HotRectDimX * 0.5f, SlideRc.Min.y), 
                                        V2(HotRectDimX, HotRectDimX));
                 
                 PushOrLoadGlyph(Gui->Assets,
                                 Gui->Stack,
-                                HotRect.min,
+                                HotRect.Min,
                                 GetRectDim(HotRect),
                                 Gui->ChamomileID,
                                 V4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -2102,7 +2159,7 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
         PrintTextCenteredInRect(Gui, Buf, SlideRc, 1.0f, textC);
         
         float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, SlideRc, Gui->fontScale);
-        v2 NameStart = V2(SlideRc.max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, NameStartY);
+        v2 NameStart = V2(SlideRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, NameStartY);
         
         rc2 NameRc = PrintText(Gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
         
@@ -2127,7 +2184,7 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
         rc2 textRc = GetTextRect(Gui, 
                                  "                            ", 
                                  layout->At);
-        textRc = GetTxtElemRect(Gui, layout, textRc, V2(4.0f, 6.0f));
+        textRc = GetTxtElemRect(Gui, layout, textRc);
         GuiPushBut(Gui, textRc, PushBut_AlphaBlack);
         
         int* CaretP = &elem->Data.InputText.CaretPos;
@@ -2242,10 +2299,10 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
         float PrintPX;
         float FieldDimX = GetRectDim(textRc).x;
         if(BufTextSize.x < FieldDimX){
-            PrintPX = textRc.min.x;
+            PrintPX = textRc.Min.x;
         }
         else{
-            PrintPX = textRc.max.x - BufTextSize.x;
+            PrintPX = textRc.Max.x - BufTextSize.x;
         }
         float PrintPY = GetCenteredTextOffsetY(Gui->MainFont,
                                                textRc, 
@@ -2262,7 +2319,7 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
         EndGuiChunk(Gui->Stack);
         
         float nameStartY = GetCenteredTextOffsetY(Gui->MainFont, textRc, Gui->fontScale);
-        v2 nameStart = V2(textRc.max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, nameStartY);
+        v2 nameStart = V2(textRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, nameStartY);
         char DebugBuf[256];
         
 #if 1
@@ -2296,8 +2353,8 @@ INTERNAL_FUNCTION inline rc2 GuiGetGridRect(float WeightForThis, gui_element* Pa
     
     rc2 Result = {};
     if(Item->Type == GuiGridItem_Row){
-        float StartX = Item->InternalRect.min.x + ParentDim.x * ThisStartPercentage;
-        float StartY = Item->InternalRect.min.y;
+        float StartX = Item->InternalRect.Min.x + ParentDim.x * ThisStartPercentage;
+        float StartY = Item->InternalRect.Min.y;
         
         v2 Dim = V2(ParentDim.x * ThisAreaPercentage, ParentDim.y);
         Result = RcMinDim(V2(StartX, StartY), Dim);
@@ -2306,8 +2363,8 @@ INTERNAL_FUNCTION inline rc2 GuiGetGridRect(float WeightForThis, gui_element* Pa
             (Item->Type == GuiGridItem_Item) ||
             (Item->Type == GuiGridItem_Grid))
     {
-        float StartX = Item->InternalRect.min.x;
-        float StartY = Item->InternalRect.min.y + ParentDim.y * ThisStartPercentage;
+        float StartX = Item->InternalRect.Min.x;
+        float StartY = Item->InternalRect.Min.y + ParentDim.y * ThisStartPercentage;
         
         v2 Dim = V2(ParentDim.x, ParentDim.y * ThisAreaPercentage);
         Result = RcMinDim(V2(StartX, StartY), Dim);
@@ -2573,6 +2630,9 @@ void GuiTest(gui_state* Gui, float deltaTime){
                   Gui->ActiveInteraction.Priority);
     GuiText(Gui, InterInfo);
     
+    GuiLinkButton(Gui, "LinkButton1");
+    GuiLinkButton(Gui, "LinkButton2");
+    
 #if 0 
     GuiGridHubBegin(Gui);
     GuiGridBegin(Gui, "Grid1");
@@ -2633,7 +2693,6 @@ void GuiTest(gui_state* Gui, float deltaTime){
     
     GuiEndTree(Gui);
     
-    //GuiPushDim(Gui, V2(100, 100));
     GuiBeginLayout(Gui, "layout1", GuiLayout_Window);
     static char InputTextBuf[256];
     GuiInputText(Gui, "Input Text", InputTextBuf, 256);
@@ -2707,7 +2766,6 @@ void GuiTest(gui_state* Gui, float deltaTime){
     GuiBeginTree(Gui, "Some more buts");
     GuiBeginRow(Gui);
     GuiBeginColumn(Gui);
-    GuiPushDim(Gui, V2(100, 40));
     GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
     GuiBoolButtonOnOff(Gui, "BoolButtonOnOff1", &boolButtonValue);
     GuiBoolButtonOnOff(Gui, "BoolButtonOnOff2", &boolButtonValue);

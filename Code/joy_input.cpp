@@ -288,12 +288,6 @@ void InitInput(input_state* Input)
     AddKeyToButtonOnController(Input, 1, Button_Interact, Key_Return);
 }
 
-void InputUpdate(input_state* Input){
-    if(KeyWentDown(Input, Key_Control)){
-        Input->CapturingMouse = !Input->CapturingMouse;
-    }
-}
-
 // NOTE(Dima): If ControllerIndex passed as -1 then all controllers info collected
 v3 GetMoveVector(input_state* Input, int ControllerIndex){
     v3 MoveVector = {};

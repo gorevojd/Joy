@@ -110,22 +110,6 @@ v3* TargetSamples)
     return(Result);
 }
 
-struct test_game_mode_state{
-    game_camera Camera;
-    
-    float CameraSpeed;
-    float MouseSencitivity;
-    
-    v3* SphereDistributionsTrig;
-    v3* SphereDistributionsFib;
-    sphere_distribution SphereDistributionTrig;
-    sphere_distribution SphereDistributionFib;
-    
-    playing_animation PlayingAnim;
-    
-    b32 Initialized;
-};
-
 INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
                                                render_stack* Stack,
                                                sphere_distribution* Distr,
@@ -155,6 +139,73 @@ INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
     }
     
 }
+
+INTERNAL_FUNCTION void UpdateModel(assets* Assets, 
+                                   render_stack* Stack,
+                                   model_info* Model, 
+                                   v3 Pos, quat Rot, v3 Scale, 
+                                   f64 GlobalTime,
+                                   animation_clip* Animation,
+                                   m44* BoneTransformMatrices)
+{
+    asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
+    
+    // NOTE(Dima): Updating animation and node transforms
+    UpdateModelAnimation(Assets, Model, Animation, GlobalTime);
+    
+    // NOTE(Dima): Getting skeleton if it exists
+    skeleton_info* Skeleton = 0;
+    if(Model->HasSkeleton){
+        Skeleton = LoadSkeleton(Assets, Model->SkeletonID, ASSET_IMPORT_DEFERRED);
+    }
+    
+    // NOTE(Dima): Updating skeleton data
+    int BoneCount = UpdateModelBoneTransforms(Model, Skeleton, BoneTransformMatrices);
+    
+    m44 ModelToWorld = ScalingMatrix(Scale) * RotationMatrix(Rot) * TranslationMatrix(Pos);
+    
+    // NOTE(Dima): Pushing to render
+    for(int NodeIndex = 0;
+        NodeIndex < Model->NodeCount;
+        NodeIndex++)
+    {
+        node_info* Node = &Model->Nodes[NodeIndex];
+        
+        // TODO(Dima): Potential bug here
+        m44 NodeTran = Node->CalculatedToModel * ModelToWorld;
+        //m44 NodeTran = ModelToWorld;
+        
+        //PushOrLoadMesh(Assets, Stack, CubeMeshID, ScalingMatrix(V3(0.1f)) * NodeTran);
+        for(int MeshIndex = 0; MeshIndex < Node->MeshCount; MeshIndex++){
+            asset_id MeshID = Node->MeshIDs[MeshIndex];
+            
+            mesh_info* Mesh = LoadMesh(Assets, MeshID, ASSET_IMPORT_DEFERRED);
+            
+            if(Mesh){
+                PushMesh(Stack, Mesh, NodeTran, 
+                         BoneTransformMatrices, BoneCount);
+            }
+        }
+    }
+}
+
+struct test_game_mode_state{
+    game_camera Camera;
+    
+    float CameraSpeed;
+    float MouseSencitivity;
+    
+    v3* SphereDistributionsTrig;
+    v3* SphereDistributionsFib;
+    sphere_distribution SphereDistributionTrig;
+    sphere_distribution SphereDistributionFib;
+    
+    playing_animation PlayingAnim;
+    m44 BoneTransformMatrices[256];
+    
+    b32 Initialized;
+};
+
 
 // NOTE(Dima): TEST GAME MODE
 GAME_MODE_UPDATE(TestUpdate){
@@ -324,94 +375,24 @@ GAME_MODE_UPDATE(TestUpdate){
                                   GetFirst(Game->Assets, GameAsset_Man),
                                   ASSET_IMPORT_DEFERRED);
     
-    
-    
     if(Model){
-        v3 Pos = V3(15.0f, 0.0f, 30.0f);
-        quat Rot = QuatI();
-        v3 Scale = V3(1.0f);
-        
-        asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
-        
-        m44 ModelToWorld = ScalingMatrix(Scale) * RotationMatrix(Rot) * TranslationMatrix(Pos);
-        
-        for(int SkIndex = 0;
-            SkIndex < Model->SkeletonCount;
-            SkIndex++)
-        {
-            asset_id SkeletonID = Model->SkeletonIDs[SkIndex];
-            
-            skeleton_info* Skeleton = LOAD_ASSET(skeleton_info, 
-                                                 AssetType_Skeleton,
-                                                 Assets, SkeletonID,
-                                                 ASSET_IMPORT_DEFERRED);
-            
-            if(Skeleton){
-                
-                for(int BoneIndex = 0;
-                    BoneIndex < Skeleton->BoneCount;
-                    BoneIndex++)
-                {
-                    bone_info* Bone = &Skeleton->Bones[BoneIndex];
-                    
-                    v4 BoneP = 
-                        V4(0.0f, 0.0f, 0.0f, 1.0f) * 
-                        InverseTransformMatrix(Bone->InvBindPose) * 
-                        ModelToWorld;
-                    
-                    PushOrLoadMesh(Assets, Stack, 
-                                   CubeMeshID, BoneP.xyz, 
-                                   QuatI(), V3(0.1f), 
-                                   ASSET_IMPORT_DEFERRED);
-                }
-            }
+        animation_clip* Animation = 0;
+        if(Model->AnimationCount){
+            Animation = LoadAnimationClip(Assets, 
+                                          Model->AnimationIDs[0],
+                                          ASSET_IMPORT_IMMEDIATE);
         }
         
-#if 1        
-        for(int NodeIndex = 0;
-            NodeIndex < Model->NodeCount;
-            NodeIndex++)
-        {
-            node_info* Node = &Model->Nodes[NodeIndex];
-            
-            Node->CalculatedToParent = Node->Shared->ToParent;
-        }
+        m44* BoneTransformMatrices = State->BoneTransformMatrices;
         
-        AnimateModel(Assets, Model, Game->Input->Time);
-        
-        for(int NodeIndex = 0;
-            NodeIndex < Model->NodeCount;
-            NodeIndex++)
-        {
-            node_info* Node = &Model->Nodes[NodeIndex];
-            
-            if(Node->Shared->ParentIndex != -1){
-                // NOTE(Dima): If is not root
-                node_info* ParentNode = &Model->Nodes[Node->Shared->ParentIndex];
-                
-                Node->CalculatedToModel = Node->CalculatedToParent* ParentNode->CalculatedToModel;
-            }
-            else{
-                Node->CalculatedToModel = Node->CalculatedToParent;
-            }
-            
-            m44 NodeTran = Node->CalculatedToModel * ModelToWorld;
-            
-            PushOrLoadMesh(Assets, Stack, 
-                           CubeMeshID, ScalingMatrix(V3(0.1f)) * NodeTran);
-            
-            for(int MeshIndex = 0; MeshIndex < Node->MeshCount; MeshIndex++){
-                asset_id MeshID = Node->MeshIDs[MeshIndex];
-                
-                PushOrLoadMesh(Assets, Stack, MeshID, NodeTran,
-                               ASSET_IMPORT_DEFERRED);
-            }
-        }
-#endif
+        UpdateModel(Assets, Stack, Model, 
+                    V3(10.0f, 0.0f, 10.0f),
+                    QuatI(), 
+                    V3(1.0f),
+                    Game->Input->Time,
+                    Animation,
+                    BoneTransformMatrices);
     }
-    
-    
-    
     
 #if 0    
     PushOrLoadModel(Game->Assets, Stack,
@@ -423,7 +404,7 @@ GAME_MODE_UPDATE(TestUpdate){
     PushOrLoadModel(Game->Assets, Stack,
                     GetFirst(Game->Assets, GameAsset_Skyscraper),
                     V3(-50.0f, 0.0f, -50.0f),
-                    QuatI(), V3(10.0f),
+                    QuatI(), V3(z10.0f),
                     ASSET_IMPORT_DEFERRED);
     
     PushOrLoadModel(Game->Assets, Stack,

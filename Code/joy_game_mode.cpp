@@ -60,6 +60,7 @@ void GameInit(game_state* Game, platform_to_game_api Platform2GameAPI){
     RenderAddStack(Game->Render, "Main");
     RenderAddStack(Game->Render, "GUI");
     RenderAddStack(Game->Render, "Meshes");
+    RenderAddStack(Game->Render, "DEBUG");
     // NOTE(Dima): Init platform render stuff
     Game->Render->Init(Game->Assets);
     
@@ -80,10 +81,22 @@ void GameInit(game_state* Game, platform_to_game_api Platform2GameAPI){
     Game->ProcessInput = Platform2GameAPI.ProcessInput;
 }
 
+
+INTERNAL_FUNCTION void UpdateGameInput(input_state* Input){
+    if(KeyWentDown(Input, Key_Control)){
+        Input->CapturingMouse = !Input->CapturingMouse;
+    }
+    
+    if(KeyWentDown(Input, Key_Escape)){
+        Input->QuitRequested = true;
+    }
+}
+
 void GameUpdate(game_state* Game, render_frame_info FrameInfo){
     game_mode* CurMode = &Game->Modes[Game->CurrentModeIndex];
     
-    InputUpdate(Game->Input);
+    UpdateGameInput(Game->Input);
+    
     Game->ProcessInput();
     
     RenderBeginFrame(Game->Render);

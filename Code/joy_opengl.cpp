@@ -148,34 +148,66 @@ INTERNAL_FUNCTION gl_shader GlLoadProgram(gl_state* GL, char* vertexPath, char* 
 	return(ResultShader);
 }
 
-
-INTERNAL_FUNCTION void GlSetShader(gl_shader* shader, gl_shader src){
-    shader->ID = src.ID;
-    shader->Type = src.Type;
-    shader->_InternalProgramIndex = src._InternalProgramIndex;
+void UseShader(gl_shader* Shader){
+    glUseProgram(Shader->ID);
 }
 
-INTERNAL_FUNCTION Gl_Screen_Shader& GlLoadScreenShader(gl_state* GL, char* pathV, char* pathF){
-    Gl_Screen_Shader& Result = GL->ScreenShader;
-    
-    GlSetShader(&Result, GlLoadProgram(GL, pathV, pathF));
+void UseShaderEnd(){
+    glUseProgram(0);
+}
+
+void UniformBool(GLint Loc, b32 Value){
+    glUniform1i(Loc, Value);
+}
+
+void UniformInt(GLint Loc, int Value){
+    glUniform1i(Loc, Value);
+}
+
+void UniformV3(GLint Loc, float x, float y, float z){
+    glUniform3f(Loc, x, y, z);
+}
+
+void UniformV3(GLint Loc, v3 A){
+    glUniform3f(Loc, A.x, A.y, A.z);
+}
+
+void UniformV4(GLint Loc, float x, float y, float z, float w){
+    glUniform4f(Loc, x, y, z, w);
+}
+
+void UniformV4(GLint Loc, v4 A){
+    glUniform4f(Loc, A.x, A.y, A.z, A.w);
+}
+
+void UniformMatrix4x4(GLint Loc, float* Data){
+    glUniformMatrix4fv(Loc, 1, true, Data);
+}
+
+void UniformMatrixArray4x4(GLint Loc, int Count, m44* Array){
+    glUniformMatrix4fv(Loc, Count, true, (const GLfloat*)Array);
+}
+
+
+#define LOAD_SHADER_FUNC(name) void name(gl_state* GL, char* PathV, char* PathF)
+
+INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadScreenShader){
+    gl_screen_shader& Result = GL->ScreenShader;
+    Result.Shader = GlLoadProgram(GL, PathV, PathF);
     
     GLGETU(ScreenTexture);
-    
-    return(Result);
 }
 
-INTERNAL_FUNCTION Gl_Simple_Shader& GlLoadSimpleShader(gl_state* GL, char* PathV, char* PathF){
-    Gl_Simple_Shader& Result = GL->SimpleShader;
-    
-    GlSetShader(&Result, GlLoadProgram(GL, PathV, PathF));
+INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadSimpleShader){
+    gl_simple_shader& Result = GL->SimpleShader;
+    Result.Shader = GlLoadProgram(GL, PathV, PathF);
     
     GLGETU(Model);
     GLGETU(View);
     GLGETU(Projection);
     GLGETU(HasSkinning);
     GLGETU(BoneTransforms);
-    GLGETU(PassedBonesCount);
+    GLGETU(BonesCount);
     
     GLGETU(Albedo);
     GLGETU(Normals);
@@ -188,14 +220,12 @@ INTERNAL_FUNCTION Gl_Simple_Shader& GlLoadSimpleShader(gl_state* GL, char* PathV
     GLGETA(T);
     GLGETA(Weights);
     GLGETA(BoneIDs);
-    
-    return(Result);
 }
 
-INTERNAL_FUNCTION Gl_GuiRect_Shader& GlLoadGuiRectShader(gl_state* GL, char* PathV, char* PathF){
-    Gl_GuiRect_Shader& Result = GL->GuiRectShader;
-    
-    GlSetShader(&Result, GlLoadProgram(GL, PathV, PathF));
+INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadGuiRectShader)
+{
+    gl_guirect_shader& Result = GL->GuiRectShader;
+    Result.Shader = GlLoadProgram(GL, PathV, PathF);
     
     GLGETU(Projection);
     GLGETU(BitmapIsSet);
@@ -203,15 +233,12 @@ INTERNAL_FUNCTION Gl_GuiRect_Shader& GlLoadGuiRectShader(gl_state* GL, char* Pat
     
     GLGETA(PUV);
     GLGETA(C);
-    
-    return(Result);
 }
 
-INTERNAL_FUNCTION Gl_GuiGeom_Shader&
-GlLoadGuiGeomShader(gl_state* GL, char* PathV, char* PathF){
-    Gl_GuiGeom_Shader& Result = GL->GuiGeomShader;
-    
-    GlSetShader(&Result, GlLoadProgram(GL, PathV, PathF));
+INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadGuiGeomShader)
+{
+    gl_guigeom_shader& Result = GL->GuiGeomShader;
+    Result.Shader = GlLoadProgram(GL, PathV, PathF);
     
     GLGETU(Projection);
     GLGETU(Bitmap);
@@ -219,13 +246,22 @@ GlLoadGuiGeomShader(gl_state* GL, char* PathV, char* PathF){
     
     GLGETA(PUV);
     GLGETA(C);
-    
-    return(Result);
 }
 
-INTERNAL_FUNCTION inline void GlBindBufferAndFill(GLenum Target, GLenum Usage,
-                                                  void* Data, size_t DataSize,
-                                                  GLuint BufferName)
+INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadDebugGeomShader)
+{
+    gl_debuggeom_shader& Result = GL->DebugGeomShader;
+    Result.Shader = GlLoadProgram(GL, PathV, PathF);
+    
+    GLGETU(ViewProjection);
+    
+    GLGETA(P);
+    GLGETA(Color);
+}
+
+INTERNAL_FUNCTION inline void BindBufferAndFill(GLenum Target, GLenum Usage,
+                                                void* Data, size_t DataSize,
+                                                GLuint BufferName)
 {
     glBindBuffer(Target, BufferName);
     
@@ -236,7 +272,7 @@ INTERNAL_FUNCTION inline void GlBindBufferAndFill(GLenum Target, GLenum Usage,
     
     if(DataSize > CurrentBufSize){
         // NOTE(Dima): Reallocating or initializing at the first time
-        glBufferData(Target, DataSize + Kilobytes(20), 0, Usage);
+        glBufferData(Target, DataSize + Kilobytes(5), 0, Usage);
     }
     
     glBufferSubData(Target, 0, DataSize, Data);
@@ -316,8 +352,6 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
         
         GLuint VAO, VBO, EBO;
         
-        GLenum Err = glGetError();
-        
         glGenVertexArrays(1, &VAO);
         glGenBuffers(1, &VBO);
         glGenBuffers(1, &EBO);
@@ -325,44 +359,42 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
         size_t Stride = Mesh->TypeCtx.VertexTypeSize;
         
         glBindVertexArray(VAO);
-        GlBindBufferAndFill(GL_ARRAY_BUFFER,
-                            GL_STATIC_DRAW,
-                            Mesh->Vertices,
-                            Mesh->VerticesCount * Stride,
-                            VBO);
+        BindBufferAndFill(GL_ARRAY_BUFFER,
+                          GL_STATIC_DRAW,
+                          Mesh->Vertices,
+                          Mesh->VerticesCount * Stride,
+                          VBO);
         
-        GlBindBufferAndFill(GL_ELEMENT_ARRAY_BUFFER,
-                            GL_STATIC_DRAW,
-                            Mesh->Indices,
-                            Mesh->IndicesCount * sizeof(u32),
-                            EBO);
-        
-        Err = glGetError();
+        BindBufferAndFill(GL_ELEMENT_ARRAY_BUFFER,
+                          GL_STATIC_DRAW,
+                          Mesh->Indices,
+                          Mesh->IndicesCount * sizeof(u32),
+                          EBO);
         
 #define GLGETOFFSET(index) (GLvoid*)((index) * sizeof(GLfloat))
         
-        if(GlArrayIsValid(GL->SimpleShader.PAttrLoc)){
+        if(ArrayIsValid(GL->SimpleShader.PAttrLoc)){
             glEnableVertexAttribArray(GL->SimpleShader.PAttrLoc);
             glVertexAttribPointer(GL->SimpleShader.PAttrLoc,
                                   3, GL_FLOAT, GL_FALSE,
                                   Stride, (void*)Mesh->TypeCtx.OffsetP);
         }
         
-        if(GlArrayIsValid(GL->SimpleShader.UVAttrLoc)){
+        if(ArrayIsValid(GL->SimpleShader.UVAttrLoc)){
             glEnableVertexAttribArray(GL->SimpleShader.UVAttrLoc);
             glVertexAttribPointer(GL->SimpleShader.UVAttrLoc,
                                   2, GL_FLOAT, GL_FALSE,
                                   Stride, (void*)Mesh->TypeCtx.OffsetUV);
         }
         
-        if(GlArrayIsValid(GL->SimpleShader.NAttrLoc)){
+        if(ArrayIsValid(GL->SimpleShader.NAttrLoc)){
             glEnableVertexAttribArray(GL->SimpleShader.NAttrLoc);
             glVertexAttribPointer(GL->SimpleShader.NAttrLoc,
                                   3, GL_FLOAT, GL_FALSE,
                                   Stride, (void*)Mesh->TypeCtx.OffsetN);
         }
         
-        if(GlArrayIsValid(GL->SimpleShader.TAttrLoc)){
+        if(ArrayIsValid(GL->SimpleShader.TAttrLoc)){
             glEnableVertexAttribArray(GL->SimpleShader.TAttrLoc);
             glVertexAttribPointer(GL->SimpleShader.TAttrLoc,
                                   3, GL_FLOAT, GL_FALSE,
@@ -370,7 +402,7 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
         }
         
         if(Mesh->TypeCtx.MeshType == Mesh_Skinned){
-            if(GlArrayIsValid(GL->SimpleShader.WeightsAttrLoc)){
+            if(ArrayIsValid(GL->SimpleShader.WeightsAttrLoc)){
                 glEnableVertexAttribArray(GL->SimpleShader.WeightsAttrLoc);
                 glVertexAttribPointer(GL->SimpleShader.WeightsAttrLoc,
                                       4, GL_FLOAT, GL_FALSE,
@@ -378,7 +410,7 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
             }
             
             
-            if(GlArrayIsValid(GL->SimpleShader.BoneIDsAttrLoc)){
+            if(ArrayIsValid(GL->SimpleShader.BoneIDsAttrLoc)){
                 glEnableVertexAttribArray(GL->SimpleShader.BoneIDsAttrLoc);
                 glVertexAttribIPointer(GL->SimpleShader.BoneIDsAttrLoc,
                                        1, GL_UNSIGNED_INT,
@@ -386,16 +418,12 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
             }
         }
         
-        Err = glGetError();
-        
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
         
         GlAddMeshHandle(Result, MeshHandle_VertexArray, VAO);
         GlAddMeshHandle(Result, MeshHandle_Buffer, VBO);
         GlAddMeshHandle(Result, MeshHandle_Buffer, EBO);
-        
-        Err = glGetError();
         
         Result->Allocated = true;
     }
@@ -405,18 +433,21 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
 
 void GlInit(gl_state* GL, assets* Assets){
     GL->ProgramsCount = 0;
-    GlLoadScreenShader(GL, 
-                       "../Data/Shaders/screen.vs",
-                       "../Data/Shaders/screen.fs");
-    GlLoadSimpleShader(GL,
-                       "../Data/Shaders/simple.vs",
-                       "../Data/Shaders/simple.fs");
-    GlLoadGuiRectShader(GL,
-                        "../Data/Shaders/gui_rect.vs",
-                        "../Data/Shaders/gui_rect.fs");
-    GlLoadGuiGeomShader(GL,
-                        "../Data/Shaders/gui_geom.vs",
-                        "../Data/Shaders/gui_geom.fs");
+    LoadScreenShader(GL, 
+                     "../Data/Shaders/screen.vs",
+                     "../Data/Shaders/screen.fs");
+    LoadSimpleShader(GL,
+                     "../Data/Shaders/simple.vs",
+                     "../Data/Shaders/simple.fs");
+    LoadGuiRectShader(GL,
+                      "../Data/Shaders/gui_rect.vs",
+                      "../Data/Shaders/gui_rect.fs");
+    LoadGuiGeomShader(GL,
+                      "../Data/Shaders/gui_geom.vs",
+                      "../Data/Shaders/gui_geom.fs");
+    LoadDebugGeomShader(GL,
+                        "../Data/Shaders/debug_geometry.vs",
+                        "../Data/Shaders/debug_geometry.fs");
     
     size_t FS = sizeof(float);
     
@@ -450,12 +481,12 @@ void GlInit(gl_state* GL, assets* Assets){
     glBindBuffer(GL_ARRAY_BUFFER, GL->GuiRectVBO);
     glBufferData(GL_ARRAY_BUFFER, 6 * 8 * FS, 0, GL_DYNAMIC_DRAW);
     
-    if(GlArrayIsValid(GL->GuiRectShader.PUVAttrLoc)){
+    if(ArrayIsValid(GL->GuiRectShader.PUVAttrLoc)){
         glEnableVertexAttribArray(GL->GuiRectShader.PUVAttrLoc);
         glVertexAttribPointer(0, 4, GL_FLOAT, 0, 8 * FS, 0);
     }
     
-    if(GlArrayIsValid(GL->GuiRectShader.CAttrLoc)){
+    if(ArrayIsValid(GL->GuiRectShader.CAttrLoc)){
         glEnableVertexAttribArray(GL->GuiRectShader.CAttrLoc);
         glVertexAttribPointer(1, 4, GL_FLOAT, 0, 8 * FS, (void*)(4 * FS));
     }
@@ -467,9 +498,29 @@ void GlInit(gl_state* GL, assets* Assets){
     GL->LargeAtlasHandle = GlAllocateTexture(&Assets->MainLargeAtlas.Bitmap);
     
     // NOTE(Dima): Binding gui shader texture to 0 unit
-    glUseProgram(GL->GuiRectShader.ID);
+    UseShader(&GL->GuiRectShader.Shader);
     glUniform1i(GL->GuiRectShader.BitmapLoc, 0);
     glUseProgram(0);
+    
+    // NOTE(Dima): Init Debug geometry buffer objects
+    glGenVertexArrays(1, &GL->DEBUGGeomVAO);
+    glGenBuffers(1, &GL->DEBUGGeomVBO);
+    
+    glBindVertexArray(GL->DEBUGGeomVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, GL->DEBUGGeomVBO);
+    if(ArrayIsValid(GL->DebugGeomShader.PAttrLoc)){
+        glEnableVertexAttribArray(GL->DebugGeomShader.PAttrLoc);
+        glVertexAttribPointer(GL->DebugGeomShader.PAttrLoc,
+                              3, GL_FLOAT, GL_FALSE,
+                              6 * FS, 0);
+    }
+    if(ArrayIsValid(GL->DebugGeomShader.ColorAttrLoc)){
+        glEnableVertexAttribArray(GL->DebugGeomShader.ColorAttrLoc);
+        glVertexAttribPointer(GL->DebugGeomShader.ColorAttrLoc,
+                              3, GL_FLOAT, GL_FALSE,
+                              6 * FS, (void*)(3 * FS));
+    }
+    glBindVertexArray(0);
     
     // NOTE(Dima): Init GuiGeom buffer objects
     glGenVertexArrays(1, &GL->GuiGeomVAO);
@@ -479,18 +530,17 @@ void GlInit(gl_state* GL, assets* Assets){
     
     glBindVertexArray(GL->GuiGeomVAO);
     glBindBuffer(GL_ARRAY_BUFFER, GL->GuiGeomVBO);
-    if(GlArrayIsValid(GL->GuiGeomShader.PUVAttrLoc)){
+    if(ArrayIsValid(GL->GuiGeomShader.PUVAttrLoc)){
         glEnableVertexAttribArray(GL->GuiGeomShader.PUVAttrLoc);
         glVertexAttribPointer(GL->GuiGeomShader.PUVAttrLoc, 
                               4, GL_FLOAT, 0, 8 * FS, 0);
     }
     
-    if(GlArrayIsValid(GL->GuiGeomShader.CAttrLoc)){
+    if(ArrayIsValid(GL->GuiGeomShader.CAttrLoc)){
         glEnableVertexAttribArray(GL->GuiGeomShader.CAttrLoc);
         glVertexAttribPointer(GL->GuiGeomShader.CAttrLoc, 
                               4, GL_FLOAT, 0, 8 * FS, (void*)(4 * FS));
     }
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 }
 
@@ -520,7 +570,7 @@ INTERNAL_FUNCTION void GlRenderGuiRect(gl_state* GL,
                                        float* RectArr,
                                        size_t RectArrSize)
 {
-    glUseProgram(GL->GuiRectShader.ID);
+    UseShader(&GL->GuiRectShader.Shader);
     glUniform1i(GL->GuiRectShader.BitmapIsSetLoc, BitmapSetFlag);
     
     if(BitmapSetFlag == 1){
@@ -572,7 +622,7 @@ INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, bmp_info* bmp){
     
     // NOTE(Dima): Drawing screen rect
     glBindVertexArray(GL->ScreenVAO);
-    glUseProgram(GL->ScreenShader.ID);
+    glUseProgram(GL->ScreenShader.Shader.ID);
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, BlitTex);
@@ -651,29 +701,47 @@ void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
                 
                 glEnable(GL_DEPTH_TEST);
                 
-                GL->SimpleShader.Use();
+                UseShader(&GL->SimpleShader.Shader);
                 
                 // NOTE(Dima): Setting VS uniforms
-                GL->SimpleShader.SetM44(GL->SimpleShader.ModelLoc,
-                                        entry->Transform.e);
-                GL->SimpleShader.SetM44(GL->SimpleShader.ViewLoc,
-                                        Pass->View.e);
-                GL->SimpleShader.SetM44(GL->SimpleShader.ProjectionLoc,
-                                        Pass->Projection.e);
-                GL->SimpleShader.SetBool(GL->SimpleShader.HasSkinningLoc,
-                                         Mesh->TypeCtx.MeshType == Mesh_Skinned);
-                
-                GL->SimpleShader.SetInt(GL->SimpleShader.PassedBonesCountLoc,
-                                        0);
+                UniformMatrix4x4(GL->SimpleShader.ModelLoc,
+                                 entry->Transform.e);
+                UniformMatrix4x4(GL->SimpleShader.ViewLoc,
+                                 Pass->View.e);
+                UniformMatrix4x4(GL->SimpleShader.ProjectionLoc,
+                                 Pass->Projection.e);
+                UniformBool(GL->SimpleShader.HasSkinningLoc,
+                            Mesh->TypeCtx.MeshType == Mesh_Skinned);
+                UniformInt(GL->SimpleShader.BonesCountLoc, 
+                           entry->BoneCount);
+                if(entry->BoneCount){
+#if 0
+                    glUniformMatrix4fv(GL->SimpleShader.BoneTransformsLoc,
+                                       entry->BoneCount,
+                                       GL_TRUE,
+                                       (const GLfloat*)entry->BoneTransforms[0].e);
+#else
+                    for(int i = 0; i < entry->BoneCount; i++){
+                        char Buf[256];
+                        sprintf(Buf, "BoneTransforms[%d]", i);
+                        
+                        GLint MatrixLocation = glGetUniformLocation(GL->SimpleShader.Shader.ID, Buf);
+                        glUniformMatrix4fv(MatrixLocation,
+                                           1,
+                                           GL_TRUE,
+                                           (const GLfloat*)entry->BoneTransforms[i].e);
+                    }
+#endif
+                }
                 
                 // NOTE(Dima): Setting FS uniforms
                 b32 AlbedoIsSet = false;
                 b32 NormalsIsSet = false;
                 
-                GL->SimpleShader.SetBool(GL->SimpleShader.AlbedoIsSetLoc, AlbedoIsSet);
-                GL->SimpleShader.SetBool(GL->SimpleShader.NormalsIsSetLoc, NormalsIsSet);
+                UniformBool(GL->SimpleShader.AlbedoIsSetLoc, AlbedoIsSet);
+                UniformBool(GL->SimpleShader.NormalsIsSetLoc, NormalsIsSet);
                 
-#if 0                
+#if 0
                 glUniform1i(GL->SimpleShader.AlbedoLoc, 0);
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, ???);
@@ -699,6 +767,42 @@ void GlOutputPass(gl_state* GL, render_pass* Pass){
     for(int i = 0; i < Pass->StacksCount; i++){
         GlOutputStack(GL, Pass, Pass->Stacks[i]);
     }
+    
+#if 1    
+    // NOTE(Dima): Test lines
+    v3 StartP = V3(0, 0, 0);
+    v3 EndP = V3(10, 10, 10);
+    v3 Color1 = V3(1.0f, 0.0f, 0.0f);
+    v3 Color2 = V3(0.0f, 1.0f, 0.0f);
+    v3 Color3 = V3(0.0f, 1.0f, 1.0f);
+    
+    v3 Vertices[] = {
+        StartP, Color1, 
+        EndP, Color1,
+        V3(0.0f), Color2,
+        V3(-10.0f, 10.0f, 10.0f), Color2,
+        V3(0.0f), Color3,
+        V3(0.0f, 0.0f, 10.0f), Color3};
+    
+    glEnable(GL_DEPTH_TEST);
+    
+    UseShader(&GL->DebugGeomShader.Shader);
+    UniformMatrix4x4(GL->DebugGeomShader.ViewProjectionLoc,
+                     Pass->ViewProjection.e);
+    
+    glBindVertexArray(GL->DEBUGGeomVAO);
+    BindBufferAndFill(GL_ARRAY_BUFFER,
+                      GL_DYNAMIC_DRAW,
+                      Vertices,
+                      6* 2 * sizeof(v3),
+                      GL->DEBUGGeomVBO);
+    
+    glDrawArrays(GL_LINES, 0, 6);
+    
+    glBindVertexArray(0);
+    glDisable(GL_DEPTH_TEST);
+#endif
+    
 }
 
 void GlOutputRender(gl_state* GL, render_state* Render){
@@ -749,26 +853,27 @@ void GlOutputRender(gl_state* GL, render_state* Render){
             GlOutputPass(GL, &Render->Passes[i]);
         }
         
+        // NOTE(Dima): Outputing gui
         glEnable(GL_SCISSOR_TEST);
         
         glBindVertexArray(GL->GuiGeomVAO);
-        GlBindBufferAndFill(GL_ARRAY_BUFFER,
-                            GL_DYNAMIC_DRAW,
-                            Render->GuiGeom.Vertices,
-                            Render->GuiGeom.VerticesCount * sizeof(render_gui_geom_vertex),
-                            GL->GuiGeomVBO);
+        BindBufferAndFill(GL_ARRAY_BUFFER,
+                          GL_DYNAMIC_DRAW,
+                          Render->GuiGeom.Vertices,
+                          Render->GuiGeom.VerticesCount * sizeof(render_gui_geom_vertex),
+                          GL->GuiGeomVBO);
         
-        GlBindBufferAndFill(GL_ELEMENT_ARRAY_BUFFER,
-                            GL_DYNAMIC_DRAW,
-                            Render->GuiGeom.Indices,
-                            Render->GuiGeom.IndicesCount * sizeof(u32),
-                            GL->GuiGeomEBO);
+        BindBufferAndFill(GL_ELEMENT_ARRAY_BUFFER,
+                          GL_DYNAMIC_DRAW,
+                          Render->GuiGeom.Indices,
+                          Render->GuiGeom.IndicesCount * sizeof(u32),
+                          GL->GuiGeomEBO);
         
-        GlBindBufferAndFill(GL_TEXTURE_BUFFER,
-                            GL_DYNAMIC_DRAW,
-                            Render->GuiGeom.TriangleGeomTypes,
-                            Render->GuiGeom.TriangleGeomTypesCount,
-                            GL->GuiGeomTB);
+        BindBufferAndFill(GL_TEXTURE_BUFFER,
+                          GL_DYNAMIC_DRAW,
+                          Render->GuiGeom.TriangleGeomTypes,
+                          Render->GuiGeom.TriangleGeomTypesCount * sizeof(u8),
+                          GL->GuiGeomTB);
         
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, GL->LargeAtlasHandle);
@@ -780,16 +885,15 @@ void GlOutputRender(gl_state* GL, render_state* Render){
         glBindTexture(GL_TEXTURE_BUFFER, TexBufTex);
         glTexBuffer(GL_TEXTURE_BUFFER, GL_R8I, GL->GuiGeomTB);
         
-        GL->GuiGeomShader.Use();
-        GL->GuiGeomShader.SetM44(GL->GuiGeomShader.ProjectionLoc, GL->GuiOrtho.e);
+        UseShader(&GL->GuiGeomShader.Shader);
+        UniformMatrix4x4(GL->GuiGeomShader.ProjectionLoc, GL->GuiOrtho.e);
         
         // NOTE(Dima): Passing Bitmap uniforms to shader
         glUniform1i(GL->GuiGeomShader.BitmapLoc, 0);
         glUniform1i(GL->GuiGeomShader.TriangleGeomTypesLoc, 1);
         
-        glBindVertexArray(GL->GuiGeomVAO);
+        //glBindVertexArray(GL->GuiGeomVAO);
         
-#if 1
         for(int ChunkIndex = 0;
             ChunkIndex < Render->GuiGeom.CurChunkIndex;
             ChunkIndex++)
@@ -803,8 +907,8 @@ void GlOutputRender(gl_state* GL, render_state* Render){
                                                            Render->FrameInfo.Height);
                 
                 
-                glScissor(ClipRect.min.x,
-                          ClipRect.min.y,
+                glScissor(ClipRect.Min.x,
+                          ClipRect.Min.y,
                           ClipDim.x,
                           ClipDim.y);
                 
@@ -815,10 +919,6 @@ void GlOutputRender(gl_state* GL, render_state* Render){
                                          CurChunk->BaseVertex);
             }
         }
-#elif
-        glDrawElements(GL_TRIANGLES, Render->GuiGeom.IndicesCount, GL_UNSIGNED_INT, 0);
-#endif
-        
         
         glBindVertexArray(0);
         

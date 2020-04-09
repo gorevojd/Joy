@@ -103,8 +103,6 @@ struct bone_info{
     
     // NOTE(Dima): Parent bone index
     int ParentIndex;
-    int FirstChildIndex;
-    int ChildCount;
 };
 
 #endif

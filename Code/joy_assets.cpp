@@ -368,14 +368,6 @@ void ImportAssetDirectly(assets* Assets,
                 IntegrateIDs(Result->MaterialIDs, Src->MaterialCount, FileSource);
             }
             
-            Result->SkeletonIDs = 0;
-            if(Src->SkeletonCount){
-                u32* SkeletonIDs = GET_DATA(u32, Src->DataOffsetToSkeletonIDs);
-                Result->SkeletonIDs = SkeletonIDs;
-                
-                IntegrateIDs(Result->SkeletonIDs, Src->SkeletonCount, FileSource);
-            }
-            
             Result->AnimationIDs = 0;
             if(Src->AnimationCount){
                 u32* AnimationIDs = GET_DATA(u32, Src->DataOffsetToAnimationIDs);
@@ -618,6 +610,15 @@ model_info* LoadModel(assets* Assets,
     return(Result);
 }
 
+skeleton_info* LoadSkeleton(assets* Assets,
+                            u32 SkeletonID,
+                            b32 Immediate)
+{
+    skeleton_info* Result = LOAD_ASSET(skeleton_info, AssetType_Skeleton,
+                                       Assets, SkeletonID, Immediate);
+    
+    return(Result);
+}
 
 animation_clip* LoadAnimationClip(assets* Assets,
                                   u32 AnimID,
@@ -974,9 +975,11 @@ void InitAssets(assets* Assets){
                             model_info* Result = ALLOC_ASS_PTR_MEMBER(model_info);
                             asset_model* Src = &AssetHeader.Model;
                             
+                            Result->SkeletonID = FileToIntegratedID(FileSource, Src->SkeletonID);
+                            Result->HasSkeleton = Src->SkeletonID != 0;
+                            
                             Result->MeshCount = Src->MeshCount;
                             Result->MaterialCount = Src->MaterialCount;
-                            Result->SkeletonCount = Src->SkeletonCount;
                             Result->NodeCount = Src->NodeCount;
                             Result->NodesMeshIDsStorageCount = Src->NodesMeshIndicesStorageCount;
                             Result->AnimationCount = Src->AnimationCount;

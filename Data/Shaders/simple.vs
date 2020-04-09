@@ -12,7 +12,7 @@ uniform mat4 View;
 uniform mat4 Projection;
 
 uniform bool HasSkinning;
-uniform int PassedBonesCount;
+uniform int BonesCount;
 uniform mat4 BoneTransforms[128];
 
 out Vertex_Shader_Out{
@@ -26,27 +26,40 @@ void main(){
     vec3 ModelSpaceN = N;
     
     // NOTE(Dima): Producing some skinning
-    if(HasSkinning && (PassedBonesCount > 0)){
-        mat4 ResultTranMatrix = mat4(vec4(0.0f), vec4(0.0f), vec4(0.0f), vec4(0.0f));
+    if(HasSkinning && (BonesCount > 0)){
         
-        // NOTE(Dima): Iterating through weights and bones and apply to ResultTranMatrix
-        for(uint WeightIndex = 0u;
-            WeightIndex < 4u;
-            WeightIndex++)
-        {
-            uint BoneID = BoneIDs >> (8u * WeightIndex) & 255u;
-            
-            float Weight = Weights[WeightIndex];
-            
-            ResultTranMatrix += BoneTransforms[BoneID] * Weight;
-        }
+        uint BoneIndex0 = BoneIDs & 255u;
+        uint BoneIndex1 = (BoneIDs >> 8u) & 255u;
+        uint BoneIndex2 = (BoneIDs >> 16u) & 255u;
+        uint BoneIndex3 = (BoneIDs >> 24u) & 255u;
         
-        // NOTE(Dima): Transforming position and normals
-        vec4 ResultTranP = vec4(ModelSpaceP, 1.0f) * ResultTranMatrix;
-        vec4 ResultTranN = vec4(ModelSpaceN, 0.0f) * ResultTranMatrix;
+#if 0        
+        mat4 Tran0 = BoneTransforms[0] * Weights.x;
+        mat4 Tran1 = BoneTransforms[0] * Weights.y;
+        mat4 Tran2 = BoneTransforms[0] * Weights.z;
+        mat4 Tran3 = BoneTransforms[0] * Weights.w;
+#endif
         
-        ModelSpaceP = ResultTranP.xyz;
-        ModelSpaceN = ResultTranN.xyz;
+        mat4 Tran0 = BoneTransforms[BoneIndex0] * Weights.x;
+        mat4 Tran1 = BoneTransforms[BoneIndex1] * Weights.y;
+        mat4 Tran2 = BoneTransforms[BoneIndex2] * Weights.z;
+        mat4 Tran3 = BoneTransforms[BoneIndex3] * Weights.w;
+        
+        vec4 TempP = vec4(ModelSpaceP, 1.0f);
+        vec4 TempN = vec4(ModelSpaceN, 0.0f);
+        
+        vec4 SumP = TempP * Tran0;
+        SumP += TempP * Tran1;
+        SumP += TempP * Tran2;
+        SumP += TempP * Tran3;
+        
+        vec4 SumN = TempN * Tran0;
+        SumN += TempN * Tran1;
+        SumN += TempN * Tran2;
+        SumN += TempN * Tran3;
+        
+        ModelSpaceP = SumP.xyz;
+        ModelSpaceN = SumN.xyz;
     }
     
     // NOTE(Dima): Usual calculations

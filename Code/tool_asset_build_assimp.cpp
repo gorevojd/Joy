@@ -509,236 +509,123 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         Result.Animations.push_back(NewAnimation);
     }
     
-    // NOTE(Dima): Loading meshes
+    
+    std::unordered_set<std::string> BoneNames;
+    std::unordered_map<std::string, int> BoneNameToBoneIndex;
+    
+    tool_skeleton_info* Skeleton = &Result.Skeleton;
+    
+    // NOTE(Dima): Loading meshes bone data
     int NumMeshes = scene->mNumMeshes;
     for (int MeshIndex = 0; MeshIndex < NumMeshes; MeshIndex++) {
         aiMesh* AssimpMesh = scene->mMeshes[MeshIndex];
         
-        int ResultSkeletonIndex = -1;
-        int BonesCount = 0;
-        
         if(AssimpMesh->HasBones()){
-            BonesCount = AssimpMesh->mNumBones;
-            
-            std::unordered_set<std::string> BoneNames;
-            
             // NOTE(Dima): Finding nodes corresponding to bones and storing these pairs
             for(int BoneIndex = 0;
-                BoneIndex < BonesCount;
+                BoneIndex < AssimpMesh->mNumBones;
                 BoneIndex++)
             {
                 aiBone* AssimpBone = AssimpMesh->mBones[BoneIndex];
                 
-                BoneNames.insert(std::string(AssimpBone->mName.C_Str()));
-                
-                // NOTE(Dima): Finding corresponding Node in hierarchy
-                b32 CorrespondingFound = false;
-                
-                for(int NodeIndex = 0;
-                    NodeIndex < Result.Nodes.size();
-                    NodeIndex++)
-                {
-                    loaded_node* OurNode = &Result.Nodes[NodeIndex];
+                std::string BoneName(AssimpBone->mName.C_Str());
+                if(BoneNames.find(BoneName) == BoneNames.end()){
+                    // NOTE(Dima): Finding corresponding node
+                    auto FindNodeIt = Result.NodeNameToNodeIndex.find(BoneName);
+                    Assert(FindNodeIt != Result.NodeNameToNodeIndex.end());
                     
-                    if(strcmp(AssimpBone->mName.C_Str(), OurNode->Name) == 0){
-                        CorrespondingFound = true;
-                        
-                        OurNode->AssimpBone = AssimpBone;
-                        
-                        break;
-                    }
+                    int BoneNodeIndex = FindNodeIt->second;
+                    
+                    loaded_node* CurNode = &Result.Nodes[BoneNodeIndex];
+                    CurNode->AssimpBone = AssimpBone;
+                    
+                    // NOTE(Dima): Creating new bone
+                    bone_info NewBone;
+                    
+                    aiMatrix4x4 InvBindPoseMatrix = AssimpBone->mOffsetMatrix;
+                    InvBindPoseMatrix = InvBindPoseMatrix.Transpose();
+                    NewBone.InvBindPose = Assimp2JoyMatrix(InvBindPoseMatrix);
+                    NewBone.NodeIndex = BoneNodeIndex;
+                    NewBone.ParentIndex = -1;
+                    
+                    int ThisBoneIndex = Skeleton->Bones.size();
+                    
+                    // NOTE(Dima): Pushing bone to skeleton
+                    Skeleton->Bones.push_back(NewBone);
+                    
+                    BoneNameToBoneIndex.insert({std::string(AssimpBone->mName.C_Str()), ThisBoneIndex});
+                    BoneNames.insert(std::string(AssimpBone->mName.C_Str()));
                 }
-                
-                // NOTE(Dima): Corresponding Node should be found
-                ASSERT(CorrespondingFound);
-            }
-            
-            // NOTE(Dima): Now just go through the hierarchy and store loaded skeleton bones
-            int RootBoneNodeIndex = -1;
-            
-            /*
-            NOTE(Dima): Nodes are organized in tree like structure so first found node 
-            with the name that exist in BoneNames will be our root node of 
-            our skeleton!
-            */
-            for(int ScanIndex = 0; 
-                ScanIndex < Result.Nodes.size();
-                ScanIndex++)
-            {
-                loaded_node* CurNode = &Result.Nodes[ScanIndex];
-                
-                if(BoneNames.find(std::string(CurNode->Name)) != BoneNames.end()){
-                    RootBoneNodeIndex = ScanIndex;
-                    break;
-                }
-            }
-            
-            // NOTE(Dima): Root bone node should be found anyway
-            ASSERT(RootBoneNodeIndex != -1);
-            
-            
-            /*
-            
-            NOTE(dima): Here I build temp bones hierarchy. It represented as
-            array of temp_bone_storage structures; Each object of this structure
-            has an index of parent and vector of child indices; I begin walking
-            down the hierarchy BFS (to save the hierarchy); If i meet node with 
-            a name of one of the bones than i initialize it and add new child index
-            to that bone's parent.
-            
-            */
-            assimp_skeleton_build_entry FirstEntry;
-            FirstEntry.NodeOrBoneIndex = RootBoneNodeIndex;
-            FirstEntry.ParentBoneIndex = -1;
-            
-            std::queue<assimp_skeleton_build_entry> ScanQueue;
-            ScanQueue.push(FirstEntry);
-            
-            std::vector<temp_bone_storage> TempBonesHierarchy;
-            
-            while(!ScanQueue.empty()){
-                assimp_skeleton_build_entry& BuildEntry = ScanQueue.front();
-                int CurrentIndex = BuildEntry.NodeOrBoneIndex;
-                
-                loaded_node* CurNode = &Result.Nodes[CurrentIndex];
-                
-                /*
-                NOTE(Dima): If this is bone than init it and add 
-                new child index to parent (if that parent exist of course 
-                in case of root bone);
-                */
-                
-                int NewParentIndex = BuildEntry.ParentBoneIndex;
-                if(BoneNames.find(std::string(CurNode->Name)) != BoneNames.end()){
-                    
-                    temp_bone_storage TempBone;
-                    TempBone.ParentIndex = NewParentIndex;
-                    TempBone.NodeIndex = CurrentIndex;
-                    
-                    int NewBoneStorageIndex = TempBonesHierarchy.size();
-                    if(NewParentIndex != -1){
-                        temp_bone_storage* ParentBone = &TempBonesHierarchy[NewParentIndex];
-                        
-                        ParentBone->ChildStorageIndices.push_back(NewBoneStorageIndex);
-                    }
-                    TempBonesHierarchy.push_back(TempBone);
-                    
-                    NewParentIndex = NewBoneStorageIndex;
-                }
-                
-                // NOTE(Dima): Pushing childrent to the building queue
-                int ChildStartIndex = CurNode->FirstChildIndex;
-                int OnePastLastIndex = ChildStartIndex + CurNode->ChildCount;
-                
-                for(int ChildIndex = ChildStartIndex;
-                    ChildIndex < OnePastLastIndex;
-                    ChildIndex++)
-                {
-                    assimp_skeleton_build_entry NewEntry;
-                    
-                    NewEntry.NodeOrBoneIndex = ChildIndex;
-                    NewEntry.ParentBoneIndex = NewParentIndex;
-                    
-                    ScanQueue.push(NewEntry);
-                }
-                
-                ScanQueue.pop();
-            }
-            
-            // NOTE(Dima): Temp bones hierarchy should be same size as bones
-            ASSERT(BoneNames.size() == TempBonesHierarchy.size());
-            
-            /*
-            NOTE (Dima): Now when i have temp bones hierarchy I can just store 
-            it in skeleton_bones array. For this purpose third (and hopefully last) 
-            BFS loop will be created for walking through this temp hierarchy and 
-            just setting needed data;
-            */
-            tool_skeleton_info Skeleton;
-            
-            FirstEntry.NodeOrBoneIndex = 0;
-            FirstEntry.ParentBoneIndex = -1;
-            
-            std::queue<assimp_skeleton_build_entry> FinalQueue;
-            FinalQueue.push(FirstEntry);
-            
-            EntriesPushedTotal = 1;
-            
-            while(!FinalQueue.empty()){
-                
-                assimp_skeleton_build_entry& CurrentFront = FinalQueue.front();
-                int TempBoneIndex = CurrentFront.NodeOrBoneIndex;
-                temp_bone_storage* TempBone = &TempBonesHierarchy[TempBoneIndex];
-                
-                std::vector<int>& BoneChildren = TempBone->ChildStorageIndices;
-                loaded_node* CurNode = &Result.Nodes[TempBone->NodeIndex];
-                
-                
-                // NOTE(Dima): Init new bone
-                bone_info NewBone;
-                NewBone.ParentIndex = CurrentFront.ParentBoneIndex;
-                NewBone.FirstChildIndex = EntriesPushedTotal;
-                NewBone.ChildCount = BoneChildren.size();
-                aiMatrix4x4 BindPoseMatrix = CurNode->AssimpBone->mOffsetMatrix;
-                BindPoseMatrix = BindPoseMatrix.Transpose();
-                NewBone.InvBindPose = Assimp2JoyMatrix(BindPoseMatrix);
-                NewBone.NodeIndex = TempBone->NodeIndex;
-                
-                int ThisBoneIndex = Skeleton.Bones.size();
-                
-                // NOTE(Dima): Pushing bone to skeleton
-                Skeleton.Bones.push_back(NewBone);
-                
-                for(int ChildIndex = 0;
-                    ChildIndex < BoneChildren.size();
-                    ChildIndex++)
-                {
-                    int StorageIndex = BoneChildren[ChildIndex];
-                    
-                    assimp_skeleton_build_entry NewEntry;
-                    NewEntry.NodeOrBoneIndex = StorageIndex;
-                    NewEntry.ParentBoneIndex = ThisBoneIndex;
-                    
-                    FinalQueue.push(NewEntry);
-                    
-                    ++EntriesPushedTotal;
-                }
-                
-                FinalQueue.pop();
-            }
-            
-            // NOTE(Dima): Create Bone name to Bone index mapping
-            for(int BoneIndex = 0;
-                BoneIndex < Skeleton.Bones.size();
-                BoneIndex++)
-            {
-                bone_info* Bone = &Skeleton.Bones[BoneIndex];
-                
-                loaded_node* Node = &Result.Nodes[Bone->NodeIndex];
-                
-                Skeleton.BoneNameToBoneID.insert({Node->Name, BoneIndex});
-            }
-            
-            // NOTE(Dima): Trying to find skeleton with same check sum in skeletons array
-            Skeleton.CheckSum = CalculateCheckSumForSkeleton(&Result, &Skeleton);
-            
-            for(int SkeletonIndex = 0;
-                SkeletonIndex < Result.Skeletons.size();
-                SkeletonIndex++)
-            {
-                tool_skeleton_info* CurSkeleton = &Result.Skeletons[SkeletonIndex];
-                
-                if(CurSkeleton->CheckSum == Skeleton.CheckSum){
-                    ResultSkeletonIndex = SkeletonIndex;
-                }
-            }
-            
-            // NOTE(Dima): If there were no skeleton with same checksum then push skeleton
-            if(ResultSkeletonIndex == -1){
-                ResultSkeletonIndex = Result.Skeletons.size();
-                Result.Skeletons.push_back(Skeleton);
             }
         }
+    }
+    
+    Result.HasSkeleton = Skeleton->Bones.size() > 0;
+    if(Result.HasSkeleton){
+        // NOTE(Dima): Now just go through the hierarchy and store loaded skeleton bones
+        int RootBoneNodeIndex = -1;
+        
+        /*
+        NOTE(Dima): Nodes are organized in tree like structure so first found node 
+        with the name that exist in BoneNames will be our root node of 
+        our skeleton!
+        */
+        for(int ScanIndex = 0; 
+            ScanIndex < Result.Nodes.size();
+            ScanIndex++)
+        {
+            loaded_node* CurNode = &Result.Nodes[ScanIndex];
+            
+            if(BoneNames.find(std::string(CurNode->Name)) != BoneNames.end()){
+                RootBoneNodeIndex = ScanIndex;
+                break;
+            }
+        }
+        
+        // NOTE(Dima): Root bone node should be found anyway
+        ASSERT(RootBoneNodeIndex != -1);
+        
+        // NOTE(Dima): Finding and setting bones parents
+        for(int BoneIndex = 0;
+            BoneIndex < Skeleton->Bones.size();
+            BoneIndex++)
+        {
+            bone_info* Bone = &Skeleton->Bones[BoneIndex];
+            
+            if(Bone->NodeIndex == RootBoneNodeIndex){
+                Bone->ParentIndex = -1;
+            }
+            else{
+                int ParentBoneIndex = -1;
+                b32 ParentBoneFound = false;
+                int ThisNodeIndex = Result.Nodes[Bone->NodeIndex].ParentIndex;
+                while(ThisNodeIndex != -1){
+                    loaded_node* Node = &Result.Nodes[ThisNodeIndex];
+                    
+                    auto FindBoneIt = BoneNameToBoneIndex.find(std::string(Node->Name));
+                    
+                    if(FindBoneIt != BoneNameToBoneIndex.end()){
+                        ParentBoneIndex = FindBoneIt->second;
+                        
+                        ParentBoneFound = true;
+                        break;
+                    }
+                    
+                    ThisNodeIndex = Node->ParentIndex;
+                }
+                
+                Assert(ParentBoneFound);
+                Bone->ParentIndex = ParentBoneIndex;
+            }
+        }
+        
+        // NOTE(Dima): Trying to find skeleton with same check sum in skeletons array
+        Skeleton->CheckSum = CalculateCheckSumForSkeleton(&Result, Skeleton);
+    }
+    
+    // NOTE(Dima): Loading meshes
+    for (int MeshIndex = 0; MeshIndex < NumMeshes; MeshIndex++) {
+        aiMesh* AssimpMesh = scene->mMeshes[MeshIndex];
         
         // NOTE(Dima): Loading mesh data
         std::vector<v3> Vertices;
@@ -794,24 +681,20 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         }
         
         std::vector<vertex_weights> Weights;
-        if(BonesCount){
+        if(Result.HasSkeleton){
             Weights.insert(Weights.begin(), AssimpMesh->mNumVertices, {});
             
-            tool_skeleton_info* Skeleton = &Result.Skeletons[ResultSkeletonIndex];
-            
             // NOTE(Dima): Iterating through bones and getting vertex weights
-            for(int BoneIndex = 0;
-                BoneIndex < BonesCount;
-                BoneIndex++)
+            for(int AssimpBoneIndex = 0;
+                AssimpBoneIndex < AssimpMesh->mNumBones;
+                AssimpBoneIndex++)
             {
-                aiBone* AssimpBone = AssimpMesh->mBones[BoneIndex];
                 
-                auto FindBoneIDIt = Skeleton->BoneNameToBoneID.find(std::string(AssimpBone->mName.C_Str()));
+                aiBone* AssimpBone = AssimpMesh->mBones[AssimpBoneIndex];
                 
-                // NOTE(Dima): Result should be found
-                ASSERT(FindBoneIDIt != Skeleton->BoneNameToBoneID.end());
+                std::string BoneName(AssimpBone->mName.C_Str());
                 
-                int BoneID = FindBoneIDIt->second;
+                int BoneIndex = BoneNameToBoneIndex[BoneName];
                 
                 for(int VertexWeightIndex = 0;
                     VertexWeightIndex < AssimpBone->mNumWeights;
@@ -823,9 +706,8 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
                     
                     vertex_weight NewWeight;
                     
-                    float Weight = AssimpWeight->mWeight;
-                    NewWeight.BoneID = BoneID;
-                    NewWeight.Weight = Weight;
+                    NewWeight.BoneID = BoneIndex;
+                    NewWeight.Weight = AssimpWeight->mWeight;
                     
                     Target->Weights.push_back(NewWeight);
                 }
@@ -848,8 +730,6 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
                 JoyShouldCalculateTangents);
         }
         
-        MeshSlot.SkeletonIndex = ResultSkeletonIndex;
-        
         Result.Meshes.push_back(MeshSlot);
     }
     
@@ -861,12 +741,10 @@ INTERNAL_FUNCTION tool_model_info LoadedToToolModelInfo(loaded_model* Model){
     
     Result.MeshCount = Model->Meshes.size();
     Result.MaterialCount = Model->Materials.size();
-    Result.SkeletonCount = Model->Skeletons.size();
     Result.AnimationCount = Model->Animations.size();
     
     Result.MeshIDs = std::vector<u32>();
     Result.MaterialIDs = std::vector<u32>();
-    Result.SkeletonIDs = std::vector<u32>();
     Result.AnimationIDs = std::vector<u32>();
     
     for(int NodeIndex = 0;
@@ -1003,12 +881,13 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
     
     // NOTE(Dima): Storing skeleton
     BeginAsset(System, GameAsset_Type_Skeleton);
-    for(int SkeletonIndex = 0;
-        SkeletonIndex < Model->Skeletons.size();
-        SkeletonIndex++)
+    if(Model->HasSkeleton)
     {
-        added_asset Added = AddSkeletonAsset(System, &Model->Skeletons[SkeletonIndex]);
-        ToolModel->SkeletonIDs.push_back(Added.ID);
+        added_asset Added = AddSkeletonAsset(System, &Model->Skeleton);
+        ToolModel->SkeletonID = Added.ID;;
+    }
+    else{
+        ToolModel->SkeletonID = 0;
     }
     EndAsset(System);
     

@@ -10,12 +10,12 @@
 
 
 #define GLGET_HELP(a) #a
-#define GLGETU(unamewithoutloc) Result.##unamewithoutloc##Loc = glGetUniformLocation(Result.ID, GLGET_HELP(unamewithoutloc))
-#define GLGETA(atxtwithouattrloc) Result.##atxtwithouattrloc##AttrLoc = glGetAttribLocation(Result.ID, GLGET_HELP(atxtwithouattrloc))
+#define GLGETU(unamewithoutloc) Result.##unamewithoutloc##Loc = glGetUniformLocation(Result.Shader.ID, GLGET_HELP(unamewithoutloc))
+#define GLGETA(atxtwithouattrloc) Result.##atxtwithouattrloc##AttrLoc = glGetAttribLocation(Result.Shader.ID, GLGET_HELP(atxtwithouattrloc))
 //#define GLGETP(index) gl->Programs[index]
 //#define GLGETPID(shader) gl->Programs[(shader).ProgramIndex].ID
 
-inline b32 GlArrayIsValid(GLint Arr){
+inline b32 ArrayIsValid(GLint Arr){
     b32 Result = 1;
     
     if(Arr == -1){
@@ -50,51 +50,23 @@ struct gl_shader{
     GLuint ID;
     u32 Type;
     int _InternalProgramIndex;
-    
-    void Use(){
-        glUseProgram(ID);
-    }
-    
-    void SetBool(GLint Loc, b32 Value){
-        glUniform1i(Loc, Value);
-    }
-    
-    void SetInt(GLint Loc, int Value){
-        glUniform1i(Loc, Value);
-    }
-    
-    void SetV3(GLint Loc, float x, float y, float z){
-        glUniform3f(Loc, x, y, z);
-    }
-    
-    void SetV3(GLint Loc, v3 A){
-        glUniform3f(Loc, A.x, A.y, A.z);
-    }
-    
-    void SetV4(GLint Loc, float x, float y, float z, float w){
-        glUniform4f(Loc, x, y, z, w);
-    }
-    
-    void SetV4(GLint Loc, v4 A){
-        glUniform4f(Loc, A.x, A.y, A.z, A.w);
-    }
-    
-    void SetM44(GLint Loc, float* Data){
-        glUniformMatrix4fv(Loc, 1, true, Data);
-    }
 };
 
-struct Gl_Screen_Shader : public gl_shader{
+struct gl_screen_shader{
+    gl_shader Shader;
+    
     GLint ScreenTextureLoc;
 };
 
-struct Gl_Simple_Shader : public gl_shader{
+struct gl_simple_shader{
+    gl_shader Shader;
+    
     GLint ModelLoc;
     GLint ViewLoc;
     GLint ProjectionLoc;
     GLint HasSkinningLoc;
     GLint BoneTransformsLoc;
-    GLint PassedBonesCountLoc;
+    GLint BonesCountLoc;
     
     GLint AlbedoLoc;
     GLint NormalsLoc;
@@ -109,7 +81,9 @@ struct Gl_Simple_Shader : public gl_shader{
     GLint BoneIDsAttrLoc;
 };
 
-struct Gl_GuiRect_Shader : public gl_shader{
+struct gl_guirect_shader{
+    gl_shader Shader;
+    
     GLint BitmapLoc;
     GLint BitmapIsSetLoc;
     GLint ProjectionLoc;
@@ -118,7 +92,9 @@ struct Gl_GuiRect_Shader : public gl_shader{
     GLint CAttrLoc;
 };
 
-struct Gl_GuiGeom_Shader : public gl_shader{
+struct gl_guigeom_shader{
+    gl_shader Shader;
+    
     GLint BitmapLoc;
     GLint TriangleGeomTypesLoc;
     GLint ProjectionLoc;
@@ -127,22 +103,35 @@ struct Gl_GuiGeom_Shader : public gl_shader{
     GLint CAttrLoc;
 };
 
+struct gl_debuggeom_shader{
+    gl_shader Shader;
+    
+    GLint ViewProjectionLoc;
+    
+    GLint PAttrLoc;
+    GLint ColorAttrLoc;
+};
+
 struct gl_state{
     gl_program Programs[256];
     int ProgramsCount;
     
     GLuint LargeAtlasHandle;
     
-    Gl_Screen_Shader ScreenShader;
-    Gl_Simple_Shader SimpleShader;
-    Gl_GuiRect_Shader GuiRectShader;
-    Gl_GuiGeom_Shader GuiGeomShader;
+    gl_screen_shader ScreenShader;
+    gl_simple_shader SimpleShader;
+    gl_guirect_shader GuiRectShader;
+    gl_guigeom_shader GuiGeomShader;
+    gl_debuggeom_shader DebugGeomShader;
     
     GLuint ScreenVAO;
     GLuint ScreenVBO;
     
     GLuint MeshVAO;
     GLuint MeshVBO;
+    
+    GLuint DEBUGGeomVAO;
+    GLuint DEBUGGeomVBO;
     
     GLuint GuiGeomVAO;
     GLuint GuiGeomVBO;

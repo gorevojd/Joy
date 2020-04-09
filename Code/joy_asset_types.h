@@ -173,15 +173,16 @@ struct skeleton_info{
 struct model_info{
     u32* MeshIDs;
     u32* MaterialIDs;
-    u32* SkeletonIDs;
     u32* AnimationIDs;
     node_info* Nodes;
     u32* NodeMeshIDsStorage;
     node_shared_data* NodesSharedDatas;
     
+    b32 HasSkeleton;
+    u32 SkeletonID;
+    
     int MeshCount;
     int MaterialCount;
-    int SkeletonCount;
     int NodeCount;
     int AnimationCount;
     int NodesMeshIDsStorageCount;

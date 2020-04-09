@@ -1834,39 +1834,13 @@ Win32ProcessMessages(input_state* Input){
     } //END_WHILE
 }
 
-INTERNAL_FUNCTION void
-Win32PreProcessInput(input_state* Input){
-    // NOTE(Dima): Char input
-    Input->FrameInput[0] = 0;
-    Input->FrameInputLen = 0;
-    
-    for(int keyIndex = 0; keyIndex < Key_Count; keyIndex++){
-        Input->Keyboard.KeyStates[keyIndex].TransitionHappened = 0;
-        Input->Keyboard.KeyStates[keyIndex].RepeatCount = 0;
-    }
-    
-#if 0    
-    for(int PadIndex = 0; PadIndex < MAX_GAMEPAD_COUNT; PadIndex++){
-        gamepad_controller* Pad = &Input->GamepadControllers[PadIndex];
-        
-        for(int KeyIndex = 0; KeyIndex < GamepadKey_Count; KeyIndex++){
-            key_state* Key = &Pad->Keys[KeyIndex].Key;
-            
-            Key->TransitionHappened = 0;
-            Key->RepeatCount = 0;
-        }
-    }
-#endif
-    
-}
-
 INTERNAL_FUNCTION inline rc2 Win32RectToJoy(RECT Rect){
     rc2 Result = {};
     
-    Result.min.x = Rect.left;
-    Result.min.y = Rect.top;
-    Result.max.x = Rect.right;
-    Result.max.y = Rect.bottom;
+    Result.Min.x = Rect.left;
+    Result.Min.y = Rect.top;
+    Result.Max.x = Rect.right;
+    Result.Max.y = Rect.bottom;
     
     return(Result);
 }
@@ -1941,17 +1915,17 @@ Win32ProcessInput(input_state* Input)
         
         v2 ChangedP = MouseInScreenP;
         
-        if(ChangedP.x < MouseCanMoveRect.min.x){
-            ChangedP.x = MouseCanMoveRect.max.x;
+        if(ChangedP.x < MouseCanMoveRect.Min.x){
+            ChangedP.x = MouseCanMoveRect.Max.x;
         }
-        if(ChangedP.y < MouseCanMoveRect.min.y){
-            ChangedP.y = MouseCanMoveRect.max.y;
+        if(ChangedP.y < MouseCanMoveRect.Min.y){
+            ChangedP.y = MouseCanMoveRect.Max.y;
         }
-        if(ChangedP.x > MouseCanMoveRect.max.x){
-            ChangedP.x = MouseCanMoveRect.min.x;
+        if(ChangedP.x > MouseCanMoveRect.Max.x){
+            ChangedP.x = MouseCanMoveRect.Min.x;
         }
-        if(ChangedP.y > MouseCanMoveRect.max.y){
-            ChangedP.y = MouseCanMoveRect.min.y;
+        if(ChangedP.y > MouseCanMoveRect.Max.y){
+            ChangedP.y = MouseCanMoveRect.Min.y;
         }
         
         point.x = ChangedP.x;
@@ -2141,11 +2115,40 @@ Win32ProcessInput(input_state* Input)
             }
         }
     }
+    
+    // NOTE(Dima): Processing quit requests
+    if(Input->QuitRequested){
+        GlobalRunning = false;
+    }
 }
 
 INPUT_PLATFORM_PROCESS(Win32PlatformInputProcess){
-    Win32PreProcessInput(GlobalGame->Input);
+    input_state* Input = GlobalGame->Input;
+    
+    // NOTE(Dima): Char input
+    Input->FrameInput[0] = 0;
+    Input->FrameInputLen = 0;
+    
+    for(int keyIndex = 0; keyIndex < Key_Count; keyIndex++){
+        Input->Keyboard.KeyStates[keyIndex].TransitionHappened = 0;
+        Input->Keyboard.KeyStates[keyIndex].RepeatCount = 0;
+    }
+    
+#if 0    
+    for(int PadIndex = 0; PadIndex < MAX_GAMEPAD_COUNT; PadIndex++){
+        gamepad_controller* Pad = &Input->GamepadControllers[PadIndex];
+        
+        for(int KeyIndex = 0; KeyIndex < GamepadKey_Count; KeyIndex++){
+            key_state* Key = &Pad->Keys[KeyIndex].Key;
+            
+            Key->TransitionHappened = 0;
+            Key->RepeatCount = 0;
+        }
+    }
+#endif
+    
     Win32ProcessMessages(GlobalGame->Input);
+    
     Win32ProcessInput(GlobalGame->Input);
 }
 
@@ -2307,15 +2310,15 @@ LPARAM LParam)
         }break;
         
         case WM_DESTROY:{
-            GlobalRunning = 0;
+            GlobalRunning = false;
         }break;
         
         case WM_QUIT:{
-            GlobalRunning = 0;
+            GlobalRunning = false;
         }break;
         
         case WM_CLOSE:{
-            GlobalRunning = 0;
+            GlobalRunning = false;
         }break;
         
         default:{
@@ -2448,18 +2451,6 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     // NOTE(Dima): Calculating perfomance frequency
     QueryPerformanceFrequency(&GlobalWin32.PerformanceFreqLI);
     GlobalWin32.OneOverPerformanceFreq = 1.0 / (double)GlobalWin32.PerformanceFreqLI.QuadPart;
-    
-    platform_mutex Mutex1;
-    platform_mutex Mutex2;
-    platform_mutex Mutex3;
-    
-    Win32InitMutex(&Mutex1);
-    Win32InitMutex(&Mutex2);
-    Win32InitMutex(&Mutex3);
-    
-    Win32FreeMutex(&Mutex1);
-    Win32FreeMutex(&Mutex3);
-    Win32FreeMutex(&Mutex2);
     
     // NOTE(Dima): Init win32 debug output log func
     if(IsDebuggerPresent()){

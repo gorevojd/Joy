@@ -91,6 +91,9 @@ struct render_entry_in_atlas_bmp{
 struct render_entry_mesh{
     mesh_info* Mesh;
     
+    m44* BoneTransforms;
+    int BoneCount;
+    
     m44 Transform;
 };
 

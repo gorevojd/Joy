@@ -66,6 +66,7 @@ enum GuiColorType{
     GuiColor_ButtonForegroundHot,
     GuiColor_ButtonGrad1,
     GuiColor_ButtonGrad2,
+    GuiColor_SliderValue,
     
     GuiColor_WindowBackground,
     GuiColor_WindowBorder,
@@ -396,10 +397,6 @@ struct gui_state{
     Color_State colorState;
     v4 colors[GuiColor_Count];
     float windowAlpha;
-    
-    v2 dimStack[128];
-    int dimStackIndex;
-    b32 inPushBlock;
 };
 
 
@@ -530,59 +527,9 @@ inline void GuiGoToGrid(gui_state* Gui, char* GridName){
     }
 }
 
-inline void GuiPushDim(gui_state* Gui, v2 dim){
-    ASSERT(Gui->dimStackIndex < ARRAY_COUNT(Gui->dimStack));
-    ASSERT(!Gui->inPushBlock);
-    
-    // NOTE(Dima): can't push if inside push block
-    if(Gui->inPushBlock){
-        
-    }
-    else{
-        Gui->dimStack[Gui->dimStackIndex++] = dim;
-    }
-}
-
-inline b32 GuiPopDim(gui_state* Gui, v2* outDim){
-    b32 result = 0;
-    
-    int decrementValue = Gui->inPushBlock ? 0 : 1;
-    
-    if(Gui->dimStackIndex > 0){
-        result = 1;
-        
-        if(outDim){
-            int viewIndex = Gui->dimStackIndex - 1;
-            *outDim = Gui->dimStack[viewIndex];
-        }
-        Gui->dimStackIndex -= decrementValue;
-    }
-    
-    return(result);
-}
-
-
-inline void GuiPushDimBegin(gui_state* Gui, v2 dim){
-    Gui->dimStack[Gui->dimStackIndex++] = dim;
-    
-    Gui->inPushBlock = 1;
-}
-
-inline void GuiPushDimEnd(gui_state* Gui){
-    Gui->inPushBlock = 0;
-    
-    GuiPopDim(Gui, 0);
-}
-
-inline rc2 GetTxtElemRect(gui_state* Gui, Gui_Layout* lay, rc2 txtRc, v2 growScale){
-    v2 popDim;
-    if(GuiPopDim(Gui, &popDim)){
-        txtRc.max = txtRc.min + popDim;
-    }
-    else{
-        rc2 tempTextRc = GrowRectByScaledValue(txtRc, growScale, Gui->fontScale);
-        txtRc.max = txtRc.min + GetRectDim(tempTextRc);
-    }
+inline rc2 GetTxtElemRect(gui_state* Gui, Gui_Layout* lay, rc2 txtRc){
+    rc2 tempTextRc = GrowRectByScaledValue(txtRc, V2(3.0f, 2.0f), Gui->fontScale);
+    txtRc.Max = txtRc.Min + GetRectDim(tempTextRc);
     
     return(txtRc);
 }
@@ -634,6 +581,7 @@ void GuiFramePrepare4Render(gui_state* Gui);
 void GuiTooltip(gui_state* Gui, char* tooltipText, v2 at);
 void GuiText(gui_state* Gui, char* text);
 b32 GuiButton(gui_state* Gui, char* buttonName);
+b32 GuiLinkButton(gui_state* Gui, char* buttonName);
 void GuiBoolButton(gui_state* Gui, char* buttonName, b32* value);
 void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value);
 void GuiCheckbox(gui_state* Gui, char* name, b32* value);

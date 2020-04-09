@@ -19,5 +19,4 @@ void main(){
     VsOut.UV = PUV.zw;
     VsOut.C = C;
     VsOut.TriangleGeomType = texelFetch(TriangleGeomTypes, gl_VertexID / 2).r;
-    //VsOut.TriangleGeomType = 1u;
 }

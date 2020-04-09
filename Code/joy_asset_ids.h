@@ -80,21 +80,21 @@ struct asset_node{
 struct asset_model{
     i16 MeshCount;
     i16 MaterialCount;
-    i16 SkeletonCount;
     i16 NodeCount;
     i16 NodesMeshIndicesStorageCount;
     i16 AnimationCount;
     
+    // NOTE(Dima): If ID is 0 then there is no skeleton
+    u32 SkeletonID;
+    
     u32 DataOffsetToMeshIDs;
     u32 DataOffsetToMaterialIDs;
-    u32 DataOffsetToSkeletonIDs;
     u32 DataOffsetToNodesSharedDatas;
     u32 DataOffsetToNodesMeshIndicesStorage;
     u32 DataOffsetToAnimationIDs;
     
     u32 SizeMeshIDs;
     u32 SizeMaterialIDs;
-    u32 SizeSkeletonIDs;
     u32 SizeNodesSharedDatas;
     u32 SizeNodesMeshIndicesStorage;
     u32 SizeAnimationIDs;

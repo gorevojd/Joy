@@ -135,17 +135,23 @@ INTERNAL_FUNCTION quat GetAnimatedQuat(animation_clip* Animation,
     return(Result);
 }
 
-void AnimateModel(assets* Assets,
-                  model_info* Model, 
-                  f64 CurrentTime)
+void UpdateModelAnimation(assets* Assets,
+                          model_info* Model,
+                          animation_clip* Animation,
+                          f64 CurrentTime)
 {
-    if(Model->AnimationCount){
-        animation_clip* Animation = LoadAnimationClip(Assets, 
-                                                      Model->AnimationIDs[0],
-                                                      ASSET_IMPORT_IMMEDIATE);
+    // NOTE(Dima): Calculating initial node to parent transforms
+    for(int NodeIndex = 0;
+        NodeIndex < Model->NodeCount;
+        NodeIndex++)
+    {
+        node_info* Node = &Model->Nodes[NodeIndex];
         
-        ASSERT(Animation);
-        
+        Node->CalculatedToParent = Node->Shared->ToParent;
+    }
+    
+    // NOTE(Dima): Updating animation
+    if(Animation){
         for(int NodeAnimIndex = 0;
             NodeAnimIndex < Animation->NodeAnimationsCount;
             NodeAnimIndex++)
@@ -186,10 +192,6 @@ void AnimateModel(assets* Assets,
                                              CurrentTick,
                                              V3(1.0f, 1.0f, 1.0f));
             
-            m44 TraMatrix = TranslationMatrix(AnimatedP);
-            m44 RotMatrix = RotationMatrix(AnimatedR);
-            m44 ScaMatrix = ScalingMatrix(AnimatedS);
-            
             m44 Tran = 
                 ScalingMatrix(AnimatedS) * 
                 RotationMatrix(AnimatedR) * 
@@ -200,4 +202,49 @@ void AnimateModel(assets* Assets,
             Node->CalculatedToParent = Tran;
         }
     }
+    
+    // NOTE(Dima): Calculating to to modelspace transforms
+    for(int NodeIndex = 0;
+        NodeIndex < Model->NodeCount;
+        NodeIndex++)
+    {
+        node_info* Node = &Model->Nodes[NodeIndex];
+        
+        if(Node->Shared->ParentIndex != -1){
+            // NOTE(Dima): If is not root
+            node_info* ParentNode = &Model->Nodes[Node->Shared->ParentIndex];
+            
+            Node->CalculatedToModel = Node->CalculatedToParent* ParentNode->CalculatedToModel;
+        }
+        else{
+            Node->CalculatedToModel = Node->CalculatedToParent;
+        }
+    }
+}
+
+// NOTE(Dima): Returns bone count
+int UpdateModelBoneTransforms(model_info* Model, 
+                              skeleton_info* Skeleton,
+                              m44* BoneTransformMatrices)
+{
+    int BoneCount = 0;
+    
+    // NOTE(Dima): Updating skeleton
+    if(Skeleton){
+        BoneCount = Skeleton->BoneCount;
+        
+        for(int BoneIndex = 0;
+            BoneIndex < BoneCount;
+            BoneIndex++)
+        {
+            bone_info* Bone = &Skeleton->Bones[BoneIndex];
+            
+            node_info* CorrespondingNode = &Model->Nodes[Bone->NodeIndex];
+            
+            BoneTransformMatrices[BoneIndex] = 
+                Bone->InvBindPose * CorrespondingNode->CalculatedToModel;
+        }
+    }
+    
+    return(BoneCount);
 }

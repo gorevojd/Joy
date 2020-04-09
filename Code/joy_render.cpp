@@ -5,11 +5,11 @@ void RenderPassSetCamera(render_pass* Pass, m44 Projection, m44 View,
                          int FramebufferWidth,
                          int FramebufferHeight)
 {
-    m44 PVM  = View * Projection;
+    m44 ViewProjection  = View * Projection;
     
     Pass->Projection = Projection;
     Pass->View = View;
-    Pass->ViewProjection = PVM;
+    Pass->ViewProjection = ViewProjection;
     
     Pass->FramebufferWidth = FramebufferWidth;
     Pass->FramebufferHeight = FramebufferHeight;
@@ -17,40 +17,40 @@ void RenderPassSetCamera(render_pass* Pass, m44 Projection, m44 View,
     v4 *FrustumPlanes = Pass->FrustumPlanes;
     
     //NOTE(dima): Left plane
-	FrustumPlanes[0].A = PVM.e[3] + PVM.e[0];
-	FrustumPlanes[0].B = PVM.e[7] + PVM.e[4];
-	FrustumPlanes[0].C = PVM.e[11] + PVM.e[8];
-	FrustumPlanes[0].D = PVM.e[15] + PVM.e[12];
+	FrustumPlanes[0].A = ViewProjection.e[3] + ViewProjection.e[0];
+	FrustumPlanes[0].B = ViewProjection.e[7] + ViewProjection.e[4];
+	FrustumPlanes[0].C = ViewProjection.e[11] + ViewProjection.e[8];
+	FrustumPlanes[0].D = ViewProjection.e[15] + ViewProjection.e[12];
     
 	//NOTE(dima): Right plane
-	FrustumPlanes[1].A = PVM.e[3] - PVM.e[0];
-	FrustumPlanes[1].B = PVM.e[7] - PVM.e[4];
-	FrustumPlanes[1].C = PVM.e[11] - PVM.e[8];
-	FrustumPlanes[1].D = PVM.e[15] - PVM.e[12];
+	FrustumPlanes[1].A = ViewProjection.e[3] - ViewProjection.e[0];
+	FrustumPlanes[1].B = ViewProjection.e[7] - ViewProjection.e[4];
+	FrustumPlanes[1].C = ViewProjection.e[11] - ViewProjection.e[8];
+	FrustumPlanes[1].D = ViewProjection.e[15] - ViewProjection.e[12];
     
 	//NOTE(dima): Bottom plane
-	FrustumPlanes[2].A = PVM.e[3] + PVM.e[1];
-	FrustumPlanes[2].B = PVM.e[7] + PVM.e[5];
-	FrustumPlanes[2].C = PVM.e[11] + PVM.e[9];
-	FrustumPlanes[2].D = PVM.e[15] + PVM.e[13];
+	FrustumPlanes[2].A = ViewProjection.e[3] + ViewProjection.e[1];
+	FrustumPlanes[2].B = ViewProjection.e[7] + ViewProjection.e[5];
+	FrustumPlanes[2].C = ViewProjection.e[11] + ViewProjection.e[9];
+	FrustumPlanes[2].D = ViewProjection.e[15] + ViewProjection.e[13];
     
 	//NOTE(dima): Top plane
-	FrustumPlanes[3].A = PVM.e[3] - PVM.e[1];
-	FrustumPlanes[3].B = PVM.e[7] - PVM.e[5];
-	FrustumPlanes[3].C = PVM.e[11] - PVM.e[9];
-	FrustumPlanes[3].D = PVM.e[15] - PVM.e[13];
+	FrustumPlanes[3].A = ViewProjection.e[3] - ViewProjection.e[1];
+	FrustumPlanes[3].B = ViewProjection.e[7] - ViewProjection.e[5];
+	FrustumPlanes[3].C = ViewProjection.e[11] - ViewProjection.e[9];
+	FrustumPlanes[3].D = ViewProjection.e[15] - ViewProjection.e[13];
     
 	//NOTE(dima): Near plane
-	FrustumPlanes[4].A = PVM.e[3] + PVM.e[2];
-	FrustumPlanes[4].B = PVM.e[7] + PVM.e[6];
-	FrustumPlanes[4].C = PVM.e[11] + PVM.e[10];
-	FrustumPlanes[4].D = PVM.e[15] + PVM.e[14];
+	FrustumPlanes[4].A = ViewProjection.e[3] + ViewProjection.e[2];
+	FrustumPlanes[4].B = ViewProjection.e[7] + ViewProjection.e[6];
+	FrustumPlanes[4].C = ViewProjection.e[11] + ViewProjection.e[10];
+	FrustumPlanes[4].D = ViewProjection.e[15] + ViewProjection.e[14];
     
 	//NOTE(dima): Far plane
-	FrustumPlanes[5].A = PVM.e[3] - PVM.e[2];
-	FrustumPlanes[5].B = PVM.e[7] - PVM.e[6];
-	FrustumPlanes[5].C = PVM.e[11] - PVM.e[10];
-	FrustumPlanes[5].D = PVM.e[15] - PVM.e[14];
+	FrustumPlanes[5].A = ViewProjection.e[3] - ViewProjection.e[2];
+	FrustumPlanes[5].B = ViewProjection.e[7] - ViewProjection.e[6];
+	FrustumPlanes[5].C = ViewProjection.e[11] - ViewProjection.e[10];
+	FrustumPlanes[5].D = ViewProjection.e[15] - ViewProjection.e[14];
     
     // NOTE(Dima): Normalizing planes
 	for (int PlaneIndex = 0;

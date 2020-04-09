@@ -307,26 +307,24 @@ added_asset AddModelAsset(asset_system* System, tool_model_info* Model){
     // NOTE(Dima): SEtting file header
     asset_model* ModelHeader = &FileHeader->Model;
     
+    ModelHeader->SkeletonID = Model->SkeletonID;
+    
     ModelHeader->MeshCount = Model->MeshCount;
     ModelHeader->MaterialCount = Model->MaterialCount;
-    ModelHeader->SkeletonCount = Model->SkeletonCount;
     ModelHeader->NodeCount = Model->Nodes.size();
     ModelHeader->NodesMeshIndicesStorageCount = Model->NodeMeshIndicesStorage.size();
     ModelHeader->AnimationCount = Model->AnimationCount;
     
     ModelHeader->SizeMeshIDs = sizeof(u32) * Model->MeshCount;
     ModelHeader->SizeMaterialIDs = sizeof(u32) * Model->MaterialCount;
-    ModelHeader->SizeSkeletonIDs = sizeof(u32) * Model->SkeletonCount;
     ModelHeader->SizeNodesSharedDatas = sizeof(node_shared_data) * Model->Nodes.size();
     ModelHeader->SizeNodesMeshIndicesStorage = sizeof(u32) * Model->NodeMeshIndicesStorage.size();
     ModelHeader->SizeAnimationIDs = sizeof(u32) * Model->AnimationCount;
     
     ModelHeader->DataOffsetToMeshIDs = 0;
     ModelHeader->DataOffsetToMaterialIDs = ModelHeader->SizeMeshIDs;
-    ModelHeader->DataOffsetToSkeletonIDs = 
-        ModelHeader->DataOffsetToMaterialIDs + ModelHeader->SizeMaterialIDs;
     ModelHeader->DataOffsetToNodesSharedDatas = 
-        ModelHeader->DataOffsetToSkeletonIDs + ModelHeader->SizeSkeletonIDs;
+        ModelHeader->DataOffsetToMaterialIDs + ModelHeader->SizeMaterialIDs;
     ModelHeader->DataOffsetToNodesMeshIndicesStorage = 
         ModelHeader->DataOffsetToNodesSharedDatas + 
         ModelHeader->SizeNodesSharedDatas;
@@ -732,7 +730,6 @@ And forming group regions that are about to be written
                     DataByteSize = 
                         Header->Model.SizeMeshIDs + 
                         Header->Model.SizeMaterialIDs + 
-                        Header->Model.SizeSkeletonIDs + 
                         Header->Model.SizeNodesSharedDatas +
                         Header->Model.SizeNodesMeshIndicesStorage + 
                         Header->Model.SizeAnimationIDs;
@@ -859,13 +856,6 @@ And forming group regions that are about to be written
                         // NOTE(Dima): Writing material IDs
                         fwrite(&Asset->Model->MaterialIDs[0],
                                ModelH->SizeMaterialIDs,
-                               1, fp);
-                    }
-                    
-                    if(ModelH->SkeletonCount){
-                        // NOTE(Dima): Writing skeleton IDs
-                        fwrite(&Asset->Model->SkeletonIDs[0],
-                               ModelH->SizeSkeletonIDs,
                                1, fp);
                     }
                     

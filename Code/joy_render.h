@@ -208,8 +208,8 @@ inline void PushGuiGeom_Rect(render_gui_geom* Geom,
 {
     Rect = RectNormalizeSubpixel(Rect);
     
-    v2 Min = Rect.min;
-    v2 Max = Rect.max;
+    v2 Min = Rect.Min;
+    v2 Max = Rect.Max;
     
     float r = Color.r;
     float g = Color.g;
@@ -241,8 +241,8 @@ inline void PushGuiGeom_Gradient(render_gui_geom* Geom,
                                  v3 color2, 
                                  u32 gradType)
 {
-    v2 Min = rc.min;
-    v2 Max = rc.max;
+    v2 Min = rc.Min;
+    v2 Max = rc.Max;
     
     float r1 = color1.r;
     float g1 = color1.g;
@@ -317,14 +317,14 @@ inline void PushGuiGeom_RectOutline(render_gui_geom* Geom,
 inline void PushGuiGeom_RectOutline(render_gui_geom* Geom, rc2 rect, 
                                     int pixelWidth, v4 Color = V4(0.0f, 0.0f, 0.0f, 1.0f)) 
 {
-    v2 p = rect.min;
+    v2 p = rect.Min;
     v2 dim = GetRectDim(rect);
     
     PushGuiGeom_RectOutline(Geom, p, dim, pixelWidth, Color);
 }
 
 inline void PushGuiGeom_InnerOutline(render_gui_geom* Geom, rc2 rect, int pixelWidth, v4 Color = V4(0.0f, 0.0f, 0.0f, 1.0f)) {
-    v2 p = rect.min + V2(pixelWidth, pixelWidth);
+    v2 p = rect.Min + V2(pixelWidth, pixelWidth);
     v2 dim = GetRectDim(rect) - 2.0f * V2(pixelWidth, pixelWidth);
     
     PushGuiGeom_RectOutline(Geom, p, dim, pixelWidth, Color);
@@ -384,7 +384,7 @@ v4 multColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
         
         rect = RectNormalizeSubpixel(rect);
         
-        entry->p = rect.min;
+        entry->p = rect.Min;
         entry->dim = GetRectDim(rect);
         entry->modulationColor01 = multColor;
     }
@@ -416,14 +416,14 @@ inline void PushRectOutline(render_stack* Stack, v2 p, v2 dim, int pixelWidth, v
 }
 
 inline void PushRectOutline(render_stack* Stack, rc2 rect, int pixelWidth, v4 multColor = V4(1.0f, 1.0f, 1.0f, 1.0f)) {
-    v2 p = rect.min;
+    v2 p = rect.Min;
     v2 dim = GetRectDim(rect);
     
     PushRectOutline(Stack, p, dim, pixelWidth, multColor);
 }
 
 inline void PushRectInnerOutline(render_stack* Stack, rc2 rect, int pixelWidth, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f)) {
-    v2 p = rect.min + V2(pixelWidth, pixelWidth);;
+    v2 p = rect.Min + V2(pixelWidth, pixelWidth);;
     v2 dim = GetRectDim(rect) - 2.0f * V2(pixelWidth, pixelWidth);
     
     PushRectOutline(Stack, p, dim, pixelWidth, color);
@@ -450,12 +450,16 @@ inline void PushGlyph(render_stack* Stack,
 
 inline void PushMesh(render_stack* Stack,
                      mesh_info* Mesh,
-                     m44 Transform)
+                     m44 Transform,
+                     m44* BoneTransforms = 0,
+                     int BoneCount = 0)
 {
     render_entry_mesh* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Mesh, render_entry_mesh);
     
     entry->Mesh = Mesh;
     entry->Transform = Transform;
+    entry->BoneCount = BoneCount;
+    entry->BoneTransforms = BoneTransforms;
 }
 
 inline void PushMesh(render_stack* Stack,
