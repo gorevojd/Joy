@@ -582,8 +582,6 @@ v4 modulationColor)
 	}
 }
 
-
-
 // NOTE(Dima): MESH AND SOUND STUFF
 tool_mesh_info MakeMesh(
 std::vector<v3>& Positions,

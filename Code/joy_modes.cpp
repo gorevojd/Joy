@@ -145,13 +145,53 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
                                    model_info* Model, 
                                    v3 Pos, quat Rot, v3 Scale, 
                                    f64 GlobalTime,
-                                   animation_clip* Animation,
-                                   m44* BoneTransformMatrices)
+                                   animation_controller* AC)
 {
     asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
     
-    // NOTE(Dima): Updating animation and node transforms
-    UpdateModelAnimation(Assets, Model, Animation, GlobalTime);
+    int BlendWeight = 1.0f / (f32)AC->PlayingAnimationsCount;
+    
+    for(int PlayingAnimIndex = 0;
+        PlayingAnimIndex < AC->PlayingAnimationsCount;
+        PlayingAnimIndex++)
+    {
+        playing_animation* Playing = AC->PlayingAnimations[PlayingAnimIndex];
+        
+        m44* BoneTransformMatrices = 0;
+        
+        animation_clip* Animation = LoadAnimationClip(Assets, 
+                                                      Playing->AnimationID,
+                                                      ASSET_IMPORT_IMMEDIATE);
+        
+        // NOTE(Dima): Updating animation and node transforms
+        UpdateModelAnimation(Assets, Model, Playing, Animation, GlobalTime);
+    }
+    
+    playing_animation* First = AC->PlayingAnimations[0];
+    playing_animation* Second = AC->PlayingAnimations[1];
+    
+    // NOTE(Dima): Lerp between first 2
+    for(int NodeIndex = 0; 
+        NodeIndex < Model->NodeCount;
+        NodeIndex++)
+    {
+        node_info* TargetNode = &Model->Nodes[NodeIndex];
+        
+        node_transform* TransformFirst = &First->NodeTransforms[NodeIndex];
+        node_transform* TransformSecond = &Second->NodeTransforms[NodeIndex];
+        
+        float t = 0.5f;
+        
+        v3 ResultP = Lerp(TransformFirst->T, TransformSecond->T, t);
+        v3 ResultS = Lerp(TransformFirst->S, TransformSecond->S, t);
+        quat ResultR = Lerp(TransformFirst->R, TransformSecond->R, t);
+        
+        TargetNode->CalculatedToParent = ScalingMatrix(ResultS) * 
+            RotationMatrix(ResultR) * 
+            TranslationMatrix(ResultP);
+    }
+    
+    CalculateToModelTransforms(Model);
     
     // NOTE(Dima): Getting skeleton if it exists
     skeleton_info* Skeleton = 0;
@@ -160,7 +200,8 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
     }
     
     // NOTE(Dima): Updating skeleton data
-    int BoneCount = UpdateModelBoneTransforms(Model, Skeleton, BoneTransformMatrices);
+    int BoneCount = UpdateModelBoneTransforms(Model, Skeleton, 
+                                              AC->BoneTransformMatrices);
     
     m44 ModelToWorld = ScalingMatrix(Scale) * RotationMatrix(Rot) * TranslationMatrix(Pos);
     
@@ -183,7 +224,8 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
             
             if(Mesh){
                 PushMesh(Stack, Mesh, NodeTran, 
-                         BoneTransformMatrices, BoneCount);
+                         AC->BoneTransformMatrices, 
+                         BoneCount);
             }
         }
     }
@@ -201,7 +243,7 @@ struct test_game_mode_state{
     sphere_distribution SphereDistributionFib;
     
     playing_animation PlayingAnim;
-    m44 BoneTransformMatrices[256];
+    m44 BoneTransformMatrices[128];
     
     b32 Initialized;
 };
@@ -376,22 +418,23 @@ GAME_MODE_UPDATE(TestUpdate){
                                   ASSET_IMPORT_DEFERRED);
     
     if(Model){
-        animation_clip* Animation = 0;
-        if(Model->AnimationCount){
-            Animation = LoadAnimationClip(Assets, 
-                                          Model->AnimationIDs[0],
-                                          ASSET_IMPORT_IMMEDIATE);
-        }
+        playing_animation PlayingAnim0 = {};
+        PlayingAnim0.AnimationID = Model->AnimationIDs[0];
         
-        m44* BoneTransformMatrices = State->BoneTransformMatrices;
+        playing_animation PlayingAnim1 = {};
+        PlayingAnim1.AnimationID = Model->AnimationIDs[5];
+        
+        animation_controller PlayerAC = {};
+        PlayerAC.PlayingAnimations[0] = &PlayingAnim0;
+        PlayerAC.PlayingAnimations[1] = &PlayingAnim1;
+        PlayerAC.PlayingAnimationsCount = 2;
         
         UpdateModel(Assets, Stack, Model, 
                     V3(10.0f, 0.0f, 10.0f),
                     QuatI(), 
                     V3(1.0f),
                     Game->Input->Time,
-                    Animation,
-                    BoneTransformMatrices);
+                    &PlayerAC);
     }
     
 #if 0    

@@ -32,7 +32,7 @@ INTERNAL_FUNCTION void WriteFonts(){
     asset_system* System = &System_;
     InitAssetFile(System);
     
-    tool_font_info LibMono = LoadFont("../Data/Fonts/LiberationMono-Bold.ttf", 14.0f, LoadFont_BakeBlur);
+    tool_font_info LibMono = LoadFont("../Data/Fonts/LiberationMono-Bold.ttf", 16.0f, LoadFont_BakeBlur);
     tool_font_info Lilita = LoadFont("../Data/Fonts/LilitaOne.ttf", 20.0f, LoadFont_BakeShadow);
     tool_font_info Inconsolata = LoadFont("../Data/Fonts/Inconsolatazi4-Bold.otf", 16.0f, LoadFont_BakeBlur);
     tool_font_info PFDIN = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 16.0f, LoadFont_BakeBlur);

@@ -135,23 +135,53 @@ INTERNAL_FUNCTION quat GetAnimatedQuat(animation_clip* Animation,
     return(Result);
 }
 
+INTERNAL_FUNCTION void 
+DecomposeTransformsForNode(const m44& Matrix,
+                           node_transform* Tran)
+{
+    Tran->T = Matrix.Rows[3].xyz;
+    
+    v3 Row0 = Matrix.Rows[0].xyz;
+    v3 Row1 = Matrix.Rows[1].xyz;
+    v3 Row2 = Matrix.Rows[2].xyz;
+    
+    float Row0Len = Magnitude(Row0);
+    float Row1Len = Magnitude(Row1);
+    float Row2Len = Magnitude(Row2);
+    
+    Tran->S = V3(Row0Len, Row1Len, Row2Len);
+    
+    Row0 = Row0 / Row0Len;
+    Row1 = Row1 / Row1Len;
+    Row2 = Row2 / Row2Len;
+    
+    m33 RotMat = MatrixFromRows(Row0, Row1, Row2);
+    
+    Tran->R = QuatFromM33(RotMat);
+    
+    Tran->Calculated = true;
+}
+
 void UpdateModelAnimation(assets* Assets,
                           model_info* Model,
+                          playing_animation* PlayingAnim,
                           animation_clip* Animation,
                           f64 CurrentTime)
 {
-    // NOTE(Dima): Calculating initial node to parent transforms
-    for(int NodeIndex = 0;
-        NodeIndex < Model->NodeCount;
-        NodeIndex++)
-    {
-        node_info* Node = &Model->Nodes[NodeIndex];
-        
-        Node->CalculatedToParent = Node->Shared->ToParent;
-    }
-    
     // NOTE(Dima): Updating animation
     if(Animation){
+        
+        for(int NodeIndex = 0;
+            NodeIndex < Model->NodeCount;
+            NodeIndex++)
+        {
+            node_info* Node = &Model->Nodes[NodeIndex];
+            
+            node_transform* NodeTransform = &PlayingAnim->NodeTransforms[NodeIndex];
+            
+            NodeTransform->Calculated = false;
+        }
+        
         for(int NodeAnimIndex = 0;
             NodeAnimIndex < Animation->NodeAnimationsCount;
             NodeAnimIndex++)
@@ -192,17 +222,32 @@ void UpdateModelAnimation(assets* Assets,
                                              CurrentTick,
                                              V3(1.0f, 1.0f, 1.0f));
             
-            m44 Tran = 
-                ScalingMatrix(AnimatedS) * 
-                RotationMatrix(AnimatedR) * 
-                TranslationMatrix(AnimatedP);
+            node_transform* NodeTransform = &PlayingAnim->NodeTransforms[NodeAnim->NodeIndex];
             
-            node_info* Node = &Model->Nodes[NodeAnim->NodeIndex];
+            NodeTransform->T = AnimatedP;
+            NodeTransform->R = AnimatedR;
+            NodeTransform->S = AnimatedS;
+            NodeTransform->Calculated = true;
+        }
+        
+        // NOTE(Dima): Extract transforms that were not calculated
+        for(int NodeIndex = 0;
+            NodeIndex < Model->NodeCount;
+            NodeIndex++)
+        {
+            node_info* Node = &Model->Nodes[NodeIndex];
             
-            Node->CalculatedToParent = Tran;
+            node_transform* NodeTransform = &PlayingAnim->NodeTransforms[NodeIndex];
+            
+            if(!NodeTransform->Calculated){
+                DecomposeTransformsForNode(Node->Shared->ToParent, NodeTransform);
+            }
         }
     }
-    
+}
+
+
+void CalculateToModelTransforms(model_info* Model){
     // NOTE(Dima): Calculating to to modelspace transforms
     for(int NodeIndex = 0;
         NodeIndex < Model->NodeCount;
