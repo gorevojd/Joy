@@ -826,12 +826,18 @@ inline quat Lerp(quat A, quat B, float t) {
     quat Result;
     
     float OneMinusT = 1.0f - t;
-    
-    Result.x = A.x * OneMinusT + B.x * t;
-    Result.y = A.y * OneMinusT + B.y * t;
-    Result.z = A.z * OneMinusT + B.z * t;
-    Result.w = A.w * OneMinusT + B.w * t;
-    
+    if(Dot(A, B) < 0.0f){
+        Result.x = A.x * OneMinusT - B.x * t;
+        Result.y = A.y * OneMinusT - B.y * t;
+        Result.z = A.z * OneMinusT - B.z * t;
+        Result.w = A.w * OneMinusT - B.w * t;
+    }
+    else{
+        Result.x = A.x * OneMinusT + B.x * t;
+        Result.y = A.y * OneMinusT + B.y * t;
+        Result.z = A.z * OneMinusT + B.z * t;
+        Result.w = A.w * OneMinusT + B.w * t;
+    }
     Result = Normalize(Result);
     
     return(Result);

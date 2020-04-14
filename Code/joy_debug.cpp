@@ -5,32 +5,13 @@ inline debug_primitive* DEBUGAddPrimitive(v3 Color,
                                           b32 DepthEnabled,
                                           u32 Type)
 {
-    if(DLIST_FREE_IS_EMPTY(DEBUGGlobalTable->PrimitiveFree)){
-        const int CountToAlloc = 128;
-        debug_primitive* Pool = PushArray(&DEBUGGlobalTable->Region,
-                                          debug_primitive, CountToAlloc);
-        
-        for(int Index = 0;
-            Index < CountToAlloc;
-            Index++)
-        {
-            debug_primitive* Prim = &Pool[Index];
-            
-            DLIST_INSERT_BEFORE_SENTINEL(Prim, 
-                                         DEBUGGlobalTable->PrimitiveFree,
-                                         Next, Prev);
-        }
-        
-        DEBUGGlobalTable->TotalAllocatedPrimitives += CountToAlloc;
-    }
-    
-    debug_primitive* Result = DEBUGGlobalTable->PrimitiveFree.Next;
-    
-    DLIST_REMOVE_ENTRY(Result, Next, Prev);
-    
-    DLIST_INSERT_BEFORE_SENTINEL(Result, 
+    DLIST_ALLOCATE_FUNCTION_BODY(debug_primitive, 
+                                 &DEBUGGlobalTable->PrimitiveFree,
+                                 Next, Prev,
+                                 DEBUGGlobalTable->PrimitiveFree,
                                  DEBUGGlobalTable->PrimitiveUse,
-                                 Next, Prev);
+                                 128,
+                                 Result);
     
     Result->Color = Color;
     Result->Duration = Duration;
@@ -41,13 +22,11 @@ inline debug_primitive* DEBUGAddPrimitive(v3 Color,
 }
 
 inline debug_primitive* DEBUGRemovePrimitive(debug_primitive* Primitive){
-    DLIST_REMOVE_ENTRY(Primitive, Next, Prev);
+    DLIST_DEALLOCATE_FUNCTION_BODY(Primitive, 
+                                   DEBUGGlobalTable->PrimitiveFree,
+                                   Next, Prev);
     
-    DLIST_INSERT_BEFORE_SENTINEL(Primitive, 
-                                 DEBUGGlobalTable->PrimitiveFree,
-                                 Next, Prev);
-    
-    return(Result);
+    return(Primitive);
 }
 
 void DEBUGAddLine(v3 From,

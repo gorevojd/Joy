@@ -140,55 +140,177 @@ INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
     
 }
 
+
+INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitPlayerAC)
+{
+    anim_controller* AC = CreateAnimControl(Anim, NodesCheckSum);
+    
+    // NOTE(Dima): Adding animation nodes
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Idle");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Falling");
+    
+#if 0
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run1");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run2");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run3");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run4");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run5");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run6");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run7");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run8");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run9");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run10");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run11");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run12");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run13");
+    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run14");
+    
+    anim_graph_node* FindRes1 = FindGraphNode(AC, "Run14");
+    anim_graph_node* FindRes2 = FindGraphNode(AC, "Run7");
+#endif
+    
+    // NOTE(Dima): Adding condition variables
+    AddVariable(AC, "VelocityLength", 
+                AnimVariable_Float);
+    AddVariable(AC, "IsFalling",
+                AnimVariable_Bool);
+    
+#if 0 
+    AddVariable(AC, "TempVar0", AnimVariable_Bool);
+    AddVariable(AC, "TempVar1", AnimVariable_Bool);
+    AddVariable(AC, "TempVar2", AnimVariable_Bool);
+    AddVariable(AC, "TempVar3", AnimVariable_Bool);
+    AddVariable(AC, "TempVar4", AnimVariable_Bool);
+    AddVariable(AC, "TempVar5", AnimVariable_Bool);
+    AddVariable(AC, "TempVar6", AnimVariable_Bool);
+    AddVariable(AC, "TempVar7", AnimVariable_Bool);
+    AddVariable(AC, "TempVar8", AnimVariable_Bool);
+    AddVariable(AC, "TempVar9", AnimVariable_Bool);
+    AddVariable(AC, "TempVar10", AnimVariable_Bool);
+    AddVariable(AC, "TempVar11", AnimVariable_Bool);
+    AddVariable(AC, "TempVar12", AnimVariable_Bool);
+    AddVariable(AC, "TempVar13", AnimVariable_Bool);
+    AddVariable(AC, "TempVar14", AnimVariable_Bool);
+    AddVariable(AC, "TempVar15", AnimVariable_Bool);
+    AddVariable(AC, "TempVar16", AnimVariable_Bool);
+    AddVariable(AC, "TempVar17", AnimVariable_Bool);
+    AddVariable(AC, "TempVar18", AnimVariable_Bool);
+    AddVariable(AC, "TempVar19", AnimVariable_Bool);
+    
+    anim_variable* FindResVar1 = FindVariable(AC, "TempVar19");
+    anim_variable* FindResVar2 = FindVariable(AC, "TempVar122");
+#endif
+    
+    // NOTE(Dima): Adding transitions
+    anim_transition* IdleToRun = AddTransition(AC, "Idle", "Run");
+    AddConditionFloat(IdleToRun, 
+                      "VelocityLength",
+                      TransitionCondition_MoreEqThan,
+                      0.05f);
+    
+    anim_transition* RunToIdle = AddTransition(AC, "Run", "Idle"); 
+    AddConditionFloat(RunToIdle,
+                      "VelocityLength",
+                      TransitionCondition_LessThan,
+                      0.05f);
+    
+    anim_transition* IdleToFalling = AddTransition(AC, "Run", "Falling");
+    AddConditionBool(IdleToFalling,
+                     "IsFalling",
+                     TransitionCondition_Equal,
+                     true);
+    
+    anim_transition* FallingToIdle = AddTransition(AC, "Falling", "Idle");
+    AddConditionFloat(FallingToIdle,
+                      "VelocityLength",
+                      TransitionCondition_LessThan,
+                      0.05f);
+    AddConditionBool(FallingToIdle,
+                     "IsFalling",
+                     TransitionCondition_Equal,
+                     false);
+    
+    anim_transition* FallingToRun = AddTransition(AC, "Falling", "Run");
+    AddConditionFloat(FallingToRun,
+                      "VelocityLength",
+                      TransitionCondition_MoreEqThan,
+                      0.05f);
+    AddConditionBool(FallingToRun,
+                     "IsFalling",
+                     TransitionCondition_Equal,
+                     false);
+    
+    return(AC);
+}
+
 INTERNAL_FUNCTION void UpdateModel(assets* Assets, 
                                    render_stack* Stack,
                                    model_info* Model, 
                                    v3 Pos, quat Rot, v3 Scale, 
                                    f64 GlobalTime,
-                                   animation_controller* AC)
+                                   anim_controller* AC)
 {
     asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
     
-    int BlendWeight = 1.0f / (f32)AC->PlayingAnimationsCount;
+    ResetToParentTransforms(Model);
     
-    for(int PlayingAnimIndex = 0;
-        PlayingAnimIndex < AC->PlayingAnimationsCount;
-        PlayingAnimIndex++)
-    {
-        playing_animation* Playing = AC->PlayingAnimations[PlayingAnimIndex];
+    if(AC){
+        for(int PlayingAnimIndex = 0;
+            PlayingAnimIndex < AC->PlayingAnimationsCount;
+            PlayingAnimIndex++)
+        {
+            playing_anim* Playing = AC->PlayingAnimations[PlayingAnimIndex];
+            
+            m44* BoneTransformMatrices = 0;
+            
+            animation_clip* Animation = LoadAnimationClip(Assets, 
+                                                          Playing->AnimationID,
+                                                          ASSET_IMPORT_IMMEDIATE);
+            
+            // NOTE(Dima): Updating animation and node transforms
+            UpdateModelAnimation(Assets, Model, Playing, Animation, GlobalTime);
+        }
         
-        m44* BoneTransformMatrices = 0;
-        
-        animation_clip* Animation = LoadAnimationClip(Assets, 
-                                                      Playing->AnimationID,
-                                                      ASSET_IMPORT_IMMEDIATE);
-        
-        // NOTE(Dima): Updating animation and node transforms
-        UpdateModelAnimation(Assets, Model, Playing, Animation, GlobalTime);
-    }
-    
-    playing_animation* First = AC->PlayingAnimations[0];
-    playing_animation* Second = AC->PlayingAnimations[1];
-    
-    // NOTE(Dima): Lerp between first 2
-    for(int NodeIndex = 0; 
-        NodeIndex < Model->NodeCount;
-        NodeIndex++)
-    {
-        node_info* TargetNode = &Model->Nodes[NodeIndex];
-        
-        node_transform* TransformFirst = &First->NodeTransforms[NodeIndex];
-        node_transform* TransformSecond = &Second->NodeTransforms[NodeIndex];
-        
-        float t = 0.5f;
-        
-        v3 ResultP = Lerp(TransformFirst->T, TransformSecond->T, t);
-        v3 ResultS = Lerp(TransformFirst->S, TransformSecond->S, t);
-        quat ResultR = Lerp(TransformFirst->R, TransformSecond->R, t);
-        
-        TargetNode->CalculatedToParent = ScalingMatrix(ResultS) * 
-            RotationMatrix(ResultR) * 
-            TranslationMatrix(ResultP);
+        if(AC->PlayingAnimationsCount > 1){
+            playing_anim* First = AC->PlayingAnimations[0];
+            playing_anim* Second = AC->PlayingAnimations[1];
+            
+            // NOTE(Dima): Lerp between first 2
+            for(int NodeIndex = 0; 
+                NodeIndex < Model->NodeCount;
+                NodeIndex++)
+            {
+                node_info* TargetNode = &Model->Nodes[NodeIndex];
+                
+                node_transform* TransformFirst = &First->NodeTransforms[NodeIndex];
+                node_transform* TransformSecond = &Second->NodeTransforms[NodeIndex];
+                
+                float t = 0.5f;
+                
+                v3 ResultP = Lerp(TransformFirst->T, TransformSecond->T, t);
+                v3 ResultS = Lerp(TransformFirst->S, TransformSecond->S, t);
+                quat ResultR = Lerp(TransformFirst->R, TransformSecond->R, t);
+                
+                TargetNode->CalculatedToParent = ScalingMatrix(ResultS) * 
+                    RotationMatrix(ResultR) * 
+                    TranslationMatrix(ResultP);
+            }
+        }
+        else{
+            for(int NodeIndex = 0; 
+                NodeIndex < Model->NodeCount;
+                NodeIndex++)
+            {
+                node_info* TargetNode = &Model->Nodes[NodeIndex];
+                
+                node_transform* Transform = &AC->PlayingAnimations[0]->NodeTransforms[NodeIndex];
+                
+                TargetNode->CalculatedToParent = ScalingMatrix(Transform->S) * 
+                    RotationMatrix(Transform->R) * 
+                    TranslationMatrix(Transform->T);
+            }
+        }
     }
     
     CalculateToModelTransforms(Model);
@@ -242,8 +364,14 @@ struct test_game_mode_state{
     sphere_distribution SphereDistributionTrig;
     sphere_distribution SphereDistributionFib;
     
-    playing_animation PlayingAnim;
-    m44 BoneTransformMatrices[128];
+    playing_anim Anim0;
+    playing_anim Anim1;
+    anim_controller AC;
+    
+    playing_anim TestAnim;
+    anim_controller TestAC;
+    
+    anim_controller* PlayerAC;
     
     b32 Initialized;
 };
@@ -272,7 +400,7 @@ GAME_MODE_UPDATE(TestUpdate){
                                                                   SphereDistributionsmaxCount,
                                                                   State->SphereDistributionsFib);
         
-        State->PlayingAnim.AnimationID = 0;
+        State->PlayerAC = InitPlayerAC(Game->Anim, Game->Assets, 0);
         
         State->Initialized = true;
     }
@@ -391,6 +519,7 @@ GAME_MODE_UPDATE(TestUpdate){
     u32 StoolID = GetFirst(Game->Assets, GameAsset_Stool);
     
     
+#if 0    
     int SphereLayers = 10;
     int SphereLayerCount = 10;
     v3 SphereStartP = V3(0.0f, 1.0f, -15.0f);
@@ -410,6 +539,7 @@ GAME_MODE_UPDATE(TestUpdate){
                            ASSET_IMPORT_DEFERRED);
         }
     }
+#endif
     
     assets* Assets = Game->Assets;
     
@@ -418,24 +548,41 @@ GAME_MODE_UPDATE(TestUpdate){
                                   ASSET_IMPORT_DEFERRED);
     
     if(Model){
-        playing_animation PlayingAnim0 = {};
-        PlayingAnim0.AnimationID = Model->AnimationIDs[0];
-        
-        playing_animation PlayingAnim1 = {};
-        PlayingAnim1.AnimationID = Model->AnimationIDs[5];
-        
-        animation_controller PlayerAC = {};
-        PlayerAC.PlayingAnimations[0] = &PlayingAnim0;
-        PlayerAC.PlayingAnimations[1] = &PlayingAnim1;
-        PlayerAC.PlayingAnimationsCount = 2;
+        State->Anim0.AnimationID = Model->AnimationIDs[0];
+        State->Anim0.PlaybackRate = 1.0f;
+        State->Anim1.AnimationID = Model->AnimationIDs[5];
+        State->Anim1.PlaybackRate = 1.0f;
+        State->AC.PlayingAnimations[0] = &State->Anim0;
+        State->AC.PlayingAnimations[1] = &State->Anim1;
+        State->AC.PlayingAnimationsCount = 2;
         
         UpdateModel(Assets, Stack, Model, 
                     V3(10.0f, 0.0f, 10.0f),
                     QuatI(), 
                     V3(1.0f),
                     Game->Input->Time,
-                    &PlayerAC);
+                    &State->AC);
     }
+    
+    
+    model_info* TestModel = LoadModel(Game->Assets,
+                                      GetFirst(Game->Assets, GameAsset_Test),
+                                      ASSET_IMPORT_DEFERRED);
+    
+    if(TestModel){
+        State->TestAnim.AnimationID = TestModel->AnimationIDs[0];
+        State->TestAnim.PlaybackRate = 0.1;
+        State->TestAC.PlayingAnimations[0] = &State->TestAnim;
+        State->TestAC.PlayingAnimationsCount = 1;
+        
+        UpdateModel(Assets, Stack, TestModel, 
+                    V3(-10.0f, 0.0f, 10.0f),
+                    QuatI(), 
+                    V3(1.0f),
+                    Game->Input->Time,
+                    &State->TestAC);
+    }
+    
     
 #if 0    
     PushOrLoadModel(Game->Assets, Stack,
@@ -518,6 +665,7 @@ GAME_MODE_UPDATE(TestUpdate){
                      GetFirst(Game->Assets, GameAsset_Type_Bitmap));
     
     
+#if 0    
     ShowSphereDistributions(Game, Stack,
                             &State->SphereDistributionTrig,
                             SphereID,
@@ -529,6 +677,7 @@ GAME_MODE_UPDATE(TestUpdate){
                             SphereID,
                             V3(10.0f, 10.0f, 0.0f),
                             2.0f);
+#endif
     
     PushOrLoadMesh(Game->Assets, Stack, 
                    GetFirst(Game->Assets, GameAsset_Cube),

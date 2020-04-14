@@ -101,8 +101,8 @@ enum Gui_Layout_Type{
 };
 
 struct Gui_Layout{
-    v2 Start;
     v2 At;
+    v2 Start;
     v2 Dim;
     rc2 Rect;
     
@@ -565,7 +565,7 @@ assets* Assets);
 void GuiFrameBegin(gui_state* Gui, gui_frame_info GuiFrameInfo);
 void GuiFrameEnd(gui_state* Gui);
 
-void GuiBeginLayout(gui_state* Gui, char* name, u32 layoutType);
+void GuiBeginLayout(gui_state* Gui, char* name, u32 layoutType, v2* P = 0, v2* Dim = 0);
 void GuiEndLayout(gui_state* Gui);
 
 void GuiBeginPage(gui_state* Gui, char* name);

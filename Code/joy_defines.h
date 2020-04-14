@@ -77,5 +77,22 @@
     entry_ptr->##next##->##prev = entry_ptr->##prev##;\
     entry_ptr->##prev##->##next = entry_ptr->##next##;}
 
+// NOTE(Dima): DLIST allocate function body
+#define DLIST_ALLOCATE_FUNCTION_BODY(type, mem_region_ptr, next, prev, free_sent_value, use_sent_value, grow_count, result_ptr_name) \
+if(DLIST_FREE_IS_EMPTY(free_sent_value, next)){\
+    type* Pool = PushArray(mem_region_ptr, type, (grow_count));\
+    for(int Index = 0; Index < (grow_count); Index++){\
+        type* Prim = &Pool[Index];\
+        DLIST_INSERT_BEFORE_SENTINEL(Prim, free_sent_value, next, prev);\
+    }\
+}\
+type* result_ptr_name = (free_sent_value).##next##; \
+DLIST_REMOVE_ENTRY(Result, next, prev); \
+DLIST_INSERT_BEFORE_SENTINEL(Result, use_sent_value, next, prev);
+
+// NOTE(Dima): DLIST deallocate function body
+#define DLIST_DEALLOCATE_FUNCTION_BODY(entry_ptr, next, prev, free_sent_value) \
+DLIST_REMOVE_ENTRY(entry_ptr, next, prev);\
+DLIST_INSERT_BEFORE_SENTINEL(entry_ptr, free_sent_value, next, prev);
 
 #endif

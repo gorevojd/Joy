@@ -10,6 +10,7 @@
 #include "joy_assets.h"
 #include "joy_input.h"
 #include "joy_gui.h"
+#include "joy_animation.h"
 
 #include "joy_game_interface.h"
 
@@ -43,11 +44,13 @@ struct game_state{
     mem_region InputMemory;
     mem_region RenderMemory;
     mem_region AssetMemory;
+    mem_region AnimMemory;
     
     gui_state* Gui;
     input_state* Input;
     render_state* Render;
     assets* Assets;
+    anim_state* Anim;
     
     // NOTE(Dima): platform api functions
     input_platform_process* ProcessInput;

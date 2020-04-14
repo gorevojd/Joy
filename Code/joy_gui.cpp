@@ -481,7 +481,8 @@ assets* Assets)
     Gui->colors[GuiColor_Hot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
     Gui->colors[GuiColor_Active] = GUI_GETCOLOR_COLSYS(Color_Red);
     
-    Gui->colors[GuiColor_ButtonBackground] = GUI_GETCOLOR_COLSYS(ColorExt_DarkGreen);
+    Gui->windowAlpha = 0.85f;
+    Gui->colors[GuiColor_ButtonBackground] = V4(0.0f, 0.0f, 0.0f, Gui->windowAlpha);
     Gui->colors[GuiColor_ButtonBackgroundHot] = GUI_GETCOLOR_COLSYS(Color_Blue);
     Gui->colors[GuiColor_ButtonForeground] = GUI_GETCOLOR_COLSYS(Color_White);
     Gui->colors[GuiColor_ButtonForegroundHot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
@@ -490,8 +491,7 @@ assets* Assets)
     Gui->colors[GuiColor_ButtonGrad2] = GUI_GETCOLOR_COLSYS(ColorExt_DarkGreen);
     Gui->colors[GuiColor_SliderValue] = GUI_GETCOLOR_COLSYS(Color_DarkMagenta);
     
-    Gui->windowAlpha = 0.85f;
-    Gui->colors[GuiColor_WindowBackground] = V4(0.0f, 0.0f, 0.0f, Gui->windowAlpha);
+    Gui->colors[GuiColor_WindowBackground] = GUI_GETCOLOR_COLSYS(Color_Orange);
     Gui->colors[GuiColor_WindowBorder] = GUI_GETCOLOR_COLSYS(Color_Black);
     Gui->colors[GuiColor_WindowBorderHot] = GUI_GETCOLOR_COLSYS(Color_Magenta);
     Gui->colors[GuiColor_WindowBorderActive] = GUI_GETCOLOR_COLSYS(Color_Blue);
@@ -804,32 +804,30 @@ inline void GuiGrowWindowRect(v2* P, v2* Dim, int PixelsGrow){
 INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui, 
                                      Gui_Layout* layout, 
                                      u32 layoutType, 
-                                     gui_element* LayoutElem)
+                                     gui_element* LayoutElem,
+                                     v2* Min,
+                                     v2* Dim)
 {
     // NOTE(Dima): initializing references
     LayoutElem->Data.Layout.ref = layout;
     layout->Elem = LayoutElem;
     
-    v2 popDim = V2(640, 480);
-    
     // NOTE(Dima): Layout initializing
     layout->Type = layoutType;
     if(!LayoutElem->Data.IsInit){
-        layout->Start = V2(200.0f, 200.0f) * (Gui->layoutCount - 1);
-        layout->At = layout->Start;
+        layout->Start = V2(0.0f, 0.0f);
         // NOTE(Dima): Layout dimension should be set anyways
         // NOTE(Dima): because of interaction that account to them
         layout->Dim = V2(Gui->Width, Gui->Height);
         
-        switch(layoutType){
-            case GuiLayout_Layout:{
-                layout->Dim = V2(Gui->Width, Gui->Height);
-            }break;
-            
-            case GuiLayout_Window:{
-                layout->Dim = popDim;
-            }break;
+        if(Min){
+            layout->Start = *Min;
         }
+        
+        if(Dim){
+            layout->Dim = *Dim;
+        }
+        layout->At = layout->Start;
         
         LayoutElem->Data.IsInit = true;
     }
@@ -935,7 +933,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui,
     }
 }
 
-void GuiBeginLayout(gui_state* Gui, char* name, u32 layoutType){
+void GuiBeginLayout(gui_state* Gui, char* name, u32 layoutType, v2* P, v2* Dim){
     // NOTE(Dima): In list inserting
     u32 nameID = StringHashFNV(name);
     
@@ -965,7 +963,7 @@ void GuiBeginLayout(gui_state* Gui, char* name, u32 layoutType){
     // NOTE(Dima): Beginnning layout elem
     gui_element* LayoutElem = GuiBeginElement(Gui, name, GuiElement_Layout, true);
     
-    GuiInitLayout(Gui, foundLayout, layoutType, LayoutElem);
+    GuiInitLayout(Gui, foundLayout, layoutType, LayoutElem, P, Dim);
 }
 
 void GuiEndLayout(gui_state* Gui){
@@ -1133,7 +1131,7 @@ void GuiFrameBegin(gui_state* Gui, gui_frame_info GuiFrameInfo){
                                               GuiElement_Layout, 
                                               true);
     
-    GuiInitLayout(Gui, &Gui->rootLayout, GuiLayout_Layout, LayoutElem);
+    GuiInitLayout(Gui, &Gui->rootLayout, GuiLayout_Layout, LayoutElem, 0, 0);
 }
 
 void GuiFrameEnd(gui_state* Gui){
@@ -1413,30 +1411,34 @@ void GuiEndColumn(gui_state* Gui){
 }
 
 enum Push_But_Type{
-    PushBut_Empty,
     PushBut_Color,
+    PushBut_Color1Outline2,
     PushBut_Grad,
     PushBut_Outline,
-    PushBut_DefaultBack,
-    PushBut_DefaultGrad,
-    PushBut_RectAndOutline,
-    PushBut_AlphaBlack,
+    PushBut_GuiWindowBack,
+    PushBut_GuiButtonBack,
+    PushBut_GuiGrad,
+    PushBut_GuiOutlinedBut,
 };
 
+#define DEFAULT_OUTLINE_WIDTH 1
 INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui, 
                                   rc2 rect, 
-                                  u32 type = PushBut_DefaultBack, 
+                                  u32 type = PushBut_GuiButtonBack, 
                                   v4 Color1 = V4(0.0f, 0.0f, 0.0f, 1.0f),
-                                  v4 Color2 = V4(0.0f, 0.0f, 0.0f, 1.0f))
+                                  v4 Color2 = V4(0.0f, 0.0f, 0.0f, 1.0f),
+                                  int OutlineWidth = DEFAULT_OUTLINE_WIDTH)
 {
     
     switch(type){
-        case PushBut_Empty:{
-            
-        }break;
-        
+        // NOTE(Dima): These are with user colors
         case PushBut_Color:{
             PushRect(Gui->Stack, rect, Color1);
+        }break;
+        
+        case PushBut_Color1Outline2:{
+            PushRect(Gui->Stack, rect, Color1);
+            PushRectOutline(Gui->Stack, rect, OutlineWidth, Color2);
         }break;
         
         case PushBut_Grad:{
@@ -1445,15 +1447,21 @@ INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui,
                          RenderEntryGradient_Vertical);
         }break;
         
-        case PushBut_AlphaBlack:{
+        case PushBut_Outline:{
+            PushRectOutline(Gui->Stack, rect, DEFAULT_OUTLINE_WIDTH, Color1);
+        }break;
+        
+        // NOTE(Dima): These take colors from GUI tables
+        case PushBut_GuiWindowBack:{
             PushRect(Gui->Stack, rect, GUI_GETCOLOR(GuiColor_WindowBackground));
         }break;
         
-        case PushBut_DefaultBack:{
+        case PushBut_GuiButtonBack:{
             PushRect(Gui->Stack, rect, GUI_GETCOLOR(GuiColor_ButtonBackground));
+            //PushRectInnerOutline(Gui->Stack, rect, DEFAULT_OUTLINE_WIDTH, GUI_GETCOLOR(GuiColor_Active));
         }break;
         
-        case PushBut_DefaultGrad:{
+        case PushBut_GuiGrad:{
             PushGradient(
                 Gui->Stack, rect, 
                 GUI_GETCOLOR(GuiColor_ButtonGrad1),
@@ -1461,13 +1469,9 @@ INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui,
                 RenderEntryGradient_Vertical);
         }break;
         
-        case PushBut_Outline:{
-            PushRectOutline(Gui->Stack, rect, 2, Color1);
-        }break;
-        
-        case PushBut_RectAndOutline:{
+        case PushBut_GuiOutlinedBut:{
             PushRect(Gui->Stack, rect, GUI_GETCOLOR(GuiColor_ButtonBackground));
-            PushRectOutline(Gui->Stack, rect, 1, Color1);
+            PushRectOutline(Gui->Stack, rect, OutlineWidth, GUI_GETCOLOR(GuiColor_Active));
         }break;
     }
 }
@@ -2068,6 +2072,8 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
         v4 textC = GUI_GETCOLOR(GuiColor_ButtonForeground);
         PrintTextCenteredInRect(Gui, Buf, SlideRc, 1.0f, textC);
         
+        //GuiPushBut(Gui, SlideRc, PushBut_Outline, GUI_GETCOLOR(GuiColor_WindowBorderActive));
+        
         float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, SlideRc, Gui->fontScale);
         v2 NameStart = V2(SlideRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, NameStartY);
         
@@ -2185,7 +2191,7 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
                                  "                            ", 
                                  layout->At);
         textRc = GetTxtElemRect(Gui, layout, textRc);
-        GuiPushBut(Gui, textRc, PushBut_AlphaBlack);
+        GuiPushBut(Gui, textRc);
         
         int* CaretP = &elem->Data.InputText.CaretPos;
         
@@ -2693,7 +2699,9 @@ void GuiTest(gui_state* Gui, float deltaTime){
     
     GuiEndTree(Gui);
     
-    GuiBeginLayout(Gui, "layout1", GuiLayout_Window);
+    static v2 WindowP = V2(900.0f, 100.0f);
+    static v2 WindowDim = V2(300.0f, 600.0f);
+    GuiBeginLayout(Gui, "layout1", GuiLayout_Layout, &WindowP, &WindowDim);
     static char InputTextBuf[256];
     GuiInputText(Gui, "Input Text", InputTextBuf, 256);
     static float TestFloat4Slider;
