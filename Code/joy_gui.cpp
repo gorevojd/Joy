@@ -1507,10 +1507,10 @@ void GuiAnchor(gui_state* Gui,
                v2* RectP, v2* RectDim)
 {
     gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, false);
-    Gui_Layout* layout = GetParentLayout(Gui);
+    Gui_Layout* Layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
-       PotentiallyVisibleSmall(layout))
+       PotentiallyVisibleSmall(Layout))
     {
         v2 MinP;
         if(Centered){
@@ -1570,16 +1570,16 @@ void GuiAnchor(gui_state* Gui,
 
 void GuiBeginTree(gui_state* Gui, char* name){
     gui_element* elem = GuiBeginElement(Gui, name, GuiElement_Item, false);
-    Gui_Layout* layout = GetParentLayout(Gui);
+    Gui_Layout* Layout = GetParentLayout(Gui);
     
-    if(GuiElementOpenedInTree(elem) && PotentiallyVisibleSmall(layout))
+    if(GuiElementOpenedInTree(elem) && PotentiallyVisibleSmall(Layout))
     {
-        Gui_Layout* layout = GetParentLayout(Gui);
+        Gui_Layout* Layout = GetParentLayout(Gui);
         
-        GuiPreAdvance(Gui, layout);
+        GuiPreAdvance(Gui, Layout);
         
-        rc2 textRc = GetTextRect(Gui, name, layout->At);
-        textRc = GetTxtElemRect(Gui, layout, textRc);
+        rc2 textRc = GetTextRect(Gui, name, Layout->At);
+        textRc = GetTxtElemRect(Gui, Layout, textRc);
         
         v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
         v4 oulineColor = GUI_GETCOLOR(GuiColor_Active);
@@ -1610,7 +1610,7 @@ void GuiBeginTree(gui_state* Gui, char* name){
         
         PrintTextCenteredInRect(Gui, name, textRc, 1.0f, textColor);
         
-        GuiPostAdvance(Gui, layout, textRc);
+        GuiPostAdvance(Gui, Layout, textRc);
     }
 }
 void GuiEndTree(gui_state* Gui){
@@ -1619,16 +1619,16 @@ void GuiEndTree(gui_state* Gui){
 
 void GuiText(gui_state* Gui, char* text){
     gui_element* elem = GuiBeginElement(Gui, text, GuiElement_TempItem, true);
-    Gui_Layout* layout = GetParentLayout(Gui);
+    Gui_Layout* Layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
-       PotentiallyVisibleSmall(layout))
+       PotentiallyVisibleSmall(Layout))
     {
-        GuiPreAdvance(Gui, layout);
+        GuiPreAdvance(Gui, Layout);
         
-        rc2 textRc = PrintText(Gui, text, layout->At, GUI_GETCOLOR(GuiColor_Text));
+        rc2 textRc = PrintText(Gui, text, Layout->At, GUI_GETCOLOR(GuiColor_Text));
         
-        GuiPostAdvance(Gui, layout, textRc);
+        GuiPostAdvance(Gui, Layout, textRc);
     }
     GuiEndElement(Gui, GuiElement_TempItem);
 }
@@ -1637,15 +1637,15 @@ b32 GuiLinkButton(gui_state* Gui, char* buttonName){
     b32 result = 0;
     
     gui_element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, true);
-    Gui_Layout* layout = GetParentLayout(Gui);
+    Gui_Layout* Layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
-       PotentiallyVisibleSmall(layout))
+       PotentiallyVisibleSmall(Layout))
     {
-        GuiPreAdvance(Gui, layout);
+        GuiPreAdvance(Gui, Layout);
         
         // NOTE(Dima): Printing button and text
-        rc2 textRc = GetTextRect(Gui, buttonName, layout->At);
+        rc2 textRc = GetTextRect(Gui, buttonName, Layout->At);
         
         // NOTE(Dima): Event processing
         v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
@@ -1670,7 +1670,7 @@ b32 GuiLinkButton(gui_state* Gui, char* buttonName){
         
         PrintTextCenteredInRect(Gui, buttonName, textRc, 1.0f, textColor);
         
-        GuiPostAdvance(Gui, layout, textRc);
+        GuiPostAdvance(Gui, Layout, textRc);
     }
     GuiEndElement(Gui, GuiElement_Item);
     
@@ -1681,16 +1681,16 @@ b32 GuiButton(gui_state* Gui, char* buttonName){
     b32 result = 0;
     
     gui_element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, true);
-    Gui_Layout* layout = GetParentLayout(Gui);
+    Gui_Layout* Layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
-       PotentiallyVisibleSmall(layout))
+       PotentiallyVisibleSmall(Layout))
     {
-        GuiPreAdvance(Gui, layout);
+        GuiPreAdvance(Gui, Layout);
         
         // NOTE(Dima): Printing button and text
-        rc2 textRc = GetTextRect(Gui, buttonName, layout->At);
-        textRc = GetTxtElemRect(Gui, layout, textRc);
+        rc2 textRc = GetTextRect(Gui, buttonName, Layout->At);
+        textRc = GetTxtElemRect(Gui, Layout, textRc);
         GuiPushBut(Gui, textRc);
         
         // NOTE(Dima): Event processing
@@ -1716,35 +1716,109 @@ b32 GuiButton(gui_state* Gui, char* buttonName){
         
         PrintTextCenteredInRect(Gui, buttonName, textRc, 1.0f, textColor);
         
-        GuiPostAdvance(Gui, layout, textRc);
+        GuiPostAdvance(Gui, Layout, textRc);
     }
     GuiEndElement(Gui, GuiElement_Item);
     
     return(result);
 }
 
-void GuiBoolButton(gui_state* Gui, char* buttonName, b32* Value){
-    gui_element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, true);
-    Gui_Layout* layout = GetParentLayout(Gui);
+void GuiShowBool(gui_state* Gui, char* Name, b32 Value){
+    gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, true);
+    Gui_Layout* Layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
-       PotentiallyVisibleSmall(layout))
+       PotentiallyVisibleSmall(Layout))
     {
-        GuiPreAdvance(Gui, layout);
+        GuiPreAdvance(Gui, Layout);
         
         // NOTE(Dima): Printing button and text
-        rc2 textRc = GetTextRect(Gui, buttonName, layout->At);
-        textRc = GetTxtElemRect(Gui, layout, textRc);
-        GuiPushBut(Gui, textRc);
+        rc2 ButRc = GetTextRect(Gui, "False", Layout->At);
+        ButRc = GetTxtElemRect(Gui, Layout, ButRc);
+        GuiPushBut(Gui, ButRc);
+        
+        char ButtonText[16];
+        if(Value){
+            CopyStrings(ButtonText, "True");
+        }
+        else{
+            CopyStrings(ButtonText, "False");
+        }
+        
+        PrintTextCenteredInRect(Gui, ButtonText, ButRc, 1.0f, 
+                                GUI_GETCOLOR(GuiColor_ButtonForeground));
+        
+        
+        // NOTE(Dima): Button name text printing
+        float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, ButRc, Gui->fontScale);
+        v2 NameStart = V2(ButRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, NameStartY);
+        rc2 NameRc = PrintText(Gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
+        
+        GuiPostAdvance(Gui, Layout, GetBoundingRect(NameRc, ButRc));
+    }
+    
+    GuiEndElement(Gui, GuiElement_Item);
+}
+
+void GuiShowInt(gui_state* Gui, char* Name, int Value){
+    gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, true);
+    Gui_Layout* Layout = GetParentLayout(Gui);
+    
+    if(GuiElementOpenedInTree(elem) && 
+       PotentiallyVisibleSmall(Layout))
+    {
+        GuiPreAdvance(Gui, Layout);
+        
+        // NOTE(Dima): Printing button and text
+        char Buf[16];
+        IntegerToString(Value, Buf);
+        
+        rc2 ButRc = GetTextRect(Gui, Buf, Layout->At);
+        ButRc = GetTxtElemRect(Gui, Layout, ButRc);
+        GuiPushBut(Gui, ButRc);
+        
+        PrintTextCenteredInRect(Gui, Buf, ButRc, 1.0f, 
+                                GUI_GETCOLOR(GuiColor_ButtonForeground));
+        
+        
+        // NOTE(Dima): Button name text printing
+        float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, ButRc, Gui->fontScale);
+        v2 NameStart = V2(ButRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, NameStartY);
+        rc2 NameRc = PrintText(Gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
+        
+        GuiPostAdvance(Gui, Layout, GetBoundingRect(NameRc, ButRc));
+    }
+    
+    GuiEndElement(Gui, GuiElement_Item);
+}
+
+void GuiBoolButton(gui_state* Gui, char* ButtonName, b32* Value){
+    gui_element* elem = GuiBeginElement(Gui, ButtonName, GuiElement_Item, true);
+    Gui_Layout* Layout = GetParentLayout(Gui);
+    
+    if(GuiElementOpenedInTree(elem) && 
+       PotentiallyVisibleSmall(Layout))
+    {
+        GuiPreAdvance(Gui, Layout);
+        
+        // NOTE(Dima): Printing button and text
+        rc2 ButRc = GetTextRect(Gui, "False", Layout->At);
+        ButRc = GetTxtElemRect(Gui, Layout, ButRc);
+        GuiPushBut(Gui, ButRc);
         
         v4 textColor = GUI_GETCOLOR(GuiColor_ButtonForeground);
         
-        // NOTE(Dima): Event processing
+        char ButtonText[16];
+        CopyStrings(ButtonText, "Error");
         if(Value){
             if(*Value == 0){
                 textColor = GUI_GETCOLOR(GuiColor_ButtonForegroundDisabled);
+                
+                CopyStrings(ButtonText, "False");
             }
-            
+            else{
+                CopyStrings(ButtonText, "True");
+            }
             
             gui_interaction Interaction = CreateInteraction(elem, 
                                                             GuiInteraction_BoolInRect,
@@ -1753,7 +1827,7 @@ void GuiBoolButton(gui_state* Gui, char* buttonName, b32* Value){
             gui_interaction_data_bool_in_rect* BoolInRect = &Interaction.Data.BoolInRect;
             
             BoolInRect->Value = Value;
-            BoolInRect->Rect = textRc;
+            BoolInRect->Rect = ButRc;
             
             GuiInteract(Gui, &Interaction);
             
@@ -1762,9 +1836,16 @@ void GuiBoolButton(gui_state* Gui, char* buttonName, b32* Value){
             }
         }
         
-        PrintTextCenteredInRect(Gui, buttonName, textRc, 1.0f, textColor);
+        // NOTE(Dima): Printing value
+        PrintTextCenteredInRect(Gui, ButtonText, ButRc, 1.0f, 
+                                GUI_GETCOLOR(GuiColor_ButtonForeground));
         
-        GuiPostAdvance(Gui, layout, textRc);
+        // NOTE(Dima): Button name text printing
+        float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, ButRc, Gui->fontScale);
+        v2 NameStart = V2(ButRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, NameStartY);
+        rc2 NameRc = PrintText(Gui, ButtonName, NameStart, GUI_GETCOLOR(GuiColor_Text));
+        
+        GuiPostAdvance(Gui, Layout, GetBoundingRect(NameRc, ButRc));
     }
     
     GuiEndElement(Gui, GuiElement_Item);
@@ -1772,22 +1853,22 @@ void GuiBoolButton(gui_state* Gui, char* buttonName, b32* Value){
 
 void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* Value){
     gui_element* elem = GuiBeginElement(Gui, buttonName, GuiElement_Item, true);
-    Gui_Layout* layout = GetParentLayout(Gui);
+    Gui_Layout* Layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
-       PotentiallyVisibleSmall(layout))
+       PotentiallyVisibleSmall(Layout))
     {
-        GuiPreAdvance(Gui, layout);
+        GuiPreAdvance(Gui, Layout);
         
         // NOTE(Dima): Button printing
-        rc2 ButRc = GetTextRect(Gui, "OFF", layout->At);
-        ButRc = GetTxtElemRect(Gui, layout, ButRc);
+        rc2 ButRc = GetTextRect(Gui, "OFF", Layout->At);
+        ButRc = GetTxtElemRect(Gui, Layout, ButRc);
         GuiPushBut(Gui, ButRc);
         
         // NOTE(Dima): Button name text printing
-        float nameStartY = GetCenteredTextOffsetY(Gui->MainFont, ButRc, Gui->fontScale);
-        v2 nameStart = V2(ButRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, nameStartY);
-        rc2 NameRc = PrintText(Gui, buttonName, nameStart, GUI_GETCOLOR(GuiColor_Text));
+        float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, ButRc, Gui->fontScale);
+        v2 NameStart = V2(ButRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, NameStartY);
+        rc2 NameRc = PrintText(Gui, buttonName, NameStart, GUI_GETCOLOR(GuiColor_Text));
         
         // NOTE(Dima): Event processing
         char buttonText[4];
@@ -1823,27 +1904,27 @@ void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* Value){
         PrintTextCenteredInRect(Gui, buttonText, ButRc, 1.0f, buttonTextC);
         
         rc2 AdvanceRect = GetBoundingRect(ButRc, NameRc);
-        GuiPostAdvance(Gui, layout, AdvanceRect);
+        GuiPostAdvance(Gui, Layout, AdvanceRect);
     }
     GuiEndElement(Gui, GuiElement_Item);
 }
 
 void GuiCheckbox(gui_state* Gui, char* name, b32* Value){
     gui_element* elem = GuiBeginElement(Gui, name, GuiElement_Item, true);
-    Gui_Layout* layout = GetParentLayout(Gui);
+    Gui_Layout* Layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
-       PotentiallyVisibleSmall(layout))
+       PotentiallyVisibleSmall(Layout))
     {
         
-        GuiPreAdvance(Gui, layout);
+        GuiPreAdvance(Gui, Layout);
         
         // NOTE(Dima): Checkbox rendering
         float chkSize = GetLineAdvance(Gui->MainFont, Gui->fontScale);
         rc2 chkRect;
-        chkRect.Min = V2(layout->At.x, layout->At.y - GetScaledAscender(Gui->MainFont, Gui->fontScale));
+        chkRect.Min = V2(Layout->At.x, Layout->At.y - GetScaledAscender(Gui->MainFont, Gui->fontScale));
         chkRect.Max = chkRect.Min + V2(chkSize, chkSize);
-        chkRect = GetTxtElemRect(Gui, layout, chkRect);
+        chkRect = GetTxtElemRect(Gui, Layout, chkRect);
         
         // NOTE(Dima): Event processing
         v4 backC = GUI_GETCOLOR(GuiColor_ButtonBackground);
@@ -1877,12 +1958,12 @@ void GuiCheckbox(gui_state* Gui, char* name, b32* Value){
         }
         
         // NOTE(Dima): Button name text printing
-        float nameStartY = GetCenteredTextOffsetY(Gui->MainFont, chkRect, Gui->fontScale);
-        v2 nameStart = V2(chkRect.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, nameStartY);
-        rc2 nameRc = PrintText(Gui, name, nameStart, GUI_GETCOLOR(GuiColor_Text));
+        float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, chkRect, Gui->fontScale);
+        v2 NameStart = V2(chkRect.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, NameStartY);
+        rc2 nameRc = PrintText(Gui, name, NameStart, GUI_GETCOLOR(GuiColor_Text));
         
         rc2 advanceRect = GetBoundingRect(chkRect, nameRc);
-        GuiPostAdvance(Gui, layout, advanceRect);
+        GuiPostAdvance(Gui, Layout, advanceRect);
     }
     
     GuiEndElement(Gui, GuiElement_Item);
@@ -1928,29 +2009,29 @@ GuiFindRadioGroupParent(gui_element* curElement) {
 void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId) {
     gui_element* radioBut = GuiBeginElement(Gui, name, GuiElement_Item, true);
     gui_element* radioGroup = GuiFindRadioGroupParent(Gui->curElement);
-    Gui_Layout* layout = GetParentLayout(Gui);
+    Gui_Layout* Layout = GetParentLayout(Gui);
     
     if (radioGroup && 
         GuiElementOpenedInTree(radioBut) && 
-        PotentiallyVisibleSmall(layout)) 
+        PotentiallyVisibleSmall(Layout)) 
     {
         b32 isActive = 0;
         if (radioGroup->Data.RadioGroup.activeId == uniqueId) {
             isActive = 1;
         }
         
-        GuiPreAdvance(Gui, layout);
+        GuiPreAdvance(Gui, Layout);
         
         // NOTE(Dima): Printing button and text
-        rc2 textRc = GetTextRect(Gui, name, layout->At);
-        textRc = GetTxtElemRect(Gui, layout, textRc);
-        GuiPushBut(Gui, textRc);
+        rc2 TextRc = GetTextRect(Gui, name, Layout->At);
+        TextRc = GetTxtElemRect(Gui, Layout, TextRc);
+        GuiPushBut(Gui, TextRc);
         
         v4 textC;
         if(isActive){
             textC = GUI_GETCOLOR(GuiColor_ButtonForeground);
             v4 oulineColor = GUI_GETCOLOR_COLSYS(Color_Red);
-            GuiPushBut(Gui, textRc, PushBut_Outline, oulineColor);
+            GuiPushBut(Gui, TextRc, PushBut_Outline, oulineColor);
         }
         else{
             textC = GUI_GETCOLOR(GuiColor_ButtonForegroundDisabled);
@@ -1960,7 +2041,7 @@ void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId) {
                                                         GuiInteraction_Empty,
                                                         GuiPriority_Avg);
         
-        if (MouseInInteractiveArea(Gui, textRc)) {
+        if (MouseInInteractiveArea(Gui, TextRc)) {
             GuiSetHot(Gui, &Interaction, true);
             textC = GUI_GETCOLOR(GuiColor_ButtonForegroundHot);
             
@@ -1979,9 +2060,9 @@ void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId) {
             GuiSetHot(Gui, &Interaction, false);
         }
         
-        PrintTextCenteredInRect(Gui, name, textRc, 1.0f, textC);
+        PrintTextCenteredInRect(Gui, name, TextRc, 1.0f, textC);
         
-        GuiPostAdvance(Gui, layout, textRc);
+        GuiPostAdvance(Gui, Layout, TextRc);
     }
     
     GuiEndElement(Gui, GuiElement_Item);
@@ -1993,17 +2074,17 @@ void GuiEndRadioGroup(gui_state* Gui) {
 
 void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 Style){
     gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, true);
-    Gui_Layout* layout = GetParentLayout(Gui);
+    Gui_Layout* Layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
-       PotentiallyVisibleSmall(layout))
+       PotentiallyVisibleSmall(Layout))
     {
-        GuiPreAdvance(Gui, layout);
+        GuiPreAdvance(Gui, Layout);
         
         rc2 SlideRc = GetTextRect(Gui, 
                                   "                ", 
-                                  layout->At);
-        SlideRc = GetTxtElemRect(Gui, layout, SlideRc);
+                                  Layout->At);
+        SlideRc = GetTxtElemRect(Gui, Layout, SlideRc);
         GuiPushBut(Gui, SlideRc);
         
         float SlideRcWidth = GetRectWidth(SlideRc);
@@ -2080,7 +2161,7 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
         rc2 NameRc = PrintText(Gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
         
         rc2 AdvanceRect = GetBoundingRect(NameRc, SlideRc);
-        GuiPostAdvance(Gui, layout, AdvanceRect);
+        GuiPostAdvance(Gui, Layout, AdvanceRect);
     }
     
     GuiEndElement(Gui, GuiElement_Item);
@@ -2088,17 +2169,17 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
 
 void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Name, u32 Style){
     gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, true);
-    Gui_Layout* layout = GetParentLayout(Gui);
+    Gui_Layout* Layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
-       PotentiallyVisibleSmall(layout))
+       PotentiallyVisibleSmall(Layout))
     {
-        GuiPreAdvance(Gui, layout);
+        GuiPreAdvance(Gui, Layout);
         
         rc2 SlideRc = GetTextRect(Gui, 
                                   "                ", 
-                                  layout->At);
-        SlideRc = GetTxtElemRect(Gui, layout, SlideRc);
+                                  Layout->At);
+        SlideRc = GetTxtElemRect(Gui, Layout, SlideRc);
         GuiPushBut(Gui, SlideRc);
         
         float SlideRcWidth = GetRectWidth(SlideRc);
@@ -2170,28 +2251,35 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
         rc2 NameRc = PrintText(Gui, Name, NameStart, GUI_GETCOLOR(GuiColor_Text));
         
         rc2 AdvanceRect = GetBoundingRect(NameRc, SlideRc);
-        GuiPostAdvance(Gui, layout, AdvanceRect);
+        GuiPostAdvance(Gui, Layout, AdvanceRect);
     }
     
     GuiEndElement(Gui, GuiElement_Item);
     
 }
 
+void GuiProgress01(gui_state* Gui,
+                   char* Name,
+                   float Value)
+{
+    GuiSliderFloat(Gui, &Value, 0.0f, 1.0f, Name, GuiSlider_ProgressNonModify);
+}
+
 void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
     gui_element* elem = GuiBeginElement(Gui, name, GuiElement_Item, true);
-    Gui_Layout* layout = GetParentLayout(Gui);
+    Gui_Layout* Layout = GetParentLayout(Gui);
     
     if(GuiElementOpenedInTree(elem) && 
-       PotentiallyVisibleSmall(layout))
+       PotentiallyVisibleSmall(Layout))
     {
-        GuiPreAdvance(Gui, layout);
+        GuiPreAdvance(Gui, Layout);
         
         // NOTE(Dima): Printing button and text
-        rc2 textRc = GetTextRect(Gui, 
+        rc2 TextRc = GetTextRect(Gui, 
                                  "                            ", 
-                                 layout->At);
-        textRc = GetTxtElemRect(Gui, layout, textRc);
-        GuiPushBut(Gui, textRc);
+                                 Layout->At);
+        TextRc = GetTxtElemRect(Gui, Layout, TextRc);
+        GuiPushBut(Gui, TextRc);
         
         int* CaretP = &elem->Data.InputText.CaretPos;
         
@@ -2199,7 +2287,7 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
                                                         GuiInteraction_Empty,
                                                         GuiPriority_Avg);
         
-        if(MouseInInteractiveArea(Gui, textRc)){
+        if(MouseInInteractiveArea(Gui, TextRc)){
             GuiSetHot(Gui, &Interaction, true);
             
             if(KeyWentDown(Gui->Input, MouseKey_Left)){
@@ -2293,30 +2381,30 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
             }
             
             v4 oulineColor = GUI_GETCOLOR_COLSYS(Color_Red);
-            GuiPushBut(Gui, textRc, PushBut_Outline, oulineColor);
+            GuiPushBut(Gui, TextRc, PushBut_Outline, oulineColor);
         }
         
         *CaretP = Max(0, *CaretP);
         *CaretP = Min(*CaretP, Min(StringLength(Buf), BufSize - 1));
         
         v4 textC = V4(1.0f, 1.0f, 1.0f, 1.0f);
-        //PrintTextCenteredInRect(Gui, Buf, textRc, 1.0f, textC);
+        //PrintTextCenteredInRect(Gui, Buf, TextRc, 1.0f, textC);
         v2 BufTextSize = GetTextSize(Gui, Buf, 1.0f);
         float PrintPX;
-        float FieldDimX = GetRectDim(textRc).x;
+        float FieldDimX = GetRectDim(TextRc).x;
         if(BufTextSize.x < FieldDimX){
-            PrintPX = textRc.Min.x;
+            PrintPX = TextRc.Min.x;
         }
         else{
-            PrintPX = textRc.Max.x - BufTextSize.x;
+            PrintPX = TextRc.Max.x - BufTextSize.x;
         }
         float PrintPY = GetCenteredTextOffsetY(Gui->MainFont,
-                                               textRc, 
+                                               TextRc, 
                                                Gui->fontScale);
         v2 PrintP = V2(PrintPX, PrintPY);
         v2 CaretPrintP = GetCaretPrintP(Gui, Buf, PrintP, *CaretP);
         
-        BeginGuiChunk(Gui->Stack, textRc);
+        BeginGuiChunk(Gui->Stack, TextRc);
         v4 CaretColor = V4(0.0f, 1.0f, 0.0f, 1.0f);
         PrintCaret(Gui, 
                    CaretPrintP,
@@ -2324,22 +2412,22 @@ void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize){
         PrintText(Gui, Buf, PrintP, GUI_GETCOLOR(GuiColor_Text));
         EndGuiChunk(Gui->Stack);
         
-        float nameStartY = GetCenteredTextOffsetY(Gui->MainFont, textRc, Gui->fontScale);
-        v2 nameStart = V2(textRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, nameStartY);
+        float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, TextRc, Gui->fontScale);
+        v2 NameStart = V2(TextRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->fontScale) * 0.5f, NameStartY);
         char DebugBuf[256];
         
 #if 1
         stbsp_sprintf(DebugBuf, "CaretP: %d; LeftRC: %d", *CaretP, 
                       Gui->Input->Keyboard.KeyStates[Key_Left].RepeatCount);
-        rc2 NameRc = PrintText(Gui, DebugBuf, nameStart, GUI_GETCOLOR(GuiColor_Text));
+        rc2 NameRc = PrintText(Gui, DebugBuf, NameStart, GUI_GETCOLOR(GuiColor_Text));
 #else
-        rc2 NameRc = PrintText(Gui, name, nameStart, GUI_GETCOLOR(GuiColor_Text));
+        rc2 NameRc = PrintText(Gui, name, NameStart, GUI_GETCOLOR(GuiColor_Text));
 #endif
         
         
-        rc2 AdvanceRect = GetBoundingRect(NameRc, textRc);
+        rc2 AdvanceRect = GetBoundingRect(NameRc, TextRc);
         
-        GuiPostAdvance(Gui, layout, AdvanceRect);
+        GuiPostAdvance(Gui, Layout, AdvanceRect);
     }
     
     GuiEndElement(Gui, GuiElement_Item);
@@ -2701,7 +2789,7 @@ void GuiTest(gui_state* Gui, float deltaTime){
     
     static v2 WindowP = V2(900.0f, 100.0f);
     static v2 WindowDim = V2(300.0f, 600.0f);
-    GuiBeginLayout(Gui, "layout1", GuiLayout_Layout, &WindowP, &WindowDim);
+    GuiBeginLayout(Gui, "Layout1", GuiLayout_Layout, &WindowP, &WindowDim);
     static char InputTextBuf[256];
     GuiInputText(Gui, "Input Text", InputTextBuf, 256);
     static float TestFloat4Slider;

@@ -770,6 +770,11 @@ inline quat operator/(quat A, float S) { return Div(A, S); }
 
 inline quat operator*(quat A, quat B) { return(Mul(A, B)); }
 
+inline quat &operator+=(quat& A, quat B) { return(A = A + B); }
+inline quat &operator-=(quat& A, quat B) { return(A = A - B); }
+inline quat &operator*=(quat& A, float S) { return(A = A * S); }
+inline quat &operator/=(quat& A, float S) { return(A = A / S); }
+
 /*Matrix operator overloading*/
 
 inline v3 operator*(v3 A, m33 B){

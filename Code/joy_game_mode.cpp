@@ -71,8 +71,8 @@ void GameInit(game_state* Game, platform_to_game_api Platform2GameAPI){
     
     // NOTE(Dima): Animations
     Game->AnimMemory = {};
-    PushMemoryStruct(&Game->AnimMemory, anim_state, Game->Anim, Region);
-    InitAnimState(Game->Anim);
+    PushMemoryStruct(&Game->AnimMemory, anim_system, Game->Anim, Region);
+    InitAnimSystem(Game->Anim);
     
     // NOTE(Dima): Describing all game modes
     DescribeGameMode(Game, "Title", TitleUpdate, 0),

@@ -585,6 +585,8 @@ b32 GuiLinkButton(gui_state* Gui, char* buttonName);
 void GuiBoolButton(gui_state* Gui, char* buttonName, b32* value);
 void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value);
 void GuiCheckbox(gui_state* Gui, char* name, b32* value);
+void GuiShowBool(gui_state* Gui, char* Name, b32 Value);
+void GuiShowInt(gui_state* Gui, char* Name, int Value);
 
 void GuiBeginTree(gui_state* Gui, char* name);
 void GuiEndTree(gui_state* Gui);
@@ -618,6 +620,10 @@ void GuiSliderFloat(gui_state* Gui,
                     float Max, 
                     char* Name, 
                     u32 Style = 0);
+
+void GuiProgress01(gui_state* Gui,
+                   char* Name,
+                   float Value);
 
 void GuiTest(gui_state* Gui, float deltaTime);
 

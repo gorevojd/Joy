@@ -146,25 +146,25 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitPlayerAC)
     anim_controller* AC = CreateAnimControl(Anim, NodesCheckSum);
     
     // NOTE(Dima): Adding animation nodes
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Idle");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Falling");
+    AddAnimState(AC, AnimState_Animation, "Idle");
+    AddAnimState(AC, AnimState_Animation, "Run");
+    AddAnimState(AC, AnimState_Animation, "Falling");
     
 #if 0
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run1");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run2");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run3");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run4");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run5");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run6");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run7");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run8");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run9");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run10");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run11");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run12");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run13");
-    AddAnimGraphNode(AC, AnimGraphNode_Animation, "Run14");
+    AddAnimState(AC, AnimState_Animation, "Run1");
+    AddAnimState(AC, AnimState_Animation, "Run2");
+    AddAnimState(AC, AnimState_Animation, "Run3");
+    AddAnimState(AC, AnimState_Animation, "Run4");
+    AddAnimState(AC, AnimState_Animation, "Run5");
+    AddAnimState(AC, AnimState_Animation, "Run6");
+    AddAnimState(AC, AnimState_Animation, "Run7");
+    AddAnimState(AC, AnimState_Animation, "Run8");
+    AddAnimState(AC, AnimState_Animation, "Run9");
+    AddAnimState(AC, AnimState_Animation, "Run10");
+    AddAnimState(AC, AnimState_Animation, "Run11");
+    AddAnimState(AC, AnimState_Animation, "Run12");
+    AddAnimState(AC, AnimState_Animation, "Run13");
+    AddAnimState(AC, AnimState_Animation, "Run14");
     
     anim_graph_node* FindRes1 = FindGraphNode(AC, "Run14");
     anim_graph_node* FindRes2 = FindGraphNode(AC, "Run7");
@@ -202,44 +202,41 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitPlayerAC)
     anim_variable* FindResVar2 = FindVariable(AC, "TempVar122");
 #endif
     
-    // NOTE(Dima): Adding transitions
-    anim_transition* IdleToRun = AddTransition(AC, "Idle", "Run");
-    AddConditionFloat(IdleToRun, 
-                      "VelocityLength",
-                      TransitionCondition_MoreEqThan,
-                      0.05f);
+    // NOTE(Dima): Idle -> Run
+    BeginTransition(AC, "Idle", "Run");
+    AddConditionFloat(AC, "VelocityLength",
+                      TransitionCondition_MoreEqThan, 0.05f);
+    EndTransition(AC);
     
-    anim_transition* RunToIdle = AddTransition(AC, "Run", "Idle"); 
-    AddConditionFloat(RunToIdle,
-                      "VelocityLength",
-                      TransitionCondition_LessThan,
-                      0.05f);
+    // NOTE(Dima): Run -> Idle
+    BeginTransition(AC, "Run", "Idle");
+    AddConditionFloat(AC, "VelocityLength",
+                      TransitionCondition_LessThan, 0.05f);
+    EndTransition(AC);
     
-    anim_transition* IdleToFalling = AddTransition(AC, "Run", "Falling");
-    AddConditionBool(IdleToFalling,
-                     "IsFalling",
-                     TransitionCondition_Equal,
-                     true);
+    // NOTE(Dima): Run -> Falling
+    BeginTransition(AC, "Run", "Falling");
+    AddConditionBool(AC, "IsFalling",
+                     TransitionCondition_Equal, true);
+    EndTransition(AC);
     
-    anim_transition* FallingToIdle = AddTransition(AC, "Falling", "Idle");
-    AddConditionFloat(FallingToIdle,
-                      "VelocityLength",
-                      TransitionCondition_LessThan,
-                      0.05f);
-    AddConditionBool(FallingToIdle,
-                     "IsFalling",
-                     TransitionCondition_Equal,
-                     false);
+    // NOTE(Dima): Falling -> Idle
+    BeginTransition(AC, "Falling", "Idle");
+    AddConditionFloat(AC, "VelocityLength",
+                      TransitionCondition_LessThan, 0.05f);
+    AddConditionBool(AC, "IsFalling",
+                     TransitionCondition_Equal, false);
+    EndTransition(AC);
     
-    anim_transition* FallingToRun = AddTransition(AC, "Falling", "Run");
-    AddConditionFloat(FallingToRun,
-                      "VelocityLength",
-                      TransitionCondition_MoreEqThan,
-                      0.05f);
-    AddConditionBool(FallingToRun,
-                     "IsFalling",
-                     TransitionCondition_Equal,
-                     false);
+    // NOTE(Dima): Falling -> Run
+    BeginTransition(AC, "Falling", "Run");
+    AddConditionFloat(AC, "VelocityLength",
+                      TransitionCondition_MoreEqThan, 0.05f);
+    AddConditionBool(AC, "IsFalling",
+                     TransitionCondition_Equal, false);
+    EndTransition(AC);
+    
+    FinalizeCreation(AC);
     
     return(AC);
 }
@@ -249,71 +246,14 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
                                    model_info* Model, 
                                    v3 Pos, quat Rot, v3 Scale, 
                                    f64 GlobalTime,
+                                   f32 DeltaTime,
                                    anim_controller* AC)
 {
     asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
     
-    ResetToParentTransforms(Model);
-    
-    if(AC){
-        for(int PlayingAnimIndex = 0;
-            PlayingAnimIndex < AC->PlayingAnimationsCount;
-            PlayingAnimIndex++)
-        {
-            playing_anim* Playing = AC->PlayingAnimations[PlayingAnimIndex];
-            
-            m44* BoneTransformMatrices = 0;
-            
-            animation_clip* Animation = LoadAnimationClip(Assets, 
-                                                          Playing->AnimationID,
-                                                          ASSET_IMPORT_IMMEDIATE);
-            
-            // NOTE(Dima): Updating animation and node transforms
-            UpdateModelAnimation(Assets, Model, Playing, Animation, GlobalTime);
-        }
-        
-        if(AC->PlayingAnimationsCount > 1){
-            playing_anim* First = AC->PlayingAnimations[0];
-            playing_anim* Second = AC->PlayingAnimations[1];
-            
-            // NOTE(Dima): Lerp between first 2
-            for(int NodeIndex = 0; 
-                NodeIndex < Model->NodeCount;
-                NodeIndex++)
-            {
-                node_info* TargetNode = &Model->Nodes[NodeIndex];
-                
-                node_transform* TransformFirst = &First->NodeTransforms[NodeIndex];
-                node_transform* TransformSecond = &Second->NodeTransforms[NodeIndex];
-                
-                float t = 0.5f;
-                
-                v3 ResultP = Lerp(TransformFirst->T, TransformSecond->T, t);
-                v3 ResultS = Lerp(TransformFirst->S, TransformSecond->S, t);
-                quat ResultR = Lerp(TransformFirst->R, TransformSecond->R, t);
-                
-                TargetNode->CalculatedToParent = ScalingMatrix(ResultS) * 
-                    RotationMatrix(ResultR) * 
-                    TranslationMatrix(ResultP);
-            }
-        }
-        else{
-            for(int NodeIndex = 0; 
-                NodeIndex < Model->NodeCount;
-                NodeIndex++)
-            {
-                node_info* TargetNode = &Model->Nodes[NodeIndex];
-                
-                node_transform* Transform = &AC->PlayingAnimations[0]->NodeTransforms[NodeIndex];
-                
-                TargetNode->CalculatedToParent = ScalingMatrix(Transform->S) * 
-                    RotationMatrix(Transform->R) * 
-                    TranslationMatrix(Transform->T);
-            }
-        }
-    }
-    
-    CalculateToModelTransforms(Model);
+    UpdateModelAnimation(Assets, Model, AC,
+                         GlobalTime, DeltaTime, 
+                         1.0f);
     
     // NOTE(Dima): Getting skeleton if it exists
     skeleton_info* Skeleton = 0;
@@ -364,9 +304,11 @@ struct test_game_mode_state{
     sphere_distribution SphereDistributionTrig;
     sphere_distribution SphereDistributionFib;
     
+#if 0    
     playing_anim Anim0;
     playing_anim Anim1;
     anim_controller AC;
+#endif
     
     playing_anim TestAnim;
     anim_controller TestAC;
@@ -469,13 +411,7 @@ GAME_MODE_UPDATE(TestUpdate){
                   Camera->P.y,
                   Camera->P.z);
     
-    GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
     GuiText(Game->Gui, CameraInfo);
-    
-    float SliderFloatValue = fmod(Game->Input->Time, 1.0f); 
-    GuiSliderFloat(Game->Gui, &SliderFloatValue, 0.0f, 1.0f, 
-                   "TempNonModifySlider", 
-                   GuiSlider_ProgressNonModify);
     
     char MouseInfo[256];
     stbsp_sprintf(MouseInfo,
@@ -487,13 +423,7 @@ GAME_MODE_UPDATE(TestUpdate){
                   DeltaMouseY);
     GuiText(Game->Gui, MouseInfo);
     
-    if(ButIsDown(Game->Input, Button_Left)){
-        GuiText(Game->Gui, "Left");
-    }
-    
-    if(ButIsDown(Game->Input, Button_Right)){
-        GuiText(Game->Gui, "Right");
-    }
+    GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
     
     static float FindSphereQuality = 0.5f;
     GuiSliderFloat(Game->Gui, 
@@ -548,20 +478,50 @@ GAME_MODE_UPDATE(TestUpdate){
                                   ASSET_IMPORT_DEFERRED);
     
     if(Model){
-        State->Anim0.AnimationID = Model->AnimationIDs[0];
-        State->Anim0.PlaybackRate = 1.0f;
-        State->Anim1.AnimationID = Model->AnimationIDs[5];
-        State->Anim1.PlaybackRate = 1.0f;
-        State->AC.PlayingAnimations[0] = &State->Anim0;
-        State->AC.PlayingAnimations[1] = &State->Anim1;
-        State->AC.PlayingAnimationsCount = 2;
+        SetStateAnimation(State->PlayerAC, "Idle", Model->AnimationIDs[0]);
+        SetStateAnimation(State->PlayerAC, "Run", Model->AnimationIDs[5]);
+        SetStateAnimation(State->PlayerAC, "Falling", Model->AnimationIDs[1]);
+        
+        SetBool(State->PlayerAC, "IsFalling", false);
+        
+        f32 VelocityLen = 0.0f;
+        if(KeyIsDown(Game->Input, Key_Space)){
+            VelocityLen = 1.0f;
+        }
+        
+        SetFloat(State->PlayerAC, "VelocityLength", VelocityLen);
         
         UpdateModel(Assets, Stack, Model, 
                     V3(10.0f, 0.0f, 10.0f),
                     QuatI(), 
                     V3(1.0f),
                     Game->Input->Time,
-                    &State->AC);
+                    Game->Input->DeltaTime,
+                    State->PlayerAC);
+        
+        anim_controller* Control = State->PlayerAC;
+        gui_state* Gui = Game->Gui;
+        
+        v2 P = V2(100.0f, 400.0f);
+        GuiBeginLayout(Gui, "Show anim control", GuiLayout_Layout, &P, 0);
+        GuiShowInt(Gui, "Playing states count", Control->PlayingStatesCount);
+        GuiShowBool(Gui, "In transition", Control->PlayingStatesCount == 2);
+        
+        for(int PlayingStateIndex = 0;
+            PlayingStateIndex < Control->PlayingStatesCount;
+            PlayingStateIndex++)
+        {
+            char BufToShow[64];
+            stbsp_sprintf(BufToShow, "%d state name: %s", PlayingStateIndex,
+                          Control->PlayingStates[PlayingStateIndex]->Name);
+            
+            GuiText(Gui, BufToShow);
+            
+            GuiProgress01(Gui, "Anim phase", 
+                          Control->PlayingStates[PlayingStateIndex]->PlayingAnimation.Phase01);
+        }
+        
+        GuiEndLayout(Gui);
     }
     
     
@@ -571,7 +531,6 @@ GAME_MODE_UPDATE(TestUpdate){
     
     if(TestModel){
         State->TestAnim.AnimationID = TestModel->AnimationIDs[0];
-        State->TestAnim.PlaybackRate = 0.1;
         State->TestAC.PlayingAnimations[0] = &State->TestAnim;
         State->TestAC.PlayingAnimationsCount = 1;
         
@@ -580,9 +539,9 @@ GAME_MODE_UPDATE(TestUpdate){
                     QuatI(), 
                     V3(1.0f),
                     Game->Input->Time,
+                    Game->Input->DeltaTime,
                     &State->TestAC);
     }
-    
     
 #if 0    
     PushOrLoadModel(Game->Assets, Stack,
@@ -663,7 +622,6 @@ GAME_MODE_UPDATE(TestUpdate){
                      V2(0, 500),
                      V2(100, 100),
                      GetFirst(Game->Assets, GameAsset_Type_Bitmap));
-    
     
 #if 0    
     ShowSphereDistributions(Game, Stack,

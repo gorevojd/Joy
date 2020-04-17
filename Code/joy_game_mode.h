@@ -50,7 +50,7 @@ struct game_state{
     input_state* Input;
     render_state* Render;
     assets* Assets;
-    anim_state* Anim;
+    anim_system* Anim;
     
     // NOTE(Dima): platform api functions
     input_platform_process* ProcessInput;

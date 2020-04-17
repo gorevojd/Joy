@@ -158,28 +158,35 @@ DecomposeTransformsForNode(const m44& Matrix,
     m33 RotMat = MatrixFromRows(Row0, Row1, Row2);
     
     Tran->R = QuatFromM33(RotMat);
-    
-    Tran->Calculated = true;
 }
 
-void UpdateModelAnimation(assets* Assets,
-                          model_info* Model,
-                          playing_anim* PlayingAnim,
-                          animation_clip* Animation,
-                          f64 CurrentTime)
+INTERNAL_FUNCTION void ClearNodeTransforms(node_transform* Transforms, int Count){
+    for(int NodeIndex = 0; 
+        NodeIndex < Count; 
+        NodeIndex++)
+    {
+        node_transform* Tran = &Transforms[NodeIndex];
+        
+        Tran->T = V3(0.0f, 0.0f, 0.0f);
+        Tran->S = V3(0.0f, 0.0f, 0.0f);
+        Tran->R = Quat(0.0f, 0.0f, 0.0f, 0.0f);
+    }
+}
+
+INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
+                                              model_info* Model,
+                                              playing_anim* Playing,
+                                              animation_clip* Animation,
+                                              f64 CurrentTime,
+                                              f32 PlaybackRate)
 {
     // NOTE(Dima): Updating animation
     if(Animation){
-        
         for(int NodeIndex = 0;
             NodeIndex < Model->NodeCount;
             NodeIndex++)
         {
-            node_info* Node = &Model->Nodes[NodeIndex];
-            
-            node_transform* NodeTransform = &PlayingAnim->NodeTransforms[NodeIndex];
-            
-            NodeTransform->Calculated = false;
+            Playing->TransformsCalculated[NodeIndex] = false;
         }
         
         for(int NodeAnimIndex = 0;
@@ -195,11 +202,17 @@ void UpdateModelAnimation(assets* Assets,
             ASSERT(NodeAnim);
             
             // NOTE(Dima): Animating
-            f64 AnimTime = (CurrentTime - PlayingAnim->GlobalStart) * PlayingAnim->PlaybackRate;
+            f64 AnimTime = (CurrentTime - Playing->GlobalStart) * PlaybackRate;
             f64 CurrentTick = AnimTime * Animation->TicksPerSecond;
             
-            if(Animation->IsLooping && (Animation->DurationTicks > 0.0f)){
-                CurrentTick = fmod(CurrentTick, Animation->DurationTicks);
+            Playing->Phase01 = 0.0f;
+            
+            if(Animation->DurationTicks > 0.0f){
+                if(Animation->IsLooping){
+                    CurrentTick = fmod(CurrentTick, Animation->DurationTicks);
+                }
+                
+                Playing->Phase01 = Clamp01(CurrentTick / Animation->DurationTicks);
             }
             
             v3 AnimatedP = GetAnimatedVector(Animation,
@@ -223,12 +236,13 @@ void UpdateModelAnimation(assets* Assets,
                                              CurrentTick,
                                              V3(1.0f, 1.0f, 1.0f));
             
-            node_transform* NodeTransform = &PlayingAnim->NodeTransforms[NodeAnim->NodeIndex];
             
+            node_transform* NodeTransform = &Playing->NodeTransforms[NodeAnim->NodeIndex];
             NodeTransform->T = AnimatedP;
             NodeTransform->R = AnimatedR;
             NodeTransform->S = AnimatedS;
-            NodeTransform->Calculated = true;
+            
+            Playing->TransformsCalculated[NodeAnim->NodeIndex] = true;
         }
         
         // NOTE(Dima): Extract transforms that were not calculated
@@ -238,9 +252,9 @@ void UpdateModelAnimation(assets* Assets,
         {
             node_info* Node = &Model->Nodes[NodeIndex];
             
-            node_transform* NodeTransform = &PlayingAnim->NodeTransforms[NodeIndex];
+            node_transform* NodeTransform = &Playing->NodeTransforms[NodeIndex];
             
-            if(!NodeTransform->Calculated){
+            if(Playing->TransformsCalculated[NodeIndex] == false){
                 DecomposeTransformsForNode(Node->Shared->ToParent, NodeTransform);
             }
         }
@@ -248,7 +262,7 @@ void UpdateModelAnimation(assets* Assets,
 }
 
 // NOTE(Dima): Calculating initial node to parent transforms
-void ResetToParentTransforms(model_info* Model){
+INTERNAL_FUNCTION void ResetToParentTransforms(model_info* Model){
     for(int NodeIndex = 0;
         NodeIndex < Model->NodeCount;
         NodeIndex++)
@@ -259,7 +273,24 @@ void ResetToParentTransforms(model_info* Model){
     }
 }
 
-void CalculateToModelTransforms(model_info* Model){
+// NOTE(Dima): Calculating nodes to parent matrices based on transforms
+INTERNAL_FUNCTION void CalculateToParentTransforms(model_info* Model, node_transform* Transforms){
+    for(int NodeIndex = 0; 
+        NodeIndex < Model->NodeCount;
+        NodeIndex++)
+    {
+        node_info* TargetNode = &Model->Nodes[NodeIndex];
+        node_transform* NodeTran = &Transforms[NodeIndex];
+        
+        // NOTE(Dima): Calculating to parent transform
+        TargetNode->CalculatedToParent = 
+            ScalingMatrix(NodeTran->S) * 
+            RotationMatrix(NodeTran->R) * 
+            TranslationMatrix(NodeTran->T);
+    }
+}
+
+INTERNAL_FUNCTION void CalculateToModelTransforms(model_info* Model){
     // NOTE(Dima): Calculating to to modelspace transforms
     for(int NodeIndex = 0;
         NodeIndex < Model->NodeCount;
@@ -277,6 +308,267 @@ void CalculateToModelTransforms(model_info* Model){
             Node->CalculatedToModel = Node->CalculatedToParent;
         }
     }
+}
+
+INTERNAL_FUNCTION void UpdateAnimController(assets* Assets,
+                                            model_info* Model, 
+                                            anim_controller* AC,
+                                            f64 GlobalTime,
+                                            f32 DeltaTime,
+                                            f32 PlaybackRate)
+{
+    if(AC){
+        if(AC->PlayingStatesCount > 0){
+            
+            // NOTE(Dima): Updating transition
+            if(AC->PlayingStatesCount == 2){
+                // NOTE(Dima): If transitioning
+                AC->TransitionTimeLeft -= DeltaTime * PlaybackRate;
+                
+                b32 ShouldEndTransition = false;
+                
+                if(AC->TimeToTransit > 0.0f){
+                    if(AC->TransitionTimeLeft < 0.0000001f){
+                        AC->TransitionTimeLeft = 0.0f;
+                        ShouldEndTransition = true;
+                    }
+                    
+                    f32 Weight0 = Clamp01(AC->TransitionTimeLeft / AC->TimeToTransit);
+                    f32 Weight1 = 1.0f - Weight0;
+                    
+                    AC->PlayingStates[PLAY_STATE_FIRST]->Contribution = Weight0;
+                    AC->PlayingStates[PLAY_STATE_SECOND]->Contribution = Weight1;
+                }
+                else{
+                    // NOTE(Dima): 0 here because this animation ended
+                    AC->PlayingStates[PLAY_STATE_FIRST]->Contribution = 0.0f;
+                    
+                    // NOTE(Dima): 1 here because this animation is fully turned on
+                    AC->PlayingStates[PLAY_STATE_SECOND]->Contribution = 1.0f;
+                    
+                    ShouldEndTransition = true;
+                }
+                
+                if(ShouldEndTransition){
+                    AC->PlayingStates[PLAY_STATE_FIRST] = AC->PlayingStates[PLAY_STATE_SECOND];
+                    AC->PlayingStates[PLAY_STATE_SECOND] = 0;
+                    AC->PlayingStatesCount = 1;
+                    
+                    AC->TimeToTransit = 0.0f;
+                    AC->TransitionTimeLeft = 0.0f;
+                }
+            }
+            else if(AC->PlayingStatesCount == 1){
+                AC->PlayingStates[PLAY_STATE_FIRST]->Contribution = 1.0f;
+            }
+            
+            /*
+            PlayingStatesCount can change before this line so 
+            we should recalculate if we are transitioning right now
+            */
+            b32 Transitioning = (AC->PlayingStatesCount == 2);
+            if(!Transitioning){
+                Assert(AC->PlayingStatesCount == 1);
+                
+                anim_state* State = AC->PlayingStates[PLAY_STATE_FIRST];
+                
+                // NOTE(Dima): Iterating through all transitions
+                anim_transition* TransitionAt = State->FirstTransition;
+                while(TransitionAt != 0){
+                    
+                    // NOTE(Dima): From state of transition should be equal to current state
+                    Assert(TransitionAt->FromState == State);
+                    
+                    b32 AllConditionsTrue = true;
+                    for(int ConditionIndex = 0;
+                        ConditionIndex < TransitionAt->ConditionsCount;
+                        ConditionIndex++)
+                    {
+                        anim_transition_condition* Cond = &TransitionAt->Conditions[ConditionIndex];
+                        
+                        b32 ConditionTrue = 0;
+                        if(Cond->Variable->ValueType == AnimVariable_Bool){
+                            b32 VariableBool = Cond->Variable->Value.Bool;
+                            b32 CondBool = Cond->Value.Bool;
+                            
+                            if(Cond->ConditionType == TransitionCondition_Equal){
+                                ConditionTrue = (VariableBool == CondBool);
+                            }
+                        }
+                        else if(Cond->Variable->ValueType == AnimVariable_Float){
+                            float VariableFloat = Cond->Variable->Value.Float;
+                            float CondFloat = Cond->Value.Float;
+                            
+                            switch(Cond->ConditionType){
+                                case TransitionCondition_MoreEqThan:{
+                                    ConditionTrue = VariableFloat >= CondFloat;
+                                }break;
+                                
+                                case TransitionCondition_MoreThan:{
+                                    ConditionTrue = VariableFloat > CondFloat;
+                                }break;
+                                
+                                case TransitionCondition_LessEqThan:{
+                                    ConditionTrue = VariableFloat <= CondFloat;
+                                }break;
+                                
+                                case TransitionCondition_LessThan:{
+                                    ConditionTrue = VariableFloat < CondFloat;
+                                }break;
+                                
+                                case TransitionCondition_Equal:{
+                                    ConditionTrue = Abs(VariableFloat - CondFloat) < 0.00000001f;
+                                }break;
+                            }
+                        }
+                        
+                        if(!ConditionTrue){
+                            AllConditionsTrue = false;
+                            break;
+                        }
+                    }
+                    
+                    if(AllConditionsTrue){
+                        // NOTE(Dima): Initiating transition
+                        AC->PlayingStates[PLAY_STATE_SECOND] = TransitionAt->ToState;
+                        AC->PlayingStatesCount = 2;
+                        
+                        PlayStateAnimations(AC->PlayingStates[PLAY_STATE_SECOND], 
+                                            GlobalTime,
+                                            0.0f);
+                        
+                        
+                        AC->TimeToTransit = TransitionAt->TimeToTransit;
+                        AC->TransitionTimeLeft = TransitionAt->TimeToTransit;
+                        
+                        break;
+                    }
+                    
+                    // NOTE(Dima): Advancing iterator
+                    TransitionAt = TransitionAt->NextInList;
+                } // end loop through all transitions
+            } // end if transitioninig
+            
+            
+            // NOTE(Dima): Update animations and blend trees of all playing graph nodes
+            for(int PlayingStateIndex = 0;
+                PlayingStateIndex < AC->PlayingStatesCount;
+                PlayingStateIndex++)
+            {
+                anim_state* AnimNode = AC->PlayingStates[PlayingStateIndex];
+                
+                playing_anim* Playing = &AnimNode->PlayingAnimation;
+                
+                animation_clip* Animation = LoadAnimationClip(Assets, 
+                                                              Playing->AnimationID,
+                                                              ASSET_IMPORT_IMMEDIATE);
+                
+                // NOTE(Dima): Clearing transforms in anim state to safely contribute
+                // NOTE(Dima): all in-state animations
+                ClearNodeTransforms(AnimNode->ResultedTransforms, Model->NodeCount);
+                
+                // NOTE(Dima): Updating animation and node transforms
+                UpdatePlayingAnimation(Assets, Model, 
+                                       Playing, Animation, 
+                                       GlobalTime, PlaybackRate);
+                
+                // NOTE(Dima): Updated resulted graph node transforms
+                for(int NodeIndex = 0; 
+                    NodeIndex < Model->NodeCount;
+                    NodeIndex++)
+                {
+                    node_transform* Dst = &AnimNode->ResultedTransforms[NodeIndex];
+                    node_transform* Src = &Playing->NodeTransforms[NodeIndex];
+                    
+                    
+                    Dst->T += Src->T;
+                    Dst->R += Src->R;
+                    Dst->S += Src->S;
+                }
+            }
+            
+            // NOTE(Dima): Clearing transforms in anim controller to safely contribute
+            // NOTE(Dima): all in-controller playing states
+            ClearNodeTransforms(AC->ResultedTransforms, Model->NodeCount);
+            
+            // NOTE(Dima): Sum every state resulted transforms based on contribution factor
+            // TODO(Dima): Potentially we can SIMD this loop
+            for(int PlayingStateIndex = 0;
+                PlayingStateIndex < AC->PlayingStatesCount;
+                PlayingStateIndex++)
+            {
+                anim_state* AnimState = AC->PlayingStates[PlayingStateIndex];
+                
+                float Contribution = AnimState->Contribution;
+                
+                for(int NodeIndex = 0; 
+                    NodeIndex < Model->NodeCount;
+                    NodeIndex++)
+                {
+                    node_transform* Dst = &AC->ResultedTransforms[NodeIndex];
+                    node_transform* Src = &AnimState->ResultedTransforms[NodeIndex];
+                    
+                    // NOTE(Dima): Summing translation
+                    Dst->T += Src->T * Contribution;
+                    
+                    // NOTE(Dima): Summing scaling
+                    Dst->S += Src->S * Contribution;
+                    
+                    // NOTE(Dima): Summing rotation
+                    float RotDot = Dot(Dst->R, Src->R);
+                    float SignDot = SignNotZero(RotDot);
+                    Dst->R += Src->R * SignDot * Contribution;
+                }
+            }
+            
+            // TODO(Dima): SIMD this loop too
+            for(int NodeIndex = 0; 
+                NodeIndex < Model->NodeCount;
+                NodeIndex++)
+            {
+                node_info* TargetNode = &Model->Nodes[NodeIndex];
+                node_transform* NodeTran = &AC->ResultedTransforms[NodeIndex];
+                
+                // NOTE(Dima): Finaling normalization of rotation
+                NodeTran->R = Normalize(NodeTran->R);
+            }
+            
+            
+            // NOTE(Dima): Calculating to parent transforms
+            CalculateToParentTransforms(Model, AC->ResultedTransforms);
+        } // NOTE(Dima): end if transitions count greater than zero
+    }
+}
+
+void UpdateModelAnimation(assets* Assets,
+                          model_info* Model,
+                          anim_controller* Control,
+                          f64 GlobalTime,
+                          f32 DeltaTime,
+                          f32 PlaybackRate)
+{
+    // NOTE(Dima): Resetting ToParent transforms to default
+    ResetToParentTransforms(Model);
+    
+    /*
+    NOTE(dima): Here all animation controller is updated. 
+    This includes updating transitions based on incoming variables 
+    and transition conditions.
+    
+    Also interpolating between animations implemented by summing 
+    weighted state animations.
+    
+    At the end of this function ToParentTransform calculated for each node
+    */
+    UpdateAnimController(Assets, Model, 
+                         Control, 
+                         GlobalTime,
+                         DeltaTime,
+                         PlaybackRate);
+    
+    // NOTE(Dima): This function calculates ToModel transform 
+    // NOTE(Dima): based on ToParent of each node
+    CalculateToModelTransforms(Model);
 }
 
 // NOTE(Dima): Returns bone count
@@ -306,7 +598,7 @@ int UpdateModelBoneTransforms(model_info* Model,
     return(BoneCount);
 }
 
-INTERNAL_FUNCTION anim_controller* AllocateAnimController(anim_state* Anim){
+INTERNAL_FUNCTION anim_controller* AllocateAnimController(anim_system* Anim){
     DLIST_ALLOCATE_FUNCTION_BODY(anim_controller, 
                                  Anim->Region,
                                  Next, Prev,
@@ -320,7 +612,7 @@ INTERNAL_FUNCTION anim_controller* AllocateAnimController(anim_state* Anim){
     return(Result);
 }
 
-INTERNAL_FUNCTION anim_controller* DeallocateAnimController(anim_state* Anim, 
+INTERNAL_FUNCTION anim_controller* DeallocateAnimController(anim_system* Anim, 
                                                             anim_controller* Control)
 {
     DLIST_DEALLOCATE_FUNCTION_BODY(Control, Next, Prev,
@@ -329,10 +621,13 @@ INTERNAL_FUNCTION anim_controller* DeallocateAnimController(anim_state* Anim,
     return(Control);
 }
 
-anim_controller* CreateAnimControl(anim_state* Anim, 
+anim_controller* CreateAnimControl(anim_system* Anim, 
                                    u32 NodesCheckSum)
 {
     anim_controller* Result = AllocateAnimController(Anim);
+    
+    // NOTE(Dima): Initialize beginned transition to 0
+    Result->BeginnedTransition = 0;
     
     // NOTE(Dima): Initialize skeleton check sum
     Result->NodesCheckSum = NodesCheckSum;
@@ -345,36 +640,55 @@ anim_controller* CreateAnimControl(anim_state* Anim,
         Result->VariableHashTable[Index] = 0;
     }
     
-    // NOTE(Dima): Init graphnode table
+    // NOTE(Dima): Init anim state table
     for(int Index = 0;
-        Index < ANIM_GRAPHNODE_TABLE_SIZE;
+        Index < ANIM_STATE_TABLE_SIZE;
         Index++)
     {
-        Result->GraphNodeTable[Index] = 0;
+        Result->StateTable[Index] = 0;
     }
     
-    // NOTE(Dima): Initializing graph node list
-    Result->FirstGraphNode = 0;
-    Result->LastGraphNode = 0;
+    // NOTE(Dima): Initializing state list
+    Result->FirstState = 0;
+    Result->LastState = 0;
     
     // NOTE(Dima): Initializing variable list
     Result->FirstVariable = 0;
-    Result->LastGraphNode = 0;
+    Result->LastState = 0;
     
     return(Result);
 }
 
+void PlayStateAnimations(anim_state* State, 
+                         f64 GlobalStart, 
+                         f32 Phase)
+{
+    State->PlayingAnimation.GlobalStart = GlobalStart;
+    State->PlayingAnimation.Phase01 = Phase;
+}
+
+
+/*
+NOTE(Dima): This function selects default playing state(first)
+and enables it's all animations
+*/
+void FinalizeCreation(anim_controller* Control){
+    Control->PlayingStatesCount = (Control->FirstState != 0);
+    Control->PlayingStates[PLAY_STATE_FIRST] = Control->FirstState;
+    Control->PlayingStates[PLAY_STATE_SECOND] = 0;
+    
+    PlayStateAnimations(Control->PlayingStates[PLAY_STATE_FIRST], 0.0f, 0.0f);
+}
 
 // NOTE(Dima): !!!!!!!!!!!!!!!!!
-// NOTE(Dima): Graph nodes stuff
+// NOTE(Dima): Anim states stuff
 // NOTE(Dima): !!!!!!!!!!!!!!!!!
-
-INTERNAL_FUNCTION anim_graph_node* AllocateAnimGraphNode(anim_state* Anim){
-    DLIST_ALLOCATE_FUNCTION_BODY(anim_graph_node,
+INTERNAL_FUNCTION anim_state* AllocateAnimState(anim_system* Anim){
+    DLIST_ALLOCATE_FUNCTION_BODY(anim_state,
                                  Anim->Region,
                                  NextAlloc, PrevAlloc,
-                                 Anim->GraphNodeFree,
-                                 Anim->GraphNodeUse,
+                                 Anim->StateFree,
+                                 Anim->StateUse,
                                  64, 
                                  Result);
     
@@ -383,24 +697,24 @@ INTERNAL_FUNCTION anim_graph_node* AllocateAnimGraphNode(anim_state* Anim){
     return(Result);
 }
 
-INTERNAL_FUNCTION anim_graph_node* DeallocateAnimGraphNode(anim_state* Anim,
-                                                           anim_graph_node* GraphNode)
+INTERNAL_FUNCTION anim_state* DeallocateAnimState(anim_system* Anim,
+                                                  anim_state* State)
 {
-    DLIST_DEALLOCATE_FUNCTION_BODY(GraphNode, NextAlloc, PrevAlloc,
-                                   Anim->GraphNodeFree);
+    DLIST_DEALLOCATE_FUNCTION_BODY(State, NextAlloc, PrevAlloc,
+                                   Anim->StateFree);
     
-    return(GraphNode);
+    return(State);
 }
 
-INTERNAL_FUNCTION anim_graph_node* 
-FindGraphNode(anim_controller* AC, char* Name)
+INTERNAL_FUNCTION anim_state* 
+FindState(anim_controller* AC, char* Name)
 {
     u32 Hash = StringHashFNV(Name);
     
-    int EntryIndex = Hash % ANIM_GRAPHNODE_TABLE_SIZE;
+    int EntryIndex = Hash % ANIM_STATE_TABLE_SIZE;
     
-    anim_graph_node* Result = 0;
-    anim_graph_node* At = AC->GraphNodeTable[EntryIndex];
+    anim_state* Result = 0;
+    anim_state* At = AC->StateTable[EntryIndex];
     while(At){
         
         if(StringsAreEqual(At->Name, Name)){
@@ -414,23 +728,23 @@ FindGraphNode(anim_controller* AC, char* Name)
     return(Result);
 }
 
-void AddAnimGraphNode(anim_controller* Control,
-                      u32 AnimGraphNodeType,
-                      char* Name)
+void AddAnimState(anim_controller* Control,
+                  u32 AnimStateType,
+                  char* Name)
 {
-    // NOTE(Dima): Initializing new graph node
-    anim_graph_node* New = AllocateAnimGraphNode(Control->AnimState);
+    // NOTE(Dima): Initializing new state
+    anim_state* New = AllocateAnimState(Control->AnimState);
     
-    New->Type = AnimGraphNodeType;
+    New->Type = AnimStateType;
     CopyStringsSafe(New->Name, ArrayCount(New->Name), Name);
     New->NextInHash = 0;
     
     // NOTE(Dima): Inserting to hash table
     u32 Hash = StringHashFNV(Name);
     
-    int EntryIndex = Hash % ANIM_GRAPHNODE_TABLE_SIZE;
+    int EntryIndex = Hash % ANIM_STATE_TABLE_SIZE;
     
-    anim_graph_node* At = Control->GraphNodeTable[EntryIndex];
+    anim_state* At = Control->StateTable[EntryIndex];
     
     if(At){
         while(At->NextInHash != 0){
@@ -444,19 +758,19 @@ void AddAnimGraphNode(anim_controller* Control,
         At->NextInHash = New;
     }
     else{
-        Control->GraphNodeTable[EntryIndex] = New;
+        Control->StateTable[EntryIndex] = New;
     }
     
     // NOTE(Dima): Inserting to list
     New->NextInList = 0;
-    if((Control->FirstGraphNode == 0) &&
-       (Control->LastGraphNode == 0))
+    if((Control->FirstState == 0) &&
+       (Control->LastState == 0))
     {
-        Control->FirstGraphNode = Control->LastGraphNode = New;
+        Control->FirstState = Control->LastState = New;
     }
     else{
-        Control->LastGraphNode->NextInList = New;
-        Control->LastGraphNode = New;
+        Control->LastState->NextInList = New;
+        Control->LastState = New;
     }
     
     // NOTE(Dima): Init transition list
@@ -469,7 +783,7 @@ void AddAnimGraphNode(anim_controller* Control,
 // NOTE(Dima): !Variable stuff!
 // NOTE(Dima): !!!!!!!!!!!!!!!!
 
-INTERNAL_FUNCTION anim_variable* AllocateVariable(anim_state* Anim)
+INTERNAL_FUNCTION anim_variable* AllocateVariable(anim_system* Anim)
 {
     DLIST_ALLOCATE_FUNCTION_BODY(anim_variable, 
                                  Anim->Region,
@@ -485,7 +799,7 @@ INTERNAL_FUNCTION anim_variable* AllocateVariable(anim_state* Anim)
     return(Result);
 }
 
-INTERNAL_FUNCTION anim_variable* DeallocateVariable(anim_state* Anim, 
+INTERNAL_FUNCTION anim_variable* DeallocateVariable(anim_system* Anim, 
                                                     anim_variable* Var)
 {
     DLIST_DEALLOCATE_FUNCTION_BODY(Var, 
@@ -567,7 +881,7 @@ FindVariable(anim_controller* AC, char* Name)
 // NOTE(Dima): Transitions stuff
 // NOTE(Dima): !!!!!!!!!!!!!!!!!
 
-INTERNAL_FUNCTION anim_transition* AllocateTransition(anim_state* Anim)
+INTERNAL_FUNCTION anim_transition* AllocateTransition(anim_system* Anim)
 {
     DLIST_ALLOCATE_FUNCTION_BODY(anim_transition,
                                  Anim->Region,
@@ -580,7 +894,7 @@ INTERNAL_FUNCTION anim_transition* AllocateTransition(anim_state* Anim)
     return(Result);
 }
 
-INTERNAL_FUNCTION anim_transition* DeallocateTransition(anim_state* Anim,
+INTERNAL_FUNCTION anim_transition* DeallocateTransition(anim_system* Anim,
                                                         anim_transition* Transition)
 {
     DLIST_DEALLOCATE_FUNCTION_BODY(Transition,
@@ -590,8 +904,12 @@ INTERNAL_FUNCTION anim_transition* DeallocateTransition(anim_state* Anim,
     return(Transition);
 }
 
-anim_transition* AddTransition(anim_controller* Control, 
-                               char* FromAnim, char* ToAnim)
+INTERNAL_FUNCTION anim_transition* 
+AddTransition(anim_controller* Control, 
+              char* FromAnim, 
+              char* ToAnim,
+              b32 AnimationShouldExit,
+              f32 TimeToTransit)
 {
     anim_transition* Result = AllocateTransition(Control->AnimState);
     
@@ -599,28 +917,50 @@ anim_transition* AddTransition(anim_controller* Control,
     Result->AnimControl = Control;
     
     // NOTE(Dima): Finding from
-    anim_graph_node* FromNode = FindGraphNode(Control, FromAnim);
-    Assert(FromNode);
+    anim_state* FromState = FindState(Control, FromAnim);
+    Assert(FromState);
     
     // NOTE(Dima): Finding to
-    anim_graph_node* ToNode = FindGraphNode(Control, ToAnim);
-    Assert(ToNode);
+    anim_state* ToState = FindState(Control, ToAnim);
+    Assert(ToState);
+    
+    Result->FromState = FromState;
+    Result->ToState = ToState;
+    
+    Result->AnimationShouldExit = AnimationShouldExit;
+    Result->TimeToTransit = TimeToTransit;
     
     // NOTE(Dima): Inserting to the end of From's transitions list
     Result->NextInList = 0;
-    if((FromNode->FirstTransition == 0) &&
-       (FromNode->LastTransition == 0))
+    if((FromState->FirstTransition == 0) &&
+       (FromState->LastTransition == 0))
     {
-        FromNode->FirstTransition = FromNode->LastTransition = Result;
+        FromState->FirstTransition = FromState->LastTransition = Result;
     }
     else{
-        FromNode->LastTransition->NextInList = Result;
-        FromNode->LastTransition = Result;
+        FromState->LastTransition->NextInList = Result;
+        FromState->LastTransition = Result;
     }
     
     return(Result);
 }
 
+void BeginTransition(anim_controller* Control,
+                     char* FromAnim, 
+                     char* ToAnim, 
+                     b32 AnimationShouldExit,
+                     f32 TimeToTransit)
+{
+    Assert(Control->BeginnedTransition == 0);
+    Control->BeginnedTransition = AddTransition(Control, FromAnim, ToAnim,
+                                                AnimationShouldExit,
+                                                TimeToTransit);
+}
+
+void EndTransition(anim_controller* Control){
+    Assert(Control->BeginnedTransition);
+    Control->BeginnedTransition = 0;
+}
 
 // NOTE(Dima): !!!!!!!!!!!!!!!!
 // NOTE(Dima): Conditions stuff
@@ -645,12 +985,13 @@ inline anim_transition_condition* AddCondition(anim_transition* Transition,
     return(Result);
 }
 
-void AddConditionFloat(anim_transition* Transition,
+void AddConditionFloat(anim_controller* Control,
                        char* VariableName,
                        u32 ConditionType,
                        f32 Value)
 {
-    anim_transition_condition* Cond = AddCondition(Transition,
+    Assert(Control->BeginnedTransition);
+    anim_transition_condition* Cond = AddCondition(Control->BeginnedTransition,
                                                    VariableName,
                                                    AnimVariable_Float,
                                                    ConditionType);
@@ -658,12 +999,13 @@ void AddConditionFloat(anim_transition* Transition,
     Cond->Value.Float = Value;
 }
 
-void AddConditionBool(anim_transition* Transition,
+void AddConditionBool(anim_controller* Control,
                       char* VariableName,
                       u32 ConditionType,
                       b32 Value)
 {
-    anim_transition_condition* Cond = AddCondition(Transition,
+    Assert(Control->BeginnedTransition);
+    anim_transition_condition* Cond = AddCondition(Control->BeginnedTransition,
                                                    VariableName,
                                                    AnimVariable_Bool,
                                                    ConditionType);
@@ -695,11 +1037,23 @@ void SetBool(anim_controller* Control,
     FoundVariable->Value.Bool = Value;
 }
 
-void InitAnimState(anim_state* Anim)
+
+void SetStateAnimation(anim_controller* Control,
+                       char* StateName,
+                       u32 AnimationID)
 {
-    // NOTE(Dima): Initializing graph nodes sentinels
-    DLIST_REFLECT_PTRS(Anim->GraphNodeUse, NextAlloc, PrevAlloc);
-    DLIST_REFLECT_PTRS(Anim->GraphNodeFree, NextAlloc, PrevAlloc);
+    anim_state* State = FindState(Control, StateName);
+    
+    if(State){
+        State->PlayingAnimation.AnimationID = AnimationID;
+    }
+}
+
+void InitAnimSystem(anim_system* Anim)
+{
+    // NOTE(Dima): Initializing states sentinels
+    DLIST_REFLECT_PTRS(Anim->StateUse, NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(Anim->StateFree, NextAlloc, PrevAlloc);
     
     // NOTE(Dima): Initializing variable sentinels
     DLIST_REFLECT_PTRS(Anim->VariableUse, NextAlloc, PrevAlloc);
