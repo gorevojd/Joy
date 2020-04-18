@@ -2225,71 +2225,6 @@ WIN32_DEBUG_OUTPUT(Win32DebugOutputLog){
     WriteConsoleA(HandleOut, Str, Len, &CharsWritten, 0);
 }
 
-
-#if 0
-static struct ODS_Buffer
-{
-    DWORD process_id;
-    char  data[4096 - sizeof(DWORD)];
-}* ods_buffer;
-
-static HANDLE ods_data_ready;
-static HANDLE ods_buffer_ready;
-
-INTERNAL_FUNCTION DWORD WINAPI OutputDebugString_Proc(LPVOID arg)
-{
-    DWORD ret = 0;
-    
-    HANDLE StdERR = GetStdHandle(STD_ERROR_HANDLE);
-    Assert(StdERR);
-    
-    for (;;)
-    {
-        SetEvent(ods_buffer_ready);
-        
-        DWORD wait = WaitForSingleObject(ods_data_ready, INFINITE);
-        Assert(wait == WAIT_OBJECT_0);
-        
-        // NOTE(Dima): Getting the str length
-        DWORD length = 0;
-        while (length < sizeof(ods_buffer->data) && ods_buffer->data[length] != 0)
-        {
-            length++;
-        }
-        
-        // NOTE(Dima): Write to StdERR
-        if (length != 0)
-        {
-            DWORD written;
-            WriteFile(StdERR, ods_buffer->data, length, &written, NULL);
-        }
-    }
-}
-
-INTERNAL_FUNCTION void OutputDebugString_Capture()
-{
-    if (IsDebuggerPresent())
-    {
-        return;
-    }
-    
-    HANDLE file = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(*ods_buffer), "DBWIN_BUFFER");
-    Assert(file != INVALID_HANDLE_VALUE);
-    
-    ods_buffer = (ODS_Buffer*)MapViewOfFile(file, SECTION_MAP_READ, 0, 0, 0);
-    Assert(ods_buffer);
-    
-    ods_buffer_ready = CreateEventA(NULL, FALSE, FALSE, "DBWIN_BUFFER_READY");
-    Assert(ods_buffer_ready);
-    
-    ods_data_ready = CreateEventA(NULL, FALSE, FALSE, "DBWIN_DATA_READY");
-    Assert(ods_data_ready);
-    
-    HANDLE thread = CreateThread(NULL, 0, OutputDebugString_Proc, NULL, 0, NULL);
-    Assert(thread);
-}
-#endif
-
 LRESULT CALLBACK
 Win32WindowProcessing(
 HWND Window,
@@ -2451,39 +2386,6 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     // NOTE(Dima): Calculating perfomance frequency
     QueryPerformanceFrequency(&GlobalWin32.PerformanceFreqLI);
     GlobalWin32.OneOverPerformanceFreq = 1.0 / (double)GlobalWin32.PerformanceFreqLI.QuadPart;
-    
-    // NOTE(Dima): Init win32 debug output log func
-    if(IsDebuggerPresent()){
-        GlobalWin32.DebugOutputFunc = OutputDebugStringA;
-    }
-    else{
-        //AllocConsole();
-        GlobalWin32.DebugOutputFunc = Win32DebugOutputLog;
-        
-        // redirect unbuffered STDOUT to the console
-        intptr_t stdHandle = reinterpret_cast<intptr_t>(::GetStdHandle(STD_OUTPUT_HANDLE));
-        int	conHandle = _open_osfhandle(stdHandle, _O_TEXT);
-        FILE* file = _fdopen(conHandle, "w");
-        *stdout = *file;
-        setvbuf(stdout, NULL, _IONBF, 0);
-        
-        // redirect unbuffered STDIN to the console
-        stdHandle = reinterpret_cast<intptr_t>(::GetStdHandle(STD_INPUT_HANDLE));
-        conHandle = _open_osfhandle(stdHandle, _O_TEXT);
-        file = _fdopen(conHandle, "r");
-        *stdin = *file;
-        setvbuf(stdin, NULL, _IONBF, 0);
-        
-        // redirect unbuffered STDERR to the console
-        stdHandle = reinterpret_cast<intptr_t>(::GetStdHandle(STD_ERROR_HANDLE));
-        conHandle = _open_osfhandle(stdHandle, _O_TEXT);
-        file = _fdopen(conHandle, "w");
-        *stderr = *file;
-        setvbuf(stderr, NULL, _IONBF, 0);
-        
-        //GlobalWin32.DebugOutputFunc = OutputDebugStringA;
-        //OutputDebugString_Capture();
-    }
     
     int WindowWidth = 1366;
     int WindowHeight = 768;

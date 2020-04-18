@@ -118,6 +118,8 @@ struct loaded_model{
     // NOTE(Dima): Mapping node name to corresponding node in hierarchy
     std::unordered_map<std::string, int> NodeNameToNodeIndex;
     
+    u32 NodesCheckSum;
+    
     tool_model_info ToolModelInfo;
 };
 

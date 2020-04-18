@@ -2,9 +2,9 @@
 
 in vec3 VsColor;
 
-out vec3 OutColor;
+out vec4 OutColor;
 
 void main(){
-    //Color = VsColor;
-    OutColor = vec3(1.0f, 0.0f, 0.0f);
+    OutColor = vec4(VsColor, 1.0f);
+    //OutColor = vec4(1.0f, 0.0f, 0.0f, 1.0f);
 }

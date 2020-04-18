@@ -251,19 +251,9 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
 {
     asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
     
-    UpdateModelAnimation(Assets, Model, AC,
-                         GlobalTime, DeltaTime, 
-                         1.0f);
-    
-    // NOTE(Dima): Getting skeleton if it exists
-    skeleton_info* Skeleton = 0;
-    if(Model->HasSkeleton){
-        Skeleton = LoadSkeleton(Assets, Model->SkeletonID, ASSET_IMPORT_DEFERRED);
-    }
-    
-    // NOTE(Dima): Updating skeleton data
-    int BoneCount = UpdateModelBoneTransforms(Model, Skeleton, 
-                                              AC->BoneTransformMatrices);
+    anim_calculated_pose CalcPose = UpdateModelAnimation(Assets, Model, AC,
+                                                         GlobalTime, DeltaTime, 
+                                                         1.0f);
     
     m44 ModelToWorld = ScalingMatrix(Scale) * RotationMatrix(Rot) * TranslationMatrix(Pos);
     
@@ -286,8 +276,8 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
             
             if(Mesh){
                 PushMesh(Stack, Mesh, NodeTran, 
-                         AC->BoneTransformMatrices, 
-                         BoneCount);
+                         CalcPose.BoneTransforms, 
+                         CalcPose.BoneTransformsCount);
             }
         }
     }
@@ -342,7 +332,7 @@ GAME_MODE_UPDATE(TestUpdate){
                                                                   SphereDistributionsmaxCount,
                                                                   State->SphereDistributionsFib);
         
-        State->PlayerAC = InitPlayerAC(Game->Anim, Game->Assets, 0);
+        State->PlayerAC = 0;
         
         State->Initialized = true;
     }
@@ -478,6 +468,10 @@ GAME_MODE_UPDATE(TestUpdate){
                                   ASSET_IMPORT_DEFERRED);
     
     if(Model){
+        if(!State->PlayerAC){
+            State->PlayerAC = InitPlayerAC(Game->Anim, Game->Assets, Model->NodesCheckSum);
+        }
+        
         SetStateAnimation(State->PlayerAC, "Idle", Model->AnimationIDs[0]);
         SetStateAnimation(State->PlayerAC, "Run", Model->AnimationIDs[5]);
         SetStateAnimation(State->PlayerAC, "Falling", Model->AnimationIDs[1]);

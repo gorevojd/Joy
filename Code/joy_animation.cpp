@@ -463,6 +463,8 @@ INTERNAL_FUNCTION void UpdateAnimController(assets* Assets,
                                                               Playing->AnimationID,
                                                               ASSET_IMPORT_IMMEDIATE);
                 
+                Assert(Animation->NodesCheckSum == AC->NodesCheckSum);
+                
                 // NOTE(Dima): Clearing transforms in anim state to safely contribute
                 // NOTE(Dima): all in-state animations
                 ClearNodeTransforms(AnimNode->ResultedTransforms, Model->NodeCount);
@@ -540,12 +542,54 @@ INTERNAL_FUNCTION void UpdateAnimController(assets* Assets,
     }
 }
 
-void UpdateModelAnimation(assets* Assets,
-                          model_info* Model,
-                          anim_controller* Control,
-                          f64 GlobalTime,
-                          f32 DeltaTime,
-                          f32 PlaybackRate)
+INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(assets* Assets, 
+                                                                 model_info* Model, 
+                                                                 anim_controller* Control)
+{
+    anim_calculated_pose Result = {};
+    
+    int BoneCount = 0;
+    m44* CalculatedBoneTransforms = 0;
+    skeleton_info* Skeleton = 0;
+    
+    if(Control && Model){
+        
+        // NOTE(Dima): Getting skeleton if we can
+        if(Model->HasSkeleton){
+            Skeleton = LoadSkeleton(Assets, Model->SkeletonID, ASSET_IMPORT_DEFERRED);
+        }
+        
+        // NOTE(Dima): Updating skeleton
+        if(Skeleton){
+            BoneCount = Skeleton->BoneCount;
+            CalculatedBoneTransforms = Control->BoneTransformMatrices;
+            
+            for(int BoneIndex = 0;
+                BoneIndex < BoneCount;
+                BoneIndex++)
+            {
+                bone_info* Bone = &Skeleton->Bones[BoneIndex];
+                
+                node_info* CorrespondingNode = &Model->Nodes[Bone->NodeIndex];
+                
+                CalculatedBoneTransforms[BoneIndex] = 
+                    Bone->InvBindPose * CorrespondingNode->CalculatedToModel;
+            }
+            
+            Result.BoneTransforms = CalculatedBoneTransforms;
+            Result.BoneTransformsCount = BoneCount;
+        }
+    }
+    
+    return(Result);
+}
+
+anim_calculated_pose UpdateModelAnimation(assets* Assets,
+                                          model_info* Model,
+                                          anim_controller* Control,
+                                          f64 GlobalTime,
+                                          f32 DeltaTime,
+                                          f32 PlaybackRate)
 {
     // NOTE(Dima): Resetting ToParent transforms to default
     ResetToParentTransforms(Model);
@@ -569,33 +613,13 @@ void UpdateModelAnimation(assets* Assets,
     // NOTE(Dima): This function calculates ToModel transform 
     // NOTE(Dima): based on ToParent of each node
     CalculateToModelTransforms(Model);
-}
-
-// NOTE(Dima): Returns bone count
-int UpdateModelBoneTransforms(model_info* Model, 
-                              skeleton_info* Skeleton,
-                              m44* BoneTransformMatrices)
-{
-    int BoneCount = 0;
     
-    // NOTE(Dima): Updating skeleton
-    if(Skeleton){
-        BoneCount = Skeleton->BoneCount;
-        
-        for(int BoneIndex = 0;
-            BoneIndex < BoneCount;
-            BoneIndex++)
-        {
-            bone_info* Bone = &Skeleton->Bones[BoneIndex];
-            
-            node_info* CorrespondingNode = &Model->Nodes[Bone->NodeIndex];
-            
-            BoneTransformMatrices[BoneIndex] = 
-                Bone->InvBindPose * CorrespondingNode->CalculatedToModel;
-        }
-    }
+    // NOTE(Dima): Updating skeleton data
+    anim_calculated_pose Result = UpdateModelBoneTransforms(Assets, 
+                                                            Model, 
+                                                            Control);
     
-    return(BoneCount);
+    return(Result);
 }
 
 INTERNAL_FUNCTION anim_controller* AllocateAnimController(anim_system* Anim){

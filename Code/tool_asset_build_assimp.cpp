@@ -157,17 +157,15 @@ AiLoadMatTexturesForType(loaded_model* Model,
 }
 
 INTERNAL_FUNCTION u32 
-CalculateCheckSumForSkeleton(loaded_model* Model, tool_skeleton_info* Skeleton)
+CalculateCheckSumForNodes(loaded_model* Model)
 {
     u32 Result = 0;
     
     for(int Index = 0;
-        Index < Skeleton->Bones.size();
+        Index < Model->Nodes.size();
         Index++)
     {
-        bone_info* Bone = &Skeleton->Bones[Index];
-        
-        loaded_node* Node = &Model->Nodes[Bone->NodeIndex];
+        loaded_node* Node  = &Model->Nodes[Index];
         
         u32 ThisNameHash = StringHashFNV(Node->Name);
         
@@ -438,6 +436,9 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         NodeProcessQueue.pop();
     }
     
+    // NOTE(Dima): Calculating check sums
+    Result.NodesCheckSum = CalculateCheckSumForNodes(&Result);
+    
     // NOTE(Dima): Loading nodes animations
     int AnimationsCount = scene->mNumAnimations;
     for(int AnimIndex = 0;
@@ -451,6 +452,7 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         NewAnimation.Name = std::string(AssimpAnim->mName.C_Str());
         NewAnimation.Duration = AssimpAnim->mDuration;
         NewAnimation.TicksPerSecond = AssimpAnim->mTicksPerSecond;
+        NewAnimation.NodesCheckSum = Result.NodesCheckSum;
         
         for(int NodeAnimIndex = 0;
             NodeAnimIndex < AssimpAnim->mNumChannels;
@@ -508,7 +510,6 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         // NOTE(Dima): Pushing animation to vector
         Result.Animations.push_back(NewAnimation);
     }
-    
     
     std::unordered_set<std::string> BoneNames;
     std::unordered_map<std::string, int> BoneNameToBoneIndex;
@@ -618,9 +619,6 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
                 Bone->ParentIndex = ParentBoneIndex;
             }
         }
-        
-        // NOTE(Dima): Trying to find skeleton with same check sum in skeletons array
-        Skeleton->CheckSum = CalculateCheckSumForSkeleton(&Result, Skeleton);
     }
     
     // NOTE(Dima): Loading meshes
@@ -746,6 +744,8 @@ INTERNAL_FUNCTION tool_model_info LoadedToToolModelInfo(loaded_model* Model){
     Result.MeshIDs = std::vector<u32>();
     Result.MaterialIDs = std::vector<u32>();
     Result.AnimationIDs = std::vector<u32>();
+    
+    Result.NodesCheckSum = Model->NodesCheckSum;
     
     for(int NodeIndex = 0;
         NodeIndex < Model->Nodes.size();

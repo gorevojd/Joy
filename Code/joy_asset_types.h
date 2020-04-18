@@ -164,8 +164,6 @@ struct node_info{
 };
 
 struct skeleton_info{
-    u32 CheckSum;
-    
     bone_info* Bones;
     int BoneCount;
 };
@@ -177,6 +175,8 @@ struct model_info{
     node_info* Nodes;
     u32* NodeMeshIDsStorage;
     node_shared_data* NodesSharedDatas;
+    
+    u32 NodesCheckSum;
     
     b32 HasSkeleton;
     u32 SkeletonID;
@@ -212,6 +212,8 @@ struct animation_clip{
     char* Name;
     
     b32 IsLooping;
+    
+    u32 NodesCheckSum;
     
     u32* NodeAnimationIDs;
     int NodeAnimationsCount;

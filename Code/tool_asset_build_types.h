@@ -145,6 +145,7 @@ struct tool_model_info{
     std::vector<u32> AnimationIDs;
     
     u32 SkeletonID;
+    u32 NodesCheckSum;
     
     int MeshCount;
     int MaterialCount;
@@ -180,11 +181,11 @@ struct tool_animation_info{
     
     std::vector<tool_node_animation> NodeAnimations;
     std::vector<u32> NodeAnimationsStoredIDs;
+    
+    u32 NodesCheckSum;
 };
 
 struct tool_skeleton_info{
-    u32 CheckSum;
-    
     std::vector<bone_info> Bones;
 };
 

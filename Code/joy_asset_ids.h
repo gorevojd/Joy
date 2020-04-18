@@ -86,6 +86,7 @@ struct asset_model{
     
     // NOTE(Dima): If ID is 0 then there is no skeleton
     u32 SkeletonID;
+    u32 NodesCheckSum;
     
     u32 DataOffsetToMeshIDs;
     u32 DataOffsetToMaterialIDs;
@@ -101,7 +102,6 @@ struct asset_model{
 };
 
 struct asset_skeleton{
-    u32 CheckSum;
     int BoneCount;
     
     u32 DataOffsetToBones;
@@ -111,6 +111,8 @@ struct asset_skeleton{
 struct asset_animation_clip{
     float Duration;
     float TicksPerSecond;
+    
+    u32 NodesCheckSum;
     
     int NodeAnimationIDsCount;
     

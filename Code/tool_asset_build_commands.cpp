@@ -308,6 +308,7 @@ added_asset AddModelAsset(asset_system* System, tool_model_info* Model){
     asset_model* ModelHeader = &FileHeader->Model;
     
     ModelHeader->SkeletonID = Model->SkeletonID;
+    ModelHeader->NodesCheckSum = Model->NodesCheckSum;
     
     ModelHeader->MeshCount = Model->MeshCount;
     ModelHeader->MaterialCount = Model->MaterialCount;
@@ -397,6 +398,7 @@ added_asset AddAnimationClipAsset(asset_system* System, tool_animation_info* Ani
     AnimationHeader->Duration = Animation->Duration;
     AnimationHeader->TicksPerSecond = Animation->TicksPerSecond;
     AnimationHeader->NodeAnimationIDsCount = Animation->NodeAnimations.size();
+    AnimationHeader->NodesCheckSum = Animation->NodesCheckSum;
     
     AnimationHeader->DataOffsetToNodeAnimationIDs = 0;
     AnimationHeader->SizeNodeAnimationIDs = sizeof(u32) * Animation->NodeAnimations.size();
@@ -419,7 +421,6 @@ added_asset AddSkeletonAsset(asset_system* System, tool_skeleton_info* Skeleton)
     // NOTE(Dima): Setting file header
     asset_skeleton* SkHeader = &FileHeader->Skeleton;
     
-    SkHeader->CheckSum = Skeleton->CheckSum;
     SkHeader->BoneCount = Skeleton->Bones.size();
     SkHeader->DataOffsetToBones = 0;
     SkHeader->SizeBones = sizeof(bone_info) * Skeleton->Bones.size();

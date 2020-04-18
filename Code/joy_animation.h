@@ -109,6 +109,11 @@ struct anim_transition{
     anim_transition* PrevAlloc;
 };
 
+struct anim_calculated_pose{
+    m44* BoneTransforms;
+    int BoneTransformsCount;
+};
+
 #define ANIM_STATE_TABLE_SIZE 64
 #define ANIM_VAR_TABLE_SIZE 32
 struct anim_controller{
@@ -164,16 +169,12 @@ struct anim_system{
     anim_transition TransitionFree;
 };
 
-void UpdateModelAnimation(assets* Assets,
-                          model_info* Model,
-                          anim_controller* Control,
-                          f64 GlobalTime,
-                          f32 DeltaTime,
-                          f32 PlaybackRate);
-
-int UpdateModelBoneTransforms(model_info* Model, 
-                              skeleton_info* Skeleton,
-                              m44* BoneTransformMatrices);
+anim_calculated_pose UpdateModelAnimation(assets* Assets,
+                                          model_info* Model,
+                                          anim_controller* Control,
+                                          f64 GlobalTime,
+                                          f32 DeltaTime,
+                                          f32 PlaybackRate);
 
 #define CREATE_ANIM_CONTROL_FUNC(name) anim_controller* name(anim_system* Anim, struct assets* Assets, u32 NodesCheckSum)
 

@@ -977,6 +977,7 @@ void InitAssets(assets* Assets){
                             
                             Result->SkeletonID = FileToIntegratedID(FileSource, Src->SkeletonID);
                             Result->HasSkeleton = Src->SkeletonID != 0;
+                            Result->NodesCheckSum = Src->NodesCheckSum;
                             
                             Result->MeshCount = Src->MeshCount;
                             Result->MaterialCount = Src->MaterialCount;
@@ -1003,6 +1004,7 @@ void InitAssets(assets* Assets){
                             Clip->DurationTicks = Src->Duration;
                             Clip->TicksPerSecond = Src->TicksPerSecond;
                             Clip->NodeAnimationsCount = Src->NodeAnimationIDsCount;
+                            Clip->NodesCheckSum = Src->NodesCheckSum;
                         }break;
                         
                         case AssetType_Skeleton:{

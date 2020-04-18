@@ -533,13 +533,15 @@ void GlInit(gl_state* GL, assets* Assets){
     if(ArrayIsValid(GL->GuiGeomShader.PUVAttrLoc)){
         glEnableVertexAttribArray(GL->GuiGeomShader.PUVAttrLoc);
         glVertexAttribPointer(GL->GuiGeomShader.PUVAttrLoc, 
-                              4, GL_FLOAT, 0, 8 * FS, 0);
+                              4, GL_FLOAT, GL_FALSE, 
+                              8 * FS, 0);
     }
     
     if(ArrayIsValid(GL->GuiGeomShader.CAttrLoc)){
         glEnableVertexAttribArray(GL->GuiGeomShader.CAttrLoc);
         glVertexAttribPointer(GL->GuiGeomShader.CAttrLoc, 
-                              4, GL_FLOAT, 0, 8 * FS, (void*)(4 * FS));
+                              4, GL_FLOAT, GL_FALSE, 
+                              8 * FS, (void*)(4 * FS));
     }
     glBindVertexArray(0);
 }
@@ -776,7 +778,7 @@ void GlOutputPass(gl_state* GL, render_pass* Pass){
     v3 Color2 = V3(0.0f, 1.0f, 0.0f);
     v3 Color3 = V3(0.0f, 1.0f, 1.0f);
     
-    v3 Vertices[] = {
+    static v3 Vertices[] = {
         StartP, Color1, 
         EndP, Color1,
         V3(0.0f), Color2,
@@ -786,23 +788,23 @@ void GlOutputPass(gl_state* GL, render_pass* Pass){
     
     glEnable(GL_DEPTH_TEST);
     
-    UseShader(&GL->DebugGeomShader.Shader);
-    UniformMatrix4x4(GL->DebugGeomShader.ViewProjectionLoc,
-                     Pass->ViewProjection.e);
-    
     glBindVertexArray(GL->DEBUGGeomVAO);
     BindBufferAndFill(GL_ARRAY_BUFFER,
                       GL_DYNAMIC_DRAW,
                       Vertices,
-                      6* 2 * sizeof(v3),
+                      sizeof(Vertices),
                       GL->DEBUGGeomVBO);
     
+    UseShader(&GL->DebugGeomShader.Shader);
+    UniformMatrix4x4(GL->DebugGeomShader.ViewProjectionLoc,
+                     Pass->ViewProjection.e);
+    
+    glLineWidth(2.0f);
     glDrawArrays(GL_LINES, 0, 6);
     
     glBindVertexArray(0);
     glDisable(GL_DEPTH_TEST);
 #endif
-    
 }
 
 void GlOutputRender(gl_state* GL, render_state* Render){

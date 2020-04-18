@@ -141,4 +141,5 @@ void GameFree(game_state* Game){
     Free(&Game->InputMemory);
     Free(&Game->RenderMemory);
     Free(&Game->AssetMemory);
+    Free(&Game->AnimMemory);
 }
