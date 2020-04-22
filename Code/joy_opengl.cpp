@@ -164,19 +164,19 @@ void UniformInt(GLint Loc, int Value){
     glUniform1i(Loc, Value);
 }
 
-void UniformV3(GLint Loc, float x, float y, float z){
+void UniformVec3(GLint Loc, float x, float y, float z){
     glUniform3f(Loc, x, y, z);
 }
 
-void UniformV3(GLint Loc, v3 A){
+void UniformVec3(GLint Loc, v3 A){
     glUniform3f(Loc, A.x, A.y, A.z);
 }
 
-void UniformV4(GLint Loc, float x, float y, float z, float w){
+void UniformVec4(GLint Loc, float x, float y, float z, float w){
     glUniform4f(Loc, x, y, z, w);
 }
 
-void UniformV4(GLint Loc, v4 A){
+void UniformVec4(GLint Loc, v4 A){
     glUniform4f(Loc, A.x, A.y, A.z, A.w);
 }
 
@@ -213,6 +213,7 @@ INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadSimpleShader){
     GLGETU(Normals);
     GLGETU(AlbedoIsSet);
     GLGETU(NormalsIsSet);
+    GLGETU(AlbedoColor);
     
     GLGETA(P);
     GLGETA(UV);
@@ -248,20 +249,20 @@ INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadGuiGeomShader)
     GLGETA(C);
 }
 
-INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadDebugGeomShader)
+INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadLinesShader)
 {
-    gl_debuggeom_shader& Result = GL->DebugGeomShader;
+    gl_lines_shader& Result = GL->LinesShader;
     Result.Shader = GlLoadProgram(GL, PathV, PathF);
     
     GLGETU(ViewProjection);
+    GLGETU(ColorsTexture);
     
     GLGETA(P);
-    GLGETA(Color);
 }
 
-INTERNAL_FUNCTION inline void BindBufferAndFill(GLenum Target, GLenum Usage,
-                                                void* Data, size_t DataSize,
-                                                GLuint BufferName)
+INTERNAL_FUNCTION void BindBufferAndFill(GLenum Target, GLenum Usage,
+                                         void* Data, size_t DataSize,
+                                         GLuint BufferName)
 {
     glBindBuffer(Target, BufferName);
     
@@ -276,6 +277,58 @@ INTERNAL_FUNCTION inline void BindBufferAndFill(GLenum Target, GLenum Usage,
     }
     
     glBufferSubData(Target, 0, DataSize, Data);
+}
+
+INTERNAL_FUNCTION GLuint GenerateAndBindBufferTexture(GLint GlTextureUnit, 
+                                                      GLuint GlComponentType, 
+                                                      GLuint TBO)
+{
+    GLuint TexBufTex;
+    glGenTextures(1, &TexBufTex);
+    
+    glActiveTexture(GlTextureUnit);
+    glBindTexture(GL_TEXTURE_BUFFER, TexBufTex);
+    
+    glTexBuffer(GL_TEXTURE_BUFFER, GlComponentType, TBO);
+    
+    return(TexBufTex);
+}
+
+INTERNAL_FUNCTION void InitVertexAttribFloat(GLint AttrLoc, 
+                                             int ComponentCount,
+                                             size_t Stride,
+                                             size_t Offset)
+{
+    if(ArrayIsValid(AttrLoc)){
+        glEnableVertexAttribArray(AttrLoc);
+        glVertexAttribPointer(AttrLoc,
+                              ComponentCount, 
+                              GL_FLOAT, 
+                              GL_FALSE,
+                              Stride, 
+                              (GLvoid*)(Offset));
+    }
+}
+
+INTERNAL_FUNCTION void InitVertexAttribUint(GLint AttrLoc, 
+                                            int ComponentCount,
+                                            size_t Stride,
+                                            size_t Offset)
+{
+    if(ArrayIsValid(AttrLoc)){
+        glEnableVertexAttribArray(AttrLoc);
+        glVertexAttribIPointer(AttrLoc,
+                               ComponentCount, 
+                               GL_UNSIGNED_INT, 
+                               Stride, 
+                               (GLvoid*)(Offset));
+    }
+}
+
+INTERNAL_FUNCTION void FreeVertexAttrib(GLint AttrLoc){
+    if(ArrayIsValid(AttrLoc)){
+        glDisableVertexAttribArray(AttrLoc);
+    }
 }
 
 INTERNAL_FUNCTION GLuint GlAllocateTexture(bmp_info* bmp){
@@ -373,49 +426,30 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
         
 #define GLGETOFFSET(index) (GLvoid*)((index) * sizeof(GLfloat))
         
-        if(ArrayIsValid(GL->SimpleShader.PAttrLoc)){
-            glEnableVertexAttribArray(GL->SimpleShader.PAttrLoc);
-            glVertexAttribPointer(GL->SimpleShader.PAttrLoc,
-                                  3, GL_FLOAT, GL_FALSE,
-                                  Stride, (void*)Mesh->TypeCtx.OffsetP);
-        }
+        InitVertexAttribFloat(GL->SimpleShader.PAttrLoc,
+                              3, Stride, 
+                              Mesh->TypeCtx.OffsetP);
         
-        if(ArrayIsValid(GL->SimpleShader.UVAttrLoc)){
-            glEnableVertexAttribArray(GL->SimpleShader.UVAttrLoc);
-            glVertexAttribPointer(GL->SimpleShader.UVAttrLoc,
-                                  2, GL_FLOAT, GL_FALSE,
-                                  Stride, (void*)Mesh->TypeCtx.OffsetUV);
-        }
+        InitVertexAttribFloat(GL->SimpleShader.UVAttrLoc,
+                              2, Stride, 
+                              Mesh->TypeCtx.OffsetUV);
         
-        if(ArrayIsValid(GL->SimpleShader.NAttrLoc)){
-            glEnableVertexAttribArray(GL->SimpleShader.NAttrLoc);
-            glVertexAttribPointer(GL->SimpleShader.NAttrLoc,
-                                  3, GL_FLOAT, GL_FALSE,
-                                  Stride, (void*)Mesh->TypeCtx.OffsetN);
-        }
+        InitVertexAttribFloat(GL->SimpleShader.NAttrLoc,
+                              3, Stride, 
+                              Mesh->TypeCtx.OffsetN);
         
-        if(ArrayIsValid(GL->SimpleShader.TAttrLoc)){
-            glEnableVertexAttribArray(GL->SimpleShader.TAttrLoc);
-            glVertexAttribPointer(GL->SimpleShader.TAttrLoc,
-                                  3, GL_FLOAT, GL_FALSE,
-                                  Stride, (void*)Mesh->TypeCtx.OffsetT);
-        }
+        InitVertexAttribFloat(GL->SimpleShader.TAttrLoc,
+                              3, Stride, 
+                              Mesh->TypeCtx.OffsetT);
         
         if(Mesh->TypeCtx.MeshType == Mesh_Skinned){
-            if(ArrayIsValid(GL->SimpleShader.WeightsAttrLoc)){
-                glEnableVertexAttribArray(GL->SimpleShader.WeightsAttrLoc);
-                glVertexAttribPointer(GL->SimpleShader.WeightsAttrLoc,
-                                      4, GL_FLOAT, GL_FALSE,
-                                      Stride, (void*)Mesh->TypeCtx.OffsetWeights);
-            }
+            InitVertexAttribFloat(GL->SimpleShader.WeightsAttrLoc,
+                                  4, Stride,
+                                  Mesh->TypeCtx.OffsetWeights);
             
-            
-            if(ArrayIsValid(GL->SimpleShader.BoneIDsAttrLoc)){
-                glEnableVertexAttribArray(GL->SimpleShader.BoneIDsAttrLoc);
-                glVertexAttribIPointer(GL->SimpleShader.BoneIDsAttrLoc,
-                                       1, GL_UNSIGNED_INT,
-                                       Stride, (void*)Mesh->TypeCtx.OffsetBoneIDs);
-            }
+            InitVertexAttribUint(GL->SimpleShader.BoneIDsAttrLoc,
+                                 1, Stride,
+                                 Mesh->TypeCtx.OffsetBoneIDs);
         }
         
         glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -445,9 +479,9 @@ void GlInit(gl_state* GL, assets* Assets){
     LoadGuiGeomShader(GL,
                       "../Data/Shaders/gui_geom.vs",
                       "../Data/Shaders/gui_geom.fs");
-    LoadDebugGeomShader(GL,
-                        "../Data/Shaders/debug_geometry.vs",
-                        "../Data/Shaders/debug_geometry.fs");
+    LoadLinesShader(GL,
+                    "../Data/Shaders/lines.vs",
+                    "../Data/Shaders/lines.fs");
     
     size_t FS = sizeof(float);
     
@@ -502,25 +536,10 @@ void GlInit(gl_state* GL, assets* Assets){
     glUniform1i(GL->GuiRectShader.BitmapLoc, 0);
     glUseProgram(0);
     
-    // NOTE(Dima): Init Debug geometry buffer objects
-    glGenVertexArrays(1, &GL->DEBUGGeomVAO);
-    glGenBuffers(1, &GL->DEBUGGeomVBO);
-    
-    glBindVertexArray(GL->DEBUGGeomVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, GL->DEBUGGeomVBO);
-    if(ArrayIsValid(GL->DebugGeomShader.PAttrLoc)){
-        glEnableVertexAttribArray(GL->DebugGeomShader.PAttrLoc);
-        glVertexAttribPointer(GL->DebugGeomShader.PAttrLoc,
-                              3, GL_FLOAT, GL_FALSE,
-                              6 * FS, 0);
-    }
-    if(ArrayIsValid(GL->DebugGeomShader.ColorAttrLoc)){
-        glEnableVertexAttribArray(GL->DebugGeomShader.ColorAttrLoc);
-        glVertexAttribPointer(GL->DebugGeomShader.ColorAttrLoc,
-                              3, GL_FLOAT, GL_FALSE,
-                              6 * FS, (void*)(3 * FS));
-    }
-    glBindVertexArray(0);
+    // NOTE(Dima): Init lines geometry buffer objects
+    glGenVertexArrays(1, &GL->LinesVAO);
+    glGenBuffers(2, GL->LinesVBO);
+    glGenBuffers(2, GL->LinesTBO);
     
     // NOTE(Dima): Init GuiGeom buffer objects
     glGenVertexArrays(1, &GL->GuiGeomVAO);
@@ -639,7 +658,7 @@ INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, bmp_info* bmp){
     glDeleteTextures(1, &BlitTex);
 }
 
-void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
+void GlOutputStack(gl_state* GL, render_stack* Stack, render_camera_setup* CameraSetup){
     u8* at = (u8*)Stack->MemRegion.CreationBlock.Base;
     u8* StackEnd = (u8*)Stack->MemRegion.CreationBlock.Base + Stack->MemRegion.CreationBlock.Used;
     
@@ -691,10 +710,6 @@ void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
                 
             }break;
             
-            case RenderEntry_GuiGeom:{
-                
-            }break;
-            
             case RenderEntry_Mesh:{
                 RENDER_GET_ENTRY(render_entry_mesh);
                 mesh_info* Mesh = entry->Mesh;
@@ -709,31 +724,19 @@ void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
                 UniformMatrix4x4(GL->SimpleShader.ModelLoc,
                                  entry->Transform.e);
                 UniformMatrix4x4(GL->SimpleShader.ViewLoc,
-                                 Pass->View.e);
+                                 CameraSetup->View.e);
                 UniformMatrix4x4(GL->SimpleShader.ProjectionLoc,
-                                 Pass->Projection.e);
+                                 CameraSetup->Projection.e);
                 UniformBool(GL->SimpleShader.HasSkinningLoc,
                             Mesh->TypeCtx.MeshType == Mesh_Skinned);
                 UniformInt(GL->SimpleShader.BonesCountLoc, 
                            entry->BoneCount);
+                
                 if(entry->BoneCount){
-#if 0
                     glUniformMatrix4fv(GL->SimpleShader.BoneTransformsLoc,
                                        entry->BoneCount,
                                        GL_TRUE,
                                        (const GLfloat*)entry->BoneTransforms[0].e);
-#else
-                    for(int i = 0; i < entry->BoneCount; i++){
-                        char Buf[256];
-                        sprintf(Buf, "BoneTransforms[%d]", i);
-                        
-                        GLint MatrixLocation = glGetUniformLocation(GL->SimpleShader.Shader.ID, Buf);
-                        glUniformMatrix4fv(MatrixLocation,
-                                           1,
-                                           GL_TRUE,
-                                           (const GLfloat*)entry->BoneTransforms[i].e);
-                    }
-#endif
                 }
                 
                 // NOTE(Dima): Setting FS uniforms
@@ -742,6 +745,7 @@ void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
                 
                 UniformBool(GL->SimpleShader.AlbedoIsSetLoc, AlbedoIsSet);
                 UniformBool(GL->SimpleShader.NormalsIsSetLoc, NormalsIsSet);
+                UniformVec3(GL->SimpleShader.AlbedoColorLoc, entry->AlbedoColor);
                 
 #if 0
                 glUniform1i(GL->SimpleShader.AlbedoLoc, 0);
@@ -767,44 +771,158 @@ void GlOutputStack(gl_state* GL, render_pass* Pass, render_stack* Stack){
 
 void GlOutputPass(gl_state* GL, render_pass* Pass){
     for(int i = 0; i < Pass->StacksCount; i++){
-        GlOutputStack(GL, Pass, Pass->Stacks[i]);
+        GlOutputStack(GL, Pass->Stacks[i], &Pass->CameraSetup);
+    }
+}
+
+INTERNAL_FUNCTION void OutputLinesArray(gl_state* GL,
+                                        render_line_primitive* Lines,
+                                        v3* LineColors, int Count,
+                                        GLuint LinesVBO,
+                                        GLuint ColorsTBO)
+{
+    if(Count){
+        BindBufferAndFill(GL_ARRAY_BUFFER,
+                          GL_DYNAMIC_DRAW,
+                          Lines,
+                          Count * sizeof(render_line_primitive),
+                          LinesVBO);
+        
+        InitVertexAttribFloat(GL->LinesShader.PAttrLoc,
+                              3, 3 * sizeof(float), 0);
+        
+        BindBufferAndFill(GL_TEXTURE_BUFFER,
+                          GL_DYNAMIC_DRAW,
+                          LineColors,
+                          Count * sizeof(v3),
+                          ColorsTBO);
+        
+        GLuint ColorsTex = GenerateAndBindBufferTexture(GL_TEXTURE0,
+                                                        GL_RGB32F,
+                                                        ColorsTBO);
+        
+        glLineWidth(2.0f);
+        glDrawArrays(GL_LINES, 0, Count * 2);
+        
+        FreeVertexAttrib(GL->LinesShader.PAttrLoc);
+        
+        glDeleteTextures(1, &ColorsTex);
+    }
+}
+
+INTERNAL_FUNCTION void OutputRenderLines(gl_state* GL,
+                                         render_state* Render,
+                                         const m44& ViewProjection)
+{
+    // NOTE(Dima): Binding array object
+    glBindVertexArray(GL->LinesVAO);
+    
+    UseShader(&GL->LinesShader.Shader);
+    UniformMatrix4x4(GL->LinesShader.ViewProjectionLoc,
+                     (float*)ViewProjection.e);
+    glUniform1i(GL->LinesShader.ColorsTextureLoc, 0);
+    
+    // NOTE(Dima): Outputing with depth lines
+    glEnable(GL_DEPTH_TEST);
+    render_lines_chunk* ChunkAt = Render->LinesGeom.FirstDepth;
+    while(ChunkAt){
+        
+        OutputLinesArray(GL, 
+                         ChunkAt->Lines,
+                         ChunkAt->Colors,
+                         ChunkAt->Count,
+                         GL->LinesVBO[0],
+                         GL->LinesTBO[0]);
+        
+        ChunkAt = ChunkAt->Next;
     }
     
-#if 1    
-    // NOTE(Dima): Test lines
-    v3 StartP = V3(0, 0, 0);
-    v3 EndP = V3(10, 10, 10);
-    v3 Color1 = V3(1.0f, 0.0f, 0.0f);
-    v3 Color2 = V3(0.0f, 1.0f, 0.0f);
-    v3 Color3 = V3(0.0f, 1.0f, 1.0f);
+    // NOTE(Dima): Outputing no-depth lines
+    glDisable(GL_DEPTH_TEST);
+    ChunkAt = Render->LinesGeom.FirstNoDepth;
+    while(ChunkAt){
+        OutputLinesArray(GL, 
+                         ChunkAt->Lines,
+                         ChunkAt->Colors,
+                         ChunkAt->Count,
+                         GL->LinesVBO[1],
+                         GL->LinesTBO[1]);
+        
+        ChunkAt = ChunkAt->Next;
+    }
+}
+
+INTERNAL_FUNCTION void GlFinalOutput(gl_state* GL, render_state* Render){
     
-    static v3 Vertices[] = {
-        StartP, Color1, 
-        EndP, Color1,
-        V3(0.0f), Color2,
-        V3(-10.0f, 10.0f, 10.0f), Color2,
-        V3(0.0f), Color3,
-        V3(0.0f, 0.0f, 10.0f), Color3};
+    // NOTE(Dima): outputing lines
+    OutputRenderLines(GL, Render, Render->Passes[0].CameraSetup.ViewProjection);
     
-    glEnable(GL_DEPTH_TEST);
+    // NOTE(Dima): Outputing gui
+    glEnable(GL_SCISSOR_TEST);
     
-    glBindVertexArray(GL->DEBUGGeomVAO);
+    glBindVertexArray(GL->GuiGeomVAO);
     BindBufferAndFill(GL_ARRAY_BUFFER,
                       GL_DYNAMIC_DRAW,
-                      Vertices,
-                      sizeof(Vertices),
-                      GL->DEBUGGeomVBO);
+                      Render->GuiGeom.Vertices,
+                      Render->GuiGeom.VerticesCount * sizeof(render_gui_geom_vertex),
+                      GL->GuiGeomVBO);
     
-    UseShader(&GL->DebugGeomShader.Shader);
-    UniformMatrix4x4(GL->DebugGeomShader.ViewProjectionLoc,
-                     Pass->ViewProjection.e);
+    BindBufferAndFill(GL_ELEMENT_ARRAY_BUFFER,
+                      GL_DYNAMIC_DRAW,
+                      Render->GuiGeom.Indices,
+                      Render->GuiGeom.IndicesCount * sizeof(u32),
+                      GL->GuiGeomEBO);
     
-    glLineWidth(2.0f);
-    glDrawArrays(GL_LINES, 0, 6);
+    BindBufferAndFill(GL_TEXTURE_BUFFER,
+                      GL_DYNAMIC_DRAW,
+                      Render->GuiGeom.TriangleGeomTypes,
+                      Render->GuiGeom.TriangleGeomTypesCount * sizeof(u8),
+                      GL->GuiGeomTB);
+    
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, GL->LargeAtlasHandle);
+    
+    // NOTE(Dima): Passing geom types
+    GLuint TexBufTex = GenerateAndBindBufferTexture(GL_TEXTURE1, GL_R8I, GL->GuiGeomTB);
+    
+    UseShader(&GL->GuiGeomShader.Shader);
+    UniformMatrix4x4(GL->GuiGeomShader.ProjectionLoc, GL->GuiOrtho.e);
+    
+    // NOTE(Dima): Passing Bitmap uniforms to shader
+    glUniform1i(GL->GuiGeomShader.BitmapLoc, 0);
+    glUniform1i(GL->GuiGeomShader.TriangleGeomTypesLoc, 1);
+    
+    for(int ChunkIndex = 0;
+        ChunkIndex < Render->GuiGeom.CurChunkIndex;
+        ChunkIndex++)
+    {
+        render_gui_chunk* CurChunk = &Render->GuiGeom.Chunks[ChunkIndex];
+        
+        if(CurChunk->IndicesCount){
+            
+            v2 ClipDim = GetRectDim(CurChunk->ClipRect);
+            rc2 ClipRect = BottomLeftToTopLeftRectange(CurChunk->ClipRect,
+                                                       Render->FrameInfo.Height);
+            
+            
+            glScissor(ClipRect.Min.x,
+                      ClipRect.Min.y,
+                      ClipDim.x,
+                      ClipDim.y);
+            
+            glDrawElementsBaseVertex(GL_TRIANGLES,
+                                     CurChunk->IndicesCount,
+                                     GL_UNSIGNED_INT,
+                                     0,
+                                     CurChunk->BaseVertex);
+        }
+    }
     
     glBindVertexArray(0);
-    glDisable(GL_DEPTH_TEST);
-#endif
+    
+    glDeleteTextures(1, &TexBufTex);
+    
+    glDisable(GL_SCISSOR_TEST);
 }
 
 void GlOutputRender(gl_state* GL, render_state* Render){
@@ -837,7 +955,7 @@ void GlOutputRender(gl_state* GL, render_state* Render){
     GL->GuiOrtho = Floats2Matrix(GuiOrtho);
     
     // NOTE(Dima): Actual rendering
-    if(Render->RendererType == Renderer_Software){
+    if(Render->API.RendererType == Renderer_Software){
         if(Render->FrameInfoIsSet){
             ASSERT(Render->FrameInfoIsSet);
             
@@ -850,82 +968,11 @@ void GlOutputRender(gl_state* GL, render_state* Render){
             }
         }
     }
-    else if (Render->RendererType == Renderer_OpenGL){
+    else if (Render->API.RendererType == Renderer_OpenGL){
         for(int i = 0; i < Render->PassCount; i++){
             GlOutputPass(GL, &Render->Passes[i]);
         }
         
-        // NOTE(Dima): Outputing gui
-        glEnable(GL_SCISSOR_TEST);
-        
-        glBindVertexArray(GL->GuiGeomVAO);
-        BindBufferAndFill(GL_ARRAY_BUFFER,
-                          GL_DYNAMIC_DRAW,
-                          Render->GuiGeom.Vertices,
-                          Render->GuiGeom.VerticesCount * sizeof(render_gui_geom_vertex),
-                          GL->GuiGeomVBO);
-        
-        BindBufferAndFill(GL_ELEMENT_ARRAY_BUFFER,
-                          GL_DYNAMIC_DRAW,
-                          Render->GuiGeom.Indices,
-                          Render->GuiGeom.IndicesCount * sizeof(u32),
-                          GL->GuiGeomEBO);
-        
-        BindBufferAndFill(GL_TEXTURE_BUFFER,
-                          GL_DYNAMIC_DRAW,
-                          Render->GuiGeom.TriangleGeomTypes,
-                          Render->GuiGeom.TriangleGeomTypesCount * sizeof(u8),
-                          GL->GuiGeomTB);
-        
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, GL->LargeAtlasHandle);
-        
-        // NOTE(Dima): Passing geom types
-        GLuint TexBufTex;
-        glActiveTexture(GL_TEXTURE1);
-        glGenTextures(1, &TexBufTex);
-        glBindTexture(GL_TEXTURE_BUFFER, TexBufTex);
-        glTexBuffer(GL_TEXTURE_BUFFER, GL_R8I, GL->GuiGeomTB);
-        
-        UseShader(&GL->GuiGeomShader.Shader);
-        UniformMatrix4x4(GL->GuiGeomShader.ProjectionLoc, GL->GuiOrtho.e);
-        
-        // NOTE(Dima): Passing Bitmap uniforms to shader
-        glUniform1i(GL->GuiGeomShader.BitmapLoc, 0);
-        glUniform1i(GL->GuiGeomShader.TriangleGeomTypesLoc, 1);
-        
-        //glBindVertexArray(GL->GuiGeomVAO);
-        
-        for(int ChunkIndex = 0;
-            ChunkIndex < Render->GuiGeom.CurChunkIndex;
-            ChunkIndex++)
-        {
-            render_gui_chunk* CurChunk = &Render->GuiGeom.Chunks[ChunkIndex];
-            
-            if(CurChunk->IndicesCount){
-                
-                v2 ClipDim = GetRectDim(CurChunk->ClipRect);
-                rc2 ClipRect = BottomLeftToTopLeftRectange(CurChunk->ClipRect,
-                                                           Render->FrameInfo.Height);
-                
-                
-                glScissor(ClipRect.Min.x,
-                          ClipRect.Min.y,
-                          ClipDim.x,
-                          ClipDim.y);
-                
-                glDrawElementsBaseVertex(GL_TRIANGLES,
-                                         CurChunk->IndicesCount,
-                                         GL_UNSIGNED_INT,
-                                         0,
-                                         CurChunk->BaseVertex);
-            }
-        }
-        
-        glBindVertexArray(0);
-        
-        glDeleteTextures(1, &TexBufTex);
-        
-        glDisable(GL_SCISSOR_TEST);
+        GlFinalOutput(GL, Render);
     }
 }

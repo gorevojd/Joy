@@ -6,9 +6,7 @@
 
 #define RENDER_DEFAULT_STACK_SIZE Megabytes(1)
 
-struct render_pass{
-    render_stack* Stacks[16];
-    int StacksCount;
+struct render_camera_setup{
     
     m44 Projection;
     m44 View;
@@ -18,6 +16,13 @@ struct render_pass{
     int FramebufferHeight;
     
     v4 FrustumPlanes[6];
+};
+
+struct render_pass{
+    render_stack* Stacks[16];
+    int StacksCount;
+    
+    render_camera_setup CameraSetup;
 };
 
 struct render_gui_geom_vertex{
@@ -42,7 +47,13 @@ struct render_gui_chunk{
     rc2 ClipRect;
 };
 
+struct render_line_primitive{
+    v3 Start;
+    v3 End;
+};
+
 struct render_gui_geom{
+    // NOTE(Dima): GUI geometry
     render_gui_geom_vertex* Vertices;
     u32* Indices;
     u8* TriangleGeomTypes;
@@ -54,11 +65,31 @@ struct render_gui_geom{
     int MaxIndicesCount;
     int MaxTriangleGeomTypesCount;
     
+    render_gui_chunk Chunks[MAX_GUI_CHUNKS];
+    int CurChunkIndex;
+    
     rc2 ClipRectStack[MAX_CLIP_RECT_STACK_DEPTH];
     int ClipRectStackIndex;
     
-    render_gui_chunk Chunks[MAX_GUI_CHUNKS];
-    int CurChunkIndex;
+};
+
+struct render_lines_chunk{
+    b32 DepthEnabled;
+    
+    render_line_primitive* Lines;
+    v3* Colors;
+    
+    int Count;
+    int MaxCount;
+    
+    render_lines_chunk* Next;
+};
+
+struct render_lines_geom{
+    render_lines_chunk* FirstDepth;
+    render_lines_chunk* FirstNoDepth;
+    
+    int ChunksAllocated;
 };
 
 struct render_frame_info{
@@ -106,43 +137,142 @@ struct render_platform_api{
 struct render_state{
     mem_region* MemRegion;
     
-    render_platform_swapbuffers* SwapBuffers;
-    render_platform_init* Init;
-    render_platform_free* Free;
-    render_platform_render* Render;
+    render_platform_api API;
     
     render_stack Stacks[16];
     int StacksCount;
     
-    render_pass Passes[16];
+    render_pass Passes[256];
     int PassCount;
     
     b32 FrameInfoIsSet;
     render_frame_info FrameInfo;
     
-    u32 RendererType;
-    
+    // NOTE(Dima): GUI geometry
     render_gui_geom GuiGeom;
+    render_lines_geom LinesGeom;
 };
-
-inline render_pass* BeginRenderPass(render_state* Render){
-    ASSERT(Render->PassCount < ARRAY_COUNT(Render->Passes));
-    
-    render_pass* Result = &Render->Passes[Render->PassCount++];
-    
-    return(Result);
-}
-
-inline void AddStackToRenderPass(render_pass* Pass, render_stack* Stack){
-    ASSERT(Pass->StacksCount < ARRAY_COUNT(Pass->Stacks));
-    
-    Pass->Stacks[Pass->StacksCount++] = Stack;
-}
 
 inline render_gui_geom* GetGuiGeom(render_stack* Stack){
     render_gui_geom* Result = &Stack->Render->GuiGeom;
     
     return(Result);
+}
+
+struct render_pushed_line_primitive{
+    render_line_primitive* TargetArray;
+    v3* TargetColorArray;
+    int StartIndex;
+    int Count;
+    
+    int LinesAlreadyAdded;
+};
+
+inline render_lines_chunk* AllocateAndInitLinesChunk(render_state* Render,
+                                                     int MaxLinesCount,
+                                                     b32 HasDepth)
+{
+    render_lines_chunk* Chunk = PushStruct(Render->MemRegion, render_lines_chunk);
+    
+    Chunk->Lines = PushArray(Render->MemRegion, render_line_primitive, MaxLinesCount);
+    Chunk->Colors = PushArray(Render->MemRegion, v3, MaxLinesCount);
+    
+    Chunk->Count = 0;
+    Chunk->MaxCount = MaxLinesCount;
+    
+    Chunk->Next = 0;
+    
+    Render->LinesGeom.ChunksAllocated++;
+    
+    return(Chunk);
+}
+
+inline render_pushed_line_primitive BeginLinePrimitive(render_state* Render,
+                                                       int LinesCount,
+                                                       f32 LineWidth,
+                                                       b32 HasDepth)
+{
+    render_pushed_line_primitive Result = {};
+    render_lines_geom* Geom = &Render->LinesGeom;
+    
+    render_lines_chunk** Chunk = 0;
+    if(HasDepth){
+        Chunk = &Geom->FirstDepth;
+    }
+    else{
+        Chunk = &Geom->FirstNoDepth;
+    }
+    
+    b32 NeedAlloc = false;
+    render_lines_chunk* At = 0;
+    if(*Chunk){
+        // NOTE(Dima): Scan through all and determine if we can place
+        At = *Chunk;
+        
+        while(At){
+            
+            if(At->Count + LinesCount < At->MaxCount){
+                break;
+            }
+            
+            At = At->Next;
+        }
+        
+        if(At == 0){
+            NeedAlloc = true;
+        }
+    }
+    else{
+        NeedAlloc = true;
+    }
+    
+    
+    // NOTE(Dima): If we need to allocate new chunk - allocate
+    if(NeedAlloc){
+        render_lines_chunk* NewChunk = AllocateAndInitLinesChunk(Render, 50000, HasDepth);
+        NewChunk->Next = (*Chunk);
+        *Chunk = NewChunk;
+        
+        At = NewChunk;
+    }
+    // NOTE(Dima): Now we can place in At
+    
+    // NOTE(Dima): Init result
+    Result.TargetArray = At->Lines;
+    Result.TargetColorArray = At->Colors;
+    Result.StartIndex = At->Count;
+    Result.Count = LinesCount;
+    Result.LinesAlreadyAdded = 0;
+    
+    At->Count += LinesCount;
+    
+    return(Result);
+}
+
+inline void AddLine(render_pushed_line_primitive* Prim, 
+                    v3 Start, v3 End, v3 ColorRGB)
+{
+    Assert(Prim->LinesAlreadyAdded < Prim->Count);
+    if(Prim->LinesAlreadyAdded < Prim->Count){
+        int TargetIndex = Prim->StartIndex + Prim->LinesAlreadyAdded++;
+        render_line_primitive* Target = &Prim->TargetArray[TargetIndex];
+        
+        Target->Start = Start;
+        Target->End = End;
+        
+        Prim->TargetColorArray[TargetIndex] = ColorRGB;
+    }
+}
+
+inline void PushLine(render_state* Render, 
+                     v3 Start, 
+                     v3 End, 
+                     v3 ColorRGB,
+                     f32 LineWidth = 1.0f,
+                     b32 HasDepth = true)
+{
+    render_pushed_line_primitive Prim = BeginLinePrimitive(Render, 1, LineWidth, HasDepth);
+    AddLine(&Prim, Start, End, ColorRGB);
 }
 
 inline void PushGuiGeom_Internal(render_gui_geom* Geom, 
@@ -451,6 +581,7 @@ inline void PushGlyph(render_stack* Stack,
 inline void PushMesh(render_stack* Stack,
                      mesh_info* Mesh,
                      m44 Transform,
+                     v3 AlbedoColor = V3(1.0f, 1.0f, 1.0f),
                      m44* BoneTransforms = 0,
                      int BoneCount = 0)
 {
@@ -460,19 +591,21 @@ inline void PushMesh(render_stack* Stack,
     entry->Transform = Transform;
     entry->BoneCount = BoneCount;
     entry->BoneTransforms = BoneTransforms;
+    entry->AlbedoColor = AlbedoColor;
 }
 
 inline void PushMesh(render_stack* Stack,
                      mesh_info* Mesh,
                      v3 P,
                      quat R,
-                     v3 S)
+                     v3 S,
+                     v3 AlbedoColor = V3(1.0f, 1.0f, 1.0f))
 {
-    PushMesh(Stack, Mesh, ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P));
+    PushMesh(Stack, Mesh, ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P), AlbedoColor);
 }
 
 inline void PushGuiChunk(render_stack* Stack, int ChunkIndex){
-    render_entry_gui_chunk* Entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_GuiChunk, render_entry_gui_chunk);
+    render_entry_gui_chunk* Entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_GuiGeometryChunk, render_entry_gui_chunk);
     
     Entry->ChunkIndex = ChunkIndex;
 }
@@ -537,7 +670,7 @@ inline void RenderSetFrameInfo(render_state* Render, render_frame_info FrameInfo
     Render->FrameInfo = FrameInfo;
     Render->FrameInfoIsSet = 1;
     
-    Render->RendererType = FrameInfo.RendererType;
+    Render->API.RendererType = FrameInfo.RendererType;
 }
 
 void RenderInit(render_state* Render, 
@@ -551,8 +684,29 @@ render_stack* RenderFindAddStack(render_state* Render, char* Name);
 void RenderBeginFrame(render_state* Render);
 void RenderEndFrame(render_state* Render);
 
-void RenderPassSetCamera(render_pass* Pass, m44 Projection, m44 View, 
-                         int FramebufferWidth,
-                         int FramebufferHeight);
+inline render_pass* BeginRenderPass(render_state* Render, 
+                                    render_camera_setup CameraSetup)
+{
+    ASSERT(Render->PassCount < ARRAY_COUNT(Render->Passes));
+    
+    render_pass* Result = &Render->Passes[Render->PassCount++];
+    
+    Result->CameraSetup = CameraSetup;
+    Result->StacksCount = 0;
+    
+    return(Result);
+}
+
+inline void AddStackToRenderPass(render_pass* Pass, render_stack* Stack){
+    ASSERT(Pass->StacksCount < ARRAY_COUNT(Pass->Stacks));
+    
+    Pass->Stacks[Pass->StacksCount++] = Stack;
+}
+
+render_camera_setup SetupCamera(const m44& Projection, 
+                                const m44& View, 
+                                int FramebufferWidth,
+                                int FramebufferHeight, 
+                                b32 CalcFrustumPlanes = false);
 
 #endif

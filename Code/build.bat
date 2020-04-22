@@ -40,6 +40,7 @@ ECHO *   JOY   *
 ECHO ***********
 
 set COMPILATION_FILES=..\Code\win32_joy.cpp
+set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_debug.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_animation.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_sort.cpp
 set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_memory.cpp

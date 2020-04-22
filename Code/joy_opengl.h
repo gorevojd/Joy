@@ -72,6 +72,7 @@ struct gl_simple_shader{
     GLint NormalsLoc;
     GLint NormalsIsSetLoc;
     GLint AlbedoIsSetLoc;
+    GLint AlbedoColorLoc;
     
     GLint PAttrLoc;
     GLint UVAttrLoc;
@@ -103,13 +104,13 @@ struct gl_guigeom_shader{
     GLint CAttrLoc;
 };
 
-struct gl_debuggeom_shader{
+struct gl_lines_shader{
     gl_shader Shader;
     
     GLint ViewProjectionLoc;
+    GLint ColorsTextureLoc;
     
     GLint PAttrLoc;
-    GLint ColorAttrLoc;
 };
 
 struct gl_state{
@@ -122,7 +123,7 @@ struct gl_state{
     gl_simple_shader SimpleShader;
     gl_guirect_shader GuiRectShader;
     gl_guigeom_shader GuiGeomShader;
-    gl_debuggeom_shader DebugGeomShader;
+    gl_lines_shader LinesShader;
     
     GLuint ScreenVAO;
     GLuint ScreenVBO;
@@ -130,8 +131,10 @@ struct gl_state{
     GLuint MeshVAO;
     GLuint MeshVBO;
     
-    GLuint DEBUGGeomVAO;
-    GLuint DEBUGGeomVBO;
+    GLuint LinesVAO;
+    // NOTE(Dima): 0 - with depth, 1 - no-depth
+    GLuint LinesVBO[2];
+    GLuint LinesTBO[2];
     
     GLuint GuiGeomVAO;
     GLuint GuiGeomVBO;

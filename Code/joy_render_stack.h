@@ -14,8 +14,7 @@ enum render_entry_type{
     RenderEntry_Mesh,
     RenderEntry_Glyph,
     RenderEntry_Gradient,
-    RenderEntry_GuiGeom,
-    RenderEntry_GuiChunk,
+    RenderEntry_GuiGeometryChunk,
 };
 
 struct render_entry_header{
@@ -93,6 +92,8 @@ struct render_entry_mesh{
     
     m44* BoneTransforms;
     int BoneCount;
+    
+    v3 AlbedoColor;
     
     m44 Transform;
 };

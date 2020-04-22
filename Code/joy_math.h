@@ -1342,6 +1342,26 @@ inline v4 UnpackRGBA(uint32_t Color){
     return(res);
 }
 
+inline uint32_t PackRGB(v3 Color){
+    uint32_t Res = 
+        (uint32_t)((Color.r * 255.0f + 0.5f)) |
+        ((uint32_t)((Color.g * 255.0f) + 0.5f) << 8) |
+        ((uint32_t)((Color.b * 255.0f) + 0.5f) << 16) |
+        0xFF000000;
+    
+    return(Res);
+}
+
+inline v3 UnpackRGB(uint32_t Color){
+    v3 Res;
+    
+    Res.r = (float)(Color & 0xFF) * JOY_ONE_OVER_255;
+    Res.g = (float)((Color >> 8) & 0xFF) * JOY_ONE_OVER_255;
+    Res.b = (float)((Color >> 16) & 0xFF) * JOY_ONE_OVER_255;
+    
+    return(Res);
+}
+
 inline uint32_t PackRGB_R10G12B10(v3 Color){
     uint32_t Result = 
         ((uint32_t)(Color.r * 1023.0f + 0.5f)) |
@@ -1382,49 +1402,49 @@ inline float PlanePointTest(v4 Plane, v3 Point) {
 
 /* Complex number math */
 inline Complex_Num operator+(Complex_Num a, Complex_Num b) {
-    Complex_Num res;
+    Complex_Num Res;
     
-    res.re = a.re + b.re;
-    res.im = a.im + b.im;
+    Res.re = a.re + b.re;
+    Res.im = a.im + b.im;
     
-    return(res);
+    return(Res);
 }
 
 inline Complex_Num operator-(Complex_Num a, Complex_Num b) {
-    Complex_Num res;
+    Complex_Num Res;
     
-    res.re = a.re - b.re;
-    res.im = a.im - b.im;
+    Res.re = a.re - b.re;
+    Res.im = a.im - b.im;
     
-    return(res);
+    return(Res);
 }
 
 inline Complex_Num operator*(Complex_Num a, Complex_Num b) {
-    Complex_Num res;
+    Complex_Num Res;
     
-    res.re = a.re * b.re - a.im * b.im;
-    res.im = a.im * b.re + a.re * b.im;
+    Res.re = a.re * b.re - a.im * b.im;
+    Res.im = a.im * b.re + a.re * b.im;
     
-    return(res);
+    return(Res);
 }
 
 inline Complex_Num operator*(Complex_Num a, float s) {
-    Complex_Num res;
+    Complex_Num Res;
     
-    res.re = a.re * s;
-    res.im = a.im * s;
+    Res.re = a.re * s;
+    Res.im = a.im * s;
     
-    return(res);
+    return(Res);
 }
 
 /* Rectangle math */
 inline rc2 RcMinMax(v2 Min, v2 Max){
-    rc2 res;
+    rc2 Res;
     
-    res.Min = Min;
-    res.Max = Max;
+    Res.Min = Min;
+    Res.Max = Max;
     
-    return(res);
+    return(Res);
 }
 
 inline rc3 RcMinMax(v3 Min, v3 Max){
@@ -1437,12 +1457,12 @@ inline rc3 RcMinMax(v3 Min, v3 Max){
 }
 
 inline rc2 RcMinDim(v2 Min, v2 Dim){
-    rc2 res;
+    rc2 Res;
     
-    res.Min = Min;
-    res.Max = Min + Dim;
+    Res.Min = Min;
+    Res.Max = Min + Dim;
     
-    return(res);
+    return(Res);
 }
 
 inline rc3 RcMinDim(v3 Min, v3 Dim){
@@ -1455,10 +1475,10 @@ inline rc3 RcMinDim(v3 Min, v3 Dim){
 }
 
 inline v2 GetRectDim(rc2 A){
-    v2 res = V2(abs(A.Max.x - A.Min.x),
+    v2 Res = V2(abs(A.Max.x - A.Min.x),
                 abs(A.Max.y - A.Min.y));
     
-    return(res);
+    return(Res);
 }
 
 inline v3 GetRectDim(rc3 A){
@@ -1470,21 +1490,21 @@ inline v3 GetRectDim(rc3 A){
 }
 
 inline float GetRectWidth(rc2 A){
-    float res = A.Max.x - A.Min.x;
+    float Res = A.Max.x - A.Min.x;
     
-    return(res);
+    return(Res);
 }
 
 inline float GetRectHeight(rc2 A){
-    float res = A.Max.y - A.Min.y;
+    float Res = A.Max.y - A.Min.y;
     
-    return(res);
+    return(Res);
 }
 
 inline v2 GetRectCenter(rc2 A){
-    v2 res = A.Min + GetRectDim(A) * 0.5f;
+    v2 Res = A.Min + GetRectDim(A) * 0.5f;
     
-    return(res);
+    return(Res);
 }
 
 inline v3 GetRectCenter(rc3 A){
@@ -1494,19 +1514,19 @@ inline v3 GetRectCenter(rc3 A){
 }
 
 inline v2 ClampInRect(v2 P, rc2 A){
-    v2 res;
-    res.x = Clamp(P.x, A.Min.x, A.Max.x);
-    res.y = Clamp(P.y, A.Min.y, A.Max.y);
-    return(res);
+    v2 Res;
+    Res.x = Clamp(P.x, A.Min.x, A.Max.x);
+    Res.y = Clamp(P.y, A.Min.y, A.Max.y);
+    return(Res);
 }
 
 inline rc2 GetBoundingRect(rc2 A, rc2 B){
-    rc2 res;
-    res.Min.x = JOY_MATH_MIN(A.Min.x, B.Min.x);
-    res.Min.y = JOY_MATH_MIN(A.Min.y, B.Min.y);
-    res.Max.x = JOY_MATH_MAX(A.Max.x, B.Max.x);
-    res.Max.y = JOY_MATH_MAX(A.Max.y, B.Max.y);
-    return(res);
+    rc2 Res;
+    Res.Min.x = JOY_MATH_MIN(A.Min.x, B.Min.x);
+    Res.Min.y = JOY_MATH_MIN(A.Min.y, B.Min.y);
+    Res.Max.x = JOY_MATH_MAX(A.Max.x, B.Max.x);
+    Res.Max.y = JOY_MATH_MAX(A.Max.y, B.Max.y);
+    return(Res);
 }
 
 inline rc2 GrowRectByScale(rc2 A, v2 Scale){
@@ -1515,29 +1535,29 @@ inline rc2 GrowRectByScale(rc2 A, v2 Scale){
     NewDim.x = RectDim.x * Scale.x;
     NewDim.y = RectDim.y * Scale.y;
     v2 Center = A.Min + RectDim * 0.5f;
-    rc2 res;
-    res.Min = Center - NewDim * 0.5f;
-    res.Max = res.Min + NewDim;
-    return(res);
+    rc2 Res;
+    Res.Min = Center - NewDim * 0.5f;
+    Res.Max = Res.Min + NewDim;
+    return(Res);
 }
 
 inline rc2 GrowRectByScaledValue(rc2 A, v2 Value, float Scale){
-    rc2 res;
+    rc2 Res;
     
     v2 ValueScaled = Value * Scale;
-    res.Min.x = A.Min.x - ValueScaled.x;
-    res.Min.y = A.Min.y - ValueScaled.y;
-    res.Max.x = A.Max.x + ValueScaled.x;
-    res.Max.y = A.Max.y + ValueScaled.y;
+    Res.Min.x = A.Min.x - ValueScaled.x;
+    Res.Min.y = A.Min.y - ValueScaled.y;
+    Res.Max.x = A.Max.x + ValueScaled.x;
+    Res.Max.y = A.Max.y + ValueScaled.y;
     
-    return(res);
+    return(Res);
 }
 
 inline rc2 GrowRectByPixels(rc2 A, int PixelsCount){
-    rc2 res = A;
-    res.Min -= V2(PixelsCount, PixelsCount);
-    res.Max += V2(PixelsCount, PixelsCount);
-    return(res);
+    rc2 Res = A;
+    Res.Min -= V2(PixelsCount, PixelsCount);
+    Res.Max += V2(PixelsCount, PixelsCount);
+    return(Res);
 }
 
 #define JOY_MATH_RCNORMSUBPX_VAL(v) v = (int)(v + 0.5f);

@@ -8,6 +8,7 @@
 #include "joy_assets_render.h"
 #include "joy_random.h"
 #include "joy_animation.h"
+#include "joy_debug_api.h"
 
 #define STB_SPRINTF_STATIC
 #define STB_SPRINTF_IMPLEMENTATION
@@ -122,6 +123,7 @@ INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
                    SphereCenter, 
                    QuatI(), 
                    V3(SphereRad * 2.0f),
+                   V3(1.0f, 0.5f, 1.0f),
                    ASSET_IMPORT_DEFERRED);
     
     for(int SampleIndex = 0;
@@ -135,6 +137,7 @@ INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
                        TargetP, 
                        QuatI(), 
                        V3(0.05f),
+                       V3(0.5f, 1.0f, 1.0f),
                        ASSET_IMPORT_DEFERRED);
     }
     
@@ -150,90 +153,35 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitPlayerAC)
     AddAnimState(AC, AnimState_Animation, "Run");
     AddAnimState(AC, AnimState_Animation, "Falling");
     
-#if 0
-    AddAnimState(AC, AnimState_Animation, "Run1");
-    AddAnimState(AC, AnimState_Animation, "Run2");
-    AddAnimState(AC, AnimState_Animation, "Run3");
-    AddAnimState(AC, AnimState_Animation, "Run4");
-    AddAnimState(AC, AnimState_Animation, "Run5");
-    AddAnimState(AC, AnimState_Animation, "Run6");
-    AddAnimState(AC, AnimState_Animation, "Run7");
-    AddAnimState(AC, AnimState_Animation, "Run8");
-    AddAnimState(AC, AnimState_Animation, "Run9");
-    AddAnimState(AC, AnimState_Animation, "Run10");
-    AddAnimState(AC, AnimState_Animation, "Run11");
-    AddAnimState(AC, AnimState_Animation, "Run12");
-    AddAnimState(AC, AnimState_Animation, "Run13");
-    AddAnimState(AC, AnimState_Animation, "Run14");
-    
-    anim_graph_node* FindRes1 = FindGraphNode(AC, "Run14");
-    anim_graph_node* FindRes2 = FindGraphNode(AC, "Run7");
-#endif
-    
     // NOTE(Dima): Adding condition variables
-    AddVariable(AC, "VelocityLength", 
-                AnimVariable_Float);
-    AddVariable(AC, "IsFalling",
-                AnimVariable_Bool);
-    
-#if 0 
-    AddVariable(AC, "TempVar0", AnimVariable_Bool);
-    AddVariable(AC, "TempVar1", AnimVariable_Bool);
-    AddVariable(AC, "TempVar2", AnimVariable_Bool);
-    AddVariable(AC, "TempVar3", AnimVariable_Bool);
-    AddVariable(AC, "TempVar4", AnimVariable_Bool);
-    AddVariable(AC, "TempVar5", AnimVariable_Bool);
-    AddVariable(AC, "TempVar6", AnimVariable_Bool);
-    AddVariable(AC, "TempVar7", AnimVariable_Bool);
-    AddVariable(AC, "TempVar8", AnimVariable_Bool);
-    AddVariable(AC, "TempVar9", AnimVariable_Bool);
-    AddVariable(AC, "TempVar10", AnimVariable_Bool);
-    AddVariable(AC, "TempVar11", AnimVariable_Bool);
-    AddVariable(AC, "TempVar12", AnimVariable_Bool);
-    AddVariable(AC, "TempVar13", AnimVariable_Bool);
-    AddVariable(AC, "TempVar14", AnimVariable_Bool);
-    AddVariable(AC, "TempVar15", AnimVariable_Bool);
-    AddVariable(AC, "TempVar16", AnimVariable_Bool);
-    AddVariable(AC, "TempVar17", AnimVariable_Bool);
-    AddVariable(AC, "TempVar18", AnimVariable_Bool);
-    AddVariable(AC, "TempVar19", AnimVariable_Bool);
-    
-    anim_variable* FindResVar1 = FindVariable(AC, "TempVar19");
-    anim_variable* FindResVar2 = FindVariable(AC, "TempVar122");
-#endif
+    AddVariable(AC, "VelocityLength", AnimVariable_Float);
+    AddVariable(AC, "IsFalling", AnimVariable_Bool);
     
     // NOTE(Dima): Idle -> Run
     BeginTransition(AC, "Idle", "Run");
-    AddConditionFloat(AC, "VelocityLength",
-                      TransitionCondition_MoreEqThan, 0.05f);
+    AddConditionFloat(AC, "VelocityLength", TransitionCondition_MoreEqThan, 0.05f);
     EndTransition(AC);
     
     // NOTE(Dima): Run -> Idle
     BeginTransition(AC, "Run", "Idle");
-    AddConditionFloat(AC, "VelocityLength",
-                      TransitionCondition_LessThan, 0.05f);
+    AddConditionFloat(AC, "VelocityLength", TransitionCondition_LessThan, 0.05f);
     EndTransition(AC);
     
     // NOTE(Dima): Run -> Falling
     BeginTransition(AC, "Run", "Falling");
-    AddConditionBool(AC, "IsFalling",
-                     TransitionCondition_Equal, true);
+    AddConditionBool(AC, "IsFalling", TransitionCondition_Equal, true);
     EndTransition(AC);
     
     // NOTE(Dima): Falling -> Idle
     BeginTransition(AC, "Falling", "Idle");
-    AddConditionFloat(AC, "VelocityLength",
-                      TransitionCondition_LessThan, 0.05f);
-    AddConditionBool(AC, "IsFalling",
-                     TransitionCondition_Equal, false);
+    AddConditionFloat(AC, "VelocityLength", TransitionCondition_LessThan, 0.05f);
+    AddConditionBool(AC, "IsFalling", TransitionCondition_Equal, false);
     EndTransition(AC);
     
     // NOTE(Dima): Falling -> Run
     BeginTransition(AC, "Falling", "Run");
-    AddConditionFloat(AC, "VelocityLength",
-                      TransitionCondition_MoreEqThan, 0.05f);
-    AddConditionBool(AC, "IsFalling",
-                     TransitionCondition_Equal, false);
+    AddConditionFloat(AC, "VelocityLength", TransitionCondition_MoreEqThan, 0.05f);
+    AddConditionBool(AC, "IsFalling", TransitionCondition_Equal, false);
     EndTransition(AC);
     
     FinalizeCreation(AC);
@@ -247,7 +195,8 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
                                    v3 Pos, quat Rot, v3 Scale, 
                                    f64 GlobalTime,
                                    f32 DeltaTime,
-                                   anim_controller* AC)
+                                   anim_controller* AC,
+                                   v3 AlbedoColor)
 {
     asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
     
@@ -264,18 +213,18 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
     {
         node_info* Node = &Model->Nodes[NodeIndex];
         
-        // TODO(Dima): Potential bug here
         m44 NodeTran = Node->CalculatedToModel * ModelToWorld;
-        //m44 NodeTran = ModelToWorld;
         
-        //PushOrLoadMesh(Assets, Stack, CubeMeshID, ScalingMatrix(V3(0.1f)) * NodeTran);
+        DEBUGAddAxes(NodeTran);
+        
         for(int MeshIndex = 0; MeshIndex < Node->MeshCount; MeshIndex++){
             asset_id MeshID = Node->MeshIDs[MeshIndex];
             
             mesh_info* Mesh = LoadMesh(Assets, MeshID, ASSET_IMPORT_DEFERRED);
             
             if(Mesh){
-                PushMesh(Stack, Mesh, NodeTran, 
+                PushMesh(Stack, Mesh, NodeTran,
+                         AlbedoColor,
                          CalcPose.BoneTransforms, 
                          CalcPose.BoneTransformsCount);
             }
@@ -380,18 +329,20 @@ GAME_MODE_UPDATE(TestUpdate){
     
     m44 CameraTransform = GetCameraMatrix(Camera);
     
-    render_pass* Pass = BeginRenderPass(Game->Render);
-    render_stack* Stack = RenderFindStack(Game->Render, "Main");
-    AddStackToRenderPass(Pass, Stack);
     
     int Width = Game->Render->FrameInfo.Width;
     int Height = Game->Render->FrameInfo.Height;
     
-    RenderPassSetCamera(Pass, 
-                        PerspectiveProjection(Width, Height, 1000.0f, 0.01f),
-                        CameraTransform,
-                        Width,
-                        Height);
+    render_camera_setup CamSetup = SetupCamera(PerspectiveProjection(Width, 
+                                                                     Height, 
+                                                                     1000.0f, 0.01f),
+                                               CameraTransform,
+                                               Width,
+                                               Height);
+    
+    render_pass* Pass = BeginRenderPass(Game->Render, CamSetup);
+    render_stack* Stack = RenderFindStack(Game->Render, "Main");
+    AddStackToRenderPass(Pass, Stack);
     
     PushClearColor(Stack, V3(0.1f, 0.3f, 0.9f));
     
@@ -438,8 +389,50 @@ GAME_MODE_UPDATE(TestUpdate){
     
     u32 StoolID = GetFirst(Game->Assets, GameAsset_Stool);
     
+    DEBUGAddLine(V3(-10, 10, 10),
+                 V3(10, 10, 10),
+                 V3(1.0f, 0.0f, 0.0f),
+                 1.0f);
     
-#if 0    
+    DEBUGAddCross(V3(0, 10, 5.0f), 
+                  V3(0.0f, 1.0f, 0.0f),
+                  1.0f);
+    
+#if 1    
+    DEBUGAddCircleX(V3(5.0f, 10.0f, 10.0f),
+                    V3(1.0f, 0.0f, 0.0f),
+                    1.0f);
+    
+    
+    DEBUGAddCircleY(V3(10.0f, 10.0f, 10.0f),
+                    V3(1.0f, 0.0f, 0.0f),
+                    1.0f);
+    
+    
+    DEBUGAddCircleZ(V3(15.0f, 10.0f, 10.0f),
+                    V3(1.0f, 0.0f, 0.0f),
+                    1.0f);
+    
+    DEBUGAddSphere(V3(-15, 10, 10),
+                   V3(1.0f, 0.0f, 1.0f),
+                   1.0f, 0.0f,
+                   false);
+    
+#if 1    
+    int SideSize = 100;
+    for(int i = 0; i < SideSize; i++){
+        for(int j = 0; j < SideSize; j++){
+            DEBUGAddCross(V3(-10.0f, 10.0f, -10.0f) - V3(i, 0, j), 
+                          V3(0.0f, 
+                             (float)i / (float)SideSize, 
+                             (float)j / (float)SideSize),
+                          1.0f);
+        }
+    }
+#endif
+#endif
+    
+#if 1    
     int SphereLayers = 10;
     int SphereLayerCount = 10;
     v3 SphereStartP = V3(0.0f, 1.0f, -15.0f);
@@ -456,6 +449,9 @@ GAME_MODE_UPDATE(TestUpdate){
             PushOrLoadMesh(Game->Assets, Stack, 
                            SphereID,
                            SphereP, QuatI(), V3(1.0f),
+                           V3((f32)InLayerIndex / (SphereLayerCount + 1),
+                              (f32)LayerIndex / (SphereLayers + 1),
+                              0.5f),
                            ASSET_IMPORT_DEFERRED);
         }
     }
@@ -470,11 +466,11 @@ GAME_MODE_UPDATE(TestUpdate){
     if(Model){
         if(!State->PlayerAC){
             State->PlayerAC = InitPlayerAC(Game->Anim, Game->Assets, Model->NodesCheckSum);
+            
+            SetStateAnimation(State->PlayerAC, "Idle", Model->AnimationIDs[0]);
+            SetStateAnimation(State->PlayerAC, "Run", Model->AnimationIDs[5]);
+            SetStateAnimation(State->PlayerAC, "Falling", Model->AnimationIDs[1]);
         }
-        
-        SetStateAnimation(State->PlayerAC, "Idle", Model->AnimationIDs[0]);
-        SetStateAnimation(State->PlayerAC, "Run", Model->AnimationIDs[5]);
-        SetStateAnimation(State->PlayerAC, "Falling", Model->AnimationIDs[1]);
         
         SetBool(State->PlayerAC, "IsFalling", false);
         
@@ -491,7 +487,8 @@ GAME_MODE_UPDATE(TestUpdate){
                     V3(1.0f),
                     Game->Input->Time,
                     Game->Input->DeltaTime,
-                    State->PlayerAC);
+                    State->PlayerAC,
+                    V3(1.0f, 0.6f, 0.0f));
         
         anim_controller* Control = State->PlayerAC;
         gui_state* Gui = Game->Gui;
@@ -534,7 +531,8 @@ GAME_MODE_UPDATE(TestUpdate){
                     V3(1.0f),
                     Game->Input->Time,
                     Game->Input->DeltaTime,
-                    &State->TestAC);
+                    &State->TestAC,
+                    V3(0.0f, 0.2f, 1.0f));
     }
     
 #if 0    
@@ -635,18 +633,21 @@ GAME_MODE_UPDATE(TestUpdate){
                    GetFirst(Game->Assets, GameAsset_Cube),
                    V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
                    QuatI(), V3(1.0f), 
+                   V3(1.0f, 0.0f, 0.0f),
                    ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Stack, 
                    GetFirst(Game->Assets, GameAsset_Cube),
                    V3(0.0f, 1.0f + Sin(Game->Input->Time * 3.0f) * 0.5f, 0.0f), 
                    QuatI(), V3(1.0f), 
+                   V3(1.0f, 1.0f, 0.0f),
                    ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Stack, 
                    CylID,
                    V3(-10.0f, 1.0f, 0.0f), 
                    Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), V3(2.0f),
+                   V3(1.0f, 0.0f, 1.0f),
                    ASSET_IMPORT_DEFERRED);
     
     
@@ -655,17 +656,20 @@ GAME_MODE_UPDATE(TestUpdate){
                    V3(-13.0f, 1.0f, 0.0f),
                    Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), 
                    V3(1.0f), 
+                   V3(0.0f, 1.0f, 1.0f),
                    ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Stack, 
                    SphereID,V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
                    QuatI(), V3(1.0f),
+                   V3(0.5f, 0.0f, 1.0f),
                    ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Stack, 
                    GetFirst(Game->Assets, GameAsset_Plane),
-                   V3(0.0f, -1.0f, 0.0f), 
+                   V3(0.0f, 0.0f, 0.0f), 
                    QuatI(), V3(100.0f),
+                   V3(1.0f, 1.0f, 1.0f),
                    ASSET_IMPORT_DEFERRED);
 }
 
@@ -695,6 +699,7 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     
     array_info* Arr = GET_ASSET_PTR_MEMBER(Asset, array_info);
     
+#if 0    
     render_pass* Pass = BeginRenderPass(Game->Render);
     render_stack* Stack = RenderFindStack(Game->Render, "Main");
     AddStackToRenderPass(Pass, Stack);
@@ -713,7 +718,6 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
         
         State->Initialized = true;
     }
-#if 0    
     
     bmp_info* toShow = ToShowArray + State->ShowIndex;
     bmp_info* toShowNext = ToShowArray + State->ShowNextIndex;
@@ -750,7 +754,6 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
         State->ShowNextIndex = (State->ShowIndex + 1) % ToShowCount;
         State->TimeSinceShow = 0.0f;
     }
-#endif
     
     GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
     
@@ -759,6 +762,7 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
                V2(100, 100),
                1000,
                V4(1.0f, 1.0f, 1.0f, 1.0f));
+#endif
     
 }
 

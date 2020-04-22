@@ -2,6 +2,10 @@
 
 #include "joy_modes.h"
 
+#if defined(JOY_DEBUG_BUILD)
+debug_state* DEBUGGlobalState = 0;
+#endif
+
 // NOTE(Dima): Function returns -1 if it can't find the game mode
 INTERNAL_FUNCTION int FindGameMode(game_state* Game, char* ModeName){
     int Result = -1;
@@ -62,7 +66,7 @@ void GameInit(game_state* Game, platform_to_game_api Platform2GameAPI){
     RenderAddStack(Game->Render, "Meshes");
     RenderAddStack(Game->Render, "DEBUG");
     // NOTE(Dima): Init platform render stuff
-    Game->Render->Init(Game->Assets);
+    Game->Render->API.Init(Game->Assets);
     
     // NOTE(Dima): Gui
     Game->GuiMemory = {};
@@ -74,11 +78,20 @@ void GameInit(game_state* Game, platform_to_game_api Platform2GameAPI){
     PushMemoryStruct(&Game->AnimMemory, anim_system, Game->Anim, Region);
     InitAnimSystem(Game->Anim);
     
+    // NOTE(Dima): DEBUG
+#if defined(JOY_DEBUG_BUILD)
+    Game->DEBUGMemory = {};
+    PushMemoryStruct(&Game->DEBUGMemory, debug_state, Game->DEBUG, Region);
+    DEBUGInit(Game->DEBUG, 
+              Game->Render);
+    DEBUGGlobalState = Game->DEBUG;
+#endif
+    
     // NOTE(Dima): Describing all game modes
-    DescribeGameMode(Game, "Title", TitleUpdate, 0),
-    DescribeGameMode(Game, "Main Menu", MainMenuUpdate, 0),
-    DescribeGameMode(Game, "Changing pictures", ChangingPicturesUpdate, 0),
-    DescribeGameMode(Game, "Test", TestUpdate, 0),
+    DescribeGameMode(Game, "Title", TitleUpdate, 0);
+    DescribeGameMode(Game, "Main Menu", MainMenuUpdate, 0);
+    DescribeGameMode(Game, "Changing pictures", ChangingPicturesUpdate, 0);
+    DescribeGameMode(Game, "Test", TestUpdate, 0);
     
     SetGameMode(Game, "Test");
     
@@ -114,27 +127,32 @@ void GameUpdate(game_state* Game, render_frame_info FrameInfo){
     GuiFrameInfo.Height = FrameInfo.Height;
     GuiFrameInfo.DeltaTime = FrameInfo.dt;
     
-    // NOTE(Dima): Init gui for frame
     GuiFrameBegin(Game->Gui, GuiFrameInfo);
     
-    // NOTE(Dima): Update game
     if(CurMode->Update){
         CurMode->Update(Game, CurMode);
     }
     
-    // NOTE(Dima): Preparing GUI 4 render
-    GuiFramePrepare4Render(Game->Gui);
+#if defined(JOY_DEBUG_BUILD)
+    /*
+    NOTE(Dima): DEBUGUpdate outputs debug geometry, so it needs to calculate before render
+    and after Game Mode update.
+    */
+    DEBUGUpdate(Game->DEBUG, FrameInfo.dt);
+#endif
     
-    Game->Render->Render();
+    GuiFramePrepare4Render(Game->Gui);
+    Game->Render->API.Render();
+    
     
     GuiFrameEnd(Game->Gui);
     RenderEndFrame(Game->Render);
     
-    Game->Render->SwapBuffers();
+    Game->Render->API.SwapBuffers();
 }
 
 void GameFree(game_state* Game){
-    Game->Render->Free();
+    Game->Render->API.Free();
     
     // NOTE(Dima): Freing all the memories :)
     Free(&Game->GuiMemory);
@@ -142,4 +160,5 @@ void GameFree(game_state* Game){
     Free(&Game->RenderMemory);
     Free(&Game->AssetMemory);
     Free(&Game->AnimMemory);
+    Free(&Game->DEBUGMemory);
 }

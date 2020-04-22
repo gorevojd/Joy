@@ -8,6 +8,7 @@ in Vertex_Shader_Out{
 
 out vec4 Color;
 
+uniform vec3 AlbedoColor;
 uniform sampler2D Albedo;
 uniform sampler2D Normals;
 
@@ -34,8 +35,13 @@ void main(){
     float AmbientFactor = 0.05f;
     vec3 Ambient = vec3(AmbientFactor);
     
+    vec3 SampledAlbedo = AlbedoColor;
+    if(AlbedoIsSet){
+        SampledAlbedo = texture2D(Albedo, FsIn.UV).rgb;
+    }
+    
     vec3 ResultColor = vec3(0.0f, 0.0f, 0.0f);
-    ResultColor += Ambient + CalcDirLit(FragP, FragN, vec3(1.0f, 1.0f, 1.0f));
+    ResultColor += Ambient + CalcDirLit(FragP, FragN, SampledAlbedo);
     
     Color = vec4(ResultColor, 1.0f);
 }

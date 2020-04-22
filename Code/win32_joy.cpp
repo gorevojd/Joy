@@ -22,10 +22,6 @@ GLOBAL_VARIABLE game_state* GlobalGame;
 GLOBAL_VARIABLE f64 Time = 0.0f;
 GLOBAL_VARIABLE f64 DeltaTime = 0.0f;
 
-#if DEBUG_ENABLED
-debug_record_table* GlobalRecordTable;
-#endif
-
 #if JOY_USE_OPENGL
 GLOBAL_VARIABLE gl_state GlobalGL;
 #endif
@@ -34,7 +30,6 @@ GLOBAL_VARIABLE DirX_State GlobalDirX;
 #endif
 
 platform_api Platform;
-
 
 BOOL CALLBACK DirectSoundEnumerateCallback( 
 LPGUID lpGuid, 
@@ -46,7 +41,6 @@ LPVOID lpContext )
     
     return(TRUE);
 }
-
 
 /*
 Note that Direct Sound does use two different kinds of buffers which are primary and secondary
