@@ -121,12 +121,12 @@ INTERNAL_FUNCTION gl_shader GlLoadProgram(gl_state* GL, char* vertexPath, char* 
     
     gl_shader ResultShader = {};
     
-	Platform_Read_File_Result vFile = PlatformReadFile(vertexPath);
-	Platform_Read_File_Result fFile = PlatformReadFile(fragmentPath);
+	Platform_Read_File_Result vFile = Platform.ReadFile(vertexPath);
+	Platform_Read_File_Result fFile = Platform.ReadFile(fragmentPath);
     Platform_Read_File_Result gFile = {};
     char* toPassGeometryData = 0;
     if(geometryPath){
-        gFile = PlatformReadFile(geometryPath);
+        gFile = Platform.ReadFile(geometryPath);
         toPassGeometryData = (char*)gFile.data;
     }
     
@@ -139,10 +139,10 @@ INTERNAL_FUNCTION gl_shader GlLoadProgram(gl_state* GL, char* vertexPath, char* 
     ResultShader.Type = GlShader_Simple;
     ResultShader._InternalProgramIndex = resultIndex;
     
-	PlatformFreeFileMemory(&vFile);
-	PlatformFreeFileMemory(&fFile);
+	Platform.FreeFileMemory(&vFile);
+	Platform.FreeFileMemory(&fFile);
     if(geometryPath){
-        PlatformFreeFileMemory(&gFile);
+        Platform.FreeFileMemory(&gFile);
     }
     
 	return(ResultShader);
@@ -247,6 +247,16 @@ INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadGuiGeomShader)
     
     GLGETA(PUV);
     GLGETA(C);
+}
+
+INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadGuiLinesShader)
+{
+    gl_guigeom_lines_shader& Result = GL->GuiLinesShader;
+    Result.Shader = GlLoadProgram(GL, PathV, PathF);
+    
+    GLGETU(Projection);
+    
+    GLGETA(P);
 }
 
 INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadLinesShader)
@@ -465,7 +475,7 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
     return(Result);
 }
 
-void GlInit(gl_state* GL, assets* Assets){
+INTERNAL_FUNCTION void GlInit(gl_state* GL, assets* Assets){
     GL->ProgramsCount = 0;
     LoadScreenShader(GL, 
                      "../Data/Shaders/screen.vs",
@@ -482,6 +492,9 @@ void GlInit(gl_state* GL, assets* Assets){
     LoadLinesShader(GL,
                     "../Data/Shaders/lines.vs",
                     "../Data/Shaders/lines.fs");
+    LoadGuiLinesShader(GL,
+                       "../Data/Shaders/gui_geom_lines.vs",
+                       "../Data/Shaders/gui_geom_lines.fs");
     
     size_t FS = sizeof(float);
     
@@ -549,23 +562,26 @@ void GlInit(gl_state* GL, assets* Assets){
     
     glBindVertexArray(GL->GuiGeomVAO);
     glBindBuffer(GL_ARRAY_BUFFER, GL->GuiGeomVBO);
-    if(ArrayIsValid(GL->GuiGeomShader.PUVAttrLoc)){
-        glEnableVertexAttribArray(GL->GuiGeomShader.PUVAttrLoc);
-        glVertexAttribPointer(GL->GuiGeomShader.PUVAttrLoc, 
-                              4, GL_FLOAT, GL_FALSE, 
-                              8 * FS, 0);
-    }
+    InitVertexAttribFloat(GL->GuiGeomShader.PUVAttrLoc,
+                          4, 8 * FS, 0);
+    InitVertexAttribFloat(GL->GuiGeomShader.CAttrLoc,
+                          4, 8 * FS, 4 * FS);
+    glBindVertexArray(0);
     
-    if(ArrayIsValid(GL->GuiGeomShader.CAttrLoc)){
-        glEnableVertexAttribArray(GL->GuiGeomShader.CAttrLoc);
-        glVertexAttribPointer(GL->GuiGeomShader.CAttrLoc, 
-                              4, GL_FLOAT, GL_FALSE, 
-                              8 * FS, (void*)(4 * FS));
-    }
+    // NOTE(Dima): Init gui lines geometry
+    glGenVertexArrays(1, &GL->GuiLinesVAO);
+    glGenBuffers(1, &GL->GuiLinesVBO);
+    glGenBuffers(1, &GL->GuiLinesColorsTBO);
+    
+    glBindVertexArray(GL->GuiLinesVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, GL->GuiLinesVBO);
+    InitVertexAttribFloat(GL->GuiLinesShader.PAttrLoc,
+                          2, 2 * FS, 0);
+    
     glBindVertexArray(0);
 }
 
-void GlFree(gl_state* GL){
+INTERNAL_FUNCTION void GlFree(gl_state* GL){
     // NOTE(Dima): Freeing all of the shader programs
     for(int ProgramIndex = 0;
         ProgramIndex < GL->ProgramsCount;
@@ -769,7 +785,7 @@ void GlOutputStack(gl_state* GL, render_stack* Stack, render_camera_setup* Camer
     }
 }
 
-void GlOutputPass(gl_state* GL, render_pass* Pass){
+INTERNAL_FUNCTION void GlOutputPass(gl_state* GL, render_pass* Pass){
     for(int i = 0; i < Pass->StacksCount; i++){
         GlOutputStack(GL, Pass->Stacks[i], &Pass->CameraSetup);
     }
@@ -852,14 +868,9 @@ INTERNAL_FUNCTION void OutputRenderLines(gl_state* GL,
     }
 }
 
-INTERNAL_FUNCTION void GlFinalOutput(gl_state* GL, render_state* Render){
-    
-    // NOTE(Dima): outputing lines
-    OutputRenderLines(GL, Render, Render->Passes[0].CameraSetup.ViewProjection);
-    
-    // NOTE(Dima): Outputing gui
-    glEnable(GL_SCISSOR_TEST);
-    
+INTERNAL_FUNCTION void OutputGuiGeometry(gl_state* GL, 
+                                         render_state* Render)
+{
     glBindVertexArray(GL->GuiGeomVAO);
     BindBufferAndFill(GL_ARRAY_BUFFER,
                       GL_DYNAMIC_DRAW,
@@ -899,7 +910,6 @@ INTERNAL_FUNCTION void GlFinalOutput(gl_state* GL, render_state* Render){
         render_gui_chunk* CurChunk = &Render->GuiGeom.Chunks[ChunkIndex];
         
         if(CurChunk->IndicesCount){
-            
             v2 ClipDim = GetRectDim(CurChunk->ClipRect);
             rc2 ClipRect = BottomLeftToTopLeftRectange(CurChunk->ClipRect,
                                                        Render->FrameInfo.Height);
@@ -921,11 +931,74 @@ INTERNAL_FUNCTION void GlFinalOutput(gl_state* GL, render_state* Render){
     glBindVertexArray(0);
     
     glDeleteTextures(1, &TexBufTex);
+}
+
+INTERNAL_FUNCTION void OutputGuiGeometryLines(gl_state* GL, render_state* Render){
+    glBindVertexArray(GL->GuiLinesVAO);
     
+    BindBufferAndFill(GL_ARRAY_BUFFER,
+                      GL_DYNAMIC_DRAW,
+                      Render->GuiGeom.LinePoints,
+                      Render->GuiGeom.LinePointsCount * sizeof(v2),
+                      GL->GuiLinesVBO);
+    
+    BindBufferAndFill(GL_TEXTURE_BUFFER,
+                      GL_DYNAMIC_DRAW,
+                      Render->GuiGeom.LineColors,
+                      Render->GuiGeom.LineColorsCount * sizeof(v4),
+                      GL->GuiLinesColorsTBO);
+    
+    UseShader(&GL->GuiLinesShader.Shader);
+    UniformMatrix4x4(GL->GuiLinesShader.ProjectionLoc,
+                     (float*)GL->GuiOrtho.e);
+    glUniform1i(GL->GuiLinesShader.ColorsTextureLoc, 0);
+    
+    GLuint ColorsTex = GenerateAndBindBufferTexture(GL_TEXTURE0,
+                                                    GL_RGBA32F,
+                                                    GL->GuiLinesColorsTBO);
+    glLineWidth(1.0f);
+    
+    for(int ChunkIndex = 0;
+        ChunkIndex < Render->GuiGeom.CurChunkIndex;
+        ChunkIndex++)
+    {
+        render_gui_chunk* CurChunk = &Render->GuiGeom.Chunks[ChunkIndex];
+        
+        if(CurChunk->LinePointsCount){
+            
+            v2 ClipDim = GetRectDim(CurChunk->ClipRect);
+            rc2 ClipRect = BottomLeftToTopLeftRectange(CurChunk->ClipRect,
+                                                       Render->FrameInfo.Height);
+            
+            glScissor(ClipRect.Min.x,
+                      ClipRect.Min.y,
+                      ClipDim.x,
+                      ClipDim.y);
+            
+            glDrawArrays(GL_LINES, 
+                         CurChunk->LinePointsBase, 
+                         CurChunk->LinePointsCount);
+        }
+    }
+    
+    
+    glDeleteTextures(1, &ColorsTex);
+}
+
+INTERNAL_FUNCTION void GlFinalOutput(gl_state* GL, render_state* Render){
+    // NOTE(Dima): outputing lines
+    OutputRenderLines(GL, Render, Render->Passes[0].CameraSetup.ViewProjection);
+    
+    // NOTE(Dima): Outputing gui geometry
+    glEnable(GL_SCISSOR_TEST);
+    OutputGuiGeometry(GL, Render);
+    OutputGuiGeometryLines(GL, Render);
     glDisable(GL_SCISSOR_TEST);
 }
 
-void GlOutputRender(gl_state* GL, render_state* Render){
+INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
+    FUNCTION_TIMING();
+    
     glEnable(GL_BLEND);
     //glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     //glBlendEquation(GL_FUNC_ADD);

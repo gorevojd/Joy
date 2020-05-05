@@ -27,23 +27,32 @@ inline b32 StringsAreEqual(char* A, char* B) {
 }
 
 inline void CopyStrings(char* Dst, char* Src) {
-	if (Src) {
+	if (Src && Dst) {
 		while (*Src) {
 			*Dst++ = *Src++;
 		}
-	}
-	*Dst = 0;
+        *Dst = 0;
+    }
+}
+
+inline void CopyStringsCount(char* Dst, char* Src, int CountSrc){
+    if(Dst && Src){
+        for(int i = 0; i < CountSrc; i++){
+            Dst[i] = Src[i];
+        }
+        Dst[CountSrc] = 0;
+    }
 }
 
 inline void CopyStringsSafe(char* Dst, int DstSize, char* Src){
-    if(Src){
+    if(Src && Dst){
         int SpaceInDstAvailable = DstSize - 1;
         while(*Src && SpaceInDstAvailable){
             *Dst++ = *Src++;
             SpaceInDstAvailable--;
         }
+        *Dst = 0;
     }
-    *Dst = 0;
 }
 
 inline void ConcatStringsUnsafe(char* Dst, char* Src1, char* Src2) {

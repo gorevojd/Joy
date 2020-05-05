@@ -1,11 +1,8 @@
-#include "joy_render.h"
-#include "joy_software_renderer.h"
-
-render_camera_setup SetupCamera(const m44& Projection, 
-                                const m44& View, 
-                                int FramebufferWidth,
-                                int FramebufferHeight, 
-                                b32 CalcFrustumPlanes)
+INTERNAL_FUNCTION render_camera_setup SetupCamera(const m44& Projection, 
+                                                  const m44& View, 
+                                                  int FramebufferWidth,
+                                                  int FramebufferHeight, 
+                                                  b32 CalcFrustumPlanes)
 {
     render_camera_setup Result = {};
     
@@ -98,6 +95,7 @@ INTERNAL_FUNCTION inline void RenderStackEndFrame(render_stack* Stack){
 }
 
 INTERNAL_FUNCTION void RenderInitGuiGeom(render_state* Render){
+    // NOTE(Dima): Init GUI geometry
     int VerticesCount = 50000;
     int IndCount = VerticesCount * 1.5;
     
@@ -114,6 +112,20 @@ INTERNAL_FUNCTION void RenderInitGuiGeom(render_state* Render){
     Render->GuiGeom.TriangleGeomTypes = PushArray(
         Render->MemRegion, u8, 
         Render->GuiGeom.MaxTriangleGeomTypesCount);
+    
+    // NOTE(Dima): Init GUI lines
+    int LinesCount = 100000;
+    
+    Render->GuiGeom.MaxLinePointsCount = LinesCount * 2;
+    Render->GuiGeom.MaxLineColorsCount = LinesCount;
+    
+    Render->GuiGeom.LinePointsCount = 0;
+    Render->GuiGeom.LineColorsCount = 0;
+    
+    Render->GuiGeom.LinePoints = PushArray(Render->MemRegion, v2, 
+                                           Render->GuiGeom.MaxLinePointsCount);
+    Render->GuiGeom.LineColors = PushArray(Render->MemRegion, v4,
+                                           Render->GuiGeom.MaxLineColorsCount);
 }
 
 INTERNAL_FUNCTION void RenderInitLinesGeom(render_state* Render){
@@ -122,7 +134,7 @@ INTERNAL_FUNCTION void RenderInitLinesGeom(render_state* Render){
     Render->LinesGeom.ChunksAllocated = 0;
 }
 
-void RenderInit(render_state* Render, render_platform_api API){
+INTERNAL_FUNCTION void RenderInit(render_state* Render, render_platform_api API){
     Render->StacksCount = 0;
     
     Render->FrameInfoIsSet = 0;
@@ -134,7 +146,23 @@ void RenderInit(render_state* Render, render_platform_api API){
     RenderInitLinesGeom(Render);
 }
 
-render_stack* RenderAddStack(render_state* render, char* Name, mi Size)
+INTERNAL_FUNCTION render_stack* RenderFindStack(render_state* Render, char* Name){
+    render_stack* Result = 0;
+    
+    char NameUpperBuf[256];
+    StringToUpper(NameUpperBuf, Name);
+    
+    for(int i = 0; i < Render->StacksCount; i++){
+        if(StringsAreEqual(Render->Stacks[i].Name, NameUpperBuf)){
+            Result = &Render->Stacks[i];
+            break;
+        }
+    }
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION render_stack* RenderAddStack(render_state* render, char* Name, mi Size)
 {
     render_stack* Result = RenderFindStack(render, Name);
     
@@ -152,28 +180,12 @@ render_stack* RenderAddStack(render_state* render, char* Name, mi Size)
     return(Result);
 }
 
-render_stack* RenderFindStack(render_state* Render, char* Name){
-    render_stack* Result = 0;
-    
-    char NameUpperBuf[256];
-    StringToUpper(NameUpperBuf, Name);
-    
-    for(int i = 0; i < Render->StacksCount; i++){
-        if(StringsAreEqual(Render->Stacks[i].Name, NameUpperBuf)){
-            Result = &Render->Stacks[i];
-            break;
-        }
-    }
-    
-    return(Result);
-}
-
 /*
  NOTE(Dima): This function tries to find the stack
  in render. If it can not find the stack with the 
  specified name then it creates one.
 */
-render_stack* RenderFindAddStack(render_state* Render, char* Name){
+INTERNAL_FUNCTION render_stack* RenderFindAddStack(render_state* Render, char* Name){
     render_stack* Result = 0;
     
     render_stack* Found = RenderFindStack(Render, Name);
@@ -187,7 +199,7 @@ render_stack* RenderFindAddStack(render_state* Render, char* Name){
     return(Result);
 }
 
-void RenderBeginFrame(render_state* render){
+INTERNAL_FUNCTION void RenderBeginFrame(render_state* render){
     render->FrameInfoIsSet = 0;
     render->FrameInfo = {};
     
@@ -195,6 +207,10 @@ void RenderBeginFrame(render_state* render){
     render->GuiGeom.VerticesCount = 0;
     render->GuiGeom.IndicesCount = 0;
     render->GuiGeom.TriangleGeomTypesCount = 0;
+    
+    // NOTE(Dima): Reset gui lines
+    render->GuiGeom.LinePointsCount = 0;
+    render->GuiGeom.LineColorsCount = 0;
     
     // NOTE(Dima): Reset lines
     render_lines_chunk* AtChunk = render->LinesGeom.FirstDepth;
@@ -222,7 +238,7 @@ void RenderBeginFrame(render_state* render){
     }
 }
 
-void RenderEndFrame(render_state* render){
+INTERNAL_FUNCTION void RenderEndFrame(render_state* render){
     
     // NOTE(Dima): Deinit render stacks
     for(int StackIndex = 0; 

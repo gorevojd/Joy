@@ -3,15 +3,8 @@
 
 #include <atomic>
 
-#include "joy_types.h"
-#include "joy_defines.h"
 #include "joy_asset_types.h"
 #include "joy_asset_util.h"
-#include "joy_platform.h"
-#include "joy_memory.h"
-#include "joy_engine.h"
-#include "joy_random.h"
-
 #include "joy_asset_ids.h"
 
 #define ASSET_IMPORT_IMMEDIATE true
@@ -174,6 +167,7 @@ u32 GetBestByTags(assets* Assets,
                   u32* TagTypes, 
                   asset_tag_value* TagValues, 
                   int TagsCount);
+
 void ImportAsset(assets* Assets, asset* Asset, b32 Immediate);
 
 

@@ -1,6 +1,10 @@
-#include "joy_debug.h"
-
 #if defined(JOY_DEBUG_BUILD)
+
+#include "joy_debug_menu_gui.cpp"
+
+void DEBUGSetMenuDataSource(u32 Type, void* Data){
+    DEBUGGlobalTable->MenuDataSources[Type] = Data;
+}
 
 inline debug_primitive* DEBUGAddPrimitive(v3 Color,
                                           f32 Duration,
@@ -8,10 +12,10 @@ inline debug_primitive* DEBUGAddPrimitive(v3 Color,
                                           u32 Type)
 {
     DLIST_ALLOCATE_FUNCTION_BODY(debug_primitive, 
-                                 DEBUGGlobalState->Region,
+                                 DEBUGGlobalTable->Region,
                                  Next, Prev,
-                                 DEBUGGlobalState->PrimitiveFree,
-                                 DEBUGGlobalState->PrimitiveUse,
+                                 DEBUGGlobalTable->PrimitiveFree,
+                                 DEBUGGlobalTable->PrimitiveUse,
                                  2048, Result);
     
     Result->Color = Color;
@@ -25,7 +29,7 @@ inline debug_primitive* DEBUGAddPrimitive(v3 Color,
 inline debug_primitive* DEBUGRemovePrimitive(debug_primitive* Primitive){
     DLIST_DEALLOCATE_FUNCTION_BODY(Primitive, 
                                    Next, Prev,
-                                   DEBUGGlobalState->PrimitiveFree);
+                                   DEBUGGlobalTable->PrimitiveFree);
     
     return(Primitive);
 }
@@ -265,10 +269,12 @@ INTERNAL_FUNCTION void DEBUGPushBoxFromPoints(render_state* Render,
 
 
 void DEBUGUpdatePrimitives(debug_state* State, float DeltaTime){
-    debug_primitive* At = State->PrimitiveUse.Next;
+    debug_global_table* Table = DEBUGGlobalTable;
+    
+    debug_primitive* At = Table->PrimitiveUse.Next;
     
     // NOTE(Dima): Push to render loop
-    while(At != &State->PrimitiveUse){
+    while(At != &Table->PrimitiveUse){
         switch(At->Type){
             case DebugPrimitive_Line:{
                 debug_primitive_data_line* Line = &At->Line;
@@ -300,13 +306,13 @@ void DEBUGUpdatePrimitives(debug_state* State, float DeltaTime){
                 
                 v3* SrcArray = 0;
                 if(Circle->DirectionIndicator == 0){
-                    SrcArray = DEBUGGlobalState->CircleVerticesX;
+                    SrcArray = DEBUGGlobalTable->CircleVerticesX;
                 }
                 else if(Circle->DirectionIndicator == 1){
-                    SrcArray = DEBUGGlobalState->CircleVerticesY;
+                    SrcArray = DEBUGGlobalTable->CircleVerticesY;
                 }
                 else if(Circle->DirectionIndicator == 2){
-                    SrcArray = DEBUGGlobalState->CircleVerticesZ;
+                    SrcArray = DEBUGGlobalTable->CircleVerticesZ;
                 }
                 
                 DEBUGPushFromPointsArray(State->Render, 
@@ -414,8 +420,8 @@ void DEBUGUpdatePrimitives(debug_state* State, float DeltaTime){
         At = At->Next;
     }
     
-    At = State->PrimitiveUse.Next;
-    while(At != &State->PrimitiveUse){
+    At = Table->PrimitiveUse.Next;
+    while(At != &Table->PrimitiveUse){
         debug_primitive* Next = At->Next; 
         
         // NOTE(Dima): Update lifetime
@@ -430,8 +436,9 @@ void DEBUGUpdatePrimitives(debug_state* State, float DeltaTime){
     }
 }
 
-INTERNAL_FUNCTION void DEBUGInitCircleVertices(debug_state* State)
+INTERNAL_FUNCTION void DEBUGInitCircleVertices()
 {
+    debug_global_table* Table = DEBUGGlobalTable;
     
     int CountSegments = DEBUG_CIRCLE_SEGMENTS;
     
@@ -443,25 +450,569 @@ INTERNAL_FUNCTION void DEBUGInitCircleVertices(debug_state* State)
     {
         f32 AngleStart = (f32)SegmentIndex * AnglePerSegment;
         
-        State->CircleVerticesX[SegmentIndex] = V3(0.0f, Cos(AngleStart), Sin(AngleStart));
-        State->CircleVerticesY[SegmentIndex] = V3(Cos(AngleStart), 0.0f, Sin(AngleStart));
-        State->CircleVerticesZ[SegmentIndex] = V3(Cos(AngleStart), Sin(AngleStart), 0.0f);
+        Table->CircleVerticesX[SegmentIndex] = V3(0.0f, Cos(AngleStart), Sin(AngleStart));
+        Table->CircleVerticesY[SegmentIndex] = V3(Cos(AngleStart), 0.0f, Sin(AngleStart));
+        Table->CircleVerticesZ[SegmentIndex] = V3(Cos(AngleStart), Sin(AngleStart), 0.0f);
     }
 }
 
-void DEBUGInit(debug_state* State,
-               render_state* Render)
+INTERNAL_FUNCTION void DEBUGInitMenu(debug_state* State, u32 Type, char* Name, 
+                                     debug_menu_gui_func_callback* Func)
 {
-    State->Render = Render;
+    debug_menu* Menu = &State->Menus[Type];
     
-    DLIST_REFLECT_PTRS(State->PrimitiveUse, Next, Prev);
-    DLIST_REFLECT_PTRS(State->PrimitiveFree, Next, Prev);
-    
-    DEBUGInitCircleVertices(State);
+    CopyStringsSafe(Menu->Name, sizeof(Menu->Name), Name);
+    Menu->Type = Type;
+    Menu->Callback = Func;
 }
 
-void DEBUGUpdate(debug_state* State, f32 DeltaTime){
-    DEBUGUpdatePrimitives(State, DeltaTime);
+INTERNAL_FUNCTION void DEBUGUpdateMenus(debug_state* State)
+{
+    FUNCTION_TIMING();
+    
+    if(KeyWentDown(State->Input, Key_F3)){
+        State->ShowDebugOverlay = !State->ShowDebugOverlay;
+    }
+    
+    if(KeyWentDown(State->Input, Key_F4)){
+        State->ShowDebugMenus = !State->ShowDebugMenus;
+    }
+    
+    if(State->ShowDebugOverlay){
+        gui_state* Gui = State->Gui;
+        
+        debug_window* Window = &State->MainWindow;
+        GuiBeginLayout(Gui, "DEBUG_MainWindow", 
+                       GuiLayout_Window, 
+                       &Window->P, 
+                       &Window->Dim);
+        
+        GuiBeginRow(Gui);
+        if(State->ShowDebugMenus){
+            GuiBeginColumn(Gui);
+            GuiBeginRadioGroup(Gui, "MenuRadioGroup", 
+                               &State->ToShowMenuType, 
+                               State->ToShowMenuType);
+            
+            // NOTE(Dima): Showing menu
+            BeginDimension(Gui, BeginDimension_Both, ScaledAscDim(Gui, V2(8, 2)));
+            for(int MenuIndex = 0;
+                MenuIndex < DebugMenu_Count;
+                MenuIndex++)
+            {
+                debug_menu* Menu = &State->Menus[MenuIndex];
+                
+                Menu->Data = DEBUGGlobalTable->MenuDataSources[MenuIndex];
+                
+                GuiRadioButton(Gui, Menu->Name, Menu->Type);
+            }
+            EndDimension(Gui);
+            GuiEndRadioGroup(Gui);
+            GuiEndColumn(Gui);
+        }
+        
+        // NOTE(Dima): Calling gui callback for DEBUG menu
+        GuiBeginColumn(Gui);
+        debug_menu* ToShowMenu = &State->Menus[State->ToShowMenuType];
+        if(ToShowMenu->Callback){
+            ToShowMenu->Callback(Gui, ToShowMenu->Data);
+        }
+        else{
+            GuiText(Gui, "GUI callback was NULL");
+        }
+        GuiEndColumn(Gui);
+        
+        GuiEndRow(Gui);
+        GuiEndLayout(Gui);
+    }
+}
+
+void DEBUGParseNameFromUnique(char* To, int ToSize,
+                              char* From)
+{
+    if(To && From){
+        char* At = From;
+        
+        int Counter = 0;
+        while(*At){
+            if((Counter >= ToSize - 1) || 
+               (*At == '|'))
+            {
+                break;
+            }
+            
+            To[Counter++] = *At;
+            
+            At++;
+        }
+        
+        To[Counter] = 0;
+    }
+}
+
+INTERNAL_FUNCTION inline
+debug_profiled_tree_node* AllocateTreeNode(debug_state* State, 
+                                           debug_profiled_frame* Frame)
+{
+    DLIST_ALLOCATE_FUNCTION_BODY(debug_profiled_tree_node, State->Region,
+                                 NextAlloc, PrevAlloc, 
+                                 State->TreeNodeFree,
+                                 Frame->RootTreeNodeUse,
+                                 1024,
+                                 Result);
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline 
+void CreateSentinel4Element(debug_state* State, 
+                            debug_profiled_frame* Frame,
+                            debug_profiled_tree_node* Element)
+{
+    Element->ChildSentinel = AllocateTreeNode(State, Frame);
+    
+    DLIST_REFLECT_POINTER_PTRS(Element->ChildSentinel, Next, Prev);
+    Element->ChildSentinel->Parent = Element;
+    Element->ChildSentinel->UniqueName = State->SentinelElementsName;
+    Element->ChildSentinel->ChildSentinel = 0;
+}
+
+
+INTERNAL_FUNCTION void ClearStatsTable(debug_timing_stat** Table, 
+                                       int TableSize)
+{
+    for(int Index = 0;
+        Index < TableSize;
+        Index++)
+    {
+        Table[Index] = 0;
+    }
+}
+
+INTERNAL_FUNCTION inline void InitProfiledFrame(debug_state* State, debug_profiled_frame* Frame){
+    Frame->RootTreeNodeUse.UniqueName = State->RootNodesName;
+    
+    DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, Next, Prev);
+    DLIST_REFLECT_PTRS(Frame->StatUse, Next, Prev);
+    
+    CreateSentinel4Element(State, Frame, &Frame->RootTreeNodeUse);
+    
+    ClearStatsTable(Frame->StatTable, DEBUG_STATS_TABLE_SIZE);
+    ClearStatsTable(Frame->ToSortStats, DEBUG_STATS_TO_SORT_SIZE);
+    Frame->ToSortStatsCount = 0;
+    
+    Frame->FrameUpdateNode = 0;
+    Frame->CurNode = &Frame->RootTreeNodeUse;
+}
+
+INTERNAL_FUNCTION inline void ClearProfiledFrame(debug_state* State, 
+                                                 debug_profiled_frame* Frame)
+{
+    DLIST_REMOVE_ENTIRE_LIST(&Frame->RootTreeNodeUse, 
+                             &State->TreeNodeFree, 
+                             NextAlloc, PrevAlloc);
+    
+    DLIST_REMOVE_ENTIRE_LIST(&Frame->StatUse,
+                             &State->StatFree,
+                             Next, Prev);
+    
+    DLIST_REFLECT_POINTER_PTRS(Frame->RootTreeNodeUse.ChildSentinel, Next, Prev);
+    
+    ClearStatsTable(Frame->StatTable, DEBUG_STATS_TABLE_SIZE);
+    
+    Frame->ToSortStatsCount = 0;
+    Frame->FrameUpdateNode = 0;
+}
+
+INTERNAL_FUNCTION debug_profiled_tree_node*
+RequestTreeNode(debug_state* State, 
+                debug_profiled_frame* Frame, 
+                debug_profiled_tree_node* Current,
+                char* UniqueName,
+                b32* Allocated)
+{
+    u32 HashID = StringHashFNV(UniqueName);
+    
+    debug_profiled_tree_node* Found = 0;
+    debug_profiled_tree_node* At = Current->ChildSentinel->Next;
+    while(At != Current->ChildSentinel){
+        if(StringHashFNV(At->UniqueName) == HashID){
+            Found = At;
+            
+            break;
+        }
+        
+        At = At->Next;
+    }
+    
+    b32 IsAllocated = false;
+    if(!Found){
+        IsAllocated = true;
+        
+        Found = AllocateTreeNode(State, Frame);
+        Found->NameID = HashID;
+        Found->UniqueName = UniqueName;
+        Found->Parent = Current;
+        Found->TimingSnapshot = {};
+        CreateSentinel4Element(State, Frame, Found);
+        
+        DLIST_INSERT_BEFORE(Found, Current->ChildSentinel, Next, Prev);
+    }
+    
+    if(Allocated){
+        *Allocated = IsAllocated;
+    }
+    
+    return(Found);
+}
+
+INTERNAL_FUNCTION debug_timing_stat* AllocateTimingStat(debug_state* State,
+                                                        debug_profiled_frame* Frame)
+{
+    DLIST_ALLOCATE_FUNCTION_BODY(debug_timing_stat, State->Region,
+                                 Next, Prev, 
+                                 State->StatFree,
+                                 Frame->StatUse,
+                                 512,
+                                 Result);
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION debug_timing_stat* 
+CreateOrFindStatForUniqueName(debug_state* State, 
+                              debug_profiled_frame* Frame,
+                              char* UniqueName)
+{
+    u32 NameID = StringHashFNV(UniqueName);
+    
+    u32 Key = NameID % DEBUG_STATS_TABLE_SIZE;
+    
+    debug_timing_stat* Found = 0;
+    debug_timing_stat* StatAt = Frame->StatTable[Key];
+    
+    if(StatAt){
+        while(StatAt){
+            if(StatAt->NameID == NameID){
+                Found = StatAt;
+                
+                break;
+            }
+            
+            StatAt = StatAt->NextInHash;
+        }
+    }
+    
+    if(!Found){
+        debug_timing_stat* New = AllocateTimingStat(State, Frame);
+        
+        New->UniqueName = UniqueName;
+        New->NameID = NameID;
+        New->Stat = {};
+        // NOTE(Dima): Inserting to hash table
+        New->NextInHash = Frame->StatTable[Key];
+        Frame->StatTable[Key] = New;
+        
+        Found = New;
+    }
+    
+    return(Found);
+}
+
+INTERNAL_FUNCTION void 
+FillAndSortStats(debug_state* State, 
+                 debug_profiled_frame* Frame, 
+                 b32 IncludingChildren)
+{
+    // NOTE(Dima): Filling to sort table
+    debug_timing_stat* Stat = Frame->StatUse.Next;
+    
+    Frame->ToSortStatsCount = 0;
+    
+    for(int StatIndex = 0;
+        StatIndex < DEBUG_STATS_TO_SORT_SIZE;
+        StatIndex++)
+    {
+        if(Stat == &Frame->StatUse){
+            break;
+        }
+        
+        ++Frame->ToSortStatsCount;
+        
+        Frame->ToSortStats[StatIndex] = Stat;
+        
+        Stat = Stat->Next;
+    }
+    
+    // NOTE(Dima): Sorting ToSort table by selection sort
+    for(int i = 0; i < Frame->ToSortStatsCount - 1; i++){
+        u64 MaxValue = GetClocksFromStat(Frame->ToSortStats[i], IncludingChildren);
+        int MaxIndex = i;
+        
+        for(int j = i + 1; j < Frame->ToSortStatsCount; j++){
+            u64 CurClocks = GetClocksFromStat(Frame->ToSortStats[j], IncludingChildren);
+            if(CurClocks > MaxValue){
+                MaxValue = CurClocks;
+                MaxIndex = j;
+            }
+        }
+        
+        if(MaxIndex != i){
+            debug_timing_stat* Temp = Frame->ToSortStats[i];
+            Frame->ToSortStats[i] = Frame->ToSortStats[MaxIndex];
+            Frame->ToSortStats[MaxIndex] = Temp;
+        }
+    }
+}
+
+INTERNAL_FUNCTION inline int IncrementFrameIndex(int Value){
+    int Result = (Value + 1) % DEBUG_PROFILED_FRAMES_COUNT;
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION inline void
+IncrementFrameIndices(debug_state* State){
+    if(State->ViewFrameIndex != State->CollationFrameIndex){
+        State->ViewFrameIndex = IncrementFrameIndex(State->ViewFrameIndex);
+    }
+    
+    State->CollationFrameIndex = IncrementFrameIndex(State->CollationFrameIndex);
+}
+
+INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
+    FUNCTION_TIMING();
+    
+    int RecordCount = DEBUGGlobalTable->RecordAndTableIndex & DEBUG_RECORD_INDEX_MASK;
+    int TableIndex = (DEBUGGlobalTable->RecordAndTableIndex & DEBUG_TABLE_INDEX_MASK) >> 
+        DEBUG_TABLE_INDEX_BITSHIFT;
+    
+    debug_record* RecordArray = DEBUGGlobalTable->RecordTables[TableIndex];
+    
+    u32 NewRecordAndTableIndex = 0;
+    NewRecordAndTableIndex |= (!TableIndex) << DEBUG_TABLE_INDEX_BITSHIFT;
+    
+    DEBUGGlobalTable->RecordAndTableIndex.store(NewRecordAndTableIndex);
+    
+    for(int RecordIndex = 0; 
+        RecordIndex <  RecordCount;
+        RecordIndex++)
+    {
+        debug_record* Record = &RecordArray[RecordIndex];
+        
+        switch(Record->Type){
+            case DebugRecord_BeginTiming:{
+                debug_profiled_frame* Frame = GetFrameByIndex(State, State->CollationFrameIndex);
+                
+                b32 NodeWasAllocated = false;
+                debug_profiled_tree_node* NewNode = RequestTreeNode(State, Frame, 
+                                                                    Frame->CurNode,
+                                                                    Record->UniqueName,
+                                                                    &NodeWasAllocated);
+                
+                NewNode->TimingSnapshot.StartClock = Record->TimeStampCounter;
+                if(NodeWasAllocated){
+                    NewNode->TimingSnapshot.StartClockFirstEntry = NewNode->TimingSnapshot.StartClock;
+                }
+                
+                Frame->CurNode = NewNode;
+            }break;
+            
+            case DebugRecord_EndTiming:{
+                debug_profiled_frame* Frame = GetFrameByIndex(State, State->CollationFrameIndex);
+                
+                debug_profiled_tree_node* CurNode = Frame->CurNode;
+                
+                debug_timing_snapshot* Snapshot = &CurNode->TimingSnapshot;
+                
+                Snapshot->EndClock = Record->TimeStampCounter;
+                
+                u64 ClocksElapsedThisFrame = (Snapshot->EndClock - Snapshot->StartClock);
+                Snapshot->ClocksElapsed += ClocksElapsedThisFrame;
+                Snapshot->HitCount += 1;
+                
+                // NOTE(Dima): Adding time to total parent's children elapsed 
+                CurNode->Parent->TimingSnapshot.ClocksElapsedInChildren += ClocksElapsedThisFrame;
+                
+                // NOTE(Dima): Initializing statistic
+                debug_timing_stat* Stat = CreateOrFindStatForUniqueName(State,
+                                                                        Frame,
+                                                                        CurNode->UniqueName);
+                
+                Stat->Stat.ClocksElapsed = Snapshot->ClocksElapsed;
+                Stat->Stat.ClocksElapsedInChildren = Snapshot->ClocksElapsedInChildren;
+                Stat->Stat.HitCount = Snapshot->HitCount;
+                
+                Frame->CurNode = CurNode->Parent;
+            }break;
+            
+            case DebugRecord_FrameBarrier:{
+                
+                debug_profiled_frame* OldFrame = GetFrameByIndex(State, State->CollationFrameIndex);
+                
+                // NOTE(Dima): Finding frame update node for current collation frame
+                debug_profiled_tree_node* FrameUpdateNode = 0;
+                debug_profiled_tree_node* At = OldFrame->RootTreeNodeUse.NextAlloc;
+                while(At != &OldFrame->RootTreeNodeUse){
+                    char NameBuf[256];
+                    DEBUGParseNameFromUnique(NameBuf, 256, At->UniqueName);
+                    
+                    if(StringsAreEqual(NameBuf, FRAME_UPDATE_NODE_NAME))
+                    {
+                        FrameUpdateNode = At;
+                        break;
+                    }
+                    
+                    At = At->NextAlloc;
+                }
+                OldFrame->FrameUpdateNode = FrameUpdateNode;
+                
+                // NOTE(Dima): Incrementing frame indices when we needed
+                b32 ShouldIncrementIndices = true;
+                if(State->RecordingChangeRequested){
+                    State->RecordingChangeRequested = false;
+                    
+                    if(State->TargetRecordingValue){
+                        ShouldIncrementIndices = false;
+                        
+                        DEBUGUnsetRecordFilter();
+                    }
+                    else{
+                        DEBUGSetIncrement(State->TargetRecordingValue);
+                    }
+                    
+                }
+                
+                if(ShouldIncrementIndices){
+                    IncrementFrameIndices(State);
+                }
+                
+                debug_profiled_frame* NewFrame = GetFrameByIndex(State, State->CollationFrameIndex);
+                
+                // NOTE(Dima): Clearing profiled frame
+                ClearProfiledFrame(State, NewFrame);
+                
+            }break;
+        }
+    }
+    
+    if(State->RecordingChangeRequested &&
+       State->TargetRecordingValue)
+    {
+        DEBUGSetRecordFilter(DebugRecord_FrameBarrier);
+        DEBUGSetIncrement(State->TargetRecordingValue);
+    }
+}
+
+void DEBUGInitGlobalTable(mem_region* Region){
+    // NOTE(Dima): Initialize record arrays
+    int RecordArrayCount = 100000;
+    DEBUGGlobalTable->TableMaxRecordCount = RecordArrayCount;
+    DEBUGGlobalTable->RecordAndTableIndex = 0;
+    DEBUGGlobalTable->RecordTables[0] = PushArray(Region, debug_record, RecordArrayCount);
+    DEBUGGlobalTable->RecordTables[1] = PushArray(Region, debug_record, RecordArrayCount);
+    
+    DEBUGUnsetRecordFilter();
+    DEBUGSetIncrement(DEBUG_DEFAULT_RECORDING);
+    
+    // NOTE(Dima): Init memory region
+    DEBUGGlobalTable->Region = Region;
+    
+    // NOTE(Dima): Set pointers on primitive sentinels
+    DLIST_REFLECT_PTRS(DEBUGGlobalTable->PrimitiveUse, Next, Prev);
+    DLIST_REFLECT_PTRS(DEBUGGlobalTable->PrimitiveFree, Next, Prev);
+    
+    // NOTE(Dima): Initialize DEBUG circle geometry
+    DEBUGInitCircleVertices();
+    
+    // NOTE(Dima): Set all menu data sources to zero
+    for(int MenuSourceIndex = 0;
+        MenuSourceIndex < DebugMenu_Count;
+        MenuSourceIndex++)
+    {
+        DEBUGGlobalTable->MenuDataSources[MenuSourceIndex] = 0;
+    }
+}
+
+INTERNAL_FUNCTION void DEBUGInit(debug_state* State,
+                                 render_state* Render,
+                                 gui_state* Gui,
+                                 input_state* Input)
+{
+    State->Render = Render;
+    State->Gui = Gui;
+    State->Input = Input;
+    
+    // NOTE(Dima): Init menus
+    State->ShowDebugOverlay = true;
+    State->ShowDebugMenus = true;
+    State->MainWindow.P = V2(850, 50);
+    State->MainWindow.Dim = V2(500, 700);
+    CopyStringsSafe(State->MainWindow.Name, 
+                    sizeof(State->MainWindow.Name), 
+                    "DEBUGMainWindow");
+    
+    DEBUGInitMenu(State, DebugMenu_Profile, "Profile",
+                  DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Profile));
+    DEBUGInitMenu(State, DebugMenu_DEBUG, "DEBUG",
+                  DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_DEBUG));
+    DEBUGInitMenu(State, DebugMenu_Animation, "Animation",
+                  DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Animation));
+    DEBUGInitMenu(State, DebugMenu_Input, "Input",
+                  DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Input));
+    DEBUGInitMenu(State, DebugMenu_Assets, "Assets",
+                  DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Assets));
+    DEBUGInitMenu(State, DebugMenu_Game, "Game",
+                  DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Game));
+    DEBUGInitMenu(State, DebugMenu_Console, "Console",
+                  DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Console));
+    DEBUGInitMenu(State, DebugMenu_GUI, "GUI",
+                  DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_GUI));
+    DEBUGInitMenu(State, DebugMenu_Log, "Log",
+                  DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Log));
+    DEBUGInitMenu(State, DebugMenu_Platform, "Platform",
+                  DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Platform));
+    DEBUGInitMenu(State, DebugMenu_Render, "Render",
+                  DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Render));
+    
+    State->ToShowMenuType = DebugMenu_Profile;
+    
+    // NOTE(Dima): Init profiler stuff
+    State->CollationFrameIndex = 0;
+    State->TargetRecordingValue = DEBUG_DEFAULT_RECORDING;
+    State->RecordingChangeRequested = false;
+    State->ToShowProfileMenuType = DebugProfileMenu_TopClockEx;
+    
+    CopyStrings(State->RootNodesName, "RootNode");
+    CopyStrings(State->SentinelElementsName, "Sentinel");
+    
+    DLIST_REFLECT_PTRS(State->TreeNodeFree, NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(State->TreeNodeFree, Next, Prev);
+    DLIST_REFLECT_PTRS(State->StatFree, Next, Prev);
+    
+    for(int ProfiledFrameIndex = 0;
+        ProfiledFrameIndex < DEBUG_PROFILED_FRAMES_COUNT;
+        ProfiledFrameIndex++)
+    {
+        debug_profiled_frame* Frame = &State->ProfiledFrames[ProfiledFrameIndex];
+        
+        InitProfiledFrame(State, Frame);
+    }
+}
+
+INTERNAL_FUNCTION void DEBUGUpdate(debug_state* State){
+    FUNCTION_TIMING();
+    
+    DEBUGSetMenuDataSource(DebugMenu_Profile, State);
+    DEBUGSetMenuDataSource(DebugMenu_DEBUG, State);
+    DEBUGSetMenuDataSource(DebugMenu_Console, State);
+    DEBUGSetMenuDataSource(DebugMenu_Log, State);
+    
+    DEBUGUpdatePrimitives(State, State->Input->DeltaTime);
+    DEBUGUpdateMenus(State);
+    
+    DEBUGProcessRecords(State);
 }
 
 #endif

@@ -52,26 +52,69 @@ inline float GetScaledAscender(font_info* FontInfo, float Scale = 1.0f){
 }
 
 enum GuiColorType{
+    GuiColor_Graph0,
+    GuiColor_Graph1,
+    GuiColor_Graph2,
+    GuiColor_Graph3,
+    GuiColor_Graph4,
+    GuiColor_Graph5,
+    GuiColor_Graph6,
+    GuiColor_Graph7,
+    GuiColor_Graph8,
+    GuiColor_Graph9,
+    GuiColor_Graph10,
+    GuiColor_Graph11,
+    GuiColor_Graph12,
+    GuiColor_Graph13,
+    GuiColor_Graph14,
+    GuiColor_Graph15,
+    GuiColor_Graph16,
+    GuiColor_Graph17,
+    GuiColor_Graph18,
+    GuiColor_Graph19,
+    GuiColor_Graph20,
+    GuiColor_Graph21,
+    GuiColor_Graph22,
+    GuiColor_Graph23,
+    GuiColor_Graph24,
+    GuiColor_Graph25,
+    GuiColor_Graph26,
+    GuiColor_Graph27,
+    GuiColor_Graph28,
+    GuiColor_Graph29,
+    GuiColor_Graph30,
+    GuiColor_Graph31,
+    GuiColor_GraphCount,
+    
+    
     GuiColor_Text,
     GuiColor_HotText,
     GuiColor_Borders,
+    GuiColor_SliderValue,
     
     GuiColor_Hot,
     GuiColor_Active,
     
-    GuiColor_ButtonBackground,
-    GuiColor_ButtonBackgroundHot,
-    GuiColor_ButtonForeground,
-    GuiColor_ButtonForegroundDisabled,
-    GuiColor_ButtonForegroundHot,
-    GuiColor_ButtonGrad1,
-    GuiColor_ButtonGrad2,
-    GuiColor_SliderValue,
+    GuiColor_ActiveGrad1,
+    GuiColor_ActiveGrad2,
+    GuiColor_InactiveGrad1,
+    GuiColor_InactiveGrad2,
     
-    GuiColor_WindowBackground,
-    GuiColor_WindowBorder,
-    GuiColor_WindowBorderHot,
-    GuiColor_WindowBorderActive,
+    GuiColor_HeaderActive,
+    GuiColor_HeaderInactive,
+    GuiColor_HeaderPreview,
+    
+    GuiColor_BodyActive,
+    GuiColor_BodyInactive,
+    GuiColor_BodyPreview,
+    
+    GuiColor_BackgroundActive,
+    GuiColor_BackgroundInactive,
+    GuiColor_BackgroundPreview,
+    
+    GuiColor_OutlineActive,
+    GuiColor_OutlineInactive,
+    GuiColor_OutlinePreview,
     
     GuiColor_Count,
 };
@@ -86,21 +129,33 @@ enum GuiAdvanceType{
 };
 
 struct GuiAdvanceCtx{
-    u32 type;
-    float rememberValue;
-    float baseline;
-    float maximum;
+    u32 Type;
+    float RememberValue;
+    float Baseline;
+    float Maximum;
     
-    float maxHorz;
-    float maxVert;
+    float MaxHorz;
+    float MaxVert;
 };
 
-enum Gui_Layout_Type{
-    GuiLayout_Layout,
-    GuiLayout_Window,
+struct beginned_dimension{
+    u32 Type;
+    v2 Dim;
 };
 
-struct Gui_Layout{
+enum begin_dimension_type{
+    BeginDimension_Width,
+    BeginDimension_Height,
+    BeginDimension_Both,
+};
+
+enum gui_layout_flags{
+    GuiLayout_Window = (1 << 0),
+    GuiLayout_Resize = (1 << 1),
+    GuiLayout_Move = (1 << 2),
+};
+
+struct gui_layout{
     v2 At;
     v2 Start;
     v2 Dim;
@@ -108,12 +163,15 @@ struct Gui_Layout{
     
     char Name[128];
     u32 ID;
-    u32 Type;
+    u32 Flags;
     
     struct gui_element* Elem;
     
-    Gui_Layout* Next;
-    Gui_Layout* Prev;
+    gui_layout* Next;
+    gui_layout* Prev;
+    
+    b32 DimensionIsBeginned;
+    beginned_dimension BeginnedDimension;
     
     GuiAdvanceCtx AdvanceRememberStack[16];
     int StackCurrentIndex;
@@ -128,7 +186,7 @@ struct Gui_Window{
     
     rc2 rect;
     
-    Gui_Layout layout;
+    gui_layout layout;
     
     b32 visible;
 };
@@ -185,8 +243,8 @@ enum gui_element_type{
     GuiElement_None,
     
     GuiElement_Root,
-    GuiElement_Page,
     GuiElement_ChildrenSentinel,
+    GuiElement_Tree,
     GuiElement_Item,
     GuiElement_TempItem,
     GuiElement_RowColumn,
@@ -198,6 +256,7 @@ enum gui_element_type{
 
 struct gui_element{
     char Name[64];
+    char NameToShow[64];
     
     struct {
         union{
@@ -207,12 +266,8 @@ struct gui_element{
             } RadioGroup;
             
             struct {
-                Gui_Layout* ref;
+                gui_layout* ref;
             } Layout;
-            
-            struct {
-                Gui_Page* ref;
-            } Page;
             
             struct {
                 int CaretPos;
@@ -231,11 +286,13 @@ struct gui_element{
     
     b32 Opened;
     int TmpCount;
+    int Depth;
     
     gui_element* parentInTree;
     
     u32 ID;
-    u32 type;
+    u32 InTreeID;
+    u32 Type;
     
     gui_element* Next;
     gui_element* Prev;
@@ -243,9 +300,9 @@ struct gui_element{
     gui_element* NextAlloc;
     gui_element* PrevAlloc;
     
-    gui_element* parent;
-    gui_element* childSentinel;
-    int childCount;
+    gui_element* Parent;
+    gui_element* ChildSentinel;
+    int ChildCount;
 };
 
 enum gui_interaction_type{
@@ -324,7 +381,7 @@ inline gui_interaction CreateInteraction(gui_element* Owner,
     Result.Owner = Owner;
     Result.Type = InteractionType;
     
-    Result.Context.ID = Owner->ID;
+    Result.Context.ID = Owner->InTreeID;
     Result.Context.Name = Owner->Name;
     Result.Context.Priority = Priority;
     
@@ -342,6 +399,8 @@ struct gui_frame_info{
 struct gui_state{
     assets* Assets;
     
+    b32 ShowGuiTest;
+    
     asset_id MainFontID;
     asset_id TileFontID;
     asset_id CheckboxMarkID;
@@ -350,7 +409,7 @@ struct gui_state{
     font_info* MainFont;
     font_info* TileFont;
     
-    float fontScale;
+    float FontScale;
     
     gui_frame_info FrameInfo;
     
@@ -364,15 +423,11 @@ struct gui_state{
     gui_interaction_ctx HotInteraction;
     gui_interaction_ctx ActiveInteraction;
     
-    Gui_Page rootPage;
-    Gui_Page* currentPage;
-    int pageCount;
-    
-    Gui_Layout rootLayout;
+    gui_layout rootLayout;
     int layoutCount;
     
-    gui_element* rootElement;
-    gui_element* curElement;
+    gui_element* RootElement;
+    gui_element* CurElement;
     
     gui_element* CurrentGridHub;
     
@@ -385,12 +440,12 @@ struct gui_state{
     Gui_Window* tempWindow2;
     
     int TotalAllocatedGuiElements;
-    gui_element freeSentinel;
-    gui_element useSentinel;
+    gui_element FreeSentinel;
+    gui_element UseSentinel;
     
 #define GUI_MAX_TOOLTIPS 256
-    Gui_Tooltip tooltips[GUI_MAX_TOOLTIPS];
-    int tooltipIndex;
+    Gui_Tooltip Tooltips[GUI_MAX_TOOLTIPS];
+    int TooltipIndex;
     
     Asset_Atlas* atlas;
     
@@ -404,25 +459,25 @@ inline gui_element*
 GuiFindElementOfTypeUpInTree(gui_element* curElement, u32 elementType) {
     gui_element* result = 0;
     
-    gui_element* at = curElement;
-    while (at != 0) {
-        if (at->type == elementType) {
-            result = at;
+    gui_element* At = curElement;
+    while (At != 0) {
+        if (At->Type == elementType) {
+            result = At;
             break;
         }
         
-        at = at->parent;
+        At = At->Parent;
     }
     
     return(result);
 }
 
 
-inline Gui_Layout* GetParentLayout(gui_state* Gui){
-    Gui_Layout* res = 0;
+inline gui_layout* GetParentLayout(gui_state* Gui){
+    gui_layout* res = 0;
     
     gui_element* layoutElem = GuiFindElementOfTypeUpInTree(
-        Gui->curElement, 
+        Gui->CurElement, 
         GuiElement_Layout);
     
     if(!layoutElem){
@@ -433,6 +488,12 @@ inline Gui_Layout* GetParentLayout(gui_state* Gui){
     }
     
     return(res);
+}
+
+inline v2 GetDimensionLeftInLayout(gui_layout* Layout){
+    v2 Result = Layout->Start + Layout->Dim - Layout->At;
+    
+    return(Result);
 }
 
 inline rc2 GetParentLayoutClipRect(gui_state* Gui){
@@ -511,8 +572,8 @@ inline void GuiGoToGrid(gui_state* Gui, char* GridName){
     u32 ID = StringHashFNV(GridName);
     
     b32 FoundWithName = false;
-    gui_element* AtGrid = Parent->childSentinel->Next;
-    while(AtGrid != Parent->childSentinel){
+    gui_element* AtGrid = Parent->ChildSentinel->Next;
+    while(AtGrid != Parent->ChildSentinel){
         
         if(AtGrid->ID == ID){
             FoundWithName = true;
@@ -527,23 +588,51 @@ inline void GuiGoToGrid(gui_state* Gui, char* GridName){
     }
 }
 
-inline rc2 GetTxtElemRect(gui_state* Gui, Gui_Layout* lay, rc2 txtRc){
-    rc2 tempTextRc = GrowRectByScaledValue(txtRc, V2(3.0f, 2.0f), Gui->fontScale);
-    txtRc.Max = txtRc.Min + GetRectDim(tempTextRc);
+inline rc2 GetTxtElemRect(gui_state* Gui, gui_layout* Layout, rc2 PrintedRect){
+    v2 AlignPoint = V2(0.0f, 0.0f);
     
-    return(txtRc);
+    //rc2 TempTextRc = GrowRectByScaledValue(PrintedRect, V2(3.0f, 2.0f), Gui->fontScale);
+    rc2 TempTextRc = PrintedRect;
+    v2 ResultDimension = GetRectDim(TempTextRc);
+    
+    if(Layout->DimensionIsBeginned){
+        v2 BeginnedDim = Layout->BeginnedDimension.Dim;
+        u32 BegDimType = Layout->BeginnedDimension.Type;
+        
+        if(BegDimType == BeginDimension_Width){
+            ResultDimension.x = BeginnedDim.x;
+        }
+        else if(BegDimType == BeginDimension_Height){
+            ResultDimension.y = BeginnedDim.y;
+        }
+        else if(BegDimType == BeginDimension_Both){
+            ResultDimension = BeginnedDim;
+        }
+    }
+    
+    rc2 Result = RcMinDim(PrintedRect.Min, ResultDimension);
+    
+    return(Result);
 }
 
 inline float GuiGetBaseline(gui_state* Gui, float Scale = 1.0f){
-    float res = GetBaseline(Gui->MainFont, Gui->fontScale * Scale);
+    float res = GetBaseline(Gui->MainFont, Gui->FontScale * Scale);
     
     return(res);
 }
 
 inline float GuiGetLineAdvance(gui_state* Gui, float Scale = 1.0f){
-    float res = GetLineAdvance(Gui->MainFont, Gui->fontScale * Scale);
+    float res = GetLineAdvance(Gui->MainFont, Gui->FontScale * Scale);
     
     return(res);
+}
+
+inline v2 ScaledAscDim(gui_state* Gui, v2 Dim){
+    v2 Result = V2(
+        GetScaledAscender(Gui->MainFont, Gui->FontScale * Dim.x),
+        GetScaledAscender(Gui->MainFont, Gui->FontScale * Dim.y));
+    
+    return(Result);
 }
 
 enum print_text_operation{
@@ -568,9 +657,6 @@ void GuiFrameEnd(gui_state* Gui);
 void GuiBeginLayout(gui_state* Gui, char* name, u32 layoutType, v2* P = 0, v2* Dim = 0);
 void GuiEndLayout(gui_state* Gui);
 
-void GuiBeginPage(gui_state* Gui, char* name);
-void GuiEndPage(gui_state* Gui);
-
 void GuiBeginRow(gui_state* Gui);
 void GuiEndRow(gui_state* Gui);
 void GuiBeginColumn(gui_state* Gui);
@@ -582,11 +668,12 @@ void GuiTooltip(gui_state* Gui, char* tooltipText, v2 at);
 void GuiText(gui_state* Gui, char* text);
 b32 GuiButton(gui_state* Gui, char* buttonName);
 b32 GuiLinkButton(gui_state* Gui, char* buttonName);
-void GuiBoolButton(gui_state* Gui, char* buttonName, b32* value);
-void GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value);
-void GuiCheckbox(gui_state* Gui, char* name, b32* value);
+b32 GuiBoolButton(gui_state* Gui, char* buttonName, b32* value);
+b32 GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value);
+b32 GuiCheckbox(gui_state* Gui, char* name, b32* value);
 void GuiShowBool(gui_state* Gui, char* Name, b32 Value);
 void GuiShowInt(gui_state* Gui, char* Name, int Value);
+void GuiShowFloat(gui_state* Gui, char* Name, float Value);
 
 void GuiBeginTree(gui_state* Gui, char* name);
 void GuiEndTree(gui_state* Gui);

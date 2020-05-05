@@ -1,115 +1,136 @@
 #ifndef JOY_DEBUG_H
 #define JOY_DEBUG_H
 
-#include "joy_defines.h"
-#include "joy_types.h"
-#include "joy_math.h"
-#include "joy_memory.h"
-#include "joy_render.h"
-
 #if defined(JOY_DEBUG_BUILD)
 
-struct debug_primitive_data_line{
-    v3 From;
-    v3 To;
+struct debug_window{
+    v2 P;
+    v2 Dim;
+    char Name[64];
 };
 
-struct debug_primitive_data_cross{
-    v3 CenterP;
-    f32 Size;
+struct debug_timing_snapshot{
+    u64 StartClockFirstEntry;
+    u64 StartClock;
+    u64 EndClock;
+    u64 ClocksElapsed;
+    u64 ClocksElapsedInChildren;
+    u32 HitCount;
 };
 
-struct debug_primitive_data_circle{
-    v3 CenterP;
-    f32 Radius;
-    // NOTE(Dima): 0 - X, 1 - Y, 2 - Z
-    u8 DirectionIndicator;
-};
-
-struct debug_primitive_data_axes{
-    v3 CenterP;
-    v3 Left;
-    v3 Up;
-    v3 Front;
-    float Size;
-};
-
-struct debug_primitive_data_triangle{
-    v3 P0;
-    v3 P1;
-    v3 P2;
-};
-
-struct debug_primitive_data_aabb{
-    v3 Min;
-    v3 Max;
-};
-
-struct debug_primitive_data_obb{
-    v3 CenterP;
-    v3 Left;
-    v3 Up;
-    v3 Front;
-    v3 ScaleXYZ;
-};
-
-enum debug_primitive_type{
-    DebugPrimitive_Line,
-    DebugPrimitive_Cross,
-    DebugPrimitive_Circle,
-    DebugPrimitive_Axes,
-    DebugPrimitive_Triangle,
-    DebugPrimitive_AABB,
-    DebugPrimitive_OBB,
-    DebugPrimitive_String,
-};
-
-struct debug_primitive{
-    v3 Color;
-    f32 Duration;
-    b32 DepthEnabled;
-    f32 LineWidth;
+struct debug_profiled_tree_node{
+    char* UniqueName;
+    u32 NameID;
     
-    u32 Type;
+    debug_profiled_tree_node* Parent;
+    debug_profiled_tree_node* ChildSentinel;
     
-    union{
-        debug_primitive_data_line Line;
-        debug_primitive_data_cross Cross;
-        debug_primitive_data_circle Circle;
-        debug_primitive_data_axes Axes;
-        debug_primitive_data_triangle Triangle;
-        debug_primitive_data_aabb AABB;
-        debug_primitive_data_obb OBB;
-    };
+    debug_profiled_tree_node* NextAlloc;
+    debug_profiled_tree_node* PrevAlloc;
     
-    debug_primitive* Next;
-    debug_primitive* Prev;
+    debug_profiled_tree_node* Next;
+    debug_profiled_tree_node* Prev;
+    
+    debug_timing_snapshot TimingSnapshot;
+};
+
+struct debug_timing_stat{
+    char* UniqueName;
+    u32 NameID;
+    
+    debug_timing_stat* Next;
+    debug_timing_stat* Prev;
+    
+    debug_timing_stat* NextInHash;
+    
+    struct{
+        u64 ClocksElapsed;
+        u64 ClocksElapsedInChildren;
+        u32 HitCount;
+    } Stat;
+};
+
+
+#define DEBUG_PROFILED_FRAMES_COUNT 256
+#define DEBUG_STATS_TABLE_SIZE 128
+#define DEBUG_STATS_TO_SORT_SIZE 1024
+
+struct debug_profiled_frame{
+    debug_profiled_tree_node RootTreeNodeUse;
+    debug_timing_stat StatUse;
+    
+    debug_timing_stat* StatTable[DEBUG_STATS_TABLE_SIZE];
+    
+    debug_timing_stat* ToSortStats[DEBUG_STATS_TO_SORT_SIZE];
+    int ToSortStatsCount;
+    
+    debug_profiled_tree_node* FrameUpdateNode;
+    debug_profiled_tree_node* CurNode;
+};
+
+enum debug_profile_menu_type{
+    DebugProfileMenu_TopClock,
+    DebugProfileMenu_TopClockEx,
+    DebugProfileMenu_RootNode,
 };
 
 struct debug_state{
     mem_region* Region;
     
     render_state* Render;
+    gui_state* Gui;
+    input_state* Input;
     
-#define DEBUG_CIRCLE_SEGMENTS 16
-    v3 CircleVerticesX[DEBUG_CIRCLE_SEGMENTS];
-    v3 CircleVerticesY[DEBUG_CIRCLE_SEGMENTS];
-    v3 CircleVerticesZ[DEBUG_CIRCLE_SEGMENTS];
+    debug_menu MenuDEBUG;
+    debug_menu MenuProfile;
+    debug_menu MenuLog;
     
-    debug_primitive PrimitiveUse;
-    debug_primitive PrimitiveFree;
-    int TotalAllocatedPrimitives;
+    // NOTE(Dima): Menus stuff 
+    b32 ShowDebugOverlay;
+    b32 ShowDebugMenus;
+    debug_window MainWindow;
+    
+    u32 ToShowMenuType;
+    
+    debug_menu Menus[DebugMenu_Count];
+    
+    // NOTE(Dima): Profiler stuff
+    int CollationFrameIndex;
+    int ViewFrameIndex;
+    
+    b32 TargetRecordingValue;
+    b32 RecordingChangeRequested;
+    
+    debug_profiled_tree_node TreeNodeFree;
+    debug_timing_stat StatFree;
+    
+    debug_profiled_frame ProfiledFrames[DEBUG_PROFILED_FRAMES_COUNT];
+    
+    u32 ToShowProfileMenuType;
+    
+    char RootNodesName[32];
+    char SentinelElementsName[32];
 };
 
-void DEBUGInit(debug_state* State,
-               render_state* Render);
 
-void DEBUGUpdate(debug_state* State, 
-                 f32 DeltaTime);
+inline debug_profiled_frame* 
+GetFrameByIndex(debug_state* State, int FrameIndex){
+    debug_profiled_frame* Frame = &State->ProfiledFrames[FrameIndex];
+    
+    return(Frame);
+}
 
-extern debug_state* DEBUGGlobalState;
 
-#else // NOTE(Dima): JOY_DEBUG_BUILD
+inline u64 GetClocksFromStat(debug_timing_stat* Stat, 
+                             b32 IncludingChildren)
+{
+    u64 Result = Stat->Stat.ClocksElapsed;
+    if(!IncludingChildren){
+        Result -= Stat->Stat.ClocksElapsedInChildren;
+    }
+    
+    return(Result);
+}
 
 #endif // NOTE(Dima): JOY_DEBUG_BUILD
 

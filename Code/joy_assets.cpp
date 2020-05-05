@@ -1,15 +1,3 @@
-#include "joy_assets.h"
-#include "joy_math.h"
-#include "joy_asset_util.h"
-#include "joy_software_renderer.h"
-
-#include <vector>
-#include <atomic>
-
-#define STB_SPRINTF_STATIC
-#define STB_SPRINTF_IMPLEMENTATION
-#include "stb_sprintf.h"
-
 INTERNAL_FUNCTION void AddBitmapToAtlas(Asset_Atlas* atlas, 
                                         bmp_info* bmp)
 {
@@ -655,7 +643,7 @@ inline asset* AllocateAsset(assets* Assets, asset_file_source* FileSource, u32 F
     return(Result);
 }
 
-void InitAssets(assets* Assets){
+INTERNAL_FUNCTION void InitAssets(assets* Assets){
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // NOTE(Dima): Memory region is already initialized
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -664,7 +652,7 @@ void InitAssets(assets* Assets){
     InitRandomGeneration(&Assets->Random, 123);
     
     // NOTE(Dima): Large atlas initialization
-    Assets->MainLargeAtlas = InitAtlas(Assets->Memory, 1024);
+    Assets->MainLargeAtlas = InitAtlas(Assets->Memory, 2048);
     
     // NOTE(Dima): Init asset layered memory to allocate asset types
     u32 LayersSizes[] = {64, 128, 256, 512, 1024, 2048, 4096};

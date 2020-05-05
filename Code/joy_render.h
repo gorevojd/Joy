@@ -44,12 +44,10 @@ struct render_gui_chunk{
     int IndicesCount;
     int StartIndicesCount;
     
+    int LinePointsCount;
+    int LinePointsBase;
+    
     rc2 ClipRect;
-};
-
-struct render_line_primitive{
-    v3 Start;
-    v3 End;
 };
 
 struct render_gui_geom{
@@ -65,12 +63,25 @@ struct render_gui_geom{
     int MaxIndicesCount;
     int MaxTriangleGeomTypesCount;
     
+    v2* LinePoints; // NOTE(Dima): Per-point
+    v4* LineColors; // NOTE(Dima): Per-line
+    int LinePointsCount;
+    int LineColorsCount;
+    
+    int MaxLinePointsCount;
+    int MaxLineColorsCount;
+    
     render_gui_chunk Chunks[MAX_GUI_CHUNKS];
     int CurChunkIndex;
     
     rc2 ClipRectStack[MAX_CLIP_RECT_STACK_DEPTH];
     int ClipRectStackIndex;
     
+};
+
+struct render_line_primitive{
+    v3 Start;
+    v3 End;
 };
 
 struct render_lines_chunk{
@@ -102,37 +113,6 @@ struct render_frame_info{
     bmp_info* SoftwareBuffer;
 };
 
-#define RENDER_PLATFORM_SWAPBUFFERS(name) void name()
-typedef RENDER_PLATFORM_SWAPBUFFERS(render_platform_swapbuffers);
-
-#define RENDER_PLATFORM_INIT(name) void name(struct assets* Assets)
-typedef RENDER_PLATFORM_INIT(render_platform_init);
-
-#define RENDER_PLATFORM_FREE(name) void name()
-typedef RENDER_PLATFORM_FREE(render_platform_free);
-
-#define RENDER_PLATFORM_RENDER(name) void name()
-typedef RENDER_PLATFORM_RENDER(render_platform_render);
-
-
-enum Renderer_Type{
-    Renderer_None,
-    
-    Renderer_OpenGL,
-    Renderer_Software,
-    Renderer_DirectX,
-    
-    Renderer_Count,
-};
-
-struct render_platform_api{
-    u32 RendererType;
-    
-    render_platform_swapbuffers* SwapBuffers;
-    render_platform_init* Init;
-    render_platform_free* Free;
-    render_platform_render* Render;
-};
 
 struct render_state{
     mem_region* MemRegion;
@@ -148,7 +128,6 @@ struct render_state{
     b32 FrameInfoIsSet;
     render_frame_info FrameInfo;
     
-    // NOTE(Dima): GUI geometry
     render_gui_geom GuiGeom;
     render_lines_geom LinesGeom;
 };
@@ -273,6 +252,31 @@ inline void PushLine(render_state* Render,
 {
     render_pushed_line_primitive Prim = BeginLinePrimitive(Render, 1, LineWidth, HasDepth);
     AddLine(&Prim, Start, End, ColorRGB);
+}
+
+inline void PushGuiLine(render_state* Render,
+                        v2 From, v2 To, v4 Color)
+{
+    render_gui_geom* Geom = &Render->GuiGeom;
+    
+    Geom->LinePoints[Geom->LinePointsCount++] = From;
+    Geom->LinePoints[Geom->LinePointsCount++] = To;
+    
+    Geom->LineColors[Geom->LineColorsCount++] = Color;
+}
+
+inline void PushGuiLineRect(render_state* Render,
+                            rc2 Rect, v4 Color)
+{
+    v2 P0 = Rect.Min;
+    v2 P1 = V2(Rect.Max.x, Rect.Min.y);
+    v2 P2 = Rect.Max;
+    v2 P3 = V2(Rect.Min.x, Rect.Max.y);
+    
+    PushGuiLine(Render, P0, P1, Color);
+    PushGuiLine(Render, P1, P2, Color);
+    PushGuiLine(Render, P2, P3, Color);
+    PushGuiLine(Render, P3, P0, Color);
 }
 
 inline void PushGuiGeom_Internal(render_gui_geom* Geom, 
@@ -610,27 +614,43 @@ inline void PushGuiChunk(render_stack* Stack, int ChunkIndex){
     Entry->ChunkIndex = ChunkIndex;
 }
 
-inline void BeginGuiChunk(render_stack* Stack, rc2 ClipRect){
-    render_gui_geom* Geom = &Stack->Render->GuiGeom;
+inline void BeginSetupChunk(render_stack* Stack, render_gui_geom* Geom){
     
-    int CurIndex = Geom->CurChunkIndex;
-    render_gui_chunk* CurChunk = &Geom->Chunks[CurIndex];
+    render_gui_chunk* CurChunk = &Geom->Chunks[Geom->CurChunkIndex];
     
     CurChunk->IndicesCount = Geom->IndicesCount - CurChunk->StartIndicesCount;
-    if(CurChunk->IndicesCount > 0){
-        PushGuiChunk(Stack, CurIndex);
+    CurChunk->LinePointsCount = Geom->LinePointsCount - CurChunk->LinePointsBase;
+    
+    if((CurChunk->IndicesCount > 0) ||
+       (CurChunk->LinePointsCount > 0))
+    {
+        PushGuiChunk(Stack, Geom->CurChunkIndex);
     }
     
     // NOTE(Dima): Advancing current chunk index
-    ASSERT(CurIndex + 1 < MAX_GUI_CHUNKS);
-    Geom->CurChunkIndex = CurIndex + 1;
+    ASSERT(Geom->CurChunkIndex + 1 < MAX_GUI_CHUNKS);
+    Geom->CurChunkIndex = Geom->CurChunkIndex + 1;
+}
+
+inline void SetupNewChunk(render_gui_geom* Geom, 
+                          rc2 ClipRect, 
+                          render_gui_chunk* Chunk)
+{
+    Chunk->IndicesCount = 0;
+    Chunk->LinePointsCount = 0;
+    Chunk->BaseVertex = Geom->VerticesCount;
+    Chunk->LinePointsBase = Geom->LinePointsCount;
+    Chunk->ClipRect = ClipRect;
+    Chunk->StartIndicesCount = Geom->IndicesCount;
+}
+
+inline void BeginGuiChunk(render_stack* Stack, rc2 ClipRect){
+    render_gui_geom* Geom = &Stack->Render->GuiGeom;
+    
+    BeginSetupChunk(Stack, Geom);
     
     // NOTE(Dima): Setting new chunk
-    render_gui_chunk* NewChunk = &Geom->Chunks[Geom->CurChunkIndex];
-    NewChunk->IndicesCount = 0;
-    NewChunk->BaseVertex = Geom->VerticesCount;
-    NewChunk->ClipRect = ClipRect;
-    NewChunk->StartIndicesCount = Geom->IndicesCount;
+    SetupNewChunk(Geom, ClipRect, &Geom->Chunks[Geom->CurChunkIndex]);
     
     // NOTE(Dima): Adding new clip rect to stack
     ++Geom->ClipRectStackIndex;
@@ -641,28 +661,16 @@ inline void BeginGuiChunk(render_stack* Stack, rc2 ClipRect){
 inline void EndGuiChunk(render_stack* Stack){
     render_gui_geom* Geom = &Stack->Render->GuiGeom;
     
-    int CurIndex = Geom->CurChunkIndex;
-    render_gui_chunk* CurChunk = &Geom->Chunks[CurIndex];
-    
-    CurChunk->IndicesCount = Geom->IndicesCount - CurChunk->StartIndicesCount;
-    if(CurChunk->IndicesCount > 0){
-        PushGuiChunk(Stack, CurIndex);
-    }
+    BeginSetupChunk(Stack, Geom);
     
     // NOTE(Dima): Popping last value from ClipRect's stack
     ASSERT(Geom->ClipRectStackIndex > 0);
     --Geom->ClipRectStackIndex;
     
-    // NOTE(Dima): Advancing current chunk index
-    ASSERT(CurIndex + 1 < MAX_GUI_CHUNKS);
-    Geom->CurChunkIndex = CurIndex + 1;
-    
     // NOTE(Dima): Setting new chunk
-    render_gui_chunk* NewChunk = &Geom->Chunks[Geom->CurChunkIndex];
-    NewChunk->IndicesCount = 0;
-    NewChunk->BaseVertex = Geom->VerticesCount;
-    NewChunk->ClipRect = Geom->ClipRectStack[Geom->ClipRectStackIndex];
-    NewChunk->StartIndicesCount = Geom->IndicesCount;
+    SetupNewChunk(Geom, 
+                  Geom->ClipRectStack[Geom->ClipRectStackIndex],
+                  &Geom->Chunks[Geom->CurChunkIndex]);
 }
 
 // NOTE(Dima): RENDERER API
@@ -672,17 +680,6 @@ inline void RenderSetFrameInfo(render_state* Render, render_frame_info FrameInfo
     
     Render->API.RendererType = FrameInfo.RendererType;
 }
-
-void RenderInit(render_state* Render, 
-                render_platform_api API);
-render_stack* RenderAddStack(render_state* Render, 
-                             char* Name, 
-                             mi Size = RENDER_DEFAULT_STACK_SIZE);
-render_stack* RenderFindStack(render_state* Render, char* Name);
-render_stack* RenderFindAddStack(render_state* Render, char* Name);
-
-void RenderBeginFrame(render_state* Render);
-void RenderEndFrame(render_state* Render);
 
 inline render_pass* BeginRenderPass(render_state* Render, 
                                     render_camera_setup CameraSetup)
@@ -702,11 +699,5 @@ inline void AddStackToRenderPass(render_pass* Pass, render_stack* Stack){
     
     Pass->Stacks[Pass->StacksCount++] = Stack;
 }
-
-render_camera_setup SetupCamera(const m44& Projection, 
-                                const m44& View, 
-                                int FramebufferWidth,
-                                int FramebufferHeight, 
-                                b32 CalcFrustumPlanes = false);
 
 #endif

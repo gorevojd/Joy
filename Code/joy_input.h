@@ -1,20 +1,29 @@
 #ifndef JOY_INPUT_H
 #define JOY_INPUT_H
 
-#include "joy_types.h"
-#include "joy_math.h"
-#include "joy_memory.h"
-#include "joy_strings.h"
-
-#define INPUT_PLATFORM_PROCESS(name) void name()
-typedef INPUT_PLATFORM_PROCESS(input_platform_process);
-
 enum move_axis_type{
     MoveAxis_Horizontal,
     MoveAxis_Vertical,
     
     MoveAxis_MouseX,
     MoveAxis_MouseY,
+};
+
+enum function_key_type{
+    FuncKey_F1, 
+    FuncKey_F2,
+    FuncKey_F3,
+    FuncKey_F4,
+    FuncKey_F5,
+    FuncKey_F6,
+    FuncKey_F7,
+    FuncKey_F8,
+    FuncKey_F9,
+    FuncKey_F10,
+    FuncKey_F11,
+    FuncKey_F12,
+    
+    FuncKey_Count,
 };
 
 enum KeyType{
@@ -135,6 +144,8 @@ struct key_state{
 
 struct keyboard_controller{
     key_state KeyStates[Key_Count];
+    b32 FunctionKeysWasPressed[FuncKey_Count];
+    b32 AltIsDown;
 };
 
 enum gamepad_key_type{
@@ -240,7 +251,7 @@ struct input_controller{
         keyboard_controller* Keyboard;
     };
     
-    u32 ControllerSource;
+    u32 ControllerSourceType;
     
     u32 GamepadIndex;
 };

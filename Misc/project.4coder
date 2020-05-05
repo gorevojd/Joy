@@ -36,6 +36,19 @@ command_list = {
 	},
 
 	{
+		.name = "build_other",
+		.out = "*compilation*",
+		.footer_panel = false,
+		.save_dirty_files = true,
+		.cursor_at_end = true,
+		.cmd = {
+			{
+				"..\\Code\\build_other.bat", .os = "win"
+			},
+		},
+	},
+
+	{
 		.name = "run",
 		.out = "*run*",
 		.footer_panel = false,
@@ -77,6 +90,7 @@ command_list = {
 };
 
 fkey_command[1] = "build";
-fkey_command[2] = "run";
-fkey_command[3] = "run_asset_build";
-fkey_command[4] = "run_assimp_build";
+fkey_command[2] = "build_other";
+fkey_command[5] = "run";
+fkey_command[6] = "run_asset_build";
+fkey_command[7] = "run_assimp_build";

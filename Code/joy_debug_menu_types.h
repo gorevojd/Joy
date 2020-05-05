@@ -1,0 +1,4 @@
+#ifndef JOY_DEBUG_MENU_TYPES_H
+#define JOY_DEBUG_MENU_TYPES_H
+
+#endif

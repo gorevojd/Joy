@@ -4,10 +4,6 @@
 
 #include <intrin.h>
 
-#define STB_SPRINTF_STATIC
-#define STB_SPRINTF_IMPLEMENTATION
-#include "stb_sprintf.h"
-
 void SoftwareRenderStackToOutput(render_stack* stack, bmp_info* buf, rc2 clipRect){
     u8* at = (u8*)stack->MemRegion.CreationBlock.Base;
 	u8* stackEnd = (u8*)stack->MemRegion.CreationBlock.Base + stack->MemRegion.CreationBlock.Used;

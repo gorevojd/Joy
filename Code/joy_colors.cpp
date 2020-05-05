@@ -58,6 +58,15 @@ static void InitDefaultColors(Color_State* colorState){
     JOY_SET_COLOR(Indigo,  ColorFromHex("#4b0082"));
     JOY_SET_COLOR(SlateBlue,  ColorFromHex("#6a5acd"));
     JOY_SET_COLOR(DarkSlateBlue,  ColorFromHex("#483d8b"));
+    
+    JOY_SET_COLOR(UltraViolet,  ColorFromHex("#7E42F5"));
+    JOY_SET_COLOR(NeoMint,  ColorFromHex("#29FFC9"));
+    JOY_SET_COLOR(BurntOrange,  ColorFromHex("#FF5114"));
+    JOY_SET_COLOR(Preview,  ColorFromHex("#282834"));
+    JOY_SET_COLOR(Obsidian,  ColorFromHex("#201E20"));
+    JOY_SET_COLOR(MayaBlue,  ColorFromHex("#63D3F9"));
+    JOY_SET_COLOR(MidnightBlue,  ColorFromHex("#141246"));
+    JOY_SET_COLOR(Haiti, ColorFromHex("#282834"));
 }
 
 #define JOY_SET_EXTCOLOR(colorname, v4color) colorState->colorTable[ColorExt_##colorname] = CreateColorSlot(colorState, v4color, #colorname)

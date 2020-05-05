@@ -5,7 +5,6 @@
 #include "joy_types.h"
 #include "joy_asset_types.h"
 
-
 inline bmp_info AllocateBitmapInternal(u32 Width, u32 Height, void* pixelsData) {
 	bmp_info res = {};
     
@@ -21,11 +20,9 @@ inline bmp_info AllocateBitmapInternal(u32 Width, u32 Height, void* pixelsData) 
 }
 
 inline void AllocateBitmapInternal(bmp_info* Bmp, u32 Width, u32 Height, void* PixelsData){
-    
     if(Bmp){
         *Bmp = AllocateBitmapInternal(Width, Height, PixelsData);
     }
-    
 }
 
 #endif

@@ -181,6 +181,38 @@ typedef PLATFORM_FILE_OFFSET_READ(platform_file_offset_read);
 #define PLATFORM_PROCESS_INPUT(name) void name(struct input_state* Input)
 typedef PLATFORM_PROCESS_INPUT(platform_process_input);
 
+
+enum renderer_type{
+    Renderer_None,
+    
+    Renderer_OpenGL,
+    Renderer_Software,
+    Renderer_DirectX,
+    
+    Renderer_Count,
+};
+
+#define RENDER_PLATFORM_SWAPBUFFERS(name) void name()
+typedef RENDER_PLATFORM_SWAPBUFFERS(render_platform_swapbuffers);
+
+#define RENDER_PLATFORM_INIT(name) void name(struct assets* Assets)
+typedef RENDER_PLATFORM_INIT(render_platform_init);
+
+#define RENDER_PLATFORM_FREE(name) void name()
+typedef RENDER_PLATFORM_FREE(render_platform_free);
+
+#define RENDER_PLATFORM_RENDER(name) void name()
+typedef RENDER_PLATFORM_RENDER(render_platform_render);
+
+struct render_platform_api{
+    u32 RendererType;
+    
+    render_platform_swapbuffers* SwapBuffers;
+    render_platform_init* Init;
+    render_platform_free* Free;
+    render_platform_render* Render;
+};
+
 struct platform_api{
     Platform_Read_File* ReadFile;
     Platform_Write_File* WriteFile;
@@ -209,6 +241,9 @@ struct platform_api{
     
     Platform_Add_Entry* AddEntry;
     Platform_Wait_For_Completion* WaitForCompletion;
+    
+    render_platform_api RenderAPI;
+    //input_platform_process* ProcessInput;
     
     platform_process_input* ProcessInput;
 };

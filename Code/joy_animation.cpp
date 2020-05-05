@@ -1,5 +1,3 @@
-#include "joy_animation.h"
-
 INTERNAL_FUNCTION int FindPrevFrameIndexForKey(float* Times, 
                                                int KeysCount, 
                                                f32 CurTickTime)
@@ -180,6 +178,8 @@ INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
                                               f64 CurrentTime,
                                               f32 PlaybackRate)
 {
+    FUNCTION_TIMING();
+    
     // NOTE(Dima): Updating animation
     if(Animation){
         for(int NodeIndex = 0;
@@ -317,6 +317,8 @@ INTERNAL_FUNCTION void UpdateAnimController(assets* Assets,
                                             f32 DeltaTime,
                                             f32 PlaybackRate)
 {
+    FUNCTION_TIMING();
+    
     if(AC){
         if(AC->PlayingStatesCount > 0){
             
@@ -546,6 +548,8 @@ INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(assets* Assets,
                                                                  model_info* Model, 
                                                                  anim_controller* Control)
 {
+    FUNCTION_TIMING();
+    
     anim_calculated_pose Result = {};
     
     int BoneCount = 0;
@@ -591,6 +595,8 @@ anim_calculated_pose UpdateModelAnimation(assets* Assets,
                                           f32 DeltaTime,
                                           f32 PlaybackRate)
 {
+    FUNCTION_TIMING();
+    
     // NOTE(Dima): Resetting ToParent transforms to default
     ResetToParentTransforms(Model);
     
@@ -646,9 +652,12 @@ INTERNAL_FUNCTION anim_controller* DeallocateAnimController(anim_system* Anim,
 }
 
 anim_controller* CreateAnimControl(anim_system* Anim, 
+                                   char* Name, 
                                    u32 NodesCheckSum)
 {
     anim_controller* Result = AllocateAnimController(Anim);
+    
+    CopyStringsSafe(Result->Name, sizeof(Result->Name), Name);
     
     // NOTE(Dima): Initialize beginned transition to 0
     Result->BeginnedTransition = 0;
@@ -1090,4 +1099,10 @@ void InitAnimSystem(anim_system* Anim)
     // NOTE(Dima): Initializing transitions sentinels
     DLIST_REFLECT_PTRS(Anim->TransitionUse, NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(Anim->TransitionFree, NextAlloc, PrevAlloc);
+    
+    DEBUGSetMenuDataSource(DebugMenu_Animation, Anim);
 }
+
+#if defined(JOY_DEBUG_BUILD)
+
+#endif

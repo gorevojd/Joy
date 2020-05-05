@@ -104,6 +104,15 @@ struct gl_guigeom_shader{
     GLint CAttrLoc;
 };
 
+struct gl_guigeom_lines_shader{
+    gl_shader Shader;
+    
+    GLint ProjectionLoc;
+    GLint ColorsTextureLoc;
+    
+    GLint PAttrLoc;
+};
+
 struct gl_lines_shader{
     gl_shader Shader;
     
@@ -123,6 +132,7 @@ struct gl_state{
     gl_simple_shader SimpleShader;
     gl_guirect_shader GuiRectShader;
     gl_guigeom_shader GuiGeomShader;
+    gl_guigeom_lines_shader GuiLinesShader;
     gl_lines_shader LinesShader;
     
     GLuint ScreenVAO;
@@ -131,24 +141,27 @@ struct gl_state{
     GLuint MeshVAO;
     GLuint MeshVBO;
     
+    GLuint GuiRectVAO;
+    GLuint GuiRectVBO;
+    
+    // NOTE(Dima): Lines geometry
     GLuint LinesVAO;
     // NOTE(Dima): 0 - with depth, 1 - no-depth
     GLuint LinesVBO[2];
     GLuint LinesTBO[2];
     
+    // NOTE(Dima): Gui geometry
     GLuint GuiGeomVAO;
     GLuint GuiGeomVBO;
     GLuint GuiGeomEBO;
     GLuint GuiGeomTB;
     
-    GLuint GuiRectVAO;
-    GLuint GuiRectVBO;
+    // NOTE(Dima): Gui lines geometry
+    GLuint GuiLinesVAO;
+    GLuint GuiLinesVBO;
+    GLuint GuiLinesColorsTBO;
     
     m44 GuiOrtho;
 };
-
-void GlInit(gl_state* gl, assets* Assets);
-void GlFree(gl_state* gl);
-void GlOutputRender(gl_state* GL, render_state* Render);
 
 #endif

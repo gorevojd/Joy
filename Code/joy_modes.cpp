@@ -1,18 +1,11 @@
-#include "joy_modes.h"
-
-#include "joy_math.h"
-#include "joy_asset_types.h"
-#include "joy_gui.h"
-#include "joy_render.h"
-#include "joy_camera.h"
-#include "joy_assets_render.h"
-#include "joy_random.h"
-#include "joy_animation.h"
-#include "joy_debug_api.h"
-
-#define STB_SPRINTF_STATIC
-#define STB_SPRINTF_IMPLEMENTATION
-#include "stb_sprintf.h"
+struct game_camera{
+    v3 P;
+    v3 dP;
+    
+    Euler_Angles Angles;
+    
+    quat Rotation;
+};
 
 struct sphere_distribution{
     int Count;
@@ -21,12 +14,78 @@ struct sphere_distribution{
     v3 *Samples;
 };
 
+struct test_game_mode_state{
+    game_camera Camera;
+    
+    float CameraSpeed;
+    float MouseSencitivity;
+    
+    v3* SphereDistributionsTrig;
+    v3* SphereDistributionsFib;
+    sphere_distribution SphereDistributionTrig;
+    sphere_distribution SphereDistributionFib;
+    
+#if 0    
+    playing_anim Anim0;
+    playing_anim Anim1;
+    anim_controller AC;
+#endif
+    
+    playing_anim TestAnim;
+    anim_controller TestAC;
+    
+    anim_controller* PlayerAC;
+    
+    b32 Initialized;
+};
+
+struct image_swapper_state{
+    float FadeoutTime;
+    float ShowTime;
+    int ShowIndex;
+    int ShowNextIndex;
+    float TimeSinceShow;
+    float ShowSpeed;
+    
+    b32 Initialized;
+};
+
+// NOTE(Dima): Updating camera rotation 
+void UpdateCameraRotation(game_camera* camera,
+                          float dPitch,
+                          float dYaw,
+                          float dRoll)
+{
+    float LockEdge = 89.0f * JOY_DEG2RAD;
+    
+    camera->Angles.Pitch += dPitch * JOY_DEG2RAD;
+    camera->Angles.Yaw += dYaw * JOY_DEG2RAD;
+    camera->Angles.Roll += dRoll * JOY_DEG2RAD;
+    
+    camera->Angles.Pitch = Clamp(camera->Angles.Pitch, -LockEdge, LockEdge);
+    
+    v3 Front;
+    Front.x = Sin(camera->Angles.Yaw) * Cos(camera->Angles.Pitch);
+    Front.y = Sin(camera->Angles.Pitch);
+    Front.z = Cos(camera->Angles.Yaw) * Cos(camera->Angles.Pitch);
+    Front = NOZ(Front);
+    
+    camera->Rotation = QuatLookAt(Front, V3(0.0f, 1.0f, 0.0f));
+}
+
+// NOTE(Dima): Look at matrix
+m44 GetCameraMatrix(game_camera* camera){
+    m44 Result = InverseTranslationMatrix(camera->P) * Transpose(Quat2M44(camera->Rotation));
+    
+    return(Result);
+}
+
 // NOTE(Dima): Returns how manu distributions were actually generated
 // NOTE(Dima): Should not return more than ToGenerateEstimateCount
 #define GEN_SPHERE_DISTRIBUTION_CALLBACK(name) int name(int ToGenerateEstimateCount, v3* Samples)
 typedef GEN_SPHERE_DISTRIBUTION_CALLBACK(gen_sphere_distribution_callback);
 
-GEN_SPHERE_DISTRIBUTION_CALLBACK(GenFibonacciSphereDistributions){
+INTERNAL_FUNCTION GEN_SPHERE_DISTRIBUTION_CALLBACK(GenFibonacciSphereDistributions){
     int Result = ToGenerateEstimateCount;
     
     float GoldenRatio = (1.0f + Sqrt(5.0f)) * 0.5f;
@@ -58,7 +117,7 @@ GEN_SPHERE_DISTRIBUTION_CALLBACK(GenFibonacciSphereDistributions){
     return(Result);
 }
 
-GEN_SPHERE_DISTRIBUTION_CALLBACK(GenTrigonometricSphereDistributions){
+INTERNAL_FUNCTION GEN_SPHERE_DISTRIBUTION_CALLBACK(GenTrigonometricSphereDistributions){
     int SideCount = (int)Sqrt(ToGenerateEstimateCount);
     
     int ResultCount = SideCount * SideCount;
@@ -146,7 +205,7 @@ INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
 
 INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitPlayerAC)
 {
-    anim_controller* AC = CreateAnimControl(Anim, NodesCheckSum);
+    anim_controller* AC = CreateAnimControl(Anim, "PlayerAC", NodesCheckSum);
     
     // NOTE(Dima): Adding animation nodes
     AddAnimState(AC, AnimState_Animation, "Idle");
@@ -198,6 +257,8 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
                                    anim_controller* AC,
                                    v3 AlbedoColor)
 {
+    FUNCTION_TIMING();
+    
     asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
     
     anim_calculated_pose CalcPose = UpdateModelAnimation(Assets, Model, AC,
@@ -232,34 +293,10 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
     }
 }
 
-struct test_game_mode_state{
-    game_camera Camera;
-    
-    float CameraSpeed;
-    float MouseSencitivity;
-    
-    v3* SphereDistributionsTrig;
-    v3* SphereDistributionsFib;
-    sphere_distribution SphereDistributionTrig;
-    sphere_distribution SphereDistributionFib;
-    
-#if 0    
-    playing_anim Anim0;
-    playing_anim Anim1;
-    anim_controller AC;
-#endif
-    
-    playing_anim TestAnim;
-    anim_controller TestAC;
-    
-    anim_controller* PlayerAC;
-    
-    b32 Initialized;
-};
-
-
 // NOTE(Dima): TEST GAME MODE
 GAME_MODE_UPDATE(TestUpdate){
+    FUNCTION_TIMING();
+    
     GAME_GET_MODE_STATE(test_game_mode_state, State);
     
     if(!State->Initialized){
@@ -333,12 +370,10 @@ GAME_MODE_UPDATE(TestUpdate){
     int Width = Game->Render->FrameInfo.Width;
     int Height = Game->Render->FrameInfo.Height;
     
-    render_camera_setup CamSetup = SetupCamera(PerspectiveProjection(Width, 
-                                                                     Height, 
+    render_camera_setup CamSetup = SetupCamera(PerspectiveProjection(Width, Height, 
                                                                      1000.0f, 0.01f),
                                                CameraTransform,
-                                               Width,
-                                               Height);
+                                               Width, Height, true);
     
     render_pass* Pass = BeginRenderPass(Game->Render, CamSetup);
     render_stack* Stack = RenderFindStack(Game->Render, "Main");
@@ -364,7 +399,8 @@ GAME_MODE_UPDATE(TestUpdate){
                   DeltaMouseY);
     GuiText(Game->Gui, MouseInfo);
     
-    GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
+    static b32 TestingBool;
+    GuiBoolButton(Game->Gui, "TestingBoolButton", &TestingBool);
     
     static float FindSphereQuality = 0.5f;
     GuiSliderFloat(Game->Gui, 
@@ -389,6 +425,7 @@ GAME_MODE_UPDATE(TestUpdate){
     
     u32 StoolID = GetFirst(Game->Assets, GameAsset_Stool);
     
+#if 0    
     DEBUGAddLine(V3(-10, 10, 10),
                  V3(10, 10, 10),
                  V3(1.0f, 0.0f, 0.0f),
@@ -398,7 +435,6 @@ GAME_MODE_UPDATE(TestUpdate){
                   V3(0.0f, 1.0f, 0.0f),
                   1.0f);
     
-#if 1    
     DEBUGAddCircleX(V3(5.0f, 10.0f, 10.0f),
                     V3(1.0f, 0.0f, 0.0f),
                     1.0f);
@@ -418,7 +454,7 @@ GAME_MODE_UPDATE(TestUpdate){
                    1.0f, 0.0f,
                    false);
     
-#if 1    
+#if 0    
     int SideSize = 100;
     for(int i = 0; i < SideSize; i++){
         for(int j = 0; j < SideSize; j++){
@@ -489,30 +525,6 @@ GAME_MODE_UPDATE(TestUpdate){
                     Game->Input->DeltaTime,
                     State->PlayerAC,
                     V3(1.0f, 0.6f, 0.0f));
-        
-        anim_controller* Control = State->PlayerAC;
-        gui_state* Gui = Game->Gui;
-        
-        v2 P = V2(100.0f, 400.0f);
-        GuiBeginLayout(Gui, "Show anim control", GuiLayout_Layout, &P, 0);
-        GuiShowInt(Gui, "Playing states count", Control->PlayingStatesCount);
-        GuiShowBool(Gui, "In transition", Control->PlayingStatesCount == 2);
-        
-        for(int PlayingStateIndex = 0;
-            PlayingStateIndex < Control->PlayingStatesCount;
-            PlayingStateIndex++)
-        {
-            char BufToShow[64];
-            stbsp_sprintf(BufToShow, "%d state name: %s", PlayingStateIndex,
-                          Control->PlayingStates[PlayingStateIndex]->Name);
-            
-            GuiText(Gui, BufToShow);
-            
-            GuiProgress01(Gui, "Anim phase", 
-                          Control->PlayingStates[PlayingStateIndex]->PlayingAnimation.Phase01);
-        }
-        
-        GuiEndLayout(Gui);
     }
     
     
@@ -677,17 +689,6 @@ GAME_MODE_UPDATE(TestUpdate){
 GAME_MODE_UPDATE(MainMenuUpdate){
     
 }
-
-struct image_swapper_state{
-    float FadeoutTime;
-    float ShowTime;
-    int ShowIndex;
-    int ShowNextIndex;
-    float TimeSinceShow;
-    float ShowSpeed;
-    
-    b32 Initialized;
-};
 
 // NOTE(Dima): Changing pictures GAME MODE
 GAME_MODE_UPDATE(ChangingPicturesUpdate){

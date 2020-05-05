@@ -1,6 +1,3 @@
-#include "joy_input.h"
-
-
 INTERNAL_FUNCTION inline void _AddKeyToButOnCont(input_controller* Cont, u32 Button, u32 BoardOrPadKey){
     ASSERT(MAX_KEYS_PER_BUTTON > Cont->Buttons[Button].KeyCount);
     
@@ -19,7 +16,7 @@ INTERNAL_FUNCTION inline void MapGamepadOnInputController(input_state* Input, in
 {
     input_controller* Cont = &Input->Controllers[ControllerIndex];
     
-    Cont->ControllerSource = InputControllerSource_Gamepad;
+    Cont->ControllerSourceType = InputControllerSource_Gamepad;
     Cont->GamepadIndex = GamepadIndex;
     
     _AddKeyToButOnCont(Cont, Button_Down, GamepadKey_DpadDown);
@@ -113,7 +110,7 @@ INTERNAL_FUNCTION inline float _GetMoveAxisOnController(input_state* Input, inpu
     if(Axis == MoveAxis_Horizontal ||
        Axis == MoveAxis_Vertical)
     {
-        switch(Cont->ControllerSource){
+        switch(Cont->ControllerSourceType){
             case InputControllerSource_Gamepad:{
                 gamepad_stick* PadStick = &Input->GamepadControllers[Cont->GamepadIndex].LeftStick;
                 
@@ -148,7 +145,7 @@ INTERNAL_FUNCTION inline float _GetMoveAxisOnController(input_state* Input, inpu
     else if ((Axis == MoveAxis_MouseX) ||
              (Axis == MoveAxis_MouseY))
     {
-        switch(Cont->ControllerSource){
+        switch(Cont->ControllerSourceType){
             case InputControllerSource_Gamepad:{
                 gamepad_stick* PadStick = &Input->GamepadControllers[Cont->GamepadIndex].RightStick;
                 
@@ -233,7 +230,7 @@ void InitInput(input_state* Input)
         ControllerIndex < MAX_CONTROLLER_COUNT;
         ControllerIndex++)
     {
-        Input->Controllers[ControllerIndex].ControllerSource = InputcontrollerSource_None;
+        Input->Controllers[ControllerIndex].ControllerSourceType = InputcontrollerSource_None;
     }
     
     for(int GamepadIndex = 0; 
@@ -260,8 +257,8 @@ void InitInput(input_state* Input)
         CopyStrings(Pad->Keys[GamepadKey_Y].Name, "Y");
     }
     
-    Input->Controllers[0].ControllerSource = InputControllerSource_Keyboard;
-    Input->Controllers[1].ControllerSource = InputControllerSource_Keyboard;
+    Input->Controllers[0].ControllerSourceType = InputControllerSource_Keyboard;
+    Input->Controllers[1].ControllerSourceType = InputControllerSource_Keyboard;
     
     MapGamepadOnInputController(Input, 2, 0);
     MapGamepadOnInputController(Input, 3, 1);

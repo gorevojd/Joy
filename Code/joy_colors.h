@@ -98,6 +98,17 @@ enum ColorTableType {
     Color_SlateBlue,
     Color_DarkSlateBlue,
     
+    Color_UltraViolet,
+    Color_NeoMint,
+    Color_BurntOrange,
+    Color_Preview,
+    Color_Obsidian,
+    Color_MayaBlue,
+    Color_MidnightBlue,
+    Color_WhiteFA,
+    Color_TitanWhite,
+    Color_Haiti,
+    
 	ColorExt_AliceBlue,
 	ColorExt_AntiqueWhite,
 	ColorExt_AntiqueWhite1,

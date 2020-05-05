@@ -1,12 +1,18 @@
+#include "joy.cpp"
+
 #include "win32_joy.h"
+
+#include "joy_opengl.cpp"
 
 #if JOY_USE_DIRECTX
 #include "joy_dirx.h"
 #endif
 
+#if 0
 #define STB_SPRINTF_STATIC
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
+#endif
 
 /*
 dima privet , kak dela? i tebia lybly
@@ -30,6 +36,9 @@ GLOBAL_VARIABLE DirX_State GlobalDirX;
 #endif
 
 platform_api Platform;
+#if defined(JOY_DEBUG_BUILD)
+debug_global_table* DEBUGGlobalTable;
+#endif
 
 BOOL CALLBACK DirectSoundEnumerateCallback( 
 LPGUID lpGuid, 
@@ -1681,6 +1690,7 @@ Win32ProcessMessages(input_state* Input){
                 b32 altKeyWasDown = ((msg.lParam & (1 << 29)) != 0);
                 int RepeatCount = msg.lParam & 0xFFFF;
                 
+                
                 //NOTE(dima): If state of key was changed
                 u32 keyType = 0xFFFFFFFF;
                 
@@ -1784,6 +1794,10 @@ Win32ProcessMessages(input_state* Input){
                     
                     if(isDown){
                         
+                        if(vKey >= VK_F1 && vKey <= VK_F2){
+                            Input->Keyboard.FunctionKeysWasPressed[vKey - VK_F1] = true;
+                        }
+                        
                         if(altKeyWasDown && vKey == VK_F4){
                             GlobalRunning = 0;
                         }
@@ -1797,6 +1811,8 @@ Win32ProcessMessages(input_state* Input){
                 if(keyType != 0xFFFFFFFF){
                     Win32ProcessKey(&Input->Keyboard.KeyStates[keyType], isDown, RepeatCount);
                 }
+                
+                Input->Keyboard.AltIsDown = altKeyWasDown;
                 
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
@@ -2074,7 +2090,7 @@ Win32ProcessInput(input_state* Input)
                 
                 u32 KeyIndex = But->Keys[ButKeyIndex];
                 
-                switch(Cont->ControllerSource){
+                switch(Cont->ControllerSourceType){
                     case InputControllerSource_Keyboard:{
                         CorrespondingKey = &Input->Keyboard.KeyStates[KeyIndex];
                     }break;
@@ -2116,16 +2132,21 @@ Win32ProcessInput(input_state* Input)
     }
 }
 
-INPUT_PLATFORM_PROCESS(Win32PlatformInputProcess){
-    input_state* Input = GlobalGame->Input;
+PLATFORM_PROCESS_INPUT(Win32PlatformInputProcess){
     
     // NOTE(Dima): Char input
     Input->FrameInput[0] = 0;
     Input->FrameInputLen = 0;
     
+    // NOTE(Dima): Clear keyboard button states
     for(int keyIndex = 0; keyIndex < Key_Count; keyIndex++){
         Input->Keyboard.KeyStates[keyIndex].TransitionHappened = 0;
         Input->Keyboard.KeyStates[keyIndex].RepeatCount = 0;
+    }
+    
+    // NOTE(Dima): Clear keyboard function keys states
+    for(int KeyIndex = 0; KeyIndex < FuncKey_Count; KeyIndex++){
+        Input->Keyboard.FunctionKeysWasPressed[KeyIndex] = false;
     }
     
 #if 0    
@@ -2141,9 +2162,9 @@ INPUT_PLATFORM_PROCESS(Win32PlatformInputProcess){
     }
 #endif
     
-    Win32ProcessMessages(GlobalGame->Input);
+    Win32ProcessMessages(Input);
     
-    Win32ProcessInput(GlobalGame->Input);
+    Win32ProcessInput(Input);
 }
 
 INTERNAL_FUNCTION u32 UTF8_Sequence_Size_For_UCS4(u32 u)
@@ -2322,20 +2343,41 @@ INTERNAL_FUNCTION void Win32InitWindow(HINSTANCE Instance,
     
 }
 
-int APIENTRY WinMain(HINSTANCE hInstance,
-                     HINSTANCE hPrevInstance,
-                     LPSTR     lpCmdLine,
-                     int       nCmdShow)
-{
+INTERNAL_FUNCTION void Win32InitInternalCriticalSections(){
     //NOTE(Dima): Setting critical sections
     for(int i = 0; i < MAX_CRITICAL_SECTIONS_COUNT; i++){
         GlobalWin32.NotUsedCriticalSectionIndices[i] = i;
     }
     GlobalWin32.NotUsedCriticalSectionIndicesCount = MAX_CRITICAL_SECTIONS_COUNT;
+}
+
+int APIENTRY WinMain(HINSTANCE hInstance,
+                     HINSTANCE hPrevInstance,
+                     LPSTR     lpCmdLine,
+                     int       nCmdShow)
+{
+    Win32InitInternalCriticalSections();
     
     // NOTE(Dima): Initializing platform API
     InitJobQueue(&Platform.highPriorityQueue, 2048, 8);
     InitJobQueue(&Platform.lowPriorityQueue, 2048, 4);
+    
+    // TODO(Dima): Add array of count Renderer_Count and init all renderers
+    // TODO(Dima): Or leave if not supported
+    // NOTE(Dima): Init render API
+    render_platform_api RenderPlatformAPI = {};
+    RenderPlatformAPI.RendererType = Renderer_OpenGL;
+    RenderPlatformAPI.SwapBuffers = Win32OpenGLSwapBuffers;
+    RenderPlatformAPI.Init = Win32OpenGLRenderInit;
+    RenderPlatformAPI.Free = Win32OpenGLRenderFree;
+    RenderPlatformAPI.Render = Win32OpenGLRender;
+    
+    render_platform_api* RenderAPI = &Platform.RenderAPI;
+    RenderAPI->RendererType = Renderer_OpenGL;
+    RenderAPI->SwapBuffers = Win32OpenGLSwapBuffers;
+    RenderAPI->Init = Win32OpenGLRenderInit;
+    RenderAPI->Free = Win32OpenGLRenderFree;
+    RenderAPI->Render = Win32OpenGLRender;
     
     Platform.AddEntry = PlatformAddEntry;
     Platform.WaitForCompletion = PlatformWaitForCompletion;
@@ -2356,26 +2398,18 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     Platform.LockMutex = Win32LockMutex;
     Platform.UnlockMutex = Win32UnlockMutex;
     Platform.FreeMutex = Win32FreeMutex;
+    Platform.ProcessInput = Win32PlatformInputProcess;
     
     // NOTE(Dima): Initializing memory sentinel
     GlobalWin32.memorySentinel = {};
     GlobalWin32.memorySentinel.Prev = &GlobalWin32.memorySentinel;
     GlobalWin32.memorySentinel.Next = &GlobalWin32.memorySentinel;
     
-    // TODO(Dima): Add array of count Renderer_Count and init all renderers
-    // TODO(Dima): Or leave if not supported
-    // NOTE(Dima): Init render API
-    render_platform_api RenderPlatformAPI = {};
-    RenderPlatformAPI.RendererType = Renderer_OpenGL;
-    RenderPlatformAPI.SwapBuffers = Win32OpenGLSwapBuffers;
-    RenderPlatformAPI.Init = Win32OpenGLRenderInit;
-    RenderPlatformAPI.Free = Win32OpenGLRenderFree;
-    RenderPlatformAPI.Render = Win32OpenGLRender;
-    
-    // NOTE(Dima): Initializing platfor to game API
-    platform_to_game_api Platform2Game = {};
-    Platform2Game.RenderAPI = RenderPlatformAPI;
-    Platform2Game.ProcessInput = Win32PlatformInputProcess;
+#if defined(JOY_DEBUG_BUILD)
+    // NOTE(Dima): Initializing DEBUG global table
+    DEBUGGlobalTable = PushStruct(&GlobalMem, debug_global_table);
+    DEBUGInitGlobalTable(&GlobalMem);
+#endif
     
     // NOTE(Dima): Calculating perfomance frequency
     QueryPerformanceFrequency(&GlobalWin32.PerformanceFreqLI);
@@ -2386,7 +2420,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     Win32InitWindow(hInstance, WindowWidth, WindowHeight);
     
     GlobalGame = PushStruct(&GlobalMem, game_state);
-    GameInit(GlobalGame, Platform2Game);
+    GameInit(GlobalGame);
     
     // NOTE(Dima): Xinput Init
     for(int ControllerIndex = 0;
@@ -2409,6 +2443,10 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     
     GlobalRunning = 1;
     while(GlobalRunning){
+        FRAME_BARRIER();
+        
+        BEGIN_TIMING(FRAME_UPDATE_NODE_NAME);
+        
         // NOTE(Dima): Processing time
         LARGE_INTEGER LastFrameClockLI;
         QueryPerformanceCounter(&LastFrameClockLI);
@@ -2426,6 +2464,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         FrameInfo.RendererType = Renderer_OpenGL;
         
         GameUpdate(GlobalGame, FrameInfo);
+        
+        END_TIMING();
     }
     
     GameFree(GlobalGame);

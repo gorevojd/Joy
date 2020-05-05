@@ -1,13 +1,6 @@
 #ifndef JOY_MEMORY_H
 #define JOY_MEMORY_H
 
-#include "joy_defines.h"
-#include "joy_platform.h"
-#include "joy_types.h"
-
-#include <stdint.h>
-#include <string.h>
-
 struct mem_region{
     mem_block_entry* Block;
     

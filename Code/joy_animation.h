@@ -116,8 +116,11 @@ struct anim_calculated_pose{
 
 #define ANIM_STATE_TABLE_SIZE 64
 #define ANIM_VAR_TABLE_SIZE 32
+
 struct anim_controller{
     struct anim_system* AnimState;
+    
+    char Name[64];
     
     anim_controller* Next;
     anim_controller* Prev;
@@ -137,7 +140,7 @@ struct anim_controller{
 #define PLAY_STATE_FIRST 0
 #define PLAY_STATE_SECOND 1
     anim_state* PlayingStates[2];
-    int PlayingStatesCount = 0;
+    int PlayingStatesCount;
     f32 TimeToTransit;
     f32 TransitionTimeLeft;
     
@@ -178,8 +181,7 @@ anim_calculated_pose UpdateModelAnimation(assets* Assets,
 
 #define CREATE_ANIM_CONTROL_FUNC(name) anim_controller* name(anim_system* Anim, struct assets* Assets, u32 NodesCheckSum)
 
-anim_controller* CreateAnimControl(anim_system* Anim, 
-                                   u32 NodesCheckSum);
+anim_controller* CreateAnimControl(anim_system* Anim, char* Name, u32 NodesCheckSum);
 void FinalizeCreation(anim_controller* Control);
 
 void AddAnimState(anim_controller* Control,

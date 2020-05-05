@@ -35,6 +35,8 @@
 #define INTERNAL_FUNCTION static
 #define LOCAL_AS_GLOBAL static
 
+#define JOY_ZERO_FLAGS 0
+
 #ifndef Min
 #define Min(a, b) ((a) < (b) ? (a) : (b))
 #endif
@@ -50,6 +52,10 @@
 #define DLIST_REFLECT_PTRS(value, next, prev) {\
     (value).##next = &(value); \
     (value).##prev = &(value);}
+
+#define DLIST_REFLECT_POINTER_PTRS(ptr, next, prev) {\
+    (ptr)->##next = (ptr); \
+    (ptr)->##prev = (ptr);}
 
 #define DLIST_FREE_IS_EMPTY(free_value, next) ((free_value).##next == &(free_value))
 
@@ -85,6 +91,15 @@
 {\
     entry_ptr->##next##->##prev = entry_ptr->##prev##;\
     entry_ptr->##prev##->##next = entry_ptr->##next##;}
+
+#define DLIST_REMOVE_ENTIRE_LIST(from_ptr, to_ptr, next, prev) \
+{\
+    if((from_ptr)->##next != (from_ptr)){\
+        (from_ptr)->##next##->##prev = (to_ptr);\
+        (from_ptr)->##prev##->##next = (to_ptr)->##next;\
+        (to_ptr)->##next##->##prev = (from_ptr)->##prev;\
+        (to_ptr)->##next = (from_ptr)->##next;\
+        DLIST_REFLECT_POINTER_PTRS(from_ptr, next, prev);}}
 
 // NOTE(Dima): DLIST allocate function body
 #define DLIST_ALLOCATE_FUNCTION_BODY(type, mem_region_ptr, next, prev, free_sent_value, use_sent_value, grow_count, result_ptr_name) \
