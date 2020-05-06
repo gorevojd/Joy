@@ -387,26 +387,23 @@ GAME_MODE_UPDATE(TestUpdate){
                   Camera->P.y,
                   Camera->P.z);
     
-    GuiText(Game->Gui, CameraInfo);
+    ShowText(Game->Gui, CameraInfo);
     
     char MouseInfo[256];
     stbsp_sprintf(MouseInfo,
                   "Delta mouse X: %.2f", 
                   DeltaMouseX);
-    GuiText(Game->Gui, MouseInfo);
+    ShowText(Game->Gui, MouseInfo);
     stbsp_sprintf(MouseInfo, 
                   "Delta mouse Y: %.2f",
                   DeltaMouseY);
-    GuiText(Game->Gui, MouseInfo);
-    
-    static b32 TestingBool;
-    GuiBoolButton(Game->Gui, "TestingBoolButton", &TestingBool);
+    ShowText(Game->Gui, MouseInfo);
     
     static float FindSphereQuality = 0.5f;
-    GuiSliderFloat(Game->Gui, 
-                   &FindSphereQuality, 
-                   0.0f, 1.0f,
-                   "LOD");
+    SliderFloat(Game->Gui, 
+                &FindSphereQuality, 
+                0.0f, 1.0f,
+                "LOD");
     
     u32 FindTagTypes[1] = {AssetTag_LOD};
     asset_tag_value FindTagValues[1] = {FindSphereQuality};

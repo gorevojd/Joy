@@ -92,11 +92,16 @@ struct debug_record{
     u64 TimeStampCounter;
     u16 ThreadID;
     u8 Type;
+    
+    struct{
+        int Int;
+        float Float;
+    } Value;
 };
 
 #define DEBUG_ID_TO_STRING(name) #name
-#define DEBUG_UNIQUE_SYMBOL_HELPER(a, b, c, d) a "|" b "|" c "|" d
-#define DEBUG_UNIQUE_SYMBOL(name) DEBUG_UNIQUE_SYMBOL_HELPER(name, __FUNCTION__, DEBUG_ID_TO_STRING(__LINE__), DEBUG_ID_TO_STRING(__COUNTER__))
+#define DEBUG_UNIQUE_SYMBOL_HELPER(a, b, c, d) a "|" b "|" DEBUG_ID_TO_STRING(c) "|" DEBUG_ID_TO_STRING(d)
+#define DEBUG_UNIQUE_SYMBOL(name) DEBUG_UNIQUE_SYMBOL_HELPER(name, __FUNCTION__, __LINE__, __COUNTER__)
 
 void DEBUGSetMenuDataSource(u32 Type, void* Data);
 
@@ -185,7 +190,6 @@ struct debug_menu{
     u32 Type;
 };
 
-
 #define DEBUG_DEFAULT_RECORDING true
 #define DEBUG_TABLE_INDEX_MASK 0x80000000
 #define DEBUG_TABLE_INDEX_BITSHIFT 31
@@ -206,9 +210,6 @@ struct debug_global_table{
     
     // NOTE(Dima): Debug records
     std::atomic_uint RecordAndTableIndex;
-    std::atomic_uint Increment;
-    
-    std::atomic_uint RecordFilter;
     
     debug_record* RecordTables[2];
     int TableMaxRecordCount;
@@ -216,33 +217,19 @@ struct debug_global_table{
 
 extern debug_global_table* DEBUGGlobalTable;
 
-inline void DEBUGSetRecordFilter(u32 FilterMask){
-    DEBUGGlobalTable->RecordFilter.store(FilterMask); 
-}
-
-inline void DEBUGUnsetRecordFilter(){
-    DEBUGGlobalTable->RecordFilter.store(0xFFFFFFFF);
-}
-
-inline void DEBUGSetIncrement(b32 Enabled){
-    DEBUGGlobalTable->Increment.store(Enabled ? 1 : 0);
-}
-
 inline void DEBUGAddRecord(char* UniqueName, u8 Type){
-    if(DEBUGGlobalTable->RecordFilter & Type){
-        u32 ToParseIndex = DEBUGGlobalTable->RecordAndTableIndex.fetch_add(DEBUGGlobalTable->Increment);
-        
-        u32 TableIndex = (ToParseIndex & DEBUG_TABLE_INDEX_MASK) >> DEBUG_TABLE_INDEX_BITSHIFT;
-        u32 RecordIndex = ToParseIndex & DEBUG_RECORD_INDEX_MASK;
-        
-        debug_record* TargetArray = DEBUGGlobalTable->RecordTables[TableIndex];
-        debug_record* TargetRecord = &TargetArray[RecordIndex];
-        
-        TargetRecord->UniqueName = UniqueName;
-        TargetRecord->Type = Type;
-        TargetRecord->TimeStampCounter = __rdtsc();
-        TargetRecord->ThreadID = GetThreadID();
-    }
+    u32 ToParseIndex = DEBUGGlobalTable->RecordAndTableIndex.fetch_add(1);
+    
+    u32 TableIndex = (ToParseIndex & DEBUG_TABLE_INDEX_MASK) >> DEBUG_TABLE_INDEX_BITSHIFT;
+    u32 RecordIndex = ToParseIndex & DEBUG_RECORD_INDEX_MASK;
+    
+    debug_record* TargetArray = DEBUGGlobalTable->RecordTables[TableIndex];
+    debug_record* TargetRecord = &TargetArray[RecordIndex];
+    
+    TargetRecord->UniqueName = UniqueName;
+    TargetRecord->Type = Type;
+    TargetRecord->TimeStampCounter = __rdtsc();
+    TargetRecord->ThreadID = GetThreadID();
 }
 
 void DEBUGParseNameFromUnique(char* To, int ToSize, char* From);

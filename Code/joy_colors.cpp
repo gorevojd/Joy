@@ -58,6 +58,8 @@ static void InitDefaultColors(Color_State* colorState){
     JOY_SET_COLOR(Indigo,  ColorFromHex("#4b0082"));
     JOY_SET_COLOR(SlateBlue,  ColorFromHex("#6a5acd"));
     JOY_SET_COLOR(DarkSlateBlue,  ColorFromHex("#483d8b"));
+    JOY_SET_COLOR(Wine,  ColorFromHex("#2c051a"));
+    
     
     JOY_SET_COLOR(UltraViolet,  ColorFromHex("#7E42F5"));
     JOY_SET_COLOR(NeoMint,  ColorFromHex("#29FFC9"));

@@ -591,7 +591,6 @@ inline void GuiGoToGrid(gui_state* Gui, char* GridName){
 inline rc2 GetTxtElemRect(gui_state* Gui, gui_layout* Layout, rc2 PrintedRect){
     v2 AlignPoint = V2(0.0f, 0.0f);
     
-    //rc2 TempTextRc = GrowRectByScaledValue(PrintedRect, V2(3.0f, 2.0f), Gui->fontScale);
     rc2 TempTextRc = PrintedRect;
     v2 ResultDimension = GetRectDim(TempTextRc);
     
@@ -645,8 +644,6 @@ rc2 GetTextRect(gui_state* Gui, char* Text, v2 p, float Scale = 1.0f);
 rc2 PrintText(gui_state* Gui, char* text, v2 P, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f), float Scale = 1.0f);
 rc2 PrintTextCenteredInRect(gui_state* Gui, char* text, rc2 tect, float Scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
 
-void GuiUpdateWindows(gui_state* Gui);
-
 void InitGui(
 gui_state* Gui,
 assets* Assets);
@@ -654,39 +651,39 @@ assets* Assets);
 void GuiFrameBegin(gui_state* Gui, gui_frame_info GuiFrameInfo);
 void GuiFrameEnd(gui_state* Gui);
 
-void GuiBeginLayout(gui_state* Gui, char* name, u32 layoutType, v2* P = 0, v2* Dim = 0);
-void GuiEndLayout(gui_state* Gui);
+void BeginLayout(gui_state* Gui, char* name, u32 layoutType, v2* P = 0, v2* Dim = 0);
+void EndLayout(gui_state* Gui);
 
-void GuiBeginRow(gui_state* Gui);
-void GuiEndRow(gui_state* Gui);
-void GuiBeginColumn(gui_state* Gui);
-void GuiEndColumn(gui_state* Gui);
+void BeginRow(gui_state* Gui);
+void EndRow(gui_state* Gui);
+void BeginColumn(gui_state* Gui);
+void EndColumn(gui_state* Gui);
 
 void GuiFramePrepare4Render(gui_state* Gui);
 
-void GuiTooltip(gui_state* Gui, char* tooltipText, v2 at);
-void GuiText(gui_state* Gui, char* text);
-b32 GuiButton(gui_state* Gui, char* buttonName);
-b32 GuiLinkButton(gui_state* Gui, char* buttonName);
-b32 GuiBoolButton(gui_state* Gui, char* buttonName, b32* value);
-b32 GuiBoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value);
-b32 GuiCheckbox(gui_state* Gui, char* name, b32* value);
-void GuiShowBool(gui_state* Gui, char* Name, b32 Value);
-void GuiShowInt(gui_state* Gui, char* Name, int Value);
-void GuiShowFloat(gui_state* Gui, char* Name, float Value);
+void ShowTooltip(gui_state* Gui, char* tooltipText, v2 at);
+void ShowText(gui_state* Gui, char* text);
+b32 Button(gui_state* Gui, char* buttonName);
+b32 LinkButton(gui_state* Gui, char* buttonName);
+b32 BoolButtonTrueFalse(gui_state* Gui, char* buttonName, b32* value);
+b32 BoolButtonOnOff(gui_state* Gui, char* buttonName, b32* value);
+b32 Checkbox(gui_state* Gui, char* name, b32* value);
+void ShowBool(gui_state* Gui, char* Name, b32 Value);
+void ShowInt(gui_state* Gui, char* Name, int Value);
+void ShowFloat(gui_state* Gui, char* Name, float Value);
 
-void GuiBeginTree(gui_state* Gui, char* name);
-void GuiEndTree(gui_state* Gui);
+void BeginTree(gui_state* Gui, char* name);
+void EndTree(gui_state* Gui);
 
-void GuiBeginRadioGroup(
+void BeginRadioGroup(
 gui_state* Gui, 
 char* name, 
 u32* ref, 
 u32 defaultId);
-void GuiRadioButton(gui_state* Gui, char* name, u32 uniqueId);
-void GuiEndRadioGroup(gui_state* Gui);
+void RadioButton(gui_state* Gui, char* name, u32 uniqueId);
+void EndRadioGroup(gui_state* Gui);
 
-void GuiInputText(gui_state* Gui, char* name, char* Buf, int BufSize);
+void InputText(gui_state* Gui, char* name, char* Buf, int BufSize);
 
 enum gui_slider_style{
     GuiSlider_Index,
@@ -694,30 +691,30 @@ enum gui_slider_style{
     GuiSlider_ProgressNonModify,
 };
 
-void GuiSliderInt(gui_state* Gui, 
-                  int* Value, 
-                  int Min, 
-                  int Max, 
-                  char* Name, 
-                  u32 Style = 0);
+void SliderInt(gui_state* Gui, 
+               int* Value, 
+               int Min, 
+               int Max, 
+               char* Name, 
+               u32 Style = 0);
 
-void GuiSliderFloat(gui_state* Gui, 
-                    float* Value, 
-                    float Min, 
-                    float Max, 
-                    char* Name, 
-                    u32 Style = 0);
+void SliderFloat(gui_state* Gui, 
+                 float* Value, 
+                 float Min, 
+                 float Max, 
+                 char* Name, 
+                 u32 Style = 0);
 
-void GuiProgress01(gui_state* Gui,
-                   char* Name,
-                   float Value);
+void ProgressSlider01(gui_state* Gui,
+                      char* Name,
+                      float Value);
 
 void GuiTest(gui_state* Gui, float deltaTime);
 
-void GuiAnchor(gui_state* Gui, 
-               char* Name, 
-               v2 Pos, v2 Dim, 
-               b32 Resize,
-               b32 Centered, 
-               v2* RectP, v2* RectDim);
+void ShowAnchor(gui_state* Gui, 
+                char* Name, 
+                v2 Pos, v2 Dim, 
+                b32 Resize,
+                b32 Centered, 
+                v2* RectP, v2* RectDim);
 #endif

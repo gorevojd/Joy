@@ -97,6 +97,7 @@ enum ColorTableType {
     Color_Indigo,
     Color_SlateBlue,
     Color_DarkSlateBlue,
+    Color_Wine,
     
     Color_UltraViolet,
     Color_NeoMint,

@@ -485,13 +485,12 @@ assets* Assets)
     Gui->colors[GuiColor_BodyPreview] = GUI_GETCOLOR_COLSYS(Color_White);
     
     Gui->colors[GuiColor_BackgroundActive] = GUI_GETCOLOR_COLSYS(Color_Orchid);
-    Gui->colors[GuiColor_BackgroundInactive] = GUI_GETCOLOR_COLSYS(Color_Black);
+    Gui->colors[GuiColor_BackgroundInactive] = GUI_GETCOLOR_COLSYS(Color_Wine);
     Gui->colors[GuiColor_BackgroundPreview] = GUI_GETCOLOR_COLSYS(ColorExt_gray5);
     
     Gui->colors[GuiColor_OutlineActive] = GUI_GETCOLOR_COLSYS(Color_Red);
     Gui->colors[GuiColor_OutlineInactive] = GUI_GETCOLOR_COLSYS(Color_Yellow);
     Gui->colors[GuiColor_OutlinePreview] = GUI_GETCOLOR_COLSYS(Color_Black);
-    
     
     Gui->colors[GuiColor_Graph0] = GUI_GETCOLOR_COLSYS(Color_White);
     Gui->colors[GuiColor_Graph1] = GUI_GETCOLOR_COLSYS(Color_Red);
@@ -876,21 +875,21 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui,
                                                         GuiInteraction_Empty,
                                                         GuiPriority_Small);
         if(LayoutFlags & GuiLayout_Move){
-            GuiAnchor(Gui, "Anchor2", 
-                      layout->Start,
-                      V2(20, 20),
-                      false, true,
-                      &layout->Start,
-                      &layout->Dim);
+            ShowAnchor(Gui, "Anchor2", 
+                       layout->Start,
+                       V2(20, 20),
+                       false, true,
+                       &layout->Start,
+                       &layout->Dim);
         }
         
         if(LayoutFlags & GuiLayout_Resize){
-            GuiAnchor(Gui, "Anchor1", 
-                      layout->Start + layout->Dim,
-                      V2(20, 20),
-                      true, true,
-                      &layout->Start,
-                      &layout->Dim);
+            ShowAnchor(Gui, "Anchor1", 
+                       layout->Start + layout->Dim,
+                       V2(20, 20),
+                       true, true,
+                       &layout->Start,
+                       &layout->Dim);
         }
         
         rc2 windowRc = layout->Rect;
@@ -960,7 +959,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui,
     }
 }
 
-void GuiBeginLayout(gui_state* Gui, char* name, u32 layoutType, v2* P, v2* Dim){
+void BeginLayout(gui_state* Gui, char* name, u32 layoutType, v2* P, v2* Dim){
     // NOTE(Dima): In list inserting
     u32 nameID = StringHashFNV(name);
     
@@ -993,7 +992,7 @@ void GuiBeginLayout(gui_state* Gui, char* name, u32 layoutType, v2* P, v2* Dim){
     GuiInitLayout(Gui, FoundLayout, layoutType, LayoutElem, P, Dim);
 }
 
-void GuiEndLayout(gui_state* Gui){
+void EndLayout(gui_state* Gui){
     gui_layout* lay = GetParentLayout(Gui);
     
     lay->At = lay->Start;
@@ -1360,7 +1359,7 @@ inline GuiAdvanceCtx GuiColumnAdvanceCtx(float rememberY, float Baseline){
     return(ctx);
 }
 
-void GuiBeginRow(gui_state* Gui){
+void BeginRow(gui_state* Gui){
     char name[64];
     stbsp_sprintf(name, "Row or Column: %d", Gui->CurElement->ChildCount);
     
@@ -1376,7 +1375,7 @@ void GuiBeginRow(gui_state* Gui){
     }
 }
 
-void GuiBeginColumn(gui_state* Gui){
+void BeginColumn(gui_state* Gui){
     char name[64];
     stbsp_sprintf(name, "Row or Column: %d", Gui->CurElement->ChildCount);
     
@@ -1392,7 +1391,7 @@ void GuiBeginColumn(gui_state* Gui){
     }
 }
 
-void GuiEndRow(gui_state* Gui){
+void EndRow(gui_state* Gui){
     if(GuiElementOpenedInTree(Gui->CurElement)){
         
         gui_layout* layout = GetParentLayout(Gui);
@@ -1419,7 +1418,7 @@ void GuiEndRow(gui_state* Gui){
     GuiEndElement(Gui, GuiElement_RowColumn);
 }
 
-void GuiEndColumn(gui_state* Gui){
+void EndColumn(gui_state* Gui){
     if(GuiElementOpenedInTree(Gui->CurElement)){
         
         gui_layout* layout = GetParentLayout(Gui);
@@ -1578,7 +1577,7 @@ inline b32 PotentiallyVisibleBig(gui_layout* Layout){
     return(PotentiallyVisible(Layout, Dim));
 }
 
-void GuiTooltip(gui_state* Gui, char* tooltipText, v2 at){
+void ShowTooltip(gui_state* Gui, char* tooltipText, v2 at){
     Assert(Gui->TooltipIndex < GUI_MAX_TOOLTIPS);
     Gui_Tooltip* ttip = &Gui->Tooltips[Gui->TooltipIndex++];
     
@@ -1586,12 +1585,12 @@ void GuiTooltip(gui_state* Gui, char* tooltipText, v2 at){
     ttip->at = at;
 }
 
-void GuiAnchor(gui_state* Gui, 
-               char* Name, 
-               v2 Pos, v2 Dim, 
-               b32 IsResize,
-               b32 Centered, 
-               v2* RectP, v2* RectDim)
+void ShowAnchor(gui_state* Gui, 
+                char* Name, 
+                v2 Pos, v2 Dim, 
+                b32 IsResize,
+                b32 Centered, 
+                v2* RectP, v2* RectDim)
 {
     gui_element* elem = GuiBeginElement(Gui, Name, GuiElement_Item, false);
     gui_layout* Layout = GetParentLayout(Gui);
@@ -1655,7 +1654,7 @@ void GuiAnchor(gui_state* Gui,
     GuiEndElement(Gui, GuiElement_Item);
 }
 
-void GuiBeginTree(gui_state* Gui, char* name){
+void BeginTree(gui_state* Gui, char* name){
     gui_element* Elem = GuiBeginElement(Gui, name, GuiElement_Tree, false);
     gui_layout* Layout = GetParentLayout(Gui);
     
@@ -1716,11 +1715,11 @@ void GuiBeginTree(gui_state* Gui, char* name){
     }
 }
 
-void GuiEndTree(gui_state* Gui){
+void EndTree(gui_state* Gui){
     GuiEndElement(Gui, GuiElement_Tree);
 }
 
-void GuiText(gui_state* Gui, char* text){
+void ShowText(gui_state* Gui, char* text){
     gui_element* Elem = GuiBeginElement(Gui, text, GuiElement_TempItem, true);
     gui_layout* Layout = GetParentLayout(Gui);
     
@@ -1736,7 +1735,7 @@ void GuiText(gui_state* Gui, char* text){
     GuiEndElement(Gui, GuiElement_TempItem);
 }
 
-b32 GuiLinkButton(gui_state* Gui, char* ButtonName){
+b32 LinkButton(gui_state* Gui, char* ButtonName){
     b32 result = 0;
     
     gui_element* Elem = GuiBeginElement(Gui, ButtonName, GuiElement_Item, true);
@@ -1780,7 +1779,7 @@ b32 GuiLinkButton(gui_state* Gui, char* ButtonName){
     return(result);
 }
 
-b32 GuiButton(gui_state* Gui, char* ButtonName){
+b32 Button(gui_state* Gui, char* ButtonName){
     b32 Result = false;
     
     gui_element* Elem = GuiBeginElement(Gui, ButtonName, GuiElement_Item, true);
@@ -1809,16 +1808,14 @@ b32 GuiButton(gui_state* Gui, char* ButtonName){
             textColor = GUI_GETCOLOR(GuiColor_Hot);
             
             if(KeyWentDown(Gui->Input, MouseKey_Left)){
+                Result = true;
+                
                 GuiSetActive(Gui, &Interaction);
                 GuiReleaseInteraction(Gui, &Interaction);
             }
         }
         else{
             GuiSetHot(Gui, &Interaction, false);
-        }
-        
-        if(Interaction.WasActiveInInteraction){
-            Result = true;
         }
         
         PrintTextCenteredInRect(Gui, Elem->NameToShow, textRc, 1.0f, textColor);
@@ -1830,7 +1827,7 @@ b32 GuiButton(gui_state* Gui, char* ButtonName){
     return(Result);
 }
 
-void GuiShowBool(gui_state* Gui, char* Name, b32 Value){
+void ShowBool(gui_state* Gui, char* Name, b32 Value){
     gui_element* Elem = GuiBeginElement(Gui, Name, GuiElement_TempItem, true);
     gui_layout* Layout = GetParentLayout(Gui);
     
@@ -1867,7 +1864,7 @@ void GuiShowBool(gui_state* Gui, char* Name, b32 Value){
     GuiEndElement(Gui, GuiElement_TempItem);
 }
 
-void GuiShowInt(gui_state* Gui, char* Name, int Value){
+void ShowInt(gui_state* Gui, char* Name, int Value){
     gui_element* Elem = GuiBeginElement(Gui, Name, GuiElement_TempItem, true);
     gui_layout* Layout = GetParentLayout(Gui);
     
@@ -1899,7 +1896,7 @@ void GuiShowInt(gui_state* Gui, char* Name, int Value){
     GuiEndElement(Gui, GuiElement_TempItem);
 }
 
-void GuiShowFloat(gui_state* Gui, char* Name, float Value){
+void ShowFloat(gui_state* Gui, char* Name, float Value){
     gui_element* Elem = GuiBeginElement(Gui, Name, GuiElement_TempItem, true);
     gui_layout* Layout = GetParentLayout(Gui);
     
@@ -1931,7 +1928,69 @@ void GuiShowFloat(gui_state* Gui, char* Name, float Value){
     GuiEndElement(Gui, GuiElement_TempItem);
 }
 
-b32 GuiBoolButton(gui_state* Gui, char* ButtonName, b32* Value){
+
+b32 BoolButton(gui_state* Gui, char* ButtonName, b32* Value){
+    gui_element* Elem = GuiBeginElement(Gui, ButtonName, GuiElement_Item, true);
+    gui_layout* Layout = GetParentLayout(Gui);
+    
+    b32 Result = false;
+    
+    if(GuiElementOpenedInTree(Elem) && 
+       PotentiallyVisibleSmall(Layout))
+    {
+        GuiPreAdvance(Gui, Layout, Elem->Depth);
+        
+        // NOTE(Dima): Printing button and text
+        rc2 ButRc = GetTextRect(Gui, ButtonName, Layout->At);
+        ButRc = GetTxtElemRect(Gui, Layout, ButRc);
+        
+        b32 WasHot = false;
+        if(Value){
+            gui_interaction Interaction = CreateInteraction(Elem, 
+                                                            GuiInteraction_BoolInRect,
+                                                            GuiPriority_Avg);
+            
+            gui_interaction_data_bool_in_rect* BoolInRect = &Interaction.Data.BoolInRect;
+            
+            BoolInRect->Value = Value;
+            BoolInRect->Rect = ButRc;
+            
+            GuiInteract(Gui, &Interaction);
+            
+            if(Interaction.WasHotInInteraction){
+                WasHot = true;
+            }
+            
+            if(Interaction.WasActiveInInteraction){
+                Result = true;
+            }
+        }
+        
+        v4 TextColor;
+        if(Value && *Value){
+            TextColor = GUI_GETCOLOR(GuiColor_HeaderActive);
+            GuiPushBut(Gui, ButRc, PushBut_BackgroundActive);
+        }
+        else{
+            TextColor = GUI_GETCOLOR(GuiColor_HeaderInactive);
+            GuiPushBut(Gui, ButRc, PushBut_BackgroundInactive);
+        }
+        
+        if(WasHot){
+            TextColor = GUI_GETCOLOR(GuiColor_Hot);
+        }
+        
+        PrintTextCenteredInRect(Gui, ButtonName, ButRc, 1.0f,  TextColor);
+        
+        GuiPostAdvance(Gui, Layout, ButRc);
+    }
+    
+    GuiEndElement(Gui, GuiElement_Item);
+    
+    return(Result);
+}
+
+b32 BoolButtonTrueFalse(gui_state* Gui, char* ButtonName, b32* Value){
     gui_element* Elem = GuiBeginElement(Gui, ButtonName, GuiElement_Item, true);
     gui_layout* Layout = GetParentLayout(Gui);
     
@@ -1955,8 +2014,6 @@ b32 GuiBoolButton(gui_state* Gui, char* ButtonName, b32* Value){
             }
             else{
                 CopyStrings(ButtonText, "True");
-                
-                Result = true;
             }
             
             gui_interaction Interaction = CreateInteraction(Elem, 
@@ -1972,6 +2029,10 @@ b32 GuiBoolButton(gui_state* Gui, char* ButtonName, b32* Value){
             
             if(Interaction.WasHotInInteraction){
                 WasHot = true;
+            }
+            
+            if(Interaction.WasActiveInInteraction){
+                Result = true;
             }
         }
         
@@ -2005,7 +2066,7 @@ b32 GuiBoolButton(gui_state* Gui, char* ButtonName, b32* Value){
     return(Result);
 }
 
-b32 GuiBoolButtonOnOff(gui_state* Gui, char* ButtonName, b32* Value){
+b32 BoolButtonOnOff(gui_state* Gui, char* ButtonName, b32* Value){
     gui_element* Elem = GuiBeginElement(Gui, ButtonName, GuiElement_Item, true);
     gui_layout* Layout = GetParentLayout(Gui);
     
@@ -2082,7 +2143,7 @@ b32 GuiBoolButtonOnOff(gui_state* Gui, char* ButtonName, b32* Value){
     return(Result);
 }
 
-b32 GuiCheckbox(gui_state* Gui, char* Name, b32* Value){
+b32 Checkbox(gui_state* Gui, char* Name, b32* Value){
     gui_element* Elem = GuiBeginElement(Gui, Name, GuiElement_Item, true);
     gui_layout* Layout = GetParentLayout(Gui);
     
@@ -2156,7 +2217,7 @@ b32 GuiCheckbox(gui_state* Gui, char* Name, b32* Value){
     return(Result);
 }
 
-void GuiBeginRadioGroup(
+void BeginRadioGroup(
 gui_state* Gui, 
 char* name, 
 u32* ref, 
@@ -2193,7 +2254,7 @@ GuiFindRadioGroupParent(gui_element* CurElement) {
 }
 
 
-void GuiRadioButton(gui_state* Gui, char* Name, u32 uniqueId) {
+void RadioButton(gui_state* Gui, char* Name, u32 uniqueId) {
     gui_element* RadioBut = GuiBeginElement(Gui, Name, GuiElement_Item, true);
     gui_element* radioGroup = GuiFindRadioGroupParent(Gui->CurElement);
     gui_layout* Layout = GetParentLayout(Gui);
@@ -2260,11 +2321,11 @@ void GuiRadioButton(gui_state* Gui, char* Name, u32 uniqueId) {
     GuiEndElement(Gui, GuiElement_Item);
 }
 
-void GuiEndRadioGroup(gui_state* Gui) {
+void EndRadioGroup(gui_state* Gui) {
     GuiEndElement(Gui, GuiElement_RadioGroup);
 }
 
-void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 Style){
+void SliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 Style){
     gui_element* Elem = GuiBeginElement(Gui, Name, GuiElement_Item, true);
     gui_layout* Layout = GetParentLayout(Gui);
     
@@ -2359,7 +2420,7 @@ void GuiSliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 
     GuiEndElement(Gui, GuiElement_Item);
 }
 
-void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Name, u32 Style){
+void SliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Name, u32 Style){
     gui_element* Elem = GuiBeginElement(Gui, Name, GuiElement_Item, true);
     gui_layout* Layout = GetParentLayout(Gui);
     
@@ -2450,14 +2511,14 @@ void GuiSliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Na
     
 }
 
-void GuiProgress01(gui_state* Gui,
-                   char* Name,
-                   float Value)
+void ProgressSlider01(gui_state* Gui,
+                      char* Name,
+                      float Value)
 {
-    GuiSliderFloat(Gui, &Value, 0.0f, 1.0f, Name, GuiSlider_ProgressNonModify);
+    SliderFloat(Gui, &Value, 0.0f, 1.0f, Name, GuiSlider_ProgressNonModify);
 }
 
-void GuiInputText(gui_state* Gui, char* Name, char* Buf, int BufSize){
+void InputText(gui_state* Gui, char* Name, char* Buf, int BufSize){
     gui_element* Elem = GuiBeginElement(Gui, Name, GuiElement_Item, true);
     gui_layout* Layout = GetParentLayout(Gui);
     
@@ -2625,7 +2686,7 @@ void GuiInputText(gui_state* Gui, char* Name, char* Buf, int BufSize){
     GuiEndElement(Gui, GuiElement_Item);
 }
 
-INTERNAL_FUNCTION inline rc2 GuiGetGridRect(float WeightForThis, gui_element* Parent){
+INTERNAL_FUNCTION inline rc2 GetGridRect(float WeightForThis, gui_element* Parent){
     gui_grid_item* Item = &Parent->Data.GridItem;
     
     if(Item->LastSumWeightInChildren < 0.0001f){
@@ -2662,10 +2723,10 @@ INTERNAL_FUNCTION inline rc2 GuiGetGridRect(float WeightForThis, gui_element* Pa
     return(Result);
 }
 
-INTERNAL_FUNCTION gui_grid_item* GuiGridItemInit(gui_state* Gui, 
-                                                 gui_element* Elem, 
-                                                 u32 GridItemType, 
-                                                 float Weight)
+INTERNAL_FUNCTION gui_grid_item* GridItemInit(gui_state* Gui, 
+                                              gui_element* Elem, 
+                                              u32 GridItemType, 
+                                              float Weight)
 {
     gui_grid_item* Item = &Elem->Data.GridItem;
     switch(GridItemType){
@@ -2716,7 +2777,7 @@ INTERNAL_FUNCTION gui_grid_item* GuiGridItemInit(gui_state* Gui,
         }break;
         
         default:{
-            Item->InternalRect = GuiGetGridRect(Weight, Elem->Parent);
+            Item->InternalRect = GetGridRect(Weight, Elem->Parent);
             Item->Rect = GrowRectByPixels(Item->InternalRect, -10);
             
             gui_grid_item* ParentItem = &Elem->Parent->Data.GridItem;
@@ -2737,7 +2798,7 @@ INTERNAL_FUNCTION gui_grid_item* GuiGridItemInit(gui_state* Gui,
     return(Item);
 }
 
-void GuiGridHubBegin(gui_state* Gui){
+void GridHubBegin(gui_state* Gui){
     char name[64];
     stbsp_sprintf(name, "GridHub: %d", Gui->CurElement->ChildCount);
     
@@ -2748,60 +2809,60 @@ void GuiGridHubBegin(gui_state* Gui){
     ASSERT(Gui->CurrentGridHub == 0);
     Gui->CurrentGridHub = Elem;
     
-    gui_grid_item* Item = GuiGridItemInit(Gui,
-                                          Elem,
-                                          GuiGridItem_GridHub,
-                                          0.0f);
+    gui_grid_item* Item = GridItemInit(Gui,
+                                       Elem,
+                                       GuiGridItem_GridHub,
+                                       0.0f);
 }
 
-void GuiGridHubEnd(gui_state* Gui){
+void GridHubEnd(gui_state* Gui){
     ASSERT(Gui->CurrentGridHub);
     Gui->CurrentGridHub = 0;
     
     GuiEndElement(Gui, GuiElement_GridItem);
 }
 
-void GuiGridBegin(gui_state* Gui, char* Name){
+void GridBegin(gui_state* Gui, char* Name){
     gui_element* Elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
     
-    gui_grid_item* Item = GuiGridItemInit(Gui,
-                                          Elem,
-                                          GuiGridItem_Grid,
-                                          0.0f);
+    gui_grid_item* Item = GridItemInit(Gui,
+                                       Elem,
+                                       GuiGridItem_Grid,
+                                       0.0f);
 }
 
-void GuiGridEnd(gui_state* Gui){
+void GridEnd(gui_state* Gui){
     gui_grid_item* Item = &Gui->CurElement->Data.GridItem;
     Item->LastSumWeightInChildren = Item->SumWeightInChildren;
     Item->SumWeightInChildren = 0;
     GuiEndElement(Gui, GuiElement_GridItem);
 }
 
-void GuiGridBeginRow(gui_state* Gui, float Weight = 1.0f){
+void GridBeginRow(gui_state* Gui, float Weight = 1.0f){
     char Name[64];
     stbsp_sprintf(Name, "Row: %d", Gui->CurElement->TmpCount);
     
     gui_element* Elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
     
-    gui_grid_item* Item = GuiGridItemInit(Gui,
-                                          Elem,
-                                          GuiGridItem_Row,
-                                          Weight);
+    gui_grid_item* Item = GridItemInit(Gui,
+                                       Elem,
+                                       GuiGridItem_Row,
+                                       Weight);
 }
 
-void GuiGridBeginColumn(gui_state* Gui, float Weight = 1.0f){
+void GridBeginColumn(gui_state* Gui, float Weight = 1.0f){
     char Name[64];
     stbsp_sprintf(Name, "Column: %d", Gui->CurElement->TmpCount);
     
     gui_element* Elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
     
-    gui_grid_item* Item = GuiGridItemInit(Gui,
-                                          Elem,
-                                          GuiGridItem_Column,
-                                          Weight);
+    gui_grid_item* Item = GridItemInit(Gui,
+                                       Elem,
+                                       GuiGridItem_Column,
+                                       Weight);
 }
 
-void GuiGridEndRowOrColumn(gui_state* Gui){
+void GridEndRowOrColumn(gui_state* Gui){
     
     gui_grid_item* Item = &Gui->CurElement->Data.GridItem;
     Item->LastSumWeightInChildren = Item->SumWeightInChildren;
@@ -2810,29 +2871,29 @@ void GuiGridEndRowOrColumn(gui_state* Gui){
     GuiEndElement(Gui, GuiElement_GridItem);
 }
 
-void GuiGridTileEmpty(gui_state* Gui, float Weight = 1.0f){
+void GridTileEmpty(gui_state* Gui, float Weight = 1.0f){
     b32 Result = 0;
     
     char Name[64];
     stbsp_sprintf(Name, "EmptyTile: %d", Gui->CurElement->TmpCount);
     
     gui_element* Elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
-    gui_grid_item* Item = GuiGridItemInit(Gui,
-                                          Elem,
-                                          GuiGridItem_Item,
-                                          Weight);
+    gui_grid_item* Item = GridItemInit(Gui,
+                                       Elem,
+                                       GuiGridItem_Item,
+                                       Weight);
     
     GuiEndElement(Gui, GuiElement_GridItem);
 }
 
-b32 GuiGridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
+b32 GridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
     b32 Result = 0;
     
     gui_element* Elem = GuiBeginElement(Gui, Name, GuiElement_GridItem, true);
-    gui_grid_item* Item = GuiGridItemInit(Gui,
-                                          Elem,
-                                          GuiGridItem_Item,
-                                          Weight);
+    gui_grid_item* Item = GridItemInit(Gui,
+                                       Elem,
+                                       GuiGridItem_Item,
+                                       Weight);
     
     if(GuiElementOpenedInTree(Elem)){
         v4 TileColor = GUI_GETCOLOR_COLSYS(ColorExt_gray53);
@@ -2902,22 +2963,22 @@ void GuiTest(gui_state* Gui, float deltaTime){
     
     char FPSBuf[64];
     stbsp_sprintf(FPSBuf, "FPS %.2f, delta time(sec) %.3f", 1.0f / deltaTime, deltaTime);
-    GuiText(Gui, FPSBuf);
+    ShowText(Gui, FPSBuf);
     
     char InterInfo[256];
     stbsp_sprintf(InterInfo, "Hot Interaction ID: %u Name: \"%s\" Priority: %u", 
                   Gui->HotInteraction.ID, 
                   Gui->HotInteraction.Name,
                   Gui->HotInteraction.Priority);
-    GuiText(Gui, InterInfo);
+    ShowText(Gui, InterInfo);
     stbsp_sprintf(InterInfo, "Active Interaction ID: %u Name: \"%s\" Priority: %u", 
                   Gui->ActiveInteraction.ID,
                   Gui->ActiveInteraction.Name,
                   Gui->ActiveInteraction.Priority);
-    GuiText(Gui, InterInfo);
+    ShowText(Gui, InterInfo);
     
-    GuiLinkButton(Gui, "LinkButton1");
-    GuiLinkButton(Gui, "LinkButton2");
+    LinkButton(Gui, "LinkButton1");
+    LinkButton(Gui, "LinkButton2");
     
 #if 0 
     GuiGridHubBegin(Gui);
@@ -2967,242 +3028,242 @@ void GuiTest(gui_state* Gui, float deltaTime){
 #endif
     
     //GuiUpdateWindows(Gui);
-    GuiBeginTree(Gui, "Some text");
-    GuiText(Gui, "Hello world");
-    GuiText(Gui, "I love Kate");
-    GuiText(Gui, "I wish joy and happiness for everyone");
+    BeginTree(Gui, "Some text");
+    ShowText(Gui, "Hello world");
+    ShowText(Gui, "I love Kate");
+    ShowText(Gui, "I wish joy and happiness for everyone");
     char GuiTmpText[64];
     stbsp_sprintf(GuiTmpText, 
                   "Total GUI allocated elements %d", 
                   Gui->TotalAllocatedGuiElements);
-    GuiText(Gui, GuiTmpText);
+    ShowText(Gui, GuiTmpText);
     
-    GuiEndTree(Gui);
+    EndTree(Gui);
     
     static v2 WindowP = V2(900.0f, 100.0f);
     static v2 WindowDim = V2(300.0f, 600.0f);
     
     static char InputTextBuf[256];
-    GuiInputText(Gui, "Input Text", InputTextBuf, 256);
+    InputText(Gui, "Input Text", InputTextBuf, 256);
     static float TestFloat4Slider;
     static int TestInt4Slider;
-    GuiSliderFloat(Gui, &Gui->FontScale, 0.5f, 1.5f, "Gui font scale", GuiSlider_Index);
-    GuiSliderFloat(Gui, &TestFloat4Slider, -5.0f, 10.0f, "FloatSlider1", GuiSlider_Index);
-    GuiSliderFloat(Gui, &TestFloat4Slider, -5.0f, 10.0f, "FloatSlider2", GuiSlider_Progress);
-    GuiSliderInt(Gui, &TestInt4Slider, -4, 7, "IntSlider1", GuiSlider_Index);
-    GuiSliderInt(Gui, &TestInt4Slider, -4, 7, "IntSlider2", GuiSlider_Progress);
-    GuiBeginTree(Gui, "AddClearButtons");
+    SliderFloat(Gui, &Gui->FontScale, 0.5f, 1.5f, "Gui font scale", GuiSlider_Index);
+    SliderFloat(Gui, &TestFloat4Slider, -5.0f, 10.0f, "FloatSlider1", GuiSlider_Index);
+    SliderFloat(Gui, &TestFloat4Slider, -5.0f, 10.0f, "FloatSlider2", GuiSlider_Progress);
+    SliderInt(Gui, &TestInt4Slider, -4, 7, "IntSlider1", GuiSlider_Index);
+    SliderInt(Gui, &TestInt4Slider, -4, 7, "IntSlider2", GuiSlider_Progress);
+    BeginTree(Gui, "AddClearButtons");
     LOCAL_AS_GLOBAL int RectCount = 0;
-    GuiBeginRow(Gui);
-    if(GuiButton(Gui, "Add")){
+    BeginRow(Gui);
+    if(Button(Gui, "Add")){
         RectCount++;
     }
-    if(GuiButton(Gui, "Clear")){
+    if(Button(Gui, "Clear")){
         RectCount--;
         if(RectCount < 0){
             RectCount = 0;
         }
     }
-    GuiEndRow(Gui);
+    EndRow(Gui);
     for(int i = 0; i < RectCount; i++){
         PushRect(renderStack, RcMinDim(V2(100 + i * 50, 100), V2(40, 40)));
     }
-    GuiEndTree(Gui);
+    EndTree(Gui);
     
-    GuiBeginTree(Gui, "Buttons and checkboxes");
+    BeginTree(Gui, "Buttons and checkboxes");
     static b32 boolButtonValue;
-    GuiBeginRow(Gui);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBoolButton(Gui, "boolButton123", &boolButtonValue);
-    GuiBoolButton(Gui, "boolButton1234", &boolButtonValue);
-    GuiBoolButton(Gui, "boolButtonasdfga", &boolButtonValue);
-    GuiBoolButton(Gui, "boolButtonzxcvzxcb", &boolButtonValue);
-    GuiEndRow(Gui);
+    BeginRow(Gui);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BoolButtonTrueFalse(Gui, "boolButton123", &boolButtonValue);
+    BoolButtonTrueFalse(Gui, "boolButton1234", &boolButtonValue);
+    BoolButtonTrueFalse(Gui, "boolButtonasdfga", &boolButtonValue);
+    BoolButtonTrueFalse(Gui, "boolButtonzxcvzxcb", &boolButtonValue);
+    EndRow(Gui);
     
     static b32 boolButtonOnOffValue;
-    GuiBeginRow(Gui);
-    GuiBeginColumn(Gui);
-    GuiBoolButtonOnOff(Gui, "boolButtonOnOff", &boolButtonValue);
-    GuiBoolButtonOnOff(Gui, "boolButtonOnOff1", &boolButtonValue);
-    GuiBoolButtonOnOff(Gui, "boolButtonOnOff2", &boolButtonValue);
-    GuiBoolButtonOnOff(Gui, "boolButtonOnOff3", &boolButtonValue);
-    GuiEndColumn(Gui);
+    BeginRow(Gui);
+    BeginColumn(Gui);
+    BoolButtonOnOff(Gui, "boolButtonOnOff", &boolButtonValue);
+    BoolButtonOnOff(Gui, "boolButtonOnOff1", &boolButtonValue);
+    BoolButtonOnOff(Gui, "boolButtonOnOff2", &boolButtonValue);
+    BoolButtonOnOff(Gui, "boolButtonOnOff3", &boolButtonValue);
+    EndColumn(Gui);
     
-    GuiBeginColumn(Gui);
+    BeginColumn(Gui);
     static b32 checkboxValue1;
     static b32 checkboxValue2;
     static b32 checkboxValue3;
     static b32 checkboxValue4;
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiCheckbox(Gui, "Checkbox1", &checkboxValue2);
-    GuiCheckbox(Gui, "Checkbox2", &checkboxValue3);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiEndColumn(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    Checkbox(Gui, "Checkbox1", &checkboxValue2);
+    Checkbox(Gui, "Checkbox2", &checkboxValue3);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    EndColumn(Gui);
     
-    GuiBeginColumn(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiCheckbox(Gui, "Checkbox1", &checkboxValue2);
-    GuiCheckbox(Gui, "Checkbox2", &checkboxValue3);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiEndColumn(Gui);
-    GuiEndRow(Gui);
+    BeginColumn(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    Checkbox(Gui, "Checkbox1", &checkboxValue2);
+    Checkbox(Gui, "Checkbox2", &checkboxValue3);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    EndColumn(Gui);
+    EndRow(Gui);
     
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff4", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox4", &checkboxValue4);
-    GuiEndTree(Gui);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff4", &boolButtonValue);
+    Checkbox(Gui, "Checkbox4", &checkboxValue4);
+    EndTree(Gui);
     
-    GuiBeginTree(Gui, "Some more buts");
-    GuiBeginRow(Gui);
-    GuiBeginColumn(Gui);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff1", &boolButtonValue);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff2", &boolButtonValue);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff3", &boolButtonValue);
-    GuiEndColumn(Gui);
+    BeginTree(Gui, "Some more buts");
+    BeginRow(Gui);
+    BeginColumn(Gui);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff1", &boolButtonValue);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff2", &boolButtonValue);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff3", &boolButtonValue);
+    EndColumn(Gui);
     
-    GuiBeginColumn(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiCheckbox(Gui, "Checkbox1", &checkboxValue2);
-    GuiCheckbox(Gui, "Checkbox2", &checkboxValue3);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiEndColumn(Gui);
+    BeginColumn(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    Checkbox(Gui, "Checkbox1", &checkboxValue2);
+    Checkbox(Gui, "Checkbox2", &checkboxValue3);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    EndColumn(Gui);
     
-    GuiEndRow(Gui);
-    GuiEndTree(Gui);
+    EndRow(Gui);
+    EndTree(Gui);
     
-    GuiBeginTree(Gui, "TestCull");
+    BeginTree(Gui, "TestCull");
     static u32 activeRadio = 0;
-    GuiBeginRow(Gui);
-    GuiBeginColumn(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiEndColumn(Gui);
-    GuiBeginColumn(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiEndColumn(Gui);
-    GuiBeginColumn(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiEndColumn(Gui);
-    GuiBeginColumn(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiEndColumn(Gui);
-    GuiBeginColumn(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiCheckbox(Gui, "Checkbox", &checkboxValue1);
-    GuiBoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
-    GuiCheckbox(Gui, "Checkbox3", &checkboxValue4);
-    GuiBoolButton(Gui, "boolButton", &boolButtonValue);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiEndRadioGroup(Gui);
-    GuiEndColumn(Gui);
-    GuiEndRow(Gui);
-    GuiEndTree(Gui);
+    BeginRow(Gui);
+    BeginColumn(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    EndColumn(Gui);
+    BeginColumn(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    EndColumn(Gui);
+    BeginColumn(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    EndColumn(Gui);
+    BeginColumn(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    EndColumn(Gui);
+    BeginColumn(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    Checkbox(Gui, "Checkbox", &checkboxValue1);
+    BoolButtonOnOff(Gui, "BoolButtonOnOff", &boolButtonValue);
+    Checkbox(Gui, "Checkbox3", &checkboxValue4);
+    BoolButtonTrueFalse(Gui, "boolButton", &boolButtonValue);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    EndRadioGroup(Gui);
+    EndColumn(Gui);
+    EndRow(Gui);
+    EndTree(Gui);
     
-    GuiBeginRow(Gui);
-    GuiBeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
-    GuiRadioButton(Gui, "radio0", 0);
-    GuiRadioButton(Gui, "radio1", 1);
-    GuiRadioButton(Gui, "radio2", 2);
-    GuiRadioButton(Gui, "radio3", 3);
-    GuiEndRadioGroup(Gui);
+    BeginRow(Gui);
+    BeginRadioGroup(Gui, "radioGroup1", &activeRadio, 0);
+    RadioButton(Gui, "radio0", 0);
+    RadioButton(Gui, "radio1", 1);
+    RadioButton(Gui, "radio2", 2);
+    RadioButton(Gui, "radio3", 3);
+    EndRadioGroup(Gui);
     
     char radioTxt[32];
     stbsp_sprintf(radioTxt, "radio but value: %u", activeRadio);
-    GuiEndRow(Gui);
-    GuiText(Gui, radioTxt);
+    EndRow(Gui);
+    ShowText(Gui, radioTxt);
     
-    GuiTooltip(Gui, "Hello world!", input->MouseP);
+    ShowTooltip(Gui, "Hello world!", input->MouseP);
 }

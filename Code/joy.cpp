@@ -231,6 +231,8 @@ void GameUpdate(game_state* Game, render_frame_info FrameInfo){
     GuiFrameBegin(Game->Gui, GuiFrameInfo);
     
     if(CurMode->Update){
+        BLOCK_TIMING("Frame: GameModeUpdate");
+        
         CurMode->Update(Game, CurMode);
     }
     

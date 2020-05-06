@@ -482,17 +482,17 @@ INTERNAL_FUNCTION void DEBUGUpdateMenus(debug_state* State)
         gui_state* Gui = State->Gui;
         
         debug_window* Window = &State->MainWindow;
-        GuiBeginLayout(Gui, "DEBUG_MainWindow", 
-                       GuiLayout_Window, 
-                       &Window->P, 
-                       &Window->Dim);
+        BeginLayout(Gui, "DEBUG_MainWindow", 
+                    GuiLayout_Window, 
+                    &Window->P, 
+                    &Window->Dim);
         
-        GuiBeginRow(Gui);
+        BeginRow(Gui);
         if(State->ShowDebugMenus){
-            GuiBeginColumn(Gui);
-            GuiBeginRadioGroup(Gui, "MenuRadioGroup", 
-                               &State->ToShowMenuType, 
-                               State->ToShowMenuType);
+            BeginColumn(Gui);
+            BeginRadioGroup(Gui, "MenuRadioGroup", 
+                            &State->ToShowMenuType, 
+                            State->ToShowMenuType);
             
             // NOTE(Dima): Showing menu
             BeginDimension(Gui, BeginDimension_Both, ScaledAscDim(Gui, V2(8, 2)));
@@ -504,26 +504,26 @@ INTERNAL_FUNCTION void DEBUGUpdateMenus(debug_state* State)
                 
                 Menu->Data = DEBUGGlobalTable->MenuDataSources[MenuIndex];
                 
-                GuiRadioButton(Gui, Menu->Name, Menu->Type);
+                RadioButton(Gui, Menu->Name, Menu->Type);
             }
             EndDimension(Gui);
-            GuiEndRadioGroup(Gui);
-            GuiEndColumn(Gui);
+            EndRadioGroup(Gui);
+            EndColumn(Gui);
         }
         
         // NOTE(Dima): Calling gui callback for DEBUG menu
-        GuiBeginColumn(Gui);
+        BeginColumn(Gui);
         debug_menu* ToShowMenu = &State->Menus[State->ToShowMenuType];
         if(ToShowMenu->Callback){
             ToShowMenu->Callback(Gui, ToShowMenu->Data);
         }
         else{
-            GuiText(Gui, "GUI callback was NULL");
+            ShowText(Gui, "GUI callback was NULL");
         }
-        GuiEndColumn(Gui);
+        EndColumn(Gui);
         
-        GuiEndRow(Gui);
-        GuiEndLayout(Gui);
+        EndRow(Gui);
+        EndLayout(Gui);
     }
 }
 
@@ -552,7 +552,7 @@ void DEBUGParseNameFromUnique(char* To, int ToSize,
 
 INTERNAL_FUNCTION inline
 debug_profiled_tree_node* AllocateTreeNode(debug_state* State, 
-                                           debug_profiled_frame* Frame)
+                                           debug_thread_frame* Frame)
 {
     DLIST_ALLOCATE_FUNCTION_BODY(debug_profiled_tree_node, State->Region,
                                  NextAlloc, PrevAlloc, 
@@ -566,7 +566,7 @@ debug_profiled_tree_node* AllocateTreeNode(debug_state* State,
 
 INTERNAL_FUNCTION inline 
 void CreateSentinel4Element(debug_state* State, 
-                            debug_profiled_frame* Frame,
+                            debug_thread_frame* Frame,
                             debug_profiled_tree_node* Element)
 {
     Element->ChildSentinel = AllocateTreeNode(State, Frame);
@@ -577,6 +577,16 @@ void CreateSentinel4Element(debug_state* State,
     Element->ChildSentinel->ChildSentinel = 0;
 }
 
+INTERNAL_FUNCTION void ClearThreadsTable(debug_thread** Table,
+                                         int TableSize)
+{
+    for(int Index = 0;
+        Index < TableSize;
+        Index++)
+    {
+        Table[Index] = 0;
+    }
+}
 
 INTERNAL_FUNCTION void ClearStatsTable(debug_timing_stat** Table, 
                                        int TableSize)
@@ -590,34 +600,21 @@ INTERNAL_FUNCTION void ClearStatsTable(debug_timing_stat** Table,
 }
 
 INTERNAL_FUNCTION inline void InitProfiledFrame(debug_state* State, debug_profiled_frame* Frame){
-    Frame->RootTreeNodeUse.UniqueName = State->RootNodesName;
-    
-    DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, NextAlloc, PrevAlloc);
-    DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, Next, Prev);
     DLIST_REFLECT_PTRS(Frame->StatUse, Next, Prev);
-    
-    CreateSentinel4Element(State, Frame, &Frame->RootTreeNodeUse);
     
     ClearStatsTable(Frame->StatTable, DEBUG_STATS_TABLE_SIZE);
     ClearStatsTable(Frame->ToSortStats, DEBUG_STATS_TO_SORT_SIZE);
     Frame->ToSortStatsCount = 0;
     
     Frame->FrameUpdateNode = 0;
-    Frame->CurNode = &Frame->RootTreeNodeUse;
 }
 
 INTERNAL_FUNCTION inline void ClearProfiledFrame(debug_state* State, 
                                                  debug_profiled_frame* Frame)
 {
-    DLIST_REMOVE_ENTIRE_LIST(&Frame->RootTreeNodeUse, 
-                             &State->TreeNodeFree, 
-                             NextAlloc, PrevAlloc);
-    
     DLIST_REMOVE_ENTIRE_LIST(&Frame->StatUse,
                              &State->StatFree,
                              Next, Prev);
-    
-    DLIST_REFLECT_POINTER_PTRS(Frame->RootTreeNodeUse.ChildSentinel, Next, Prev);
     
     ClearStatsTable(Frame->StatTable, DEBUG_STATS_TABLE_SIZE);
     
@@ -625,9 +622,52 @@ INTERNAL_FUNCTION inline void ClearProfiledFrame(debug_state* State,
     Frame->FrameUpdateNode = 0;
 }
 
+INTERNAL_FUNCTION inline void ClearIndexFrame(debug_state* State, 
+                                              int FrameIndex)
+{
+    debug_profiled_frame* Frame = GetFrameByIndex(State, FrameIndex);
+    ClearProfiledFrame(State, Frame);
+}
+
+INTERNAL_FUNCTION inline void InitThreadFrame(debug_state* State, 
+                                              debug_thread_frame* Frame)
+{
+    Frame->RootTreeNodeUse.UniqueName = State->RootNodesName;
+    
+    DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, Next, Prev);
+    
+    CreateSentinel4Element(State, Frame, &Frame->RootTreeNodeUse);
+    
+    Frame->CurNode = &Frame->RootTreeNodeUse;
+}
+
+INTERNAL_FUNCTION inline void ClearThreadFrame(debug_state* State,
+                                               debug_thread_frame* Frame)
+{
+    DLIST_REMOVE_ENTIRE_LIST(&Frame->RootTreeNodeUse, 
+                             &State->TreeNodeFree, 
+                             NextAlloc, PrevAlloc);
+    
+    DLIST_REFLECT_POINTER_PTRS(Frame->RootTreeNodeUse.ChildSentinel, Next, Prev);
+}
+
+INTERNAL_FUNCTION inline void ClearThreadsIndexFrame(debug_state* State, int FrameIndex){
+    // NOTE(Dima): Clearing corresponding frames in threads
+    debug_thread* ThreadAt = State->ThreadSentinel.NextAlloc;
+    while(ThreadAt != &State->ThreadSentinel){
+        debug_thread_frame* Frame = &ThreadAt->Frames[FrameIndex];
+        
+        ClearThreadFrame(State, Frame);
+        
+        ThreadAt = ThreadAt->NextAlloc;
+    }
+    
+}
+
 INTERNAL_FUNCTION debug_profiled_tree_node*
 RequestTreeNode(debug_state* State, 
-                debug_profiled_frame* Frame, 
+                debug_thread_frame* Frame, 
                 debug_profiled_tree_node* Current,
                 char* UniqueName,
                 b32* Allocated)
@@ -662,6 +702,50 @@ RequestTreeNode(debug_state* State,
     
     if(Allocated){
         *Allocated = IsAllocated;
+    }
+    
+    return(Found);
+}
+
+INTERNAL_FUNCTION debug_thread* 
+CreateOrFindThreadForID(debug_state* State, u16 ThreadID)
+{
+    u32 Key = ThreadID % DEBUG_THREADS_TABLE_SIZE;
+    
+    debug_thread* Found = 0;
+    debug_thread* At = State->ThreadHashTable[Key];
+    
+    if(At){
+        while(At){
+            if(At->ThreadID == ThreadID){
+                Found = At;
+                break;
+            }
+            
+            At = At->NextInHash;
+        }
+    }
+    
+    if(!Found){
+        Found = PushStruct(State->Region, debug_thread);
+        
+        DLIST_INSERT_BEFORE_SENTINEL(Found, State->ThreadSentinel, 
+                                     NextAlloc, PrevAlloc);
+        Found->ThreadID = ThreadID;
+        
+        Found->NextInHash = State->ThreadHashTable[Key];
+        State->ThreadHashTable[Key] = Found;
+        
+        Found->Frames = PushArray(State->Region, debug_thread_frame, 
+                                  DEBUG_PROFILED_FRAMES_COUNT);
+        for(int FrameIndex = 0;
+            FrameIndex < DEBUG_PROFILED_FRAMES_COUNT;
+            FrameIndex++)
+        {
+            debug_thread_frame* Frame = &Found->Frames[FrameIndex];
+            
+            InitThreadFrame(State, Frame);
+        }
     }
     
     return(Found);
@@ -778,7 +862,58 @@ IncrementFrameIndices(debug_state* State){
         State->ViewFrameIndex = IncrementFrameIndex(State->ViewFrameIndex);
     }
     
+    State->NewestFrameIndex = State->CollationFrameIndex;
     State->CollationFrameIndex = IncrementFrameIndex(State->CollationFrameIndex);
+    
+    if(State->CollationFrameIndex == State->OldestFrameIndex){
+        State->OldestShouldBeIncremented = true;
+    }
+    
+    if(State->OldestShouldBeIncremented){
+        State->OldestFrameIndex = IncrementFrameIndex(State->OldestFrameIndex);
+    }
+}
+
+INTERNAL_FUNCTION inline void
+ProcessRecordsIndicesInc(debug_state* State){
+    b32 ShouldIncrement = true;
+    if(State->RecordingChangeRequested){
+        State->RecordingChangeRequested = false;
+        
+        if(State->IsRecording){
+            State->Filter = DEBUG_DEFAULT_FILTER_VALUE;
+            ShouldIncrement = false;
+        }
+        else{
+            State->Filter = DebugRecord_FrameBarrier;
+        }
+    }
+    
+    if(State->IsRecording && ShouldIncrement){
+        IncrementFrameIndices(State);
+    }
+}
+
+INTERNAL_FUNCTION debug_profiled_tree_node*
+FindFrameUpdateNode(debug_thread_frame* Frame){
+    debug_profiled_tree_node* FrameUpdateNode = 0;
+    
+    debug_profiled_tree_node* At = Frame->RootTreeNodeUse.NextAlloc;
+    
+    while(At != &Frame->RootTreeNodeUse){
+        char NameBuf[256];
+        DEBUGParseNameFromUnique(NameBuf, 256, At->UniqueName);
+        
+        if(StringsAreEqual(NameBuf, FRAME_UPDATE_NODE_NAME))
+        {
+            FrameUpdateNode = At;
+            break;
+        }
+        
+        At = At->NextAlloc;
+    }
+    
+    return(FrameUpdateNode);
 }
 
 INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
@@ -801,107 +936,87 @@ INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
     {
         debug_record* Record = &RecordArray[RecordIndex];
         
-        switch(Record->Type){
-            case DebugRecord_BeginTiming:{
-                debug_profiled_frame* Frame = GetFrameByIndex(State, State->CollationFrameIndex);
-                
-                b32 NodeWasAllocated = false;
-                debug_profiled_tree_node* NewNode = RequestTreeNode(State, Frame, 
-                                                                    Frame->CurNode,
-                                                                    Record->UniqueName,
-                                                                    &NodeWasAllocated);
-                
-                NewNode->TimingSnapshot.StartClock = Record->TimeStampCounter;
-                if(NodeWasAllocated){
-                    NewNode->TimingSnapshot.StartClockFirstEntry = NewNode->TimingSnapshot.StartClock;
-                }
-                
-                Frame->CurNode = NewNode;
-            }break;
-            
-            case DebugRecord_EndTiming:{
-                debug_profiled_frame* Frame = GetFrameByIndex(State, State->CollationFrameIndex);
-                
-                debug_profiled_tree_node* CurNode = Frame->CurNode;
-                
-                debug_timing_snapshot* Snapshot = &CurNode->TimingSnapshot;
-                
-                Snapshot->EndClock = Record->TimeStampCounter;
-                
-                u64 ClocksElapsedThisFrame = (Snapshot->EndClock - Snapshot->StartClock);
-                Snapshot->ClocksElapsed += ClocksElapsedThisFrame;
-                Snapshot->HitCount += 1;
-                
-                // NOTE(Dima): Adding time to total parent's children elapsed 
-                CurNode->Parent->TimingSnapshot.ClocksElapsedInChildren += ClocksElapsedThisFrame;
-                
-                // NOTE(Dima): Initializing statistic
-                debug_timing_stat* Stat = CreateOrFindStatForUniqueName(State,
-                                                                        Frame,
-                                                                        CurNode->UniqueName);
-                
-                Stat->Stat.ClocksElapsed = Snapshot->ClocksElapsed;
-                Stat->Stat.ClocksElapsedInChildren = Snapshot->ClocksElapsedInChildren;
-                Stat->Stat.HitCount = Snapshot->HitCount;
-                
-                Frame->CurNode = CurNode->Parent;
-            }break;
-            
-            case DebugRecord_FrameBarrier:{
-                
-                debug_profiled_frame* OldFrame = GetFrameByIndex(State, State->CollationFrameIndex);
-                
-                // NOTE(Dima): Finding frame update node for current collation frame
-                debug_profiled_tree_node* FrameUpdateNode = 0;
-                debug_profiled_tree_node* At = OldFrame->RootTreeNodeUse.NextAlloc;
-                while(At != &OldFrame->RootTreeNodeUse){
-                    char NameBuf[256];
-                    DEBUGParseNameFromUnique(NameBuf, 256, At->UniqueName);
+        if(Record->Type & State->Filter){
+            switch(Record->Type){
+                case DebugRecord_BeginTiming:{
+                    debug_thread* Thread = CreateOrFindThreadForID(State, Record->ThreadID);
                     
-                    if(StringsAreEqual(NameBuf, FRAME_UPDATE_NODE_NAME))
-                    {
-                        FrameUpdateNode = At;
-                        break;
+                    debug_thread_frame* Frame = GetThreadFrameByIndex(Thread, State->CollationFrameIndex);
+                    
+                    b32 NodeWasAllocated = false;
+                    debug_profiled_tree_node* NewNode = RequestTreeNode(State, Frame, 
+                                                                        Frame->CurNode,
+                                                                        Record->UniqueName,
+                                                                        &NodeWasAllocated);
+                    
+                    NewNode->TimingSnapshot.StartClock = Record->TimeStampCounter;
+                    if(NodeWasAllocated){
+                        NewNode->TimingSnapshot.StartClockFirstEntry = NewNode->TimingSnapshot.StartClock;
                     }
                     
-                    At = At->NextAlloc;
-                }
-                OldFrame->FrameUpdateNode = FrameUpdateNode;
+                    Frame->CurNode = NewNode;
+                }break;
                 
-                // NOTE(Dima): Incrementing frame indices when we needed
-                b32 ShouldIncrementIndices = true;
-                if(State->RecordingChangeRequested){
-                    State->RecordingChangeRequested = false;
+                case DebugRecord_EndTiming:{
+                    debug_thread* Thread = CreateOrFindThreadForID(State, Record->ThreadID);
                     
-                    if(State->TargetRecordingValue){
-                        ShouldIncrementIndices = false;
-                        
-                        DEBUGUnsetRecordFilter();
-                    }
-                    else{
-                        DEBUGSetIncrement(State->TargetRecordingValue);
+                    debug_thread_frame* Frame = GetThreadFrameByIndex(Thread, State->CollationFrameIndex);
+                    
+                    debug_profiled_tree_node* CurNode = Frame->CurNode;
+                    
+                    debug_timing_snapshot* Snapshot = &CurNode->TimingSnapshot;
+                    
+                    Snapshot->EndClock = Record->TimeStampCounter;
+                    
+                    u64 ClocksElapsedThisFrame = (Snapshot->EndClock - Snapshot->StartClock);
+                    int PendingHitCount = 1;
+                    
+                    Snapshot->ClocksElapsed += ClocksElapsedThisFrame;
+                    Snapshot->HitCount += PendingHitCount;
+                    
+                    // NOTE(Dima): Adding time to total parent's children elapsed 
+                    debug_profiled_frame* StatFrame = GetFrameByIndex(State, State->CollationFrameIndex);
+                    debug_profiled_tree_node* ParentNode = CurNode->Parent;
+                    if(ParentNode->Parent != 0){
+                        debug_timing_stat* ParentStat = CreateOrFindStatForUniqueName(State, StatFrame,
+                                                                                      ParentNode->UniqueName);
+                        ParentStat->Stat.ClocksElapsedInChildren += ClocksElapsedThisFrame;
                     }
                     
-                }
+                    // NOTE(Dima): Initializing statistic
+                    debug_timing_stat* Stat = CreateOrFindStatForUniqueName(State, StatFrame,
+                                                                            CurNode->UniqueName);
+                    
+                    Stat->Stat.ClocksElapsed += ClocksElapsedThisFrame;
+                    Stat->Stat.HitCount += PendingHitCount;
+                    
+                    Frame->CurNode = CurNode->Parent;
+                }break;
                 
-                if(ShouldIncrementIndices){
-                    IncrementFrameIndices(State);
-                }
-                
-                debug_profiled_frame* NewFrame = GetFrameByIndex(State, State->CollationFrameIndex);
-                
-                // NOTE(Dima): Clearing profiled frame
-                ClearProfiledFrame(State, NewFrame);
-                
-            }break;
+                case DebugRecord_FrameBarrier:{
+                    
+                    debug_thread* MainThread = State->MainThread;
+                    Assert(MainThread->ThreadID == Record->ThreadID);
+                    
+                    debug_profiled_frame* OldProfiledFrame = GetFrameByIndex(State, 
+                                                                             State->CollationFrameIndex);
+                    debug_thread_frame* OldFrame = GetThreadFrameByIndex(MainThread, 
+                                                                         State->CollationFrameIndex);
+                    
+                    // NOTE(Dima): Finding frame update node
+                    OldProfiledFrame->FrameUpdateNode = FindFrameUpdateNode(OldFrame);
+                    
+                    Assert(OldFrame->CurNode == &OldFrame->RootTreeNodeUse);
+                    
+                    // NOTE(Dima): Incrementing frame indices when we needed
+                    ProcessRecordsIndicesInc(State);
+                    
+                    // NOTE(Dima): Clearing frame
+                    ClearIndexFrame(State, State->CollationFrameIndex);
+                    ClearThreadsIndexFrame(State, State->CollationFrameIndex);
+                }break;
+            }
         }
-    }
-    
-    if(State->RecordingChangeRequested &&
-       State->TargetRecordingValue)
-    {
-        DEBUGSetRecordFilter(DebugRecord_FrameBarrier);
-        DEBUGSetIncrement(State->TargetRecordingValue);
     }
 }
 
@@ -912,9 +1027,6 @@ void DEBUGInitGlobalTable(mem_region* Region){
     DEBUGGlobalTable->RecordAndTableIndex = 0;
     DEBUGGlobalTable->RecordTables[0] = PushArray(Region, debug_record, RecordArrayCount);
     DEBUGGlobalTable->RecordTables[1] = PushArray(Region, debug_record, RecordArrayCount);
-    
-    DEBUGUnsetRecordFilter();
-    DEBUGSetIncrement(DEBUG_DEFAULT_RECORDING);
     
     // NOTE(Dima): Init memory region
     DEBUGGlobalTable->Region = Region;
@@ -980,8 +1092,12 @@ INTERNAL_FUNCTION void DEBUGInit(debug_state* State,
     
     // NOTE(Dima): Init profiler stuff
     State->CollationFrameIndex = 0;
-    State->TargetRecordingValue = DEBUG_DEFAULT_RECORDING;
+    State->NewestFrameIndex = 0;
+    State->OldestFrameIndex = 0;
+    State->OldestShouldBeIncremented = false;
+    State->IsRecording = DEBUG_DEFAULT_RECORDING;
     State->RecordingChangeRequested = false;
+    State->Filter = DEBUG_DEFAULT_FILTER_VALUE;
     State->ToShowProfileMenuType = DebugProfileMenu_TopClockEx;
     
     CopyStrings(State->RootNodesName, "RootNode");
@@ -990,6 +1106,10 @@ INTERNAL_FUNCTION void DEBUGInit(debug_state* State,
     DLIST_REFLECT_PTRS(State->TreeNodeFree, NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(State->TreeNodeFree, Next, Prev);
     DLIST_REFLECT_PTRS(State->StatFree, Next, Prev);
+    
+    DLIST_REFLECT_PTRS(State->ThreadSentinel, NextAlloc, PrevAlloc);
+    ClearThreadsTable(State->ThreadHashTable, DEBUG_THREADS_TABLE_SIZE);
+    State->MainThread = CreateOrFindThreadForID(State, GetThreadID());
     
     for(int ProfiledFrameIndex = 0;
         ProfiledFrameIndex < DEBUG_PROFILED_FRAMES_COUNT;

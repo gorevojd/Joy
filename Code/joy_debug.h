@@ -14,7 +14,6 @@ struct debug_timing_snapshot{
     u64 StartClock;
     u64 EndClock;
     u64 ClocksElapsed;
-    u64 ClocksElapsedInChildren;
     u32 HitCount;
 };
 
@@ -53,10 +52,11 @@ struct debug_timing_stat{
 
 #define DEBUG_PROFILED_FRAMES_COUNT 256
 #define DEBUG_STATS_TABLE_SIZE 128
-#define DEBUG_STATS_TO_SORT_SIZE 1024
+#define DEBUG_STATS_TO_SORT_SIZE 4096
+#define DEBUG_THREADS_TABLE_SIZE 32
+#define DEBUG_DEFAULT_FILTER_VALUE 0xFFFFFFFF
 
 struct debug_profiled_frame{
-    debug_profiled_tree_node RootTreeNodeUse;
     debug_timing_stat StatUse;
     
     debug_timing_stat* StatTable[DEBUG_STATS_TABLE_SIZE];
@@ -65,13 +65,30 @@ struct debug_profiled_frame{
     int ToSortStatsCount;
     
     debug_profiled_tree_node* FrameUpdateNode;
+};
+
+struct debug_thread_frame{
+    debug_profiled_tree_node RootTreeNodeUse;
+    
     debug_profiled_tree_node* CurNode;
+};
+
+struct debug_thread{
+    debug_thread* NextAlloc;
+    debug_thread* PrevAlloc;
+    
+    debug_thread* NextInHash;
+    
+    debug_thread_frame* Frames;
+    
+    u16 ThreadID;
 };
 
 enum debug_profile_menu_type{
     DebugProfileMenu_TopClock,
     DebugProfileMenu_TopClockEx,
     DebugProfileMenu_RootNode,
+    DebugProfileMenu_Threads,
 };
 
 struct debug_state{
@@ -97,12 +114,20 @@ struct debug_state{
     // NOTE(Dima): Profiler stuff
     int CollationFrameIndex;
     int ViewFrameIndex;
+    int NewestFrameIndex;
+    int OldestFrameIndex;
+    b32 OldestShouldBeIncremented;
     
-    b32 TargetRecordingValue;
+    b32 IsRecording;
     b32 RecordingChangeRequested;
+    u32 Filter;
     
     debug_profiled_tree_node TreeNodeFree;
     debug_timing_stat StatFree;
+    
+    debug_thread ThreadSentinel;
+    debug_thread* MainThread;
+    debug_thread* ThreadHashTable[DEBUG_THREADS_TABLE_SIZE];
     
     debug_profiled_frame ProfiledFrames[DEBUG_PROFILED_FRAMES_COUNT];
     
@@ -120,6 +145,12 @@ GetFrameByIndex(debug_state* State, int FrameIndex){
     return(Frame);
 }
 
+inline debug_thread_frame* 
+GetThreadFrameByIndex(debug_thread* Thread, int FrameIndex){
+    debug_thread_frame* Frame = &Thread->Frames[FrameIndex];
+    
+    return(Frame);
+}
 
 inline u64 GetClocksFromStat(debug_timing_stat* Stat, 
                              b32 IncludingChildren)

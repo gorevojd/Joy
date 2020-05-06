@@ -2,7 +2,7 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Animation)){
     if(Data){
         anim_system* AnimSys = (anim_system*)Data;
         
-        GuiBeginTree(Gui, "Controllers");
+        BeginTree(Gui, "Controllers");
         
         anim_controller* ControlAt = AnimSys->ControlUse.Next;
         if(ControlAt != &AnimSys->ControlUse){
@@ -11,10 +11,10 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Animation)){
                 if(Control){
                     
                     // NOTE(Dima): Begin anim controller tree
-                    GuiBeginTree(Gui, ControlAt->Name); 
+                    BeginTree(Gui, ControlAt->Name); 
                     
                     // NOTE(Dima): Printing states
-                    GuiBeginTree(Gui, "States");
+                    BeginTree(Gui, "States");
                     anim_state* StateAt = Control->FirstState;
                     while(StateAt != 0){
                         char StateBuf[128];
@@ -34,9 +34,9 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Animation)){
                         
                         
                         // NOTE(Dima): Begin state tree 
-                        GuiBeginTree(Gui, StateBuf); 
+                        BeginTree(Gui, StateBuf); 
                         {
-                            GuiBeginTree(Gui, "Transitions");
+                            BeginTree(Gui, "Transitions");
                             anim_transition* TranAt = StateAt->FirstTransition;
                             while(TranAt){
                                 
@@ -54,35 +54,35 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Animation)){
                                 
                                 stbsp_sprintf(TransitionBuf, "%s -> %s", 
                                               FromName, ToName);
-                                GuiText(Gui, TransitionBuf);
+                                ShowText(Gui, TransitionBuf);
                                 
                                 TranAt = TranAt->NextInList;
                             }
-                            GuiEndTree(Gui);
+                            EndTree(Gui);
                         }
-                        GuiEndTree(Gui); // NOTE(Dima): End state tree
+                        EndTree(Gui); // NOTE(Dima): End state tree
                         
                         StateAt = StateAt->NextInList;
                     }
-                    GuiEndTree(Gui);
+                    EndTree(Gui);
                     
                     // NOTE(Dima): Printing variables
-                    GuiBeginTree(Gui, "Variables");
+                    BeginTree(Gui, "Variables");
                     anim_variable* VarAt = Control->FirstVariable;
                     while(VarAt != 0){
                         if(VarAt->ValueType == AnimVariable_Float){
-                            GuiShowFloat(Gui, VarAt->Name, VarAt->Value.Float);
+                            ShowFloat(Gui, VarAt->Name, VarAt->Value.Float);
                         }
                         else if(VarAt->ValueType == AnimVariable_Bool){
-                            GuiShowBool(Gui, VarAt->Name, VarAt->Value.Bool);
+                            ShowBool(Gui, VarAt->Name, VarAt->Value.Bool);
                         }
                         
                         VarAt = VarAt->NextInList;
                     }
-                    GuiEndTree(Gui);
+                    EndTree(Gui);
                     
-                    GuiShowInt(Gui, "Playing states count", Control->PlayingStatesCount);
-                    GuiShowBool(Gui, "In transition", Control->PlayingStatesCount == 2);
+                    ShowInt(Gui, "Playing states count", Control->PlayingStatesCount);
+                    ShowBool(Gui, "In transition", Control->PlayingStatesCount == 2);
                     
                     for(int PlayingStateIndex = 0;
                         PlayingStateIndex < Control->PlayingStatesCount;
@@ -91,34 +91,34 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Animation)){
                         char BufToShow[64];
                         stbsp_sprintf(BufToShow, "%d state name: %s", PlayingStateIndex,
                                       Control->PlayingStates[PlayingStateIndex]->Name);
-                        GuiText(Gui, BufToShow);
+                        ShowText(Gui, BufToShow);
                         
-                        GuiProgress01(Gui, "Anim phase", 
-                                      Control->PlayingStates[PlayingStateIndex]->PlayingAnimation.Phase01);
+                        ProgressSlider01(Gui, "Anim phase", 
+                                         Control->PlayingStates[PlayingStateIndex]->PlayingAnimation.Phase01);
                     }
                     
                     
                     
-                    GuiEndTree(Gui); // End anim controller tree
+                    EndTree(Gui); // End anim controller tree
                     
                     ControlAt = ControlAt->Next;
                 }
                 else{
-                    GuiText(Gui, "Error");
+                    ShowText(Gui, "Error");
                     break;
                 }
             }
         }
         else{
-            GuiText(Gui, "None");
+            ShowText(Gui, "None");
         }
         
-        GuiEndTree(Gui);
+        EndTree(Gui);
         
         
     }
     else{
-        GuiText(Gui, "ERROR. Data was NULL");
+        ShowText(Gui, "ERROR. Data was NULL");
     }
 }
 
@@ -128,31 +128,31 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Input)){
         
         char GlobalTimeText[64];
         stbsp_sprintf(GlobalTimeText, "Global time: %.2f sec", Input->Time);
-        GuiText(Gui, GlobalTimeText);
+        ShowText(Gui, GlobalTimeText);
         
         char DeltaTimeText[64];
         stbsp_sprintf(DeltaTimeText, "Last frame time: %.3f sec", Input->DeltaTime);
-        GuiText(Gui, DeltaTimeText);
+        ShowText(Gui, DeltaTimeText);
         
         char MousePText[64];
         stbsp_sprintf(MousePText, 
                       "MouseP: x(%.2f); y(%.2f)", 
                       Input->MouseP.x, 
                       Input->MouseP.y);
-        GuiText(Gui, MousePText);
+        ShowText(Gui, MousePText);
         
         char DeltaMousePText[64];
         stbsp_sprintf(DeltaMousePText, 
                       "DeltaMouseP: x(%.2f) y(%.2f)", 
                       Input->MouseDeltaP.x, 
                       Input->MouseDeltaP.y);
-        GuiText(Gui, DeltaMousePText);
+        ShowText(Gui, DeltaMousePText);
         
         
-        GuiBoolButtonOnOff(Gui, "Capturing mouse", &Input->CapturingMouse);
+        BoolButtonOnOff(Gui, "Capturing mouse", &Input->CapturingMouse);
     }
     else{
-        GuiText(Gui, "ERROR. Data was NULL");
+        ShowText(Gui, "ERROR. Data was NULL");
     }
 }
 
@@ -200,13 +200,13 @@ INTERNAL_FUNCTION void ShowTopClocks(gui_state* Gui,
             DEBUGParseNameFromUnique(StatName, 256, Stat->UniqueName);
             
             char StatBuf[256];
-            stbsp_sprintf(StatBuf, "%11lluc %8.2f%% %8u  %-30s",
+            stbsp_sprintf(StatBuf, "%11lluc %8.2f%% %8uh  %-30s",
                           ToShowClocks,
                           CoveragePercentage,
                           Stat->Stat.HitCount,
                           StatName);
             
-            GuiText(Gui, StatBuf);
+            ShowText(Gui, StatBuf);
         }
     }
 }
@@ -268,11 +268,61 @@ INTERNAL_FUNCTION void ShowFramesSlider(gui_state* Gui, debug_state* State){
         
         float WidthPerOneBar = DimLeft.x / (float)DEBUG_PROFILED_FRAMES_COUNT;
         
+        
+        gui_interaction Interaction = CreateInteraction(Elem, 
+                                                        GuiInteraction_Empty,
+                                                        GuiPriority_Avg);
+        if(MouseInInteractiveArea(Gui, SliderRect)){
+            GuiSetHot(Gui, &Interaction, true);
+            
+            if(KeyWentDown(Gui->Input, MouseKey_Left)){
+                GuiSetActive(Gui, &Interaction);
+            }
+        }
+        else{
+            GuiSetHot(Gui, &Interaction, false);
+        }
+        
+        if(GuiIsActive(Gui, &Interaction)){
+            if(KeyWentUp(Gui->Input, MouseKey_Left)){
+                GuiReleaseInteraction(Gui, &Interaction);
+            }
+        }
+        
+        for(int BarIndex = 0;
+            BarIndex < DEBUG_PROFILED_FRAMES_COUNT;
+            BarIndex++)
+        {
+            rc2 BarRc = GetBarRectHorz(SliderRect, DEBUG_PROFILED_FRAMES_COUNT,
+                                       BarIndex);
+            
+            if(MouseInInteractiveArea(Gui, BarRc)){
+                if(KeyIsDown(Gui->Input, MouseKey_Left) && 
+                   (BarIndex != State->CollationFrameIndex))
+                {
+                    State->ViewFrameIndex = BarIndex;
+                }
+            }
+        }
+        
         // NOTE(Dima): Printing collation frame bar
         PushRect(Stack, 
                  GetBarRectHorz(SliderRect, DEBUG_PROFILED_FRAMES_COUNT, 
                                 State->CollationFrameIndex),
                  V4(0.0f, 1.0f, 0.0f, 1.0f));
+        
+        // NOTE(Dima): Printing newest frame bar
+        PushRect(Stack, 
+                 GetBarRectHorz(SliderRect, DEBUG_PROFILED_FRAMES_COUNT, 
+                                State->NewestFrameIndex),
+                 V4(1.0f, 0.0f, 0.0f, 1.0f));
+        
+        // NOTE(Dima): Printing oldest frame bar
+        PushRect(Stack, 
+                 GetBarRectHorz(SliderRect, DEBUG_PROFILED_FRAMES_COUNT, 
+                                State->OldestFrameIndex),
+                 V4(0.2f, 0.3f, 0.9f, 1.0f));
+        
         
         
         // NOTE(Dima): Printing viewing frame bar
@@ -316,7 +366,7 @@ INTERNAL_FUNCTION void ShowRootViewer(gui_state* Gui, debug_state* State){
             FrameIndex++)
         {
             debug_profiled_frame* Frame = GetFrameByIndex(State, 
-                                                          State->ViewFrameIndex);
+                                                          FrameIndex);
             
             if(Frame->FrameUpdateNode){
                 rc2 BarRc = GetBarRectHorz(WorkRect, 
@@ -329,8 +379,8 @@ INTERNAL_FUNCTION void ShowRootViewer(gui_state* Gui, debug_state* State){
                 
                 debug_profiled_tree_node* At = Frame->FrameUpdateNode->ChildSentinel->Next;
                 float CurrentStackedValue = 0.0f;
+                int TempIndex = 0;
                 while(At != Frame->FrameUpdateNode->ChildSentinel){
-                    
                     u64 ThisClocks = At->TimingSnapshot.ClocksElapsed;
                     
                     f32 ThisPercentage = (f32)ThisClocks / (f32)TotalClocks;
@@ -346,17 +396,33 @@ INTERNAL_FUNCTION void ShowRootViewer(gui_state* Gui, debug_state* State){
                         char TooltipText[256];
                         stbsp_sprintf(TooltipText, "%s", ParsedName);
                         
-                        GuiTooltip(Gui, TooltipText, Gui->Input->MouseP);
+                        ShowTooltip(Gui, TooltipText, Gui->Input->MouseP);
                     }
                     
                     CurrentStackedValue += ThisHeight;
                     
                     // NOTE(Dima): Printing rect
-                    int ThisColorIndex = GuiColor_Graph0 + At->NameID % (GuiColor_GraphCount - GuiColor_Graph0);
-                    PushRect(Stack, ThisRc, GUI_GETCOLOR_COLSYS(ThisColorIndex));
+                    int ThisColorIndex = GuiColor_Graph0 + TempIndex % (GuiColor_GraphCount - GuiColor_Graph0);
+                    PushRect(Stack, ThisRc, GUI_GETCOLOR(ThisColorIndex));
                     
+                    
+                    TempIndex++;
                     At = At->Next;
                 }
+            }
+            
+            if(FrameIndex == State->ViewFrameIndex){
+                PushRect(Stack, GetBarRectHorz(WorkRect, 
+                                               DEBUG_PROFILED_FRAMES_COUNT, 
+                                               FrameIndex), 
+                         V4(0.0f, 0.0f, 0.0f, 0.5f));
+            }
+            
+            if(FrameIndex == State->CollationFrameIndex){
+                PushRect(Stack, GetBarRectHorz(WorkRect, 
+                                               DEBUG_PROFILED_FRAMES_COUNT, 
+                                               FrameIndex), 
+                         V4(0.0f, 1.0f, 0.0f, 1.0f));
             }
         }
         
@@ -375,27 +441,44 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Profile)){
     if(Data){
         debug_state* State = (debug_state*)Data;
         
-        if(GuiBoolButtonOnOff(Gui, "Recording", &State->TargetRecordingValue)){
+        BeginDimension(Gui, BeginDimension_Both, ScaledAscDim(Gui, V2(7, 2)));
+        BeginRow(Gui);
+        if(BoolButton(Gui, "Recording", &State->IsRecording)){
             State->RecordingChangeRequested = true;
         }
+        if(Button(Gui, "Newest")){
+            State->ViewFrameIndex = State->NewestFrameIndex;
+        }
+        if(Button(Gui, "Oldest")){
+            State->ViewFrameIndex = State->OldestFrameIndex;
+        }
+        EndRow(Gui);
+        EndDimension(Gui);
         
         ShowFramesSlider(Gui, State);
         
-        GuiBeginRow(Gui);
-        GuiBeginRadioGroup(Gui, "MenuRadioGroup", 
-                           &State->ToShowProfileMenuType, 
-                           State->ToShowProfileMenuType);
+        // NOTE(Dima): Viewing frame info
+        char FrameInfo[256];
+        stbsp_sprintf(FrameInfo,
+                      "Viewing frame: %.2fdt, %.0fFPS, index=%d",
+                      1.0f, 1.0f, State->ViewFrameIndex);
+        ShowText(Gui, FrameInfo);
+        
+        BeginRow(Gui);
+        BeginRadioGroup(Gui, "MenuRadioGroup", 
+                        &State->ToShowProfileMenuType, 
+                        State->ToShowProfileMenuType);
         BeginDimension(Gui, BeginDimension_Both, ScaledAscDim(Gui, V2(7, 2)));
-        GuiRadioButton(Gui, "ClocksEx", DebugProfileMenu_TopClockEx);
-        GuiRadioButton(Gui, "Clocks", DebugProfileMenu_TopClock);
-        GuiRadioButton(Gui, "Root", DebugProfileMenu_RootNode);
+        RadioButton(Gui, "ClocksEx", DebugProfileMenu_TopClockEx);
+        RadioButton(Gui, "Clocks", DebugProfileMenu_TopClock);
+        RadioButton(Gui, "Root", DebugProfileMenu_RootNode);
 #if 0        
         GuiRadioButton();
         GuiRadioButton();
 #endif
         EndDimension(Gui);
-        GuiEndRadioGroup(Gui);
-        GuiEndRow(Gui);
+        EndRadioGroup(Gui);
+        EndRow(Gui);
         
         switch(State->ToShowProfileMenuType){
             case DebugProfileMenu_TopClock:{
@@ -412,7 +495,7 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Profile)){
         }
     }
     else{
-        GuiText(Gui, "ERROR. Data was NULL");
+        ShowText(Gui, "ERROR. Data was NULL");
     }
 }
 
@@ -424,9 +507,9 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Assets)){
         stbsp_sprintf(CurBlockBuf, 
                       "Current asset block index: %d", 
                       Assets->CurrentBlockIndex);
-        GuiText(Gui, CurBlockBuf);
+        ShowText(Gui, CurBlockBuf);
         
-        GuiBeginTree(Gui, "Asset file sources");
+        BeginTree(Gui, "Asset file sources");
         asset_file_source* At = Assets->FileSourceUse.Next;
         
         if(At != &Assets->FileSourceUse){
@@ -438,15 +521,15 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Assets)){
                               At->FileDescription.FullPath,
                               At->IntegrationBaseID);
                 
-                GuiText(Gui, FileSourceBuf);
+                ShowText(Gui, FileSourceBuf);
                 
                 At = At->Next;
             }
         }
         else{
-            GuiText(Gui, "None");
+            ShowText(Gui, "None");
         }
-        GuiEndTree(Gui);
+        EndTree(Gui);
     }
 }
 
@@ -455,7 +538,7 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Game)){
         
     }
     else{
-        GuiText(Gui, "ERROR. Data was NULL");
+        ShowText(Gui, "ERROR. Data was NULL");
     }
 }
 
@@ -464,7 +547,7 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Console)){
         
     }
     else{
-        GuiText(Gui, "ERROR. Data was NULL");
+        ShowText(Gui, "ERROR. Data was NULL");
     }
 }
 
@@ -475,27 +558,28 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_GUI)){
         char FPSBuf[64];
         stbsp_sprintf(FPSBuf, "FPS %.2f, delta time(sec) %.3f", 
                       1.0f / DeltaTime, DeltaTime);
-        GuiText(Gui, FPSBuf);
+        ShowText(Gui, FPSBuf);
         
         char InterInfo[256];
         stbsp_sprintf(InterInfo, "Hot Interaction ID: %u Name: \"%s\" Priority: %u", 
                       Gui->HotInteraction.ID, 
                       Gui->HotInteraction.Name,
                       Gui->HotInteraction.Priority);
-        GuiText(Gui, InterInfo);
+        ShowText(Gui, InterInfo);
         
         stbsp_sprintf(InterInfo, "Active Interaction ID: %u Name: \"%s\" Priority: %u", 
                       Gui->ActiveInteraction.ID,
                       Gui->ActiveInteraction.Name,
                       Gui->ActiveInteraction.Priority);
-        GuiText(Gui, InterInfo);
+        ShowText(Gui, InterInfo);
         
-        if(GuiBoolButton(Gui, "Show GuiTest", &Gui->ShowGuiTest)){
+        BoolButtonTrueFalse(Gui, "Show GuiTest", &Gui->ShowGuiTest);
+        if(Gui->ShowGuiTest){
             GuiTest(Gui, Gui->FrameInfo.DeltaTime);
         }
     }
     else{
-        GuiText(Gui, "ERROR. Data was NULL");
+        ShowText(Gui, "ERROR. Data was NULL");
     }
 }
 
@@ -505,13 +589,13 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_DEBUG)){
         
         
         
-        GuiBoolButton(Gui, "Show DEBUG overlays (F3 to toggle)",
-                      &DEBUG->ShowDebugOverlay);
-        GuiBoolButton(Gui, "Show DEBUG menus (F4 to toggle)", 
-                      &DEBUG->ShowDebugMenus);
+        BoolButtonTrueFalse(Gui, "Show DEBUG overlays (F3 to toggle)",
+                            &DEBUG->ShowDebugOverlay);
+        BoolButtonTrueFalse(Gui, "Show DEBUG menus (F4 to toggle)", 
+                            &DEBUG->ShowDebugMenus);
     }
     else{
-        GuiText(Gui, "ERROR. Data was NULL");
+        ShowText(Gui, "ERROR. Data was NULL");
     }
 }
 
@@ -520,7 +604,7 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Log)){
         
     }
     else{
-        GuiText(Gui, "ERROR. Data was NULL");
+        ShowText(Gui, "ERROR. Data was NULL");
     }
 }
 
@@ -530,7 +614,7 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Platform)){
         
     }
     else{
-        GuiText(Gui, "ERROR. Data was NULL");
+        ShowText(Gui, "ERROR. Data was NULL");
     }
 }
 
@@ -540,6 +624,6 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Render)){
         
     }
     else{
-        GuiText(Gui, "ERROR. Data was NULL");
+        ShowText(Gui, "ERROR. Data was NULL");
     }
 }
