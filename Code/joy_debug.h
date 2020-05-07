@@ -56,7 +56,8 @@ struct debug_timing_stat{
 #define DEBUG_THREADS_TABLE_SIZE 32
 #define DEBUG_DEFAULT_FILTER_VALUE 0xFFFFFFFF
 
-struct debug_profiled_frame{
+struct debug_thread_frame{
+    debug_profiled_tree_node RootTreeNodeUse;
     debug_timing_stat StatUse;
     
     debug_timing_stat* StatTable[DEBUG_STATS_TABLE_SIZE];
@@ -65,11 +66,6 @@ struct debug_profiled_frame{
     int ToSortStatsCount;
     
     debug_profiled_tree_node* FrameUpdateNode;
-    debug_profiled_tree_node* WatchNode;
-};
-
-struct debug_thread_frame{
-    debug_profiled_tree_node RootTreeNodeUse;
     
     debug_profiled_tree_node* CurNode;
 };
@@ -133,8 +129,6 @@ struct debug_state{
     debug_thread* ThreadHashTable[DEBUG_THREADS_TABLE_SIZE];
     int ProfiledThreadsCount;
     
-    debug_profiled_frame ProfiledFrames[DEBUG_PROFILED_FRAMES_COUNT];
-    
     u32 ToShowProfileMenuType;
     
     char RootNodesName[32];
@@ -142,14 +136,6 @@ struct debug_state{
     u32 RootNodesNameHash;
     u32 SentinelElementsNameHash;
 };
-
-
-inline debug_profiled_frame* 
-GetFrameByIndex(debug_state* State, int FrameIndex){
-    debug_profiled_frame* Frame = &State->ProfiledFrames[FrameIndex];
-    
-    return(Frame);
-}
 
 inline debug_thread_frame* 
 GetThreadFrameByIndex(debug_thread* Thread, int FrameIndex){

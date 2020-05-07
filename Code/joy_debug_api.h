@@ -234,7 +234,7 @@ inline void DEBUGAddRecord(char* UniqueName, u8 Type){
 
 void DEBUGParseNameFromUnique(char* To, int ToSize, char* From);
 void FillAndSortStats(struct debug_state* State, 
-                      struct debug_profiled_frame* Frame, 
+                      struct debug_thread_frame* Frame, 
                       b32 IncludingChildren);
 
 struct debug_timing{

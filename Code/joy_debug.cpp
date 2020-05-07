@@ -601,7 +601,15 @@ INTERNAL_FUNCTION void ClearStatsTable(debug_timing_stat** Table,
     }
 }
 
-INTERNAL_FUNCTION inline void InitProfiledFrame(debug_state* State, debug_profiled_frame* Frame){
+INTERNAL_FUNCTION inline void InitThreadFrame(debug_state* State, 
+                                              debug_thread_frame* Frame)
+{
+    Frame->RootTreeNodeUse.UniqueName = State->RootNodesName;
+    Frame->RootTreeNodeUse.NameID = State->RootNodesNameHash;
+    
+    
+    DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, Next, Prev);
     DLIST_REFLECT_PTRS(Frame->StatUse, Next, Prev);
     
     ClearStatsTable(Frame->StatTable, DEBUG_STATS_TABLE_SIZE);
@@ -609,36 +617,6 @@ INTERNAL_FUNCTION inline void InitProfiledFrame(debug_state* State, debug_profil
     Frame->ToSortStatsCount = 0;
     
     Frame->FrameUpdateNode = 0;
-}
-
-INTERNAL_FUNCTION inline void ClearProfiledFrame(debug_state* State, 
-                                                 debug_profiled_frame* Frame)
-{
-    DLIST_REMOVE_ENTIRE_LIST(&Frame->StatUse,
-                             &State->StatFree,
-                             Next, Prev);
-    
-    ClearStatsTable(Frame->StatTable, DEBUG_STATS_TABLE_SIZE);
-    
-    Frame->ToSortStatsCount = 0;
-    Frame->FrameUpdateNode = 0;
-}
-
-INTERNAL_FUNCTION inline void ClearIndexFrame(debug_state* State, 
-                                              int FrameIndex)
-{
-    debug_profiled_frame* Frame = GetFrameByIndex(State, FrameIndex);
-    ClearProfiledFrame(State, Frame);
-}
-
-INTERNAL_FUNCTION inline void InitThreadFrame(debug_state* State, 
-                                              debug_thread_frame* Frame)
-{
-    Frame->RootTreeNodeUse.UniqueName = State->RootNodesName;
-    Frame->RootTreeNodeUse.NameID = State->RootNodesNameHash;
-    
-    DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, NextAlloc, PrevAlloc);
-    DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, Next, Prev);
     
     CreateSentinel4Element(State, Frame, &Frame->RootTreeNodeUse);
     
@@ -648,14 +626,29 @@ INTERNAL_FUNCTION inline void InitThreadFrame(debug_state* State,
 INTERNAL_FUNCTION inline void ClearThreadFrame(debug_state* State,
                                                debug_thread_frame* Frame)
 {
+    // NOTE(Dima): Freing profiled nodes
     DLIST_REMOVE_ENTIRE_LIST(&Frame->RootTreeNodeUse, 
                              &State->TreeNodeFree, 
                              NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, NextAlloc, PrevAlloc);
     
+    // NOTE(Dima): Freing stats 
+    DLIST_REMOVE_ENTIRE_LIST(&Frame->StatUse,
+                             &State->StatFree,
+                             Next, Prev);
+    DLIST_REFLECT_PTRS(Frame->StatUse, Next, Prev);
+    
+    
+    ClearStatsTable(Frame->StatTable, DEBUG_STATS_TABLE_SIZE);
+    
+    Frame->ToSortStatsCount = 0;
+    Frame->FrameUpdateNode = 0;
+    
+    // NOTE(Dima): Recreating childs 
     CreateSentinel4Element(State, Frame, &Frame->RootTreeNodeUse);
+    //DLIST_REFLECT_POINTER_PTRS(Frame->RootTreeNodeUse.ChildSentinel, Next, Prev);
+    
     Frame->CurNode = &Frame->RootTreeNodeUse;
-    DLIST_REFLECT_POINTER_PTRS(Frame->RootTreeNodeUse.ChildSentinel, Next, Prev);
 }
 
 INTERNAL_FUNCTION inline void ClearThreadsIndexFrame(debug_state* State, int FrameIndex){
@@ -764,7 +757,7 @@ CreateOrFindThreadForID(debug_state* State, u16 ThreadID)
 }
 
 INTERNAL_FUNCTION debug_timing_stat* AllocateTimingStat(debug_state* State,
-                                                        debug_profiled_frame* Frame)
+                                                        debug_thread_frame* Frame)
 {
     DLIST_ALLOCATE_FUNCTION_BODY(debug_timing_stat, State->Region,
                                  Next, Prev, 
@@ -778,7 +771,7 @@ INTERNAL_FUNCTION debug_timing_stat* AllocateTimingStat(debug_state* State,
 
 INTERNAL_FUNCTION debug_timing_stat* 
 CreateOrFindStatForUniqueName(debug_state* State, 
-                              debug_profiled_frame* Frame,
+                              debug_thread_frame* Frame,
                               char* UniqueName)
 {
     u32 NameID = StringHashFNV(UniqueName);
@@ -818,7 +811,7 @@ CreateOrFindStatForUniqueName(debug_state* State,
 
 INTERNAL_FUNCTION void 
 FillAndSortStats(debug_state* State, 
-                 debug_profiled_frame* Frame, 
+                 debug_thread_frame* Frame, 
                  b32 IncludingChildren)
 {
     // NOTE(Dima): Filling to sort table
@@ -906,7 +899,7 @@ ProcessRecordsIndicesInc(debug_state* State){
     }
 }
 
-INTERNAL_FUNCTION debug_profiled_tree_node*
+INTERNAL_FUNCTION void
 FindFrameUpdateNode(debug_thread_frame* Frame){
     debug_profiled_tree_node* FrameUpdateNode = 0;
     
@@ -925,7 +918,7 @@ FindFrameUpdateNode(debug_thread_frame* Frame){
         At = At->NextAlloc;
     }
     
-    return(FrameUpdateNode);
+    Frame->FrameUpdateNode = FrameUpdateNode;
 }
 
 INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
@@ -987,16 +980,15 @@ INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
                     Snapshot->HitCount += PendingHitCount;
                     
                     // NOTE(Dima): Adding time to total parent's children elapsed 
-                    debug_profiled_frame* StatFrame = GetFrameByIndex(State, State->CollationFrameIndex);
                     debug_profiled_tree_node* ParentNode = CurNode->Parent;
                     if(ParentNode->Parent != 0){
-                        debug_timing_stat* ParentStat = CreateOrFindStatForUniqueName(State, StatFrame,
+                        debug_timing_stat* ParentStat = CreateOrFindStatForUniqueName(State, Frame,
                                                                                       ParentNode->UniqueName);
                         ParentStat->Stat.ClocksElapsedInChildren += ClocksElapsedThisFrame;
                     }
                     
                     // NOTE(Dima): Initializing statistic
-                    debug_timing_stat* Stat = CreateOrFindStatForUniqueName(State, StatFrame,
+                    debug_timing_stat* Stat = CreateOrFindStatForUniqueName(State, Frame,
                                                                             CurNode->UniqueName);
                     
                     Stat->Stat.ClocksElapsed += ClocksElapsedThisFrame;
@@ -1010,13 +1002,11 @@ INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
                     debug_thread* MainThread = State->MainThread;
                     Assert(MainThread->ThreadID == Record->ThreadID);
                     
-                    debug_profiled_frame* OldProfiledFrame = GetFrameByIndex(State, 
-                                                                             State->CollationFrameIndex);
                     debug_thread_frame* OldFrame = GetThreadFrameByIndex(MainThread, 
                                                                          State->CollationFrameIndex);
                     
                     // NOTE(Dima): Finding frame update node
-                    OldProfiledFrame->FrameUpdateNode = FindFrameUpdateNode(OldFrame);
+                    FindFrameUpdateNode(OldFrame);
                     
                     Assert(OldFrame->CurNode == &OldFrame->RootTreeNodeUse);
                     
@@ -1024,7 +1014,6 @@ INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
                     ProcessRecordsIndicesInc(State);
                     
                     // NOTE(Dima): Clearing frame
-                    ClearIndexFrame(State, State->CollationFrameIndex);
                     ClearThreadsIndexFrame(State, State->CollationFrameIndex);
                 }break;
             }
@@ -1125,15 +1114,6 @@ INTERNAL_FUNCTION void DEBUGInit(debug_state* State,
     DLIST_REFLECT_PTRS(State->ThreadSentinel, NextAlloc, PrevAlloc);
     ClearThreadsTable(State->ThreadHashTable, DEBUG_THREADS_TABLE_SIZE);
     State->MainThread = CreateOrFindThreadForID(State, GetThreadID());
-    
-    for(int ProfiledFrameIndex = 0;
-        ProfiledFrameIndex < DEBUG_PROFILED_FRAMES_COUNT;
-        ProfiledFrameIndex++)
-    {
-        debug_profiled_frame* Frame = &State->ProfiledFrames[ProfiledFrameIndex];
-        
-        InitProfiledFrame(State, Frame);
-    }
 }
 
 PLATFORM_CALLBACK(DEBUGDummyThreadsWorkCallback){

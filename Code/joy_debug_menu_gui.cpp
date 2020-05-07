@@ -180,8 +180,10 @@ INTERNAL_FUNCTION void ShowTopClocks(gui_state* Gui,
     GuiEndElement(Gui, GuiElement_Item);
 #endif
     
-    debug_profiled_frame* Frame = GetFrameByIndex(State, 
-                                                  State->ViewFrameIndex);
+    
+    
+    debug_thread_frame* Frame = GetThreadFrameByIndex(State->MainThread, 
+                                                      State->ViewFrameIndex);
     
     if(Frame->FrameUpdateNode){
         FillAndSortStats(State, Frame, IncludingChildren);
@@ -363,8 +365,8 @@ INTERNAL_FUNCTION void ShowRootViewer(gui_state* Gui, debug_state* State){
             FrameIndex < DEBUG_PROFILED_FRAMES_COUNT;
             FrameIndex++)
         {
-            debug_profiled_frame* Frame = GetFrameByIndex(State, 
-                                                          FrameIndex);
+            debug_thread_frame* Frame = GetThreadFrameByIndex(State->MainThread, 
+                                                              FrameIndex);
             
             if(Frame->FrameUpdateNode){
                 rc2 BarRc = GetBarRectHorz(WorkRect, 
@@ -520,7 +522,7 @@ INTERNAL_FUNCTION void ShowThreadsViewer(gui_state* Gui, debug_state* State){
         int LaneCount = State->ProfiledThreadsCount;
         
         debug_thread* MainThread = State->MainThread;
-        debug_profiled_frame* ProfFrame = &State->ProfiledFrames[ViewFrame];
+        debug_thread_frame* ProfFrame = &State->MainThread->Frames[ViewFrame];
         
         u64 FrameUpdateStart = ProfFrame->FrameUpdateNode->TimingSnapshot.StartClock;
         f32 OneOverFramesClock = 1.0f / (f32)ProfFrame->FrameUpdateNode->TimingSnapshot.ClocksElapsed;
