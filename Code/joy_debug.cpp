@@ -574,6 +574,8 @@ void CreateSentinel4Element(debug_state* State,
     DLIST_REFLECT_POINTER_PTRS(Element->ChildSentinel, Next, Prev);
     Element->ChildSentinel->Parent = Element;
     Element->ChildSentinel->UniqueName = State->SentinelElementsName;
+    Element->ChildSentinel->NameID = State->SentinelElementsNameHash;
+    
     Element->ChildSentinel->ChildSentinel = 0;
 }
 
@@ -633,6 +635,7 @@ INTERNAL_FUNCTION inline void InitThreadFrame(debug_state* State,
                                               debug_thread_frame* Frame)
 {
     Frame->RootTreeNodeUse.UniqueName = State->RootNodesName;
+    Frame->RootTreeNodeUse.NameID = State->RootNodesNameHash;
     
     DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, Next, Prev);
@@ -648,7 +651,10 @@ INTERNAL_FUNCTION inline void ClearThreadFrame(debug_state* State,
     DLIST_REMOVE_ENTIRE_LIST(&Frame->RootTreeNodeUse, 
                              &State->TreeNodeFree, 
                              NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(Frame->RootTreeNodeUse, NextAlloc, PrevAlloc);
     
+    CreateSentinel4Element(State, Frame, &Frame->RootTreeNodeUse);
+    Frame->CurNode = &Frame->RootTreeNodeUse;
     DLIST_REFLECT_POINTER_PTRS(Frame->RootTreeNodeUse.ChildSentinel, Next, Prev);
 }
 
@@ -727,11 +733,14 @@ CreateOrFindThreadForID(debug_state* State, u16 ThreadID)
     }
     
     if(!Found){
+        // NOTE(Dima): Allocate the thread
         Found = PushStruct(State->Region, debug_thread);
         
+        // NOTE(Dima): Init the debug thread
         DLIST_INSERT_BEFORE_SENTINEL(Found, State->ThreadSentinel, 
                                      NextAlloc, PrevAlloc);
         Found->ThreadID = ThreadID;
+        Found->WatchNodeUniqueName = 0;
         
         Found->NextInHash = State->ThreadHashTable[Key];
         State->ThreadHashTable[Key] = Found;
@@ -746,6 +755,9 @@ CreateOrFindThreadForID(debug_state* State, u16 ThreadID)
             
             InitThreadFrame(State, Frame);
         }
+        
+        // NOTE(Dima): Increasing profiled debug thread count
+        State->ProfiledThreadsCount++;
     }
     
     return(Found);
@@ -1102,11 +1114,14 @@ INTERNAL_FUNCTION void DEBUGInit(debug_state* State,
     
     CopyStrings(State->RootNodesName, "RootNode");
     CopyStrings(State->SentinelElementsName, "Sentinel");
+    State->RootNodesNameHash = StringHashFNV(State->RootNodesName);
+    State->SentinelElementsNameHash = StringHashFNV(State->SentinelElementsName);
     
     DLIST_REFLECT_PTRS(State->TreeNodeFree, NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(State->TreeNodeFree, Next, Prev);
     DLIST_REFLECT_PTRS(State->StatFree, Next, Prev);
     
+    State->ProfiledThreadsCount = 0;
     DLIST_REFLECT_PTRS(State->ThreadSentinel, NextAlloc, PrevAlloc);
     ClearThreadsTable(State->ThreadHashTable, DEBUG_THREADS_TABLE_SIZE);
     State->MainThread = CreateOrFindThreadForID(State, GetThreadID());
@@ -1121,6 +1136,26 @@ INTERNAL_FUNCTION void DEBUGInit(debug_state* State,
     }
 }
 
+PLATFORM_CALLBACK(DEBUGDummyThreadsWorkCallback){
+    FUNCTION_TIMING();
+    
+    for(int i = 0; i < 100000; i++){
+        u32 Res = 1000.0f / 234.0f * Sqrt(i) * (i + 1);
+    }
+}
+
+INTERNAL_FUNCTION void DEBUGDummyThreadsWork(){
+    int WorksCount = 100;
+    
+    platform_job_queue* JobQueue = &Platform.HighPriorityQueue;
+    
+    for(int i = 0; i < WorksCount; i++){
+        Platform.AddEntry(JobQueue, DEBUGDummyThreadsWorkCallback, 0);
+    }
+    
+    Platform.WaitForCompletion(JobQueue);
+}
+
 INTERNAL_FUNCTION void DEBUGUpdate(debug_state* State){
     FUNCTION_TIMING();
     
@@ -1131,6 +1166,8 @@ INTERNAL_FUNCTION void DEBUGUpdate(debug_state* State){
     
     DEBUGUpdatePrimitives(State, State->Input->DeltaTime);
     DEBUGUpdateMenus(State);
+    
+    DEBUGDummyThreadsWork();
     
     DEBUGProcessRecords(State);
 }

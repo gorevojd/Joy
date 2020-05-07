@@ -65,6 +65,7 @@ struct debug_profiled_frame{
     int ToSortStatsCount;
     
     debug_profiled_tree_node* FrameUpdateNode;
+    debug_profiled_tree_node* WatchNode;
 };
 
 struct debug_thread_frame{
@@ -80,6 +81,8 @@ struct debug_thread{
     debug_thread* NextInHash;
     
     debug_thread_frame* Frames;
+    
+    char* WatchNodeUniqueName;
     
     u16 ThreadID;
 };
@@ -128,6 +131,7 @@ struct debug_state{
     debug_thread ThreadSentinel;
     debug_thread* MainThread;
     debug_thread* ThreadHashTable[DEBUG_THREADS_TABLE_SIZE];
+    int ProfiledThreadsCount;
     
     debug_profiled_frame ProfiledFrames[DEBUG_PROFILED_FRAMES_COUNT];
     
@@ -135,6 +139,8 @@ struct debug_state{
     
     char RootNodesName[32];
     char SentinelElementsName[32];
+    u32 RootNodesNameHash;
+    u32 SentinelElementsNameHash;
 };
 
 

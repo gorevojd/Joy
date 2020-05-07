@@ -221,8 +221,8 @@ struct platform_api{
     Platform_Show_Error* ShowError;
     Platform_Debug_Output_String* OutputString;
     
-    platform_job_queue highPriorityQueue;
-    platform_job_queue lowPriorityQueue;
+    platform_job_queue HighPriorityQueue;
+    platform_job_queue LowPriorityQueue;
     
     platform_memalloc* MemAlloc;
     platform_memfree* MemFree;

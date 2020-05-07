@@ -464,8 +464,9 @@ assets* Assets)
     // NOTE(Dima): Initializing colors
     InitColorsState(&Gui->colorState, Gui->Mem);
     Gui->colors[GuiColor_Text] = GUI_GETCOLOR_COLSYS(Color_White);
-    Gui->colors[GuiColor_Borders] = GUI_GETCOLOR_COLSYS(Color_NeoMint);
+    Gui->colors[GuiColor_Borders] = GUI_GETCOLOR_COLSYS(Color_Black);
     Gui->colors[GuiColor_SliderValue] = GUI_GETCOLOR_COLSYS(Color_DarkMagenta);
+    Gui->colors[GuiColor_Error] = GUI_GETCOLOR_COLSYS(Color_Red);
     
     Gui->colors[GuiColor_Hot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
     Gui->colors[GuiColor_Active] = GUI_GETCOLOR_COLSYS(Color_Red);
@@ -488,7 +489,7 @@ assets* Assets)
     Gui->colors[GuiColor_BackgroundInactive] = GUI_GETCOLOR_COLSYS(Color_Wine);
     Gui->colors[GuiColor_BackgroundPreview] = GUI_GETCOLOR_COLSYS(ColorExt_gray5);
     
-    Gui->colors[GuiColor_OutlineActive] = GUI_GETCOLOR_COLSYS(Color_Red);
+    Gui->colors[GuiColor_OutlineActive] = GUI_GETCOLOR_COLSYS(Color_Green);
     Gui->colors[GuiColor_OutlineInactive] = GUI_GETCOLOR_COLSYS(Color_Yellow);
     Gui->colors[GuiColor_OutlinePreview] = GUI_GETCOLOR_COLSYS(Color_Black);
     

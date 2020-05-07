@@ -86,11 +86,11 @@ enum GuiColorType{
     GuiColor_Graph31,
     GuiColor_GraphCount,
     
-    
     GuiColor_Text,
     GuiColor_HotText,
     GuiColor_Borders,
     GuiColor_SliderValue,
+    GuiColor_Error,
     
     GuiColor_Hot,
     GuiColor_Active,
@@ -122,6 +122,12 @@ enum GuiColorType{
 #define GUI_GETCOLOR(color) Gui->colors[color]
 #define GUI_GETCOLOR_COLSYS(index) Gui->colorState.colorTable[index].color
 #define GUI_COLORHEX(str) ColorFromHex(str)
+
+inline int GetGraphColorIndexFromHash(u32 Hash){
+    int Result = GuiColor_Graph0 + Hash % (GuiColor_GraphCount - GuiColor_Graph0);
+    
+    return(Result);
+}
 
 enum GuiAdvanceType{
     GuiAdvanceType_Column,

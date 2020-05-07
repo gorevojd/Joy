@@ -2359,8 +2359,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     Win32InitInternalCriticalSections();
     
     // NOTE(Dima): Initializing platform API
-    InitJobQueue(&Platform.highPriorityQueue, 2048, 8);
-    InitJobQueue(&Platform.lowPriorityQueue, 2048, 4);
+    InitJobQueue(&Platform.HighPriorityQueue, 2048, 8);
+    InitJobQueue(&Platform.LowPriorityQueue, 2048, 4);
     
     // TODO(Dima): Add array of count Renderer_Count and init all renderers
     // TODO(Dima): Or leave if not supported
@@ -2474,8 +2474,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     
     DestroyWindow(GlobalWin32.window);
     
-    FreeJobQueue(&Platform.highPriorityQueue);
-    FreeJobQueue(&Platform.lowPriorityQueue);
+    FreeJobQueue(&Platform.HighPriorityQueue);
+    FreeJobQueue(&Platform.LowPriorityQueue);
     
     return (0);
 }
