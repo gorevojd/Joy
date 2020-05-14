@@ -25,16 +25,9 @@ struct test_game_mode_state{
     sphere_distribution SphereDistributionTrig;
     sphere_distribution SphereDistributionFib;
     
-#if 0    
-    playing_anim Anim0;
-    playing_anim Anim1;
-    anim_controller AC;
-#endif
-    
-    playing_anim TestAnim;
-    anim_controller TestAC;
-    
     anim_controller* PlayerAC;
+    anim_controller* FoxAC;
+    anim_controller* BearAC;
     
     b32 Initialized;
 };
@@ -182,7 +175,6 @@ INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
                    SphereCenter, 
                    QuatI(), 
                    V3(SphereRad * 2.0f),
-                   V3(1.0f, 0.5f, 1.0f),
                    ASSET_IMPORT_DEFERRED);
     
     for(int SampleIndex = 0;
@@ -196,7 +188,6 @@ INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
                        TargetP, 
                        QuatI(), 
                        V3(0.05f),
-                       V3(0.5f, 1.0f, 1.0f),
                        ASSET_IMPORT_DEFERRED);
     }
     
@@ -248,14 +239,36 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitPlayerAC)
     return(AC);
 }
 
+INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFoxAC){
+    anim_controller* AC = CreateAnimControl(Anim, "FoxAC", NodesCheckSum);
+    
+    // NOTE(Dima): Adding animation nodes
+    AddAnimState(AC, AnimState_Animation, "Idle");
+    
+    FinalizeCreation(AC);
+    
+    return(AC);
+}
+
+
+INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitBearAC){
+    anim_controller* AC = CreateAnimControl(Anim, "FoxAC", NodesCheckSum);
+    
+    // NOTE(Dima): Adding animation nodes
+    AddAnimState(AC, AnimState_Animation, "Idle");
+    
+    FinalizeCreation(AC);
+    
+    return(AC);
+}
+
 INTERNAL_FUNCTION void UpdateModel(assets* Assets, 
                                    render_stack* Stack,
                                    model_info* Model, 
                                    v3 Pos, quat Rot, v3 Scale, 
                                    f64 GlobalTime,
                                    f32 DeltaTime,
-                                   anim_controller* AC,
-                                   v3 AlbedoColor)
+                                   anim_controller* AC)
 {
     FUNCTION_TIMING();
     
@@ -276,7 +289,7 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
         
         m44 NodeTran = Node->CalculatedToModel * ModelToWorld;
         
-        DEBUGAddAxes(NodeTran);
+        //DEBUGAddAxes(NodeTran);
         
         for(int MeshIndex = 0; MeshIndex < Node->MeshCount; MeshIndex++){
             asset_id MeshID = Node->MeshIDs[MeshIndex];
@@ -284,10 +297,20 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
             mesh_info* Mesh = LoadMesh(Assets, MeshID, ASSET_IMPORT_DEFERRED);
             
             if(Mesh){
-                PushMesh(Stack, Mesh, NodeTran,
-                         AlbedoColor,
+                material_info* Material = LoadMaterial(Assets, 
+                                                       Model->MaterialIDs[Mesh->MaterialIndex],
+                                                       ASSET_IMPORT_DEFERRED);
+                
+#if 1                
+                PushMesh(Stack, Mesh, 
+                         NodeTran, Material,
                          CalcPose.BoneTransforms, 
                          CalcPose.BoneTransformsCount);
+#else
+                PushMesh(Stack, Mesh, 
+                         NodeTran, Material);
+#endif
+                
             }
         }
     }
@@ -370,10 +393,7 @@ GAME_MODE_UPDATE(TestUpdate){
     int Width = Game->Render->FrameInfo.Width;
     int Height = Game->Render->FrameInfo.Height;
     
-    render_camera_setup CamSetup = SetupCamera(PerspectiveProjection(Width, Height, 
-                                                                     1000.0f, 0.01f),
-                                               CameraTransform,
-                                               Width, Height, true);
+    render_camera_setup CamSetup = DefaultPerspSetup(Width, Height, CameraTransform);
     
     render_pass* Pass = BeginRenderPass(Game->Render, CamSetup);
     render_stack* Stack = RenderFindStack(Game->Render, "Main");
@@ -420,8 +440,6 @@ GAME_MODE_UPDATE(TestUpdate){
                               FindTagValues,
                               1);
     
-    u32 StoolID = GetFirst(Game->Assets, GameAsset_Stool);
-    
 #if 0    
     DEBUGAddLine(V3(-10, 10, 10),
                  V3(10, 10, 10),
@@ -465,7 +483,7 @@ GAME_MODE_UPDATE(TestUpdate){
 #endif
 #endif
     
-#if 1    
+#if 0    
     int SphereLayers = 10;
     int SphereLayerCount = 10;
     v3 SphereStartP = V3(0.0f, 1.0f, -15.0f);
@@ -482,9 +500,6 @@ GAME_MODE_UPDATE(TestUpdate){
             PushOrLoadMesh(Game->Assets, Stack, 
                            SphereID,
                            SphereP, QuatI(), V3(1.0f),
-                           V3((f32)InLayerIndex / (SphereLayerCount + 1),
-                              (f32)LayerIndex / (SphereLayers + 1),
-                              0.5f),
                            ASSET_IMPORT_DEFERRED);
         }
     }
@@ -520,109 +535,62 @@ GAME_MODE_UPDATE(TestUpdate){
                     V3(1.0f),
                     Game->Input->Time,
                     Game->Input->DeltaTime,
-                    State->PlayerAC,
-                    V3(1.0f, 0.6f, 0.0f));
+                    State->PlayerAC);
     }
     
+    u32 MatchTagTypes[] = {AssetTag_Character};
+    asset_tag_value MatchTagFoxValue[] = {TagValue(TagCharacter_Fox)};
     
-    model_info* TestModel = LoadModel(Game->Assets,
-                                      GetFirst(Game->Assets, GameAsset_Test),
-                                      ASSET_IMPORT_DEFERRED);
+    u32 FoxModelID = GetBestByTags(Assets, GameAsset_Model_Character, 
+                                   MatchTagTypes, MatchTagFoxValue, 1);
     
-    if(TestModel){
-        State->TestAnim.AnimationID = TestModel->AnimationIDs[0];
-        State->TestAC.PlayingAnimations[0] = &State->TestAnim;
-        State->TestAC.PlayingAnimationsCount = 1;
+    model_info* FoxModel = LoadModel(Game->Assets, FoxModelID,
+                                     ASSET_IMPORT_DEFERRED);
+    
+    if(FoxModel){
+        if(!State->FoxAC){
+            State->FoxAC = InitFoxAC(Game->Anim, Game->Assets, FoxModel->NodesCheckSum);
+            
+            u32 RunAnimID = GetBestByTags(Assets, GameAsset_Anim_Success,
+                                          MatchTagTypes, MatchTagFoxValue, 1);
+            SetStateAnimation(State->FoxAC, "Idle", RunAnimID);
+        }
         
-        UpdateModel(Assets, Stack, TestModel, 
-                    V3(-10.0f, 0.0f, 10.0f),
-                    QuatI(), 
-                    V3(1.0f),
+        UpdateModel(Assets, Stack, FoxModel, 
+                    V3(3.0f, 0.0f, 5.0f),
+                    Quat(V3(1.0f, 0.0f, 0.0f), -JOY_PI_OVER_TWO), 
+                    V3(0.02f),
                     Game->Input->Time,
                     Game->Input->DeltaTime,
-                    &State->TestAC,
-                    V3(0.0f, 0.2f, 1.0f));
+                    State->FoxAC);
     }
     
-#if 0    
-    PushOrLoadModel(Game->Assets, Stack,
-                    GetFirst(Game->Assets, GameAsset_Man),
-                    V3(15.0f, 0.0f, 10.0f),
-                    QuatI(), V3(1.0f),
-                    ASSET_IMPORT_DEFERRED);
     
-    PushOrLoadModel(Game->Assets, Stack,
-                    GetFirst(Game->Assets, GameAsset_Skyscraper),
-                    V3(-50.0f, 0.0f, -50.0f),
-                    QuatI(), V3(z10.0f),
-                    ASSET_IMPORT_DEFERRED);
+    asset_tag_value MatchTagBearValue[] = {TagValue(TagCharacter_Bear)};
+    u32 BearModelID = GetBestByTags(Assets, GameAsset_Model_Character,
+                                    MatchTagTypes, MatchTagBearValue, 1);
     
-    PushOrLoadModel(Game->Assets, Stack,
-                    GetFirst(Game->Assets, GameAsset_Stool),
-                    V3(10.0f, 0.0f, 10.0f),
-                    QuatI(), V3(1.0f),
-                    ASSET_IMPORT_DEFERRED);
+    model_info* BearModel = LoadModel(Game->Assets, BearModelID,
+                                      ASSET_IMPORT_DEFERRED);
     
+    if(BearModel){
+        if(!State->BearAC){
+            State->BearAC = InitBearAC(Game->Anim, Game->Assets, BearModel->NodesCheckSum);
+            
+            u32 RunAnimID = GetBestByTags(Assets, GameAsset_Anim_Success,
+                                          MatchTagTypes, MatchTagBearValue, 1);
+            SetStateAnimation(State->BearAC, "Idle", RunAnimID);
+        }
+        
+        UpdateModel(Assets, Stack, BearModel, 
+                    V3(1, 0.0f, 5.0f),
+                    Quat(V3(1.0f, 0.0f, 0.0f), -JOY_PI_OVER_TWO), 
+                    V3(0.02f),
+                    Game->Input->Time,
+                    Game->Input->DeltaTime,
+                    State->BearAC);
+    }
     
-    PushOrLoadModel(Game->Assets, Stack,
-                    GetFirst(Game->Assets, GameAsset_Bathroom),
-                    V3(5.0f, 0.0f, 10.0f),
-                    QuatI(), V3(1.0f),
-                    ASSET_IMPORT_DEFERRED);
-    
-    
-    PushOrLoadModel(Game->Assets, Stack,
-                    GetFirst(Game->Assets, GameAsset_Heart),
-                    V3(0.0f, 0.0f, 10.0f),
-                    QuatI(), V3(1.0f),
-                    ASSET_IMPORT_DEFERRED);
-    
-    
-    PushOrLoadModel(Game->Assets, Stack,
-                    GetFirst(Game->Assets, GameAsset_KindPlane),
-                    V3(-5.0f, 0.0f, 10.0f),
-                    QuatI(), V3(1.0f),
-                    ASSET_IMPORT_DEFERRED);
-    
-    
-    PushOrLoadModel(Game->Assets, Stack,
-                    GetFirst(Game->Assets, GameAsset_Podkova),
-                    V3(-10.0f, 0.0f, 10.0f),
-                    QuatI(), V3(1.0f),
-                    ASSET_IMPORT_DEFERRED);
-    
-    
-    PushOrLoadModel(Game->Assets, Stack,
-                    GetFirst(Game->Assets, GameAsset_RubbishBin),
-                    V3(-15.0f, 0.0f, 10.0f),
-                    QuatI(), V3(1.0f),
-                    ASSET_IMPORT_DEFERRED);
-    
-    
-    PushOrLoadModel(Game->Assets, Stack,
-                    GetFirst(Game->Assets, GameAsset_Snowman),
-                    V3(-20.0f, 0.0f, 10.0f),
-                    QuatI(), V3(1.0f),
-                    ASSET_IMPORT_DEFERRED);
-    
-    PushOrLoadModel(Game->Assets, Stack,
-                    GetFirst(Game->Assets, GameAsset_Toilet),
-                    V3(-25.0f, 0.0f, 10.0f),
-                    QuatI(), V3(1.0f),
-                    ASSET_IMPORT_DEFERRED);
-    
-    
-    PushOrLoadModel(Game->Assets, Stack,
-                    GetFirst(Game->Assets, GameAsset_Vase),
-                    V3(-30.0f, 0.0f, 10.0f),
-                    QuatI(), V3(1.0f),
-                    ASSET_IMPORT_DEFERRED);
-#endif
-    
-    PushOrLoadBitmap(Game->Assets, Stack,
-                     V2(0, 500),
-                     V2(100, 100),
-                     GetFirst(Game->Assets, GameAsset_Type_Bitmap));
     
 #if 0    
     ShowSphereDistributions(Game, Stack,
@@ -638,25 +606,23 @@ GAME_MODE_UPDATE(TestUpdate){
                             2.0f);
 #endif
     
+#if 1
     PushOrLoadMesh(Game->Assets, Stack, 
                    GetFirst(Game->Assets, GameAsset_Cube),
                    V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
                    QuatI(), V3(1.0f), 
-                   V3(1.0f, 0.0f, 0.0f),
                    ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Stack, 
                    GetFirst(Game->Assets, GameAsset_Cube),
                    V3(0.0f, 1.0f + Sin(Game->Input->Time * 3.0f) * 0.5f, 0.0f), 
                    QuatI(), V3(1.0f), 
-                   V3(1.0f, 1.0f, 0.0f),
                    ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Stack, 
                    CylID,
                    V3(-10.0f, 1.0f, 0.0f), 
                    Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), V3(2.0f),
-                   V3(1.0f, 0.0f, 1.0f),
                    ASSET_IMPORT_DEFERRED);
     
     
@@ -665,21 +631,20 @@ GAME_MODE_UPDATE(TestUpdate){
                    V3(-13.0f, 1.0f, 0.0f),
                    Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), 
                    V3(1.0f), 
-                   V3(0.0f, 1.0f, 1.0f),
                    ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Stack, 
                    SphereID,V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
                    QuatI(), V3(1.0f),
-                   V3(0.5f, 0.0f, 1.0f),
                    ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Stack, 
                    GetFirst(Game->Assets, GameAsset_Plane),
                    V3(0.0f, 0.0f, 0.0f), 
                    QuatI(), V3(100.0f),
-                   V3(1.0f, 1.0f, 1.0f),
                    ASSET_IMPORT_DEFERRED);
+#endif
+    
 }
 
 // NOTE(Dima): MAIN MENU GAME MODE
@@ -697,8 +662,12 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     
     array_info* Arr = GET_ASSET_PTR_MEMBER(Asset, array_info);
     
-#if 0    
-    render_pass* Pass = BeginRenderPass(Game->Render);
+    
+    render_camera_setup CamSetup = DefaultOrthoSetup(Game->Render->FrameInfo.Width,
+                                                     Game->Render->FrameInfo.Height,
+                                                     Identity());
+    
+    render_pass* Pass = BeginRenderPass(Game->Render, CamSetup);
     render_stack* Stack = RenderFindStack(Game->Render, "Main");
     AddStackToRenderPass(Pass, Stack);
     
@@ -717,34 +686,43 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
         State->Initialized = true;
     }
     
-    bmp_info* toShow = ToShowArray + State->ShowIndex;
-    bmp_info* toShowNext = ToShowArray + State->ShowNextIndex;
+    u32 ToShowID = Arr->FirstID + State->ShowIndex;
+    u32 ToShowNextID = Arr->FirstID + State->ShowNextIndex;
+    
+    bmp_info* ToShow = LoadBmp(Game->Assets, ToShowID, ASSET_IMPORT_DEFERRED);
+    bmp_info* ToShowNext = LoadBmp(Game->Assets, ToShowNextID, ASSET_IMPORT_DEFERRED);
     
     int Width = Game->Render->FrameInfo.Width;
     int Height = Game->Render->FrameInfo.Height;
     
-    float toShowH = CalcScreenFitHeight(
-        toShow->Width, toShow->Height,
-        Width, Height);
-    float toShowNextH = CalcScreenFitHeight(
-        toShowNext->Width, toShowNext->Height,
-        Width, Height);
+    float FadeoutAlpha = Clamp01((State->TimeSinceShow - State->ShowTime) / State->FadeoutTime);
     
-    float fadeoutAlpha = Clamp01((State->TimeSinceShow - State->ShowTime) / State->FadeoutTime);
+    if(ToShow){
+        float ToShowH = CalcScreenFitHeight(
+            ToShow->Width, 
+            ToShow->Height,
+            Width, Height);
+        
+        PushBitmap(
+            Stack, 
+            ToShow, 
+            V2(0.0f, 0.0f), 
+            ToShowH, 
+            V4(1.0f, 1.0f, 1.0f, 1.0f));
+    }
     
-    PushBitmap(
-        Stack, 
-        toShow, 
-        V2(0.0f, 0.0f), 
-        toShowH, 
-        V4(1.0f, 1.0f, 1.0f, 1.0f));
-    
-    PushBitmap(
-        Stack, 
-        toShowNext, 
-        V2(0.0f, 0.0f), 
-        toShowNextH, 
-        V4(1.0f, 1.0f, 1.0f, fadeoutAlpha));
+    if(ToShowNext){
+        float ToShowNextH = CalcScreenFitHeight(
+            ToShowNext->Width, ToShowNext->Height,
+            Width, Height);
+        
+        PushBitmap(
+            Stack, 
+            ToShowNext, 
+            V2(0.0f, 0.0f), 
+            ToShowNextH, 
+            V4(1.0f, 1.0f, 1.0f, FadeoutAlpha));
+    }
     
     State->TimeSinceShow += Game->Render->FrameInfo.dt * State->ShowSpeed;
     if(State->TimeSinceShow > State->ShowTime + State->FadeoutTime){
@@ -752,16 +730,6 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
         State->ShowNextIndex = (State->ShowIndex + 1) % ToShowCount;
         State->TimeSinceShow = 0.0f;
     }
-    
-    GuiTest(Game->Gui, Game->Render->FrameInfo.dt);
-    
-    PushBitmap(Stack,
-               &Game->Assets->MainLargeAtlas.Bitmap,
-               V2(100, 100),
-               1000,
-               V4(1.0f, 1.0f, 1.0f, 1.0f));
-#endif
-    
 }
 
 // NOTE(Dima): TITLE GAME MODE

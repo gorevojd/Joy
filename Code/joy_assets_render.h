@@ -1,11 +1,6 @@
 #ifndef JOY_ASSETS_RENDER_H
 #define JOY_ASSETS_RENDER_H
 
-#include "joy_math.h"
-#include "joy_asset_ids.h"
-#include "joy_render.h"
-#include "joy_assets.h"
-
 inline bmp_info* PushOrLoadBitmap(assets* Assets, 
                                   render_stack* Stack,
                                   v2 P, v2 Dim,
@@ -47,13 +42,12 @@ inline mesh_info* PushOrLoadMesh(assets* Assets,
                                  render_stack* Stack,
                                  asset_id MeshID,
                                  v3 P, quat R, v3 S,
-                                 v3 AlbedoColor = V3(1.0f, 1.0f, 1.0f),
                                  b32 Immediate = false)
 {
     mesh_info* Mesh = LoadMesh(Assets, MeshID, Immediate);
     
     if(Mesh){
-        PushMesh(Stack, Mesh, P, R, S, AlbedoColor);
+        PushMesh(Stack, Mesh, P, R, S);
     }
     
     return(Mesh);
@@ -63,13 +57,12 @@ inline mesh_info* PushOrLoadMesh(assets* Assets,
                                  render_stack* Stack,
                                  asset_id MeshID,
                                  m44 Transformation,
-                                 v3 AlbedoColor = V3(1.0f, 1.0f, 1.0f),
                                  b32 Immediate = false)
 {
     mesh_info* Mesh = LoadMesh(Assets, MeshID, Immediate);
     
     if(Mesh){
-        PushMesh(Stack, Mesh, Transformation, AlbedoColor);
+        PushMesh(Stack, Mesh, Transformation);
     }
     
     return(Mesh);
@@ -78,7 +71,6 @@ inline mesh_info* PushOrLoadMesh(assets* Assets,
 inline model_info* PushModel(assets* Assets,
                              render_stack* Stack,
                              model_info* Model,
-                             v3 AlbedoColor,
                              v3 P, quat R, v3 S)
 {
     m44 ModelToWorld = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
@@ -107,7 +99,6 @@ inline model_info* PushModel(assets* Assets,
                 PushOrLoadMesh(Assets, Stack, 
                                CubeMeshID, BoneP.xyz, 
                                QuatI(), V3(0.1f), 
-                               AlbedoColor,
                                ASSET_IMPORT_DEFERRED);
             }
         }

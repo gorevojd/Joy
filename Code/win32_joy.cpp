@@ -2443,7 +2443,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     
     GlobalRunning = 1;
     while(GlobalRunning){
-        FRAME_BARRIER();
+        FRAME_BARRIER(DeltaTime);
         
         BEGIN_TIMING(FRAME_UPDATE_NODE_NAME);
         

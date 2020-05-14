@@ -1,6 +1,6 @@
-INTERNAL_FUNCTION int FindPrevFrameIndexForKey(float* Times, 
-                                               int KeysCount, 
-                                               f32 CurTickTime)
+INTERNAL_FUNCTION inline int FindPrevFrameIndexForKey(float* Times, 
+                                                      int KeysCount, 
+                                                      f32 CurTickTime)
 {
     int Result = -1;
     
@@ -30,7 +30,7 @@ struct find_anim_deltas_ctx{
     float t;
 };
 
-INTERNAL_FUNCTION find_anim_deltas_ctx
+INTERNAL_FUNCTION inline find_anim_deltas_ctx
 FindAnimDeltas(animation_clip* Animation,
                float* Times,
                int KeysCount,
@@ -48,18 +48,15 @@ FindAnimDeltas(animation_clip* Animation,
     // NOTE(Dima): If not last key frame
     float PrevKeyTime = Times[FoundPrevIndex];
     
-    int NextKeyIndex;
     f32 TickDistance = 0.0f;
     
     // NOTE(Dima): If found frame is not last
-    if(FoundPrevIndex != LastFrameIndex)
+    int NextKeyIndex = FoundPrevIndex + 1;
+    TickDistance = Times[NextKeyIndex] - PrevKeyTime;
+    
+    // NOTE(Dima): Else
+    if(FoundPrevIndex == LastFrameIndex)
     {
-        NextKeyIndex = FoundPrevIndex + 1;
-        float NextKeyTime = Times[NextKeyIndex];
-        
-        TickDistance = NextKeyTime - PrevKeyTime;
-    }
-    else{
         if(Animation->IsLooping){
             NextKeyIndex = 0;
             
@@ -75,11 +72,9 @@ FindAnimDeltas(animation_clip* Animation,
     }
     
     // NOTE(Dima): Lerping
-    f32 t = (CurTickTime - PrevKeyTime) / TickDistance;
-    
     Result.PrevKeyIndex = FoundPrevIndex;
     Result.NextKeyIndex = NextKeyIndex;
-    Result.t = t;
+    Result.t = (CurTickTime - PrevKeyTime) / TickDistance;
     
     return(Result);
 }
@@ -114,7 +109,8 @@ INTERNAL_FUNCTION quat GetAnimatedQuat(animation_clip* Animation,
                                        float* Times,
                                        int KeysCount,
                                        f32 CurTickTime,
-                                       quat DefaultValue){
+                                       quat DefaultValue)
+{
     quat Result = DefaultValue;
     
     // NOTE(Dima): Loading first frame's values
@@ -189,6 +185,20 @@ INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
             Playing->TransformsCalculated[NodeIndex] = false;
         }
         
+        // NOTE(Dima): Animating
+        f64 AnimTime = (CurrentTime - Playing->GlobalStart) * PlaybackRate;
+        f64 CurrentTick = AnimTime * Animation->TicksPerSecond;
+        
+        Playing->Phase01 = 0.0f;
+        
+        if(Animation->DurationTicks > 0.0f){
+            if(Animation->IsLooping){
+                CurrentTick = fmod(CurrentTick, Animation->DurationTicks);
+            }
+            
+            Playing->Phase01 = Clamp01(CurrentTick / Animation->DurationTicks);
+        }
+        
         for(int NodeAnimIndex = 0;
             NodeAnimIndex < Animation->NodeAnimationsCount;
             NodeAnimIndex++)
@@ -200,20 +210,6 @@ INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
                                                     ASSET_IMPORT_IMMEDIATE);
             
             ASSERT(NodeAnim);
-            
-            // NOTE(Dima): Animating
-            f64 AnimTime = (CurrentTime - Playing->GlobalStart) * PlaybackRate;
-            f64 CurrentTick = AnimTime * Animation->TicksPerSecond;
-            
-            Playing->Phase01 = 0.0f;
-            
-            if(Animation->DurationTicks > 0.0f){
-                if(Animation->IsLooping){
-                    CurrentTick = fmod(CurrentTick, Animation->DurationTicks);
-                }
-                
-                Playing->Phase01 = Clamp01(CurrentTick / Animation->DurationTicks);
-            }
             
             v3 AnimatedP = GetAnimatedVector(Animation,
                                              NodeAnim->PositionKeysValues,
@@ -235,7 +231,6 @@ INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
                                              NodeAnim->ScalingKeysCount,
                                              CurrentTick,
                                              V3(1.0f, 1.0f, 1.0f));
-            
             
             node_transform* NodeTransform = &Playing->NodeTransforms[NodeAnim->NodeIndex];
             NodeTransform->T = AnimatedP;
@@ -275,6 +270,8 @@ INTERNAL_FUNCTION void ResetToParentTransforms(model_info* Model){
 
 // NOTE(Dima): Calculating nodes to parent matrices based on transforms
 INTERNAL_FUNCTION void CalculateToParentTransforms(model_info* Model, node_transform* Transforms){
+    FUNCTION_TIMING();
+    
     for(int NodeIndex = 0; 
         NodeIndex < Model->NodeCount;
         NodeIndex++)
@@ -491,55 +488,63 @@ INTERNAL_FUNCTION void UpdateAnimController(assets* Assets,
                 }
             }
             
-            // NOTE(Dima): Clearing transforms in anim controller to safely contribute
-            // NOTE(Dima): all in-controller playing states
-            ClearNodeTransforms(AC->ResultedTransforms, Model->NodeCount);
-            
-            // NOTE(Dima): Sum every state resulted transforms based on contribution factor
-            // TODO(Dima): Potentially we can SIMD this loop
-            for(int PlayingStateIndex = 0;
-                PlayingStateIndex < AC->PlayingStatesCount;
-                PlayingStateIndex++)
             {
-                anim_state* AnimState = AC->PlayingStates[PlayingStateIndex];
+                BLOCK_TIMING("UpdateAC::Contribute");
                 
-                float Contribution = AnimState->Contribution;
+                // NOTE(Dima): Clearing transforms in anim controller to safely contribute
+                // NOTE(Dima): all in-controller playing states
+                ClearNodeTransforms(AC->ResultedTransforms, Model->NodeCount);
                 
+                // NOTE(Dima): Sum every state resulted transforms based on contribution factor
+                // TODO(Dima): Potentially we can SIMD this loop
+                for(int PlayingStateIndex = 0;
+                    PlayingStateIndex < AC->PlayingStatesCount;
+                    PlayingStateIndex++)
+                {
+                    anim_state* AnimState = AC->PlayingStates[PlayingStateIndex];
+                    
+                    float Contribution = AnimState->Contribution;
+                    
+                    for(int NodeIndex = 0; 
+                        NodeIndex < Model->NodeCount;
+                        NodeIndex++)
+                    {
+                        node_transform* Dst = &AC->ResultedTransforms[NodeIndex];
+                        node_transform* Src = &AnimState->ResultedTransforms[NodeIndex];
+                        
+                        // NOTE(Dima): Summing translation
+                        Dst->T += Src->T * Contribution;
+                        
+                        // NOTE(Dima): Summing scaling
+                        Dst->S += Src->S * Contribution;
+                        
+                        // NOTE(Dima): Summing rotation
+                        float RotDot = Dot(Dst->R, Src->R);
+                        float SignDot = SignNotZero(RotDot);
+                        Dst->R += Src->R * SignDot * Contribution;
+                    }
+                }
+            }
+            
+            {
+                BLOCK_TIMING("UpdateAC::Final");
+                
+                // TODO(Dima): SIMD this loop too
                 for(int NodeIndex = 0; 
                     NodeIndex < Model->NodeCount;
                     NodeIndex++)
                 {
-                    node_transform* Dst = &AC->ResultedTransforms[NodeIndex];
-                    node_transform* Src = &AnimState->ResultedTransforms[NodeIndex];
+                    node_info* TargetNode = &Model->Nodes[NodeIndex];
+                    node_transform* NodeTran = &AC->ResultedTransforms[NodeIndex];
                     
-                    // NOTE(Dima): Summing translation
-                    Dst->T += Src->T * Contribution;
-                    
-                    // NOTE(Dima): Summing scaling
-                    Dst->S += Src->S * Contribution;
-                    
-                    // NOTE(Dima): Summing rotation
-                    float RotDot = Dot(Dst->R, Src->R);
-                    float SignDot = SignNotZero(RotDot);
-                    Dst->R += Src->R * SignDot * Contribution;
+                    // NOTE(Dima): Finaling normalization of rotation
+                    NodeTran->R = Normalize(NodeTran->R);
                 }
-            }
-            
-            // TODO(Dima): SIMD this loop too
-            for(int NodeIndex = 0; 
-                NodeIndex < Model->NodeCount;
-                NodeIndex++)
-            {
-                node_info* TargetNode = &Model->Nodes[NodeIndex];
-                node_transform* NodeTran = &AC->ResultedTransforms[NodeIndex];
                 
-                // NOTE(Dima): Finaling normalization of rotation
-                NodeTran->R = Normalize(NodeTran->R);
+                
+                // NOTE(Dima): Calculating to parent transforms
+                CalculateToParentTransforms(Model, AC->ResultedTransforms);
             }
-            
-            
-            // NOTE(Dima): Calculating to parent transforms
-            CalculateToParentTransforms(Model, AC->ResultedTransforms);
         } // NOTE(Dima): end if transitions count greater than zero
     }
 }

@@ -209,11 +209,12 @@ INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadSimpleShader){
     GLGETU(BoneTransforms);
     GLGETU(BonesCount);
     
+    GLGETU(AlbedoColor);
     GLGETU(Albedo);
     GLGETU(Normals);
-    GLGETU(AlbedoIsSet);
-    GLGETU(NormalsIsSet);
-    GLGETU(AlbedoColor);
+    GLGETU(Emissive);
+    GLGETU(Specular);
+    GLGETU(TexturesSetFlags);
     
     GLGETA(P);
     GLGETA(UV);
@@ -342,28 +343,32 @@ INTERNAL_FUNCTION void FreeVertexAttrib(GLint AttrLoc){
 }
 
 INTERNAL_FUNCTION GLuint GlAllocateTexture(bmp_info* bmp){
-    GLuint GenerateTex;
-    glGenTextures(1, &GenerateTex);
-    glBindTexture(GL_TEXTURE_2D, GenerateTex);
+    GLuint GenerateTex = 0;
     
-    glTexImage2D(
-        GL_TEXTURE_2D,
-        0,
-        GL_RGBA,
-        bmp->Width,
-        bmp->Height,
-        0,
-        GL_RGBA,
-        GL_UNSIGNED_BYTE,
-        bmp->Pixels);
-    
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
-    bmp->Handle = GenerateTex;
+    if(!bmp->Handle){
+        
+        glGenTextures(1, &GenerateTex);
+        glBindTexture(GL_TEXTURE_2D, GenerateTex);
+        
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_RGBA,
+            bmp->Width,
+            bmp->Height,
+            0,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            bmp->Pixels);
+        
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        
+        bmp->Handle = GenerateTex;
+    }
     
     return(GenerateTex);
 }
@@ -756,22 +761,57 @@ void GlOutputStack(gl_state* GL, render_stack* Stack, render_camera_setup* Camer
                 }
                 
                 // NOTE(Dima): Setting FS uniforms
-                b32 AlbedoIsSet = false;
-                b32 NormalsIsSet = false;
+                b32 AlbedoIsSet = 0;
+                b32 NormalsIsSet = 0;
+                b32 SpecularIsSet = 0;
+                b32 EmissiveIsSet = 0;
                 
-                UniformBool(GL->SimpleShader.AlbedoIsSetLoc, AlbedoIsSet);
-                UniformBool(GL->SimpleShader.NormalsIsSetLoc, NormalsIsSet);
+                if(entry->Material){
+                    material_info* Mat = entry->Material;
+                    
+                    bmp_info* Albedo = Mat->Textures[MaterialTexture_Diffuse];
+                    bmp_info* Normals = Mat->Textures[MaterialTexture_Normals];
+                    bmp_info* Specular = Mat->Textures[MaterialTexture_Specular];
+                    bmp_info* Emissive = Mat->Textures[MaterialTexture_Emissive];
+                    
+                    
+                    if(Albedo){
+                        AlbedoIsSet = 1;
+                        GlAllocateTexture(Albedo);
+                        
+                        glUniform1i(GL->SimpleShader.AlbedoLoc, 0);
+                        glActiveTexture(GL_TEXTURE0);
+                        glBindTexture(GL_TEXTURE_2D, Albedo->Handle);
+                    }
+                    
+                    if(Specular){
+                        SpecularIsSet = 1;
+                        GlAllocateTexture(Specular);
+                    }
+                    
+                    if(Normals){
+                        NormalsIsSet = 1;
+                        GlAllocateTexture(Normals);
+                        
+                        glUniform1i(GL->SimpleShader.NormalsLoc, 1);
+                        glActiveTexture(GL_TEXTURE1);
+                        glBindTexture(GL_TEXTURE_2D, Normals->Handle);
+                    }
+                    
+                    if(Emissive){
+                        EmissiveIsSet = 1;
+                        GlAllocateTexture(Emissive);
+                    }
+                }
+                
+                u32 TexturesSetFlags = 
+                    (AlbedoIsSet) |
+                    (NormalsIsSet << 1) |
+                    (SpecularIsSet << 2) |
+                    (EmissiveIsSet << 3);
+                
                 UniformVec3(GL->SimpleShader.AlbedoColorLoc, entry->AlbedoColor);
-                
-#if 0
-                glUniform1i(GL->SimpleShader.AlbedoLoc, 0);
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, ???);
-                
-                glUniform1i(GL->SimpleShader.NormalsLoc, 1);
-                glActiveTexture(GL_TEXTURE1);
-                glBindTexture(GL_TEXTURE_2D, ???);
-#endif
+                UniformInt(GL->SimpleShader.TexturesSetFlagsLoc, TexturesSetFlags);
                 
                 glBindVertexArray(Mesh->Handles.Handles[0]);
                 glDrawElements(GL_TRIANGLES, Mesh->IndicesCount, GL_UNSIGNED_INT, 0);

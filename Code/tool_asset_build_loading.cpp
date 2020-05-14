@@ -271,6 +271,8 @@ tool_bmp_info LoadBMP(char* FilePath){
         &Channels,
         STBI_rgb_alpha);
     
+    Assert(Image);
+    
     tool_bmp_info res = LoadBMPInternal(Image, Width, Height);
     
     stbi_image_free(Image);

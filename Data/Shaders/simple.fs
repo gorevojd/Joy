@@ -9,11 +9,18 @@ in Vertex_Shader_Out{
 out vec4 Color;
 
 uniform vec3 AlbedoColor;
+
 uniform sampler2D Albedo;
 uniform sampler2D Normals;
+uniform sampler2D Specular;
+uniform sampler2D Emissive;
 
-uniform bool AlbedoIsSet;
-uniform bool NormalsIsSet;
+uniform int TexturesSetFlags;
+
+const int ALBEDO_SET_FLAG = 1;
+const int NORMALS_SET_FLAG = 1 << 1;
+const int SPECULAR_SET_FLAG = 1 << 2;
+const int EMISSIVE_SET_FLAG = 1 << 3;
 
 vec3 CalcDirLit(vec3 FragP, vec3 FragN, vec3 FragC){
     vec3 DirLitDir = vec3(0.5f, -0.5f, -0.5f);
@@ -31,6 +38,11 @@ vec3 CalcDirLit(vec3 FragP, vec3 FragN, vec3 FragC){
 void main(){
     vec3 FragP = FsIn.WorldP;
     vec3 FragN = normalize(FsIn.WorldN);
+    
+    bool AlbedoIsSet = (TexturesSetFlags & ALBEDO_SET_FLAG) != 0;
+    bool SpecularIsSet = (TexturesSetFlags & SPECULAR_SET_FLAG) != 0;
+    bool NormalsIsSet = (TexturesSetFlags & NORMALS_SET_FLAG) != 0;
+    bool EmissiveIsSet = (TexturesSetFlags & EMISSIVE_SET_FLAG) != 0;
     
     float AmbientFactor = 0.05f;
     vec3 Ambient = vec3(AmbientFactor);

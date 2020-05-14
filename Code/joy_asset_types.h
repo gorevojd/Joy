@@ -1,8 +1,6 @@
 #ifndef JOY_ASSET_TYPES_H
 #define JOY_ASSET_TYPES_H
 
-#include "joy_types.h"
-#include "joy_math.h"
 #include "joy_asset_types_shared.h"
 
 struct array_info{
@@ -118,6 +116,8 @@ struct mesh_info{
     void* Vertices;
     int VerticesCount;
     
+    u32 MaterialIndex;
+    
     mesh_type_context TypeCtx;
     
     mesh_handles Handles;
@@ -166,6 +166,15 @@ struct node_info{
 struct skeleton_info{
     bone_info* Bones;
     int BoneCount;
+};
+
+struct material_info{
+    v3 ColorDiffuse;
+    v3 ColorSpecular;
+    v3 ColorAmbient;
+    v3 ColorEmissive;
+    
+    bmp_info* Textures[MaterialTexture_Count];
 };
 
 struct model_info{

@@ -2,6 +2,8 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Animation)){
     if(Data){
         anim_system* AnimSys = (anim_system*)Data;
         
+        BeginDimension(Gui, BeginDimension_Height, ScaledAscDim(Gui, V2(0, 2)));
+        
         BeginTree(Gui, "Controllers");
         
         anim_controller* ControlAt = AnimSys->ControlUse.Next;
@@ -115,7 +117,7 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Animation)){
         
         EndTree(Gui);
         
-        
+        EndDimension(Gui);
     }
     else{
         ShowText(Gui, "ERROR. Data was NULL");
@@ -181,11 +183,14 @@ INTERNAL_FUNCTION void ShowTopClocks(gui_state* Gui,
 #endif
     
     
+    debug_thread_frame* MainFrame = GetThreadFrameByIndex(State->MainThread,
+                                                          State->ViewFrameIndex);
     
-    debug_thread_frame* Frame = GetThreadFrameByIndex(State->MainThread, 
+    debug_thread_frame* Frame = GetThreadFrameByIndex(State->WatchThread, 
                                                       State->ViewFrameIndex);
+    debug_common_frame* FrameCommon = GetFrameByIndex(State, State->ViewFrameIndex);
     
-    if(Frame->FrameUpdateNode){
+    if(MainFrame->FrameUpdateNode){
         FillAndSortStats(State, Frame, IncludingChildren);
         
         for(int StatIndex = 0; 
@@ -196,15 +201,18 @@ INTERNAL_FUNCTION void ShowTopClocks(gui_state* Gui,
             
             u64 ToShowClocks = GetClocksFromStat(Stat, IncludingChildren);
             
-            f32 CoveragePercentage = 100.0f * (f32)ToShowClocks / (f32)Frame->FrameUpdateNode->TimingSnapshot.ClocksElapsed;
+            f32 CoveragePercentage = 100.0f * (f32)ToShowClocks / (f32)MainFrame->FrameUpdateNode->TimingSnapshot.ClocksElapsed;
+            
+            f32 CloseInFrameTime = CoveragePercentage * FrameCommon->FrameTime * 0.01f;
             
             char StatName[256];
             DEBUGParseNameFromUnique(StatName, 256, Stat->UniqueName);
             
             char StatBuf[256];
-            stbsp_sprintf(StatBuf, "%11lluc %8.2f%% %8uh  %-30s",
+            stbsp_sprintf(StatBuf, "%11lluc %8.2f%% %5.2fms %8uh  %-30s",
                           ToShowClocks,
                           CoveragePercentage,
+                          CloseInFrameTime * 1000.0f,
                           Stat->Stat.HitCount,
                           StatName);
             
@@ -266,7 +274,7 @@ INTERNAL_FUNCTION void ShowFramesSlider(gui_state* Gui, debug_state* State){
         
         float ScaledAsc = GetScaledAscender(Gui->MainFont, Gui->FontScale);
         v2 At = Layout->At - V2(0.0f, ScaledAsc);
-        rc2 SliderRectInit = RcMinDim(At, V2(DimLeft.x, ScaledAsc * 5.0f));
+        rc2 SliderRectInit = RcMinDim(At, V2(DimLeft.x, ScaledAsc * 4.0f));
         rc2 SliderRect = GrowRectByPixels(SliderRectInit, -5);
         
         gui_interaction Interaction = CreateInteraction(Elem, 
@@ -474,6 +482,26 @@ INTERNAL_FUNCTION void ResetThreadsWatchNodes(debug_state* State){
     }
 }
 
+INTERNAL_FUNCTION inline rc2
+GetLaneRect(rc2 TotalRect, int LaneIndex, int LaneCount){
+    rc2 Result = {};
+    
+    
+    if(LaneCount){
+        v2 TotalRectDim = GetRectDim(TotalRect);
+        f32 ThisLaneStart = TotalRect.Min.x + 
+            TotalRectDim.x * (f32)(LaneIndex + 0) / (f32)LaneCount;
+        
+        f32 ThisLaneEnd = TotalRect.Min.x + 
+            TotalRectDim.x * (f32)(LaneIndex + 1) / (f32)LaneCount;
+        
+        Result = RcMinMax(V2(ThisLaneStart, TotalRect.Min.y),
+                          V2(ThisLaneEnd, TotalRect.Max.y));
+    }
+    
+    return(Result);
+}
+
 INTERNAL_FUNCTION void ShowThreadsViewer(gui_state* Gui, debug_state* State){
     
     render_state* Render = State->Render;
@@ -492,7 +520,7 @@ INTERNAL_FUNCTION void ShowThreadsViewer(gui_state* Gui, debug_state* State){
         float ScaledAsc = GetScaledAscender(Gui->MainFont, Gui->FontScale);
         v2 At = Layout->At - V2(0.0f, ScaledAsc);
         //rc2 SliderRectInit = RcMinDim(At, ScaledAscDim(Gui, V2(20.0f, 30.0f)));
-        rc2 SliderRectInit = RcMinDim(At, V2(DimLeft.x, ScaledAsc * 20.0f));
+        rc2 SliderRectInit = RcMinDim(At, V2(DimLeft.x, ScaledAsc * 10.0f));
         rc2 SliderRect = GrowRectByPixels(SliderRectInit, -5);
         v2 SliderRectDim = GetRectDim(SliderRect);
         
@@ -523,87 +551,113 @@ INTERNAL_FUNCTION void ShowThreadsViewer(gui_state* Gui, debug_state* State){
         
         debug_thread* MainThread = State->MainThread;
         debug_thread_frame* ProfFrame = &State->MainThread->Frames[ViewFrame];
+        b32 ShowWatchingOutline = false;
+        int WatchThreadLaneAt = 0;
         
-        u64 FrameUpdateStart = ProfFrame->FrameUpdateNode->TimingSnapshot.StartClock;
-        f32 OneOverFramesClock = 1.0f / (f32)ProfFrame->FrameUpdateNode->TimingSnapshot.ClocksElapsed;
-        
-        int ThreadLaneAt = 0;
-        debug_thread* ThreadAt = State->ThreadSentinel.NextAlloc;
-        while(ThreadAt != &State->ThreadSentinel){
+        if(ProfFrame->FrameUpdateNode){
+            u64 FrameUpdateStart = ProfFrame->FrameUpdateNode->TimingSnapshot.StartClock;
+            f32 OneOverFramesClock = 1.0f / (f32)ProfFrame->FrameUpdateNode->TimingSnapshot.ClocksElapsed;
             
-            debug_thread_frame* Frame = &ThreadAt->Frames[ViewFrame];
-            
-            if(LaneCount){
-                f32 ThisLaneStart = SliderRect.Min.x + 
-                    SliderRectDim.x * (f32)(ThreadLaneAt + 0) / (f32)LaneCount;
+            int ThreadLaneAt = 0;
+            debug_thread* ThreadAt = State->ThreadSentinel.NextAlloc;
+            while(ThreadAt != &State->ThreadSentinel){
                 
-                f32 ThisLaneEnd = SliderRect.Min.x + 
-                    SliderRectDim.x * (f32)(ThreadLaneAt + 1) / (f32)LaneCount;
+                debug_thread_frame* Frame = &ThreadAt->Frames[ViewFrame];
                 
-                rc2 LaneRect = RcMinMax(V2(ThisLaneStart, SliderRect.Min.y),
-                                        V2(ThisLaneEnd, SliderRect.Max.y));
-                
-                if(ThreadAt->WatchNodeUniqueName == 0){
-                    ThreadAt->WatchNodeUniqueName = ProfFrame->FrameUpdateNode->UniqueName;
-                }
-                
-                debug_profiled_tree_node* Node = FindProfiledTreeNodeInThreadFrame(Frame, ThreadAt->WatchNodeUniqueName);
-                
-                if(!Node){
-                    Node = &Frame->RootTreeNodeUse;
-                    ThreadAt->WatchNodeUniqueName = Node->UniqueName;
-                }
-                
-                if(Node){
-                    debug_profiled_tree_node* At = Node->ChildSentinel->Next;
-                    while(At != Node->ChildSentinel){
-                        f32 ThisClocks = (f32)At->TimingSnapshot.ClocksElapsed;
-                        
-                        f32 ThisPercentage = ThisClocks * OneOverFramesClock;
-                        f32 ThisStartPercentage = (At->TimingSnapshot.StartClockFirstEntry - FrameUpdateStart)  * OneOverFramesClock;
-                        
-                        if(ThisPercentage > 0.01f){
-                            f32 ThisHeight = SliderRectDim.y * ThisPercentage;
-                            f32 ThisStart = SliderRect.Max.y - (SliderRectDim.y * ThisStartPercentage);
+                if(LaneCount){
+                    ShowWatchingOutline = true;
+                    
+                    rc2 LaneRect = GetLaneRect(SliderRect, ThreadLaneAt, 
+                                               State->ProfiledThreadsCount);
+                    
+                    f32 ThisLaneStart = LaneRect.Min.x;
+                    f32 ThisLaneEnd = LaneRect.Max.x;
+                    
+                    if(ThreadAt->WatchNodeUniqueName == 0){
+                        ThreadAt->WatchNodeUniqueName = ProfFrame->FrameUpdateNode->UniqueName;
+                    }
+                    
+                    debug_profiled_tree_node* Node = FindProfiledTreeNodeInThreadFrame(Frame, ThreadAt->WatchNodeUniqueName);
+                    
+                    if(!Node){
+                        Node = &Frame->RootTreeNodeUse;
+                        ThreadAt->WatchNodeUniqueName = Node->UniqueName;
+                    }
+                    
+                    if(Node){
+                        debug_profiled_tree_node* At = Node->ChildSentinel->Next;
+                        while(At != Node->ChildSentinel){
+                            f32 ThisClocks = (f32)At->TimingSnapshot.ClocksElapsed;
                             
-                            rc2 ThisRect = RcMinMax(V2(ThisLaneStart, ThisStart - ThisHeight), 
-                                                    V2(ThisLaneEnd, ThisStart));
+                            f32 ThisPercentage = ThisClocks * OneOverFramesClock;
+                            f32 ThisStartPercentage = (At->TimingSnapshot.StartClockFirstEntry - FrameUpdateStart)  * OneOverFramesClock;
                             
-                            u32 GuiColorID = GetGraphColorIndexFromHash(At->NameID);
-                            v4 RectColor = GUI_GETCOLOR(GuiColorID);
-                            PushRect(Stack, ThisRect, RectColor);
-                            PushRectInnerOutline(Stack, ThisRect, 1, GUI_GETCOLOR(GuiColor_Borders));
-                            
-                            if(MouseInRect(Gui->Input, ThisRect)){
-                                b32 HasChildren = At->ChildSentinel->Next != At->ChildSentinel;
+                            if(ThisPercentage > 0.01f){
+                                f32 ThisHeight = SliderRectDim.y * ThisPercentage;
+                                f32 ThisStart = SliderRect.Max.y - (SliderRectDim.y * ThisStartPercentage);
                                 
-                                if(KeyWentDown(Gui->Input, MouseKey_Left) && HasChildren){
-                                    ThreadAt->WatchNodeUniqueName = At->UniqueName;
+                                rc2 ThisRect = RcMinMax(V2(ThisLaneStart, ThisStart - ThisHeight), 
+                                                        V2(ThisLaneEnd, ThisStart));
+                                
+                                u32 GuiColorID = GetGraphColorIndexFromHash(At->NameID);
+                                v4 RectColor = GUI_GETCOLOR(GuiColorID);
+                                PushRect(Stack, ThisRect, RectColor);
+                                PushRectInnerOutline(Stack, ThisRect, 1, GUI_GETCOLOR(GuiColor_Borders));
+                                
+                                if(MouseInRect(Gui->Input, ThisRect)){
+                                    b32 HasChildren = At->ChildSentinel->Next != At->ChildSentinel;
+                                    
+                                    ShowTooltip(Gui, At->UniqueName, Gui->Input->MouseP);
+                                    
+                                    if(KeyWentDown(Gui->Input, MouseKey_Left) && HasChildren){
+                                        ThreadAt->WatchNodeUniqueName = At->UniqueName;
+                                    }
                                 }
                             }
+                            
+                            At = At->Next;
+                        }
+                    }
+                    else{
+                        PushRectInnerOutline(Stack, LaneRect, 3, GUI_GETCOLOR(GuiColor_Error));
+                    }
+                    
+                    
+                    if(MouseInRect(Gui->Input, LaneRect)){
+                        if(KeyWentDown(Gui->Input, MouseKey_Right) && Node->Parent){
+                            ThreadAt->WatchNodeUniqueName = Node->Parent->UniqueName;
                         }
                         
-                        At = At->Next;
+                        if(KeyWentDown(Gui->Input, MouseKey_Middle)){
+                            State->WatchThread = ThreadAt;
+                        }
                     }
-                }
-                else{
-                    PushRectInnerOutline(Stack, LaneRect, 3, GUI_GETCOLOR(GuiColor_Error));
-                }
-                
-                
-                if(MouseInRect(Gui->Input, LaneRect)){
                     
-                    if(KeyWentDown(Gui->Input, MouseKey_Right) && Node->Parent){
-                        ThreadAt->WatchNodeUniqueName = Node->Parent->UniqueName;
+                    if(ThreadAt->ThreadID == State->WatchThread->ThreadID){
+                        WatchThreadLaneAt = ThreadLaneAt;
                     }
                 }
+                
+                ThreadLaneAt++;
+                ThreadAt = ThreadAt->NextAlloc;
             }
+        }
+        else{
+            PushRectInnerOutline(Stack, SliderRect, 3, GUI_GETCOLOR(GuiColor_Error));
             
-            ThreadLaneAt++;
-            ThreadAt = ThreadAt->NextAlloc;
+            PrintTextCenteredInRect(Gui, "Can't find frame update node in frame",
+                                    SliderRect, 0.7f, GUI_GETCOLOR(GuiColor_Error));
         }
         
         PushRectOutline(Stack, SliderRect, 2, GUI_GETCOLOR(GuiColor_Borders));
+        
+        if(ShowWatchingOutline){
+            // NOTE(Dima): Pushing outline for watching thread
+            rc2 WatchLaneRect = GetLaneRect(SliderRect, WatchThreadLaneAt,
+                                            State->ProfiledThreadsCount);
+            
+            PushRectOutline(Stack, WatchLaneRect, 2, GUI_GETCOLOR(GuiColor_Active));
+        }
         
         GuiPostAdvance(Gui, Layout, SliderRectInit);
     }
@@ -615,9 +669,9 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Profile)){
     if(Data){
         debug_state* State = (debug_state*)Data;
         
-        BeginDimension(Gui, BeginDimension_Both, ScaledAscDim(Gui, V2(7, 2)));
+        BeginDimension(Gui, BeginDimension_Both, ScaledAscDim(Gui, V2(6, 2)));
         BeginRow(Gui);
-        if(BoolButton(Gui, "Recording", &State->IsRecording)){
+        if(BoolButton(Gui, "REC", &State->IsRecording)){
             State->RecordingChangeRequested = true;
         }
         if(Button(Gui, "Newest")){
@@ -631,11 +685,36 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Profile)){
         
         ShowFramesSlider(Gui, State);
         
+        BeginDimension(Gui, BeginDimension_Both, ScaledAscDim(Gui, V2(6, 2)));
+        BeginRow(Gui);
+        if(Button(Gui, "Reset")){
+            ResetThreadsWatchNodes(State);
+        }
+        if(Button(Gui, "To Main")){
+            State->WatchThread = State->MainThread;
+        }
+        if(Button(Gui, "Next")){
+            if(State->WatchThread->NextAlloc == &State->ThreadSentinel){
+                State->WatchThread = State->ThreadSentinel.NextAlloc;
+            }
+            else{
+                State->WatchThread = State->WatchThread->NextAlloc;
+            }
+        }
+        EndRow(Gui);
+        EndDimension(Gui);
+        
+        ShowThreadsViewer(Gui, State);
+        
+        debug_common_frame* Frame = &State->Frames[State->ViewFrameIndex];
+        
         // NOTE(Dima): Viewing frame info
         char FrameInfo[256];
         stbsp_sprintf(FrameInfo,
-                      "Viewing frame: %.2fdt, %.0fFPS, index=%d",
-                      1.0f, 1.0f, State->ViewFrameIndex);
+                      "Viewing frame: %.2fms, %.0fFPS, index=%d",
+                      Frame->FrameTime * 1000.0f, 
+                      1.0f / Frame->FrameTime, 
+                      State->ViewFrameIndex);
         ShowText(Gui, FrameInfo);
         
         BeginRow(Gui);
@@ -646,7 +725,6 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Profile)){
         RadioButton(Gui, "ClocksEx", DebugProfileMenu_TopClockEx);
         RadioButton(Gui, "Clocks", DebugProfileMenu_TopClock);
         RadioButton(Gui, "Root", DebugProfileMenu_RootNode);
-        RadioButton(Gui, "Threads", DebugProfileMenu_Threads);
         
 #if 0        
         GuiRadioButton();
@@ -666,18 +744,6 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Profile)){
             
             case DebugProfileMenu_RootNode:{
                 ShowRootViewer(Gui, State);
-            }break;
-            
-            case DebugProfileMenu_Threads:{
-                BeginDimension(Gui, BeginDimension_Both, ScaledAscDim(Gui, V2(7, 2)));
-                BeginRow(Gui);
-                if(Button(Gui, "Reset")){
-                    ResetThreadsWatchNodes(State);
-                }
-                EndRow(Gui);
-                EndDimension(Gui);
-                
-                ShowThreadsViewer(Gui, State);
             }break;
         }
     }
@@ -759,6 +825,10 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_GUI)){
                       Gui->ActiveInteraction.Name,
                       Gui->ActiveInteraction.Priority);
         ShowText(Gui, InterInfo);
+        
+        SliderFloat(Gui, &Gui->FontScale,
+                    0.5f, 1.5f,
+                    "FontScale");
         
         BoolButtonTrueFalse(Gui, "Show GuiTest", &Gui->ShowGuiTest);
         if(Gui->ShowGuiTest){

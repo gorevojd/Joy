@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <xmmintrin.h>
 
 #define JOY_DEG2RAD 0.0174532925f
 #define JOY_RAD2DEG 57.2958f
@@ -14,10 +15,6 @@
 #define JOY_ONE_OVER_255 0.00392156862f;
 
 #define JOY_ENABLE_SIMD_MATH 1
-
-#if JOY_ENABLE_SIMD_MATH
-#include <xmmintrin.h>
-#endif
 
 #define JOY_MATH_MIN(a, b) ((a) > (b) ? (b) : (a))
 #define JOY_MATH_MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -136,9 +133,7 @@ union m44 {
 	float e[16];
     float e2[4][4];
 	v4 Rows[4];
-#if JOY_ENABLE_SIMD_MATH
     __m128 mmRows[4];
-#endif
 };
 
 union quat {
@@ -573,7 +568,7 @@ inline __m128 MulVecMatSSE(__m128 V, const m44& M){
 }
 #endif
 
-inline m44 Mul(m44 A, m44 B) {
+inline m44 MulRefs(const m44& A, const m44& B){
     m44 res = {};
     
 #if JOY_ENABLE_SIMD_MATH
@@ -602,6 +597,13 @@ inline m44 Mul(m44 A, m44 B) {
     res.e[14] = A.e[12] * B.e[2] + A.e[13] * B.e[6] + A.e[14] * B.e[10] + A.e[15] * B.e[14];
     res.e[15] = A.e[12] * B.e[3] + A.e[13] * B.e[7] + A.e[14] * B.e[11] + A.e[15] * B.e[15];
 #endif
+    
+    return(res);
+}
+
+
+inline m44 Mul(m44 A, m44 B) {
+    m44 res = MulRefs(A, B);
     
     return(res);
 }
@@ -1511,6 +1513,22 @@ inline v3 GetRectCenter(rc3 A){
     v3 Result = A.Min + GetRectDim(A) * 0.5f;
     
     return(Result);
+}
+
+inline float GetRectAreaSigned(rc2 A){
+    v2 Dim = GetRectDim(A);
+    
+    float Area = Dim.x * Dim.y;
+    
+    return(Area);
+}
+
+inline float GetRectAreaAbs(rc2 A){
+    v2 Dim = GetRectDim(A);
+    
+    float Area = abs(Dim.x * Dim.y);
+    
+    return(Area);
 }
 
 inline v2 ClampInRect(v2 P, rc2 A){

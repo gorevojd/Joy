@@ -481,21 +481,25 @@ INTERNAL_FUNCTION void DEBUGUpdateMenus(debug_state* State)
     if(State->ShowDebugOverlay){
         gui_state* Gui = State->Gui;
         
-        debug_window* Window = &State->MainWindow;
-        BeginLayout(Gui, "DEBUG_MainWindow", 
-                    GuiLayout_Window, 
-                    &Window->P, 
-                    &Window->Dim);
+        debug_window* Window = &State->TestWindow;
         
-        BeginRow(Gui);
+        v2 Dim4But = ScaledAscDim(Gui, V2(8, 2));
+        v2 DimNeeded = V2(Dim4But.x, Dim4But.y * (float)DebugMenu_Count * 1.1);
+        
         if(State->ShowDebugMenus){
+            
+            BeginLayout(Gui, "TestWindow", 
+                        GuiLayout_Window | GuiLayout_Resize, 
+                        &Window->P, 
+                        &DimNeeded);
             BeginColumn(Gui);
+            // NOTE(Dima): Showing menu
+            BeginDimension(Gui, BeginDimension_Both, Dim4But);
+            
             BeginRadioGroup(Gui, "MenuRadioGroup", 
                             &State->ToShowMenuType, 
                             State->ToShowMenuType);
             
-            // NOTE(Dima): Showing menu
-            BeginDimension(Gui, BeginDimension_Both, ScaledAscDim(Gui, V2(8, 2)));
             for(int MenuIndex = 0;
                 MenuIndex < DebugMenu_Count;
                 MenuIndex++)
@@ -506,23 +510,36 @@ INTERNAL_FUNCTION void DEBUGUpdateMenus(debug_state* State)
                 
                 RadioButton(Gui, Menu->Name, Menu->Type);
             }
-            EndDimension(Gui);
+            
             EndRadioGroup(Gui);
+            
+            EndDimension(Gui);
             EndColumn(Gui);
+            EndLayout(Gui);
         }
         
+        
+        Window = &State->MainWindow;
+        BeginLayout(Gui, "DEBUG_MainWindow", 
+                    GuiLayout_Window | GuiLayout_Resize, 
+                    &Window->P, 
+                    &Window->Dim);
+        
+        
         // NOTE(Dima): Calling gui callback for DEBUG menu
-        BeginColumn(Gui);
         debug_menu* ToShowMenu = &State->Menus[State->ToShowMenuType];
+        PushGuiFont(Gui, GetFirst(Gui->Assets, GameAsset_LilitaOne));
+        BeginDimension(Gui, BeginDimension_Height, V2(0.0f, GetScaledAscender(Gui) * 2.0f));
+        ShowHeader(Gui, ToShowMenu->Name);
+        EndDimension(Gui);
+        PopGuiFont(Gui);
         if(ToShowMenu->Callback){
             ToShowMenu->Callback(Gui, ToShowMenu->Data);
         }
         else{
             ShowText(Gui, "GUI callback was NULL");
         }
-        EndColumn(Gui);
         
-        EndRow(Gui);
         EndLayout(Gui);
     }
 }
@@ -966,16 +983,13 @@ INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
                     debug_thread* Thread = CreateOrFindThreadForID(State, Record->ThreadID);
                     
                     debug_thread_frame* Frame = GetThreadFrameByIndex(Thread, State->CollationFrameIndex);
-                    
                     debug_profiled_tree_node* CurNode = Frame->CurNode;
-                    
                     debug_timing_snapshot* Snapshot = &CurNode->TimingSnapshot;
                     
-                    Snapshot->EndClock = Record->TimeStampCounter;
-                    
-                    u64 ClocksElapsedThisFrame = (Snapshot->EndClock - Snapshot->StartClock);
+                    u64 ClocksElapsedThisFrame = (Record->TimeStampCounter - Snapshot->StartClock);
                     int PendingHitCount = 1;
                     
+                    Snapshot->EndClock = Record->TimeStampCounter;
                     Snapshot->ClocksElapsed += ClocksElapsedThisFrame;
                     Snapshot->HitCount += PendingHitCount;
                     
@@ -998,15 +1012,19 @@ INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
                 }break;
                 
                 case DebugRecord_FrameBarrier:{
-                    
                     debug_thread* MainThread = State->MainThread;
                     Assert(MainThread->ThreadID == Record->ThreadID);
                     
                     debug_thread_frame* OldFrame = GetThreadFrameByIndex(MainThread, 
                                                                          State->CollationFrameIndex);
+                    debug_common_frame* OldFrameCommon = GetFrameByIndex(State, 
+                                                                         State->CollationFrameIndex);
                     
                     // NOTE(Dima): Finding frame update node
                     FindFrameUpdateNode(OldFrame);
+                    
+                    // NOTE(Dima): Set frame time
+                    OldFrameCommon->FrameTime = Record->Value.Float;
                     
                     Assert(OldFrame->CurNode == &OldFrame->RootTreeNodeUse);
                     
@@ -1066,6 +1084,13 @@ INTERNAL_FUNCTION void DEBUGInit(debug_state* State,
                     sizeof(State->MainWindow.Name), 
                     "DEBUGMainWindow");
     
+    State->TestWindow.P = V2(100, 50);
+    State->TestWindow.Dim = V2(300, 300);
+    CopyStringsSafe(State->TestWindow.Name, 
+                    sizeof(State->TestWindow.Name), 
+                    "TestWindow");
+    
+    
     DEBUGInitMenu(State, DebugMenu_Profile, "Profile",
                   DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Profile));
     DEBUGInitMenu(State, DebugMenu_DEBUG, "DEBUG",
@@ -1114,6 +1139,7 @@ INTERNAL_FUNCTION void DEBUGInit(debug_state* State,
     DLIST_REFLECT_PTRS(State->ThreadSentinel, NextAlloc, PrevAlloc);
     ClearThreadsTable(State->ThreadHashTable, DEBUG_THREADS_TABLE_SIZE);
     State->MainThread = CreateOrFindThreadForID(State, GetThreadID());
+    State->WatchThread = State->MainThread;
 }
 
 PLATFORM_CALLBACK(DEBUGDummyThreadsWorkCallback){
@@ -1147,7 +1173,7 @@ INTERNAL_FUNCTION void DEBUGUpdate(debug_state* State){
     DEBUGUpdatePrimitives(State, State->Input->DeltaTime);
     DEBUGUpdateMenus(State);
     
-    DEBUGDummyThreadsWork();
+    //DEBUGDummyThreadsWork();
     
     DEBUGProcessRecords(State);
 }

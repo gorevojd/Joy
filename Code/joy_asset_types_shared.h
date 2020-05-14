@@ -7,6 +7,22 @@
 #define MAX_CHANNELS_PER_BONE 4
 #define MAX_WEIGHTS_PER_VERTEX 4
 
+enum material_texture_type{
+    MaterialTexture_Diffuse,
+    MaterialTexture_Specular,
+    MaterialTexture_Ambient,
+    MaterialTexture_Emissive,
+    MaterialTexture_Height,
+    MaterialTexture_Normals,
+    MaterialTexture_Shininess,
+    MaterialTexture_Opacity,
+    MaterialTexture_Displacement,
+    MaterialTexture_Lightmap,
+    MaterialTexture_Reflection,
+    MaterialTexture_Unknown,
+    
+    MaterialTexture_Count,
+};
 
 struct mesh_type_context{
     u16 VertexTypeSize;

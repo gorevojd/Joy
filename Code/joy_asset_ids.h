@@ -1,8 +1,6 @@
 #ifndef JOY_ASSET_IDS_H
 #define JOY_ASSET_IDS_H
 
-#include "joy_types.h"
-#include "joy_math.h"
 #include "joy_asset_types_shared.h"
 
 enum asset_type{
@@ -32,23 +30,6 @@ typedef u32 asset_id;
 
 #define ASSET_PTR_MEMBER(data_type) data_type* Ptr_##data_type
 #define GET_ASSET_PTR_MEMBER(asset, data_type) ((asset)->Data.Ptr_##data_type)
-
-enum material_texture_type{
-    MaterialTexture_Diffuse,
-    MaterialTexture_Specular,
-    MaterialTexture_Ambient,
-    MaterialTexture_Emissive,
-    MaterialTexture_Height,
-    MaterialTexture_Normals,
-    MaterialTexture_Shininess,
-    MaterialTexture_Opacity,
-    MaterialTexture_Displacement,
-    MaterialTexture_Lightmap,
-    MaterialTexture_Reflection,
-    MaterialTexture_Unknown,
-    
-    MaterialTexture_Count,
-};
 
 struct asset_material{
     u32 BitmapArrayIDs[MaterialTexture_Count];
@@ -194,6 +175,8 @@ struct asset_font{
 struct asset_mesh{
     mesh_type_context TypeCtx;
     
+    int MaterialIndex;
+    
     u32 VerticesCount;
     u32 IndicesCount;
     
@@ -213,30 +196,48 @@ struct asset_sound{
     u32 DataOffsetToRightChannel;
 };
 
-union asset_tag_value {
-    float Value_Float;
-    int Value_Int;
+enum asset_tag_value_type{
+    TagValue_Empty,
+    TagValue_Float,
+    TagValue_Int,
 };
 
-enum asset_tag_value_type{
-    AssetTagValue_Empty,
-    AssetTagValue_Float,
-    AssetTagValue_Int,
+struct asset_tag_value {
+    union{
+        float Value_Float;
+        int Value_Int;
+    };
+    u8 Type;
 };
 
 struct asset_tag_header{
     u32 Type;
     
-    u32 ValueType;
-    
     asset_tag_value Value;
 };
 
-inline asset_tag_header TagHeader(u32 Type, u32 ValueType, asset_tag_value Value){
+inline asset_tag_value TagValue(int Value){
+    asset_tag_value Result;
+    
+    Result.Type = TagValue_Int;
+    Result.Value_Int = Value;
+    
+    return(Result);
+}
+
+inline asset_tag_value TagValue(float Value){
+    asset_tag_value Result;
+    
+    Result.Type = TagValue_Float;
+    Result.Value_Float = Value;
+    
+    return(Result);
+}
+
+inline asset_tag_header TagHeader(u32 Type, asset_tag_value Value){
     asset_tag_header Result;
     
     Result.Type = Type;
-    Result.ValueType = ValueType;
     Result.Value = Value;
     
     return(Result);
@@ -323,8 +324,25 @@ struct asset_file_header{
 };
 
 enum asset_tag_font_type_value{
-    AssetFontTypeTag_Regular,
-    AssetFontTypeTag_Bold,
+    TagFont_Regular,
+    TagFont_Bold,
+};
+
+enum asset_tag_character_type{
+    TagCharacter_Rabbit,
+    TagCharacter_Moose,
+    TagCharacter_Deer,
+    TagCharacter_Bear,
+    TagCharacter_Fox,
+};
+
+enum asset_tag_idle_anim{
+    TagIdleAnim_Idle0,
+    TagIdleAnim_Idle1,
+    TagIdleAnim_Idle2,
+    TagIdleAnim_Idle3,
+    TagIdleAnim_Idle4,
+    TagIdleAnim_Idle5,
 };
 
 enum asset_tag_type{
@@ -332,6 +350,9 @@ enum asset_tag_type{
     AssetTag_LOD,
     AssetTag_Counter,
     AssetTag_Size,
+    
+    AssetTag_Character,
+    AssetTag_IdleAnim,
 };
 
 struct asset_tag{
@@ -360,22 +381,21 @@ enum asset_group_type{
     GameAsset_Sphere,
     GameAsset_Cylynder,
     
-    // NOTE(Dima): Animations
-    GameAsset_Test,
-    GameAsset_Man,
-    GameAsset_Spider,
+    GameAsset_Model_Character,
+    GameAsset_Anim_Failure,
+    GameAsset_Anim_Fall,
+    GameAsset_Anim_Idle,
+    GameAsset_Anim_JumpUp,
+    GameAsset_Anim_Land,
+    GameAsset_Anim_Roll,
+    GameAsset_Anim_Run,
+    GameAsset_Anim_Sleep,
+    GameAsset_Anim_Success,
+    GameAsset_Anim_Talk,
+    GameAsset_Anim_Walk,
     
-    // NOTE(Dima): Meshes
-    GameAsset_Skyscraper,
-    GameAsset_Bathroom,
-    GameAsset_Heart,
-    GameAsset_KindPlane,
-    GameAsset_Podkova,
-    GameAsset_RubbishBin,
-    GameAsset_Snowman,
-    GameAsset_Stool,
-    GameAsset_Toilet,
-    GameAsset_Vase,
+    // NOTE(Dima): Animations
+    GameAsset_Man,
     
     // NOTE(Dima): Fonts
     GameAsset_LiberationMono,

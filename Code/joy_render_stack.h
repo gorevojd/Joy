@@ -92,6 +92,7 @@ struct render_entry_mesh{
     
     m44* BoneTransforms;
     int BoneCount;
+    material_info* Material;
     
     v3 AlbedoColor;
     

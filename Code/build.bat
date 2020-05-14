@@ -40,4 +40,35 @@ SET THIS_PROJECT_NAME=Joy
 ECHO Compiling Joy
 cl /Fe%THIS_PROJECT_NAME% %COMP_OPTS% %INCLUDE_PATH% %COMPILATION_FILES% /link /NOLOGO /INCREMENTAL:no /OPT:ref kernel32.lib user32.lib gdi32.lib winmm.lib shell32.lib opengl32.lib dsound.lib Xinput.lib
 
+
+
+ECHO ____________________
+ECHO ********************
+ECHO *   AssetBuilder   *
+ECHO ********************
+
+set ASSBUILD_COMPFILES=..\Code\tool_asset_build.cpp
+set ASSBUILD_COMPFILES=%ASSBUILD_COMPFILES% ..\Code\tool_asset_build_loading.cpp
+set ASSBUILD_COMPFILES=%ASSBUILD_COMPFILES% ..\Code\tool_asset_build_commands.cpp
+
+SET THIS_PROJECT_NAME=AssetBuilder
+cl /Fe%THIS_PROJECT_NAME% %COMP_OPTS% %ASSBUILD_COMPFILES% /link /NOLOGO /INCREMENTAL:no /OPT:ref kernel32.lib user32.lib gdi32.lib winmm.lib shell32.lib
+
+
+
+ECHO ____________________
+ECHO ********************
+ECHO *   AssimpBuilder  *
+ECHO ********************
+
+set ASSIMP_INCLUDE="../../ExternalPrograms/3dParty/assimp-master/Include"
+set ASSIMP_LIBPATH="../../ExternalPrograms/3dParty/assimp-master/AssimpBuild/code/Release"
+set ASSBUILD_COMPFILES=..\Code\tool_asset_build_assimp.cpp
+set ASSBUILD_COMPFILES=%ASSBUILD_COMPFILES% ..\Code\tool_asset_build_loading.cpp
+set ASSBUILD_COMPFILES=%ASSBUILD_COMPFILES% ..\Code\tool_asset_build_commands.cpp
+
+SET THIS_PROJECT_NAME=AssimpBuilder
+cl /Fe%THIS_PROJECT_NAME% %COMP_OPTS% /I%ASSIMP_INCLUDE% %ASSBUILD_COMPFILES% /link /LIBPATH:%ASSIMP_LIBPATH% /NOLOGO /INCREMENTAL:no /OPT:ref kernel32.lib user32.lib gdi32.lib winmm.lib shell32.lib assimp-vc140-mt.lib
+
+
 POPD

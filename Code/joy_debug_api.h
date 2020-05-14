@@ -232,6 +232,17 @@ inline void DEBUGAddRecord(char* UniqueName, u8 Type){
     TargetRecord->ThreadID = GetThreadID();
 }
 
+inline void DEBUGAddFloatToLastRecord(float Value){
+    u32 ToParseIndex = DEBUGGlobalTable->RecordAndTableIndex;
+    
+    u32 TableIndex = (ToParseIndex & DEBUG_TABLE_INDEX_MASK) >> DEBUG_TABLE_INDEX_BITSHIFT;
+    u32 RecordIndex = ToParseIndex & DEBUG_RECORD_INDEX_MASK;
+    
+    debug_record* TargetRecord = &DEBUGGlobalTable->RecordTables[TableIndex][RecordIndex - 1];
+    
+    TargetRecord->Value.Float = Value;
+}
+
 void DEBUGParseNameFromUnique(char* To, int ToSize, char* From);
 void FillAndSortStats(struct debug_state* State, 
                       struct debug_thread_frame* Frame, 
@@ -252,7 +263,9 @@ struct debug_timing{
 #define END_TIMING() DEBUGAddRecord("End", DebugRecord_EndTiming)
 #define FUNCTION_TIMING() debug_timing FuncTiming_##__LINE__(DEBUG_UNIQUE_SYMBOL(__FUNCTION__))
 #define BLOCK_TIMING(name) debug_timing BlockTiming_##__LINE__(DEBUG_UNIQUE_SYMBOL(name))
-#define FRAME_BARRIER() DEBUGAddRecord("FrameBarrier", DebugRecord_FrameBarrier)
+#define FRAME_BARRIER(dt) {\
+    DEBUGAddRecord("FrameBarrier", DebugRecord_FrameBarrier);\
+    DEBUGAddFloatToLastRecord(dt);}
 
 #else
 

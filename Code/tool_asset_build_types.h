@@ -127,6 +127,8 @@ struct tool_mesh_info{
     int VerticesCount;
     
     mesh_type_context TypeCtx;
+    
+    int MaterialIndex;
 };
 
 struct tool_node_info{
@@ -207,12 +209,6 @@ struct game_asset_group{
     std::vector<game_asset_group_region> Regions;
 };
 
-enum game_asset_tag_value_type{
-    GameAssetTagValue_Empty,
-    GameAssetTagValue_Float,
-    GameAssetTagValue_Int,
-};
-
 struct game_asset_tag {
     u32 Type;
     u32 ValueType;
@@ -225,7 +221,7 @@ struct game_asset_tag {
     };
 };
 
-struct game_asset_tag_hub{
+struct tag_hub{
     public:
     std::vector<game_asset_tag> Tags;
     std::vector<u32> TagValueTypes;
@@ -249,8 +245,6 @@ struct game_asset_tag_hub{
     }
     
     game_asset_tag* AddTag(u32 TagType, u32 ValueType){
-        game_asset_tag* Result = FindTag(TagType);
-        
         game_asset_tag NewTag;
         
         NewTag.Type = TagType;
@@ -260,45 +254,50 @@ struct game_asset_tag_hub{
         Tags.push_back(NewTag);
         TagValueTypes.push_back({});
         
-        Result = &Tags[Tags.size() - 1];
+        game_asset_tag* Result = &Tags[Tags.size() - 1];
         
         return(Result);
     }
     
     public:
-    static game_asset_tag_hub Empty(){
-        game_asset_tag_hub Result = {};
+    static tag_hub Empty(){
+        tag_hub Result = {};
         
         return(Result);
     }
     
-    game_asset_tag_hub& AddIntTag(u32 TagType, int Value){
-        game_asset_tag* Tag = AddTag(TagType, GameAssetTagValue_Int);
+    void PopTag(){
+        Tags.pop_back();
+        TagValueTypes.pop_back();
+    }
+    
+    tag_hub& AddIntTag(u32 TagType, int Value){
+        game_asset_tag* Tag = AddTag(TagType, TagValue_Int);
         
         if(Tag){
-            TagValueTypes[Tag->InTagArrayIndex] = GameAssetTagValue_Int;
+            TagValueTypes[Tag->InTagArrayIndex] = TagValue_Int;
             Tag->Value_Int = Value;
         }
         
         return(*this);
     }
     
-    game_asset_tag_hub& AddFloatTag(u32 TagType, float Value){
-        game_asset_tag* Tag = AddTag(TagType, GameAssetTagValue_Float);
+    tag_hub& AddFloatTag(u32 TagType, float Value){
+        game_asset_tag* Tag = AddTag(TagType, TagValue_Float);
         
         if(Tag){
-            TagValueTypes[Tag->InTagArrayIndex] = GameAssetTagValue_Float;
+            TagValueTypes[Tag->InTagArrayIndex] = TagValue_Float;
             Tag->Value_Float = Value;
         }
         
         return(*this);
     }
     
-    game_asset_tag_hub& AddEmptyTag(u32 TagType){
-        game_asset_tag* Tag = AddTag(TagType, GameAssetTagValue_Empty);
+    tag_hub& AddEmptyTag(u32 TagType){
+        game_asset_tag* Tag = AddTag(TagType, TagValue_Empty);
         
         if(Tag){
-            TagValueTypes[Tag->InTagArrayIndex] = GameAssetTagValue_Empty;
+            TagValueTypes[Tag->InTagArrayIndex] = TagValue_Empty;
             Tag->Value_Int = 1;
         }
         

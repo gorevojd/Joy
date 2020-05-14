@@ -66,6 +66,26 @@ INTERNAL_FUNCTION render_camera_setup SetupCamera(const m44& Projection,
     return(Result);
 }
 
+INTERNAL_FUNCTION render_camera_setup DefaultPerspSetup(int Width, int Height, const m44& CameraTransform)
+{
+    render_camera_setup CamSetup = SetupCamera(PerspectiveProjection(Width, Height, 
+                                                                     1000.0f, 0.01f),
+                                               CameraTransform,
+                                               Width, Height, true);
+    
+    return(CamSetup);
+}
+
+INTERNAL_FUNCTION render_camera_setup DefaultOrthoSetup(int Width, int Height,
+                                                        const m44& CameraTransform){
+    render_camera_setup CamSetup = SetupCamera(OrthographicProjection(Width, Height),
+                                               CameraTransform,
+                                               Width, Height, true);
+    
+    return(CamSetup);
+}
+
+
 INTERNAL_FUNCTION void InitRenderStack(render_stack* Stack, 
                                        render_state* render,
                                        char* Name, 

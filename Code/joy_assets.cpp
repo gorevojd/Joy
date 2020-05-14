@@ -130,20 +130,20 @@ TODO(Dima): Ideas to make it faster:
                     
                     if(Tag->Type == TagType){
                         // NOTE(Dima): We found needed tag
-                        switch(Tag->ValueType){
-                            case AssetTagValue_Float:{
+                        switch(Tag->Value.Type){
+                            case TagValue_Float:{
                                 float Diff = abs(Tag->Value.Value_Float - Value->Value_Float);
                                 
                                 Weight += (1.0f - Diff);
                             }break;
                             
-                            case AssetTagValue_Int:{
+                            case TagValue_Int:{
                                 int Diff = Abs(Tag->Value.Value_Int - Value->Value_Int);
                                 
                                 Weight += 1.0f - ((float)(Diff) * 0.01f);
                             }break;
                             
-                            case AssetTagValue_Empty:{
+                            case TagValue_Empty:{
                                 BestIndex = GrpAssetIndex;
                                 
                                 ShouldExitMatchLoop = true;
@@ -557,6 +557,15 @@ void ImportAsset(assets* Assets, asset* Asset, b32 Immediate){
 }
 
 
+array_info* LoadArray(assets* Assets,
+                      u32 ArrayID)
+{
+    array_info* Result = LOAD_ASSET(array_info, AssetType_Array,
+                                    Assets, ArrayID, ASSET_IMPORT_IMMEDIATE);
+    
+    return(Result);
+}
+
 bmp_info* LoadBmp(assets* Assets,
                   u32 BmpID,
                   b32 Immediate)
@@ -584,6 +593,40 @@ mesh_info* LoadMesh(assets* Assets,
 {
     mesh_info* Result = LOAD_ASSET(mesh_info, AssetType_Mesh,
                                    Assets, MeshID, Immediate);
+    
+    return(Result);
+}
+
+
+material_info* LoadMaterial(assets* Assets,
+                            u32 MaterialID,
+                            b32 Immediate)
+{
+    material_info* Result = LOAD_ASSET(material_info, AssetType_Material,
+                                       Assets, MaterialID, Immediate);
+    
+    asset* Asset = GetAssetByID(Assets, MaterialID);
+    ASSERT(Asset->Type == AssetType_Material);
+    
+    asset_material* Src = &Asset->Header.Material;
+    
+    if(Result){
+        for(int TextureIndex = 0;
+            TextureIndex < MaterialTexture_Count;
+            TextureIndex++)
+        {
+            // NOTE(Dima): I only use first texture index of array
+            u32 ActualArrayIndex = FileToIntegratedID(Asset->FileSource, 
+                                                      Src->BitmapArrayIDs[TextureIndex]);
+            
+            if(ActualArrayIndex){
+                
+                array_info* TextureArray = LoadArray(Assets, ActualArrayIndex);
+                Result->Textures[TextureIndex] = LoadBmp(Assets, TextureArray->FirstID, 
+                                                         Immediate);
+            }
+        }
+    }
     
     return(Result);
 }
@@ -892,7 +935,7 @@ INTERNAL_FUNCTION void InitAssets(assets* Assets){
                             array_info* Result = ALLOC_ASS_PTR_MEMBER(array_info);
                             asset_array* Src = &AssetHeader.Array;
                             
-                            Result->FirstID = Src->FirstID;
+                            Result->FirstID = FileToIntegratedID(FileSource, Src->FirstID);
                             Result->Count = Src->Count;
                             
                         }break;
@@ -901,6 +944,7 @@ INTERNAL_FUNCTION void InitAssets(assets* Assets){
                             mesh_info* Result = ALLOC_ASS_PTR_MEMBER(mesh_info);
                             asset_mesh* Src = &AssetHeader.Mesh;
                             
+                            Result->MaterialIndex = Src->MaterialIndex;
                             Result->VerticesCount = Src->VerticesCount;
                             Result->IndicesCount = Src->IndicesCount;
                             Result->TypeCtx = Src->TypeCtx;
@@ -956,7 +1000,13 @@ INTERNAL_FUNCTION void InitAssets(assets* Assets){
                         }break;
                         
                         case AssetType_Material:{
+                            material_info* Result = ALLOC_ASS_PTR_MEMBER(material_info);
+                            asset_material* Src = &AssetHeader.Material;
                             
+                            Result->ColorDiffuse = UnpackRGB_R10G12B10(Src->ColorDiffuse);
+                            Result->ColorAmbient = UnpackRGB_R10G12B10(Src->ColorAmbient);
+                            Result->ColorSpecular = UnpackRGB_R10G12B10(Src->ColorSpecular);
+                            Result->ColorEmissive = UnpackRGB_R10G12B10(Src->ColorEmissive);
                         }break;
                         
                         case AssetType_Model:{

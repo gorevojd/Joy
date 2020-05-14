@@ -19,38 +19,6 @@ It can have some children and parents elements. The tree of elements is a
 Gui_Page. It's done this way because of comfortability to group the elements
 */
 
-inline float GetBaseline(font_info* FontInfo, float Scale = 1.0f){
-    float Res = 0.0f;
-    
-    if(FontInfo){
-        Res = (FontInfo->AscenderHeight + FontInfo->LineGap) * Scale;
-    }
-    
-    return(Res);
-}
-
-inline float GetLineAdvance(font_info* FontInfo, float Scale = 1.0f){
-    float Res = 0.0f; 
-    
-    if(FontInfo){
-        Res = (FontInfo->AscenderHeight + 
-               FontInfo->LineGap - 
-               FontInfo->DescenderHeight) * Scale;
-    }
-    
-    return(Res);
-}
-
-inline float GetScaledAscender(font_info* FontInfo, float Scale = 1.0f){
-    float Res = 0.0f;
-    
-    if(FontInfo){
-        Res = FontInfo->AscenderHeight * Scale;
-    }
-    
-    return(Res);
-}
-
 enum GuiColorType{
     GuiColor_Graph0,
     GuiColor_Graph1,
@@ -407,15 +375,15 @@ struct gui_state{
     
     b32 ShowGuiTest;
     
-    asset_id MainFontID;
-    asset_id TileFontID;
     asset_id CheckboxMarkID;
     asset_id ChamomileID;
     
-    font_info* MainFont;
-    font_info* TileFont;
-    
     float FontScale;
+    
+#define GUI_FONT_STACK_SIZE 16
+    font_info* FontStack[GUI_FONT_STACK_SIZE];
+    int CurFontStackIndex;
+    font_info* MainFont;
     
     gui_frame_info FrameInfo;
     
@@ -460,6 +428,44 @@ struct gui_state{
     float windowAlpha;
 };
 
+
+inline float GetBaseline(font_info* FontInfo, float Scale = 1.0f){
+    float Res = 0.0f;
+    
+    if(FontInfo){
+        Res = (FontInfo->AscenderHeight + FontInfo->LineGap) * Scale;
+    }
+    
+    return(Res);
+}
+
+inline float GetLineAdvance(font_info* FontInfo, float Scale = 1.0f){
+    float Res = 0.0f; 
+    
+    if(FontInfo){
+        Res = (FontInfo->AscenderHeight + 
+               FontInfo->LineGap - 
+               FontInfo->DescenderHeight) * Scale;
+    }
+    
+    return(Res);
+}
+
+inline float GetScaledAscender(font_info* FontInfo, float Scale = 1.0f){
+    float Res = 0.0f;
+    
+    if(FontInfo){
+        Res = FontInfo->AscenderHeight * Scale;
+    }
+    
+    return(Res);
+}
+
+inline float GetScaledAscender(gui_state* Gui){
+    float Result = GetScaledAscender(Gui->MainFont, Gui->FontScale);
+    
+    return(Result);
+}
 
 inline gui_element* 
 GuiFindElementOfTypeUpInTree(gui_element* curElement, u32 elementType) {
@@ -668,6 +674,7 @@ void EndColumn(gui_state* Gui);
 void GuiFramePrepare4Render(gui_state* Gui);
 
 void ShowTooltip(gui_state* Gui, char* tooltipText, v2 at);
+void ShowHeader(gui_state* Gui, char* HeaderText);
 void ShowText(gui_state* Gui, char* text);
 b32 Button(gui_state* Gui, char* buttonName);
 b32 LinkButton(gui_state* Gui, char* buttonName);

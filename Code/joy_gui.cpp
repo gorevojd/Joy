@@ -380,6 +380,22 @@ inline void GuiAddWindowToList(Gui_Window* window,
     window->Prev->Next = window;
 }
 
+INTERNAL_FUNCTION void PushGuiFont(gui_state* Gui, u32 FontID){
+    font_info* NewFont = LoadFont(Gui->Assets, FontID, ASSET_IMPORT_IMMEDIATE);
+    
+    Assert(Gui->CurFontStackIndex < GUI_FONT_STACK_SIZE);
+    
+    Gui->FontStack[Gui->CurFontStackIndex++] = NewFont;
+    Gui->MainFont = NewFont;
+}
+
+INTERNAL_FUNCTION void PopGuiFont(gui_state* Gui){
+    Assert(Gui->CurFontStackIndex > 0);
+    Gui->FontStack[Gui->CurFontStackIndex--] = 0;
+    
+    Gui->MainFont = Gui->FontStack[Gui->CurFontStackIndex - 1];
+}
+
 INTERNAL_FUNCTION void GuiInitRoot(gui_state* Gui, gui_element** root){
     
     (*root) = GuiAllocateElement(Gui);
@@ -413,12 +429,10 @@ assets* Assets)
     // NOTE(Dima): InitAssets
     Gui->Assets = Assets;
     
+    Gui->MainFont = 0;
+    Gui->CurFontStackIndex = 0;
     // NOTE(Dima): Getting IDs for needed assets
-    Gui->MainFontID = GetFirst(Assets, GameAsset_LiberationMono);
-    Gui->TileFontID = GetFirst(Assets, GameAsset_MollyJackFont);
-    
-    Gui->MainFont = LoadFont(Assets, Gui->MainFontID, ASSET_IMPORT_IMMEDIATE);
-    Gui->TileFont = LoadFont(Assets, Gui->TileFontID, ASSET_IMPORT_IMMEDIATE);
+    PushGuiFont(Gui, GetFirst(Gui->Assets, GameAsset_LiberationMono));
     
     Gui->CheckboxMarkID = GetFirst(Assets, GameAsset_CheckboxMark);
     Gui->ChamomileID = GetFirst(Assets, GameAsset_ChamomileIcon);
@@ -469,7 +483,7 @@ assets* Assets)
     Gui->colors[GuiColor_Error] = GUI_GETCOLOR_COLSYS(Color_Red);
     
     Gui->colors[GuiColor_Hot] = GUI_GETCOLOR_COLSYS(Color_Yellow);
-    Gui->colors[GuiColor_Active] = GUI_GETCOLOR_COLSYS(Color_Red);
+    Gui->colors[GuiColor_Active] = GUI_GETCOLOR_COLSYS(Color_Green);
     
     Gui->colors[GuiColor_ActiveGrad1] = ColorFromHex("#8e3b7a");
     Gui->colors[GuiColor_ActiveGrad2] = ColorFromHex("#dd4d5e");
@@ -630,11 +644,11 @@ v2 GetTextSizeInternal(font_info* Font, assets* Assets, char* Text, float Scale)
 
 inline v2 GetCenteredTextOffset(font_info* font, float TextDimX, rc2 Rect, float Scale = 1.0f){
     float LineDimY = GetLineAdvance(font, Scale);
-    float LineDelta = (font->AscenderHeight + font->LineGap) * Scale - LineDimY * 0.5f;
     
     v2 CenterRc = Rect.Min + GetRectDim(Rect) * 0.5f;
     
-    v2 TargetP = V2(CenterRc.x - TextDimX * 0.5f, CenterRc.y + LineDelta);
+    v2 TargetP = V2(CenterRc.x - TextDimX * 0.5f, 
+                    CenterRc.y - LineDimY * 0.5f + GetScaledAscender(font, Scale));
     return(TargetP);
 }
 
@@ -1718,6 +1732,32 @@ void BeginTree(gui_state* Gui, char* name){
 
 void EndTree(gui_state* Gui){
     GuiEndElement(Gui, GuiElement_Tree);
+}
+
+void ShowHeader(gui_state* Gui, char* HeaderText){
+    gui_element* Elem = GuiBeginElement(Gui, HeaderText, GuiElement_TempItem, true);
+    gui_layout* Layout = GetParentLayout(Gui);
+    
+    if(GuiElementOpenedInTree(Elem) && 
+       PotentiallyVisibleSmall(Layout))
+    {
+        v2 DimLeft = GetDimensionLeftInLayout(Layout);
+        rc2 HeaderRcInit = RcMinDim(Layout->At, V2(DimLeft.x, 
+                                                   GetLineAdvance(Gui->MainFont,
+                                                                  Gui->FontScale)));
+        
+        rc2 HeaderRc = GetTxtElemRect(Gui, Layout, HeaderRcInit);
+        
+        //GuiPushBut(Gui, HeaderRc, PushBut_ActiveGrad);
+        
+        PrintTextCenteredInRect(Gui, HeaderText,
+                                HeaderRc, 
+                                Gui->FontScale, 
+                                GUI_GETCOLOR(GuiColor_Text));
+        
+        GuiPostAdvance(Gui, Layout, HeaderRc);
+    }
+    GuiEndElement(Gui, GuiElement_TempItem);
 }
 
 void ShowText(gui_state* Gui, char* text){
@@ -2944,7 +2984,7 @@ b32 GridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
         v4 OutlineColor = GUI_GETCOLOR_COLSYS(Color_Black);
         GuiPushBut(Gui, WorkRect, PushBut_Grad, Color1, Color2);
         GuiPushBut(Gui, WorkRect, PushBut_Outline, OutlineColor); 
-        PrintTextCenteredInRectInternal(Gui->TileFont, 
+        PrintTextCenteredInRectInternal(Gui->MainFont, 
                                         Gui->Stack, 
                                         Gui->Assets,
                                         Elem->NameToShow, 

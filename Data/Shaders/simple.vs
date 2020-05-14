@@ -69,7 +69,7 @@ void main(){
     
     VsOut.WorldP = WorldP.xyz;
     VsOut.WorldN = normalize(ModelSpaceN * transpose(inverse(mat3(Model))));
-    VsOut.UV = UV;
+    VsOut.UV = vec2(UV.x, 1.0f - UV.y);
     
     gl_Position = ProjectedP;
 }

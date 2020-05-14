@@ -60,6 +60,27 @@ inline int ConvertAssimpToOurTextureType(u32 Assimp){
     return(Result);
 }
 
+void ReplaceSpecialPath(std::string& Path,
+                        char* SpecialPath,
+                        char* NewPath)
+{
+    // NOTE(Dima): if is special path - replace with what I need
+    size_t SpecialFindIndex = Path.find(SpecialPath);
+    b32 IsSpecial = (SpecialFindIndex != std::string::npos);
+    
+    if(IsSpecial){
+        Path.replace(SpecialFindIndex, StringLength(SpecialPath), NewPath);
+    }
+}
+
+void ReplaceSlashes(std::string& Path){
+    for(int i = 0; i < Path.length(); i++){
+        if(Path[i] == '\\'){
+            Path[i] = '/';
+        }
+    }
+}
+
 /*
 This function should return the first index of Type textures that
 were pushed in array
@@ -133,8 +154,23 @@ AiLoadMatTexturesForType(loaded_model* Model,
                 
                 b32 NotLoaded = (Mapping->find(TexturePathNew) == Mapping->end());
                 if(NotLoaded){
+                    ReplaceSpecialPath(TexturePathNew, 
+                                       "..\\..\\..\\..\\",
+                                       "..\\");
+                    
+                    ReplaceSpecialPath(TexturePathNew, 
+                                       "..\\..\\",
+                                       "..\\");
+                    
+                    ReplaceSpecialPath(TexturePathNew, 
+                                       "..\\Forest Animals Unity Project\\Forest Animals Unity\\Assets\\Forest Animals\\",
+                                       "../Data/Models/ForestAnimals/");
+                    
+                    ReplaceSlashes(TexturePathNew);
+                    
                     loaded_mat_texture Tex;
                     Tex.Bmp = LoadBMP((char*)TexturePathNew.c_str());
+                    Tex.Name = TexturePathNew;
                     
                     Mapping->insert(std::make_pair(TexturePathNew, Tex));
                 }
@@ -204,16 +240,18 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
     b32 JoyShouldCalculateTangents = 0;
     
     u64 AssimpFlags = 
+#if 0        
         aiProcess_OptimizeMeshes |
         aiProcess_OptimizeGraph |
+#endif
         aiProcess_Triangulate |
         aiProcess_JoinIdenticalVertices |
         aiProcess_SortByPType;
     
-    b32 InGenTangents = Flags & AssimpLoadMesh_GenerateTangents;
-    b32 InGenNorm = Flags & AssimpLoadMesh_GenerateNormals;
-    b32 InGenSmNorm = Flags & AssimpLoadMesh_GenerateSmoothNormals;
-    b32 InImportOnlyAnimation = Flags & AssimpLoadMesh_ImportOnlyAnimation;
+    b32 InGenTangents = Flags & Load_GenerateTangents;
+    b32 InGenNorm = Flags & Load_GenerateNormals;
+    b32 InGenSmNorm = Flags & Load_GenerateSmoothNormals;
+    b32 IsOnlyAnim = Flags & Load_ImportOnlyAnimation;
     
     // NOTE(Dima): Generating tangents if needed
     if (InGenTangents) {
@@ -240,8 +278,11 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
     
     // NOTE(Dima): Reading scene
     const aiScene* scene = importer.ReadFile(
-		FileName,
-		AssimpFlags);
+        FileName,
+        AssimpFlags);
+    
+    double factor(0.0);
+    scene->mMetaData->Get("UnitScaleFactor", factor);
     
     if (scene) {
         printf("Loaded by ASSIMP: %s\n", FileName);
@@ -250,128 +291,132 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         printf("Error reading ASSIMP: %s\n", FileName);
     }
     
-    // NOTE(Dima): Loading embeded textures
-    for(int EmbedIndex = 0;
-        EmbedIndex < scene->mNumTextures;
-        EmbedIndex++)
-    {
-        aiTexture* EmbedTexture = scene->mTextures[EmbedIndex];
+    if(!IsOnlyAnim){
         
-        b32 IsCompressed = EmbedTexture->mHeight == 0;
-        
-        // NOTE(Dima): If texture is uncompressed, this vector will store packed pixels
-        std::vector<u32> OurColors;
-        
-        unsigned char* LoadFromData = 0;
-        u32 DataSize = 0;
-        if(IsCompressed){
-            DataSize = EmbedTexture->mWidth;
+        // NOTE(Dima): Loading embeded textures
+        for(int EmbedIndex = 0;
+            EmbedIndex < scene->mNumTextures;
+            EmbedIndex++)
+        {
+            aiTexture* EmbedTexture = scene->mTextures[EmbedIndex];
             
-            LoadFromData = (unsigned char*)EmbedTexture->pcData;
-        }
-        else{
-            aiTexel* Texels = EmbedTexture->pcData;
-            int TexelsCount = EmbedTexture->mWidth * EmbedTexture->mHeight;
+            b32 IsCompressed = EmbedTexture->mHeight == 0;
             
-            // NOTE(Dima): Packing pixels
-            for(int TexelIndex = 0; 
-                TexelIndex < TexelsCount;
-                TexelIndex++)
-            {
-                aiTexel Texel = Texels[TexelIndex];
+            // NOTE(Dima): If texture is uncompressed, this vector will store packed pixels
+            std::vector<u32> OurColors;
+            
+            unsigned char* LoadFromData = 0;
+            u32 DataSize = 0;
+            if(IsCompressed){
+                DataSize = EmbedTexture->mWidth;
                 
-                aiColor4D AssimpColor = aiColor4D(Texel);
+                LoadFromData = (unsigned char*)EmbedTexture->pcData;
+            }
+            else{
+                aiTexel* Texels = EmbedTexture->pcData;
+                int TexelsCount = EmbedTexture->mWidth * EmbedTexture->mHeight;
                 
-                v4 OurColor;
-                OurColor.r = AssimpColor.r;
-                OurColor.g = AssimpColor.g;
-                OurColor.b = AssimpColor.b;
-                OurColor.a = AssimpColor.a;
+                // NOTE(Dima): Packing pixels
+                for(int TexelIndex = 0; 
+                    TexelIndex < TexelsCount;
+                    TexelIndex++)
+                {
+                    aiTexel Texel = Texels[TexelIndex];
+                    
+                    aiColor4D AssimpColor = aiColor4D(Texel);
+                    
+                    v4 OurColor;
+                    OurColor.r = AssimpColor.r;
+                    OurColor.g = AssimpColor.g;
+                    OurColor.b = AssimpColor.b;
+                    OurColor.a = AssimpColor.a;
+                    
+                    u32 Packed = PackRGBA(OurColor);
+                    OurColors.push_back(Packed);
+                }
                 
-                u32 Packed = PackRGBA(OurColor);
-                OurColors.push_back(Packed);
+                DataSize = TexelsCount * 4;
+                LoadFromData = (unsigned char*)(&OurColors[0]);
             }
             
-            DataSize = TexelsCount * 4;
-            LoadFromData = (unsigned char*)(&OurColors[0]);
-        }
-        
-        loaded_mat_texture MatTexture;
-        MatTexture.Bmp = LoadFromDataBMP(LoadFromData, DataSize);
-        
-        std::string Name = std::string(EmbedTexture->mFilename.C_Str());
-        MatTexture.Name = Name;
-        
-        Result.TextureNameToEmbedIndex.insert({Name, EmbedIndex});
-        
-        Result.EmbededTextures.push_back(MatTexture);
-    }
-    
-    //NOTE(Dima): Loading materials
-    for(int MatIndex = 0; MatIndex < scene->mNumMaterials;MatIndex++){
-        aiMaterial* AssimpMaterial = scene->mMaterials[MatIndex];
-        loaded_mat NewMaterial = {};
-        
-        // NOTE(Dima): Getting material name
-        aiString AssimpMatName;
-        if(AssimpMaterial->Get(AI_MATKEY_NAME, AssimpMatName) == AI_SUCCESS){
-            CopyStringsSafe(NewMaterial.Name, 
-                            ARRAY_COUNT(NewMaterial.Name), 
-                            (char*)AssimpMatName.C_Str());
-        }
-        
-        v3 DiffuseColorVector = V3(1.0f, 1.0f, 1.0f);
-        aiColor3D AssimpDiffuseColor;
-        if(AssimpMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, AssimpDiffuseColor) == AI_SUCCESS){
-            DiffuseColorVector = Assimp2JoyColor3(AssimpDiffuseColor);
-        }
-        
-        v3 AmbientColorVector = V3(1.0f, 1.0f, 1.0f);
-        aiColor3D AssimpAmbientColor;
-        if(AssimpMaterial->Get(AI_MATKEY_COLOR_AMBIENT, AssimpAmbientColor) == AI_SUCCESS){
-            AmbientColorVector = Assimp2JoyColor3(AssimpAmbientColor);
-        }
-        
-        v3 SpecularColorVector = V3(1.0f, 1.0f, 1.0f);
-        aiColor3D AssimpSpecularColor;
-        if(AssimpMaterial->Get(AI_MATKEY_COLOR_SPECULAR, AssimpSpecularColor) == AI_SUCCESS){
-            SpecularColorVector = Assimp2JoyColor3(AssimpSpecularColor);
-        }
-        
-        
-        v3 EmissiveColorVector = V3(0.0f, 0.0f, 0.0f);
-        aiColor3D AssimpEmissiveColor;
-        if(AssimpMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, AssimpEmissiveColor) == AI_SUCCESS){
-            EmissiveColorVector = Assimp2JoyColor3(AssimpEmissiveColor);
-        }
-        
-        u32 DiffuseColor = PackRGB_R10G12B10(DiffuseColorVector);
-        u32 AmbientColor = PackRGB_R10G12B10(AmbientColorVector);
-        u32 SpecularColor = PackRGB_R10G12B10(SpecularColorVector);
-        u32 EmissiveColor = PackRGB_R10G12B10(EmissiveColorVector);
-        
-        NewMaterial.ColorDiffusePacked = DiffuseColor;
-        NewMaterial.ColorAmbientPacked = AmbientColor;
-        NewMaterial.ColorSpecularPacked = SpecularColor;
-        NewMaterial.ColorEmissivePacked = EmissiveColor;
-        
-        // NOTE(Dima): Loading textures for supported Assimp textures types
-        for(int TTypeIndex = 0;
-            TTypeIndex < ARRAY_COUNT(SupportedTexturesTypes);
-            TTypeIndex++)
-        {
-            assimp_loaded_textures_for_type LoadedRes = AiLoadMatTexturesForType(
-                &Result, 
-                &NewMaterial,
-                LoadingCtx, 
-                AssimpMaterial, 
-                SupportedTexturesTypes[TTypeIndex]);
+            loaded_mat_texture MatTexture;
+            MatTexture.Bmp = LoadFromDataBMP(LoadFromData, DataSize);
             
-            NewMaterial.TextureFirstIndexOfTypeInArray[TTypeIndex] = LoadedRes.FirstID;
-            NewMaterial.TextureCountOfType[TTypeIndex] = LoadedRes.Count;
+            std::string Name = std::string(EmbedTexture->mFilename.C_Str());
+            MatTexture.Name = Name;
+            
+            Result.TextureNameToEmbedIndex.insert({Name, EmbedIndex});
+            
+            Result.EmbededTextures.push_back(MatTexture);
         }
         
-        Result.Materials.push_back(NewMaterial);
+        
+        //NOTE(Dima): Loading materials
+        for(int MatIndex = 0; MatIndex < scene->mNumMaterials;MatIndex++){
+            aiMaterial* AssimpMaterial = scene->mMaterials[MatIndex];
+            loaded_mat NewMaterial = {};
+            
+            // NOTE(Dima): Getting material name
+            aiString AssimpMatName;
+            if(AssimpMaterial->Get(AI_MATKEY_NAME, AssimpMatName) == AI_SUCCESS){
+                CopyStringsSafe(NewMaterial.Name, 
+                                ARRAY_COUNT(NewMaterial.Name), 
+                                (char*)AssimpMatName.C_Str());
+            }
+            
+            v3 DiffuseColorVector = V3(1.0f, 1.0f, 1.0f);
+            aiColor3D AssimpDiffuseColor;
+            if(AssimpMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, AssimpDiffuseColor) == AI_SUCCESS){
+                DiffuseColorVector = Assimp2JoyColor3(AssimpDiffuseColor);
+            }
+            
+            v3 AmbientColorVector = V3(1.0f, 1.0f, 1.0f);
+            aiColor3D AssimpAmbientColor;
+            if(AssimpMaterial->Get(AI_MATKEY_COLOR_AMBIENT, AssimpAmbientColor) == AI_SUCCESS){
+                AmbientColorVector = Assimp2JoyColor3(AssimpAmbientColor);
+            }
+            
+            v3 SpecularColorVector = V3(1.0f, 1.0f, 1.0f);
+            aiColor3D AssimpSpecularColor;
+            if(AssimpMaterial->Get(AI_MATKEY_COLOR_SPECULAR, AssimpSpecularColor) == AI_SUCCESS){
+                SpecularColorVector = Assimp2JoyColor3(AssimpSpecularColor);
+            }
+            
+            
+            v3 EmissiveColorVector = V3(0.0f, 0.0f, 0.0f);
+            aiColor3D AssimpEmissiveColor;
+            if(AssimpMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, AssimpEmissiveColor) == AI_SUCCESS){
+                EmissiveColorVector = Assimp2JoyColor3(AssimpEmissiveColor);
+            }
+            
+            u32 DiffuseColor = PackRGB_R10G12B10(DiffuseColorVector);
+            u32 AmbientColor = PackRGB_R10G12B10(AmbientColorVector);
+            u32 SpecularColor = PackRGB_R10G12B10(SpecularColorVector);
+            u32 EmissiveColor = PackRGB_R10G12B10(EmissiveColorVector);
+            
+            NewMaterial.ColorDiffusePacked = DiffuseColor;
+            NewMaterial.ColorAmbientPacked = AmbientColor;
+            NewMaterial.ColorSpecularPacked = SpecularColor;
+            NewMaterial.ColorEmissivePacked = EmissiveColor;
+            
+            // NOTE(Dima): Loading textures for supported Assimp textures types
+            for(int TTypeIndex = 0;
+                TTypeIndex < ARRAY_COUNT(SupportedTexturesTypes);
+                TTypeIndex++)
+            {
+                assimp_loaded_textures_for_type LoadedRes = AiLoadMatTexturesForType(
+                    &Result, 
+                    &NewMaterial,
+                    LoadingCtx, 
+                    AssimpMaterial, 
+                    SupportedTexturesTypes[TTypeIndex]);
+                
+                NewMaterial.TextureFirstIndexOfTypeInArray[TTypeIndex] = LoadedRes.FirstID;
+                NewMaterial.TextureCountOfType[TTypeIndex] = LoadedRes.Count;
+            }
+            
+            Result.Materials.push_back(NewMaterial);
+        }
     }
     
     // NOTE(Dima): Reading node hierarchy BFS and ordering it
@@ -441,6 +486,7 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
     
     // NOTE(Dima): Loading nodes animations
     int AnimationsCount = scene->mNumAnimations;
+    
     for(int AnimIndex = 0;
         AnimIndex < AnimationsCount;
         AnimIndex++)
@@ -515,9 +561,9 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
     std::unordered_map<std::string, int> BoneNameToBoneIndex;
     
     tool_skeleton_info* Skeleton = &Result.Skeleton;
+    int NumMeshes = scene->mNumMeshes;
     
     // NOTE(Dima): Loading meshes bone data
-    int NumMeshes = scene->mNumMeshes;
     for (int MeshIndex = 0; MeshIndex < NumMeshes; MeshIndex++) {
         aiMesh* AssimpMesh = scene->mMeshes[MeshIndex];
         
@@ -560,6 +606,7 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
             }
         }
     }
+    
     
     Result.HasSkeleton = Skeleton->Bones.size() > 0;
     if(Result.HasSkeleton){
@@ -621,102 +668,104 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         }
     }
     
-    // NOTE(Dima): Loading meshes
-    for (int MeshIndex = 0; MeshIndex < NumMeshes; MeshIndex++) {
-        aiMesh* AssimpMesh = scene->mMeshes[MeshIndex];
-        
-        // NOTE(Dima): Loading mesh data
-        std::vector<v3> Vertices;
-        std::vector<v3> Normals;
-        std::vector<v2> TexCoords;
-        std::vector<v3> Tangents;
-        std::vector<u32> Indices;
-        
-        int NumColorChannels = AssimpMesh->GetNumColorChannels();
-        int NumUVChannels = AssimpMesh->GetNumUVChannels();
-        
-        //NOTE(dima): Getting indices
-        for (int FaceIndex = 0; FaceIndex < AssimpMesh->mNumFaces; FaceIndex++) {
-            aiFace* AssimpFace = &AssimpMesh->mFaces[FaceIndex];
+    if(!IsOnlyAnim){
+        // NOTE(Dima): Loading meshes
+        for (int MeshIndex = 0; MeshIndex < NumMeshes; MeshIndex++) {
+            aiMesh* AssimpMesh = scene->mMeshes[MeshIndex];
             
-            int NumberOfIndicesInPrimitive = AssimpFace->mNumIndices;
-            if (NumberOfIndicesInPrimitive == 3) {
-                Indices.push_back(AssimpFace->mIndices[0]);
-                Indices.push_back(AssimpFace->mIndices[1]);
-                Indices.push_back(AssimpFace->mIndices[2]);
-            }
-        }
-        
-        //NOTE(Dima): Getting UVs
-        if (NumUVChannels) {
-            int UVChannelIndex = 0;
+            int MaterialIndex = AssimpMesh->mMaterialIndex;
             
-            for (int VIndex = 0; VIndex < AssimpMesh->mNumVertices; VIndex++) {
-                v3 TexCoord = Assimp2JoyVector3(AssimpMesh->mTextureCoords[UVChannelIndex][VIndex]);
-                
-                TexCoords.push_back(V2(TexCoord.x, TexCoord.y));
-            }
-        }
-        
-        //NOTE(dima): Getting normals, positions, tangents
-        for (int VIndex = 0; VIndex < AssimpMesh->mNumVertices; VIndex++) {
-            v3 P = Assimp2JoyVector3(AssimpMesh->mVertices[VIndex]);
-            v3 N = Assimp2JoyVector3(AssimpMesh->mNormals[VIndex]);
+            // NOTE(Dima): Loading mesh data
+            std::vector<v3> Vertices;
+            std::vector<v3> Normals;
+            std::vector<v2> TexCoords;
+            std::vector<v3> Tangents;
+            std::vector<u32> Indices;
             
-            Vertices.push_back(P);
-            Normals.push_back(N);
+            int NumColorChannels = AssimpMesh->GetNumColorChannels();
+            int NumUVChannels = AssimpMesh->GetNumUVChannels();
             
-            /*
-            NOTE(dima): For some reason ASSIMP sometimes fails to generate tangents.
-            So here i will skip tangent storing if they were not generated.
-            That way tangents will be generated by MakeMesh
-            */
-            if(AssimpMesh->mTangents){
-                v3 T = Assimp2JoyVector3(AssimpMesh->mTangents[VIndex]);
+            //NOTE(dima): Getting indices
+            for (int FaceIndex = 0; FaceIndex < AssimpMesh->mNumFaces; FaceIndex++) {
+                aiFace* AssimpFace = &AssimpMesh->mFaces[FaceIndex];
                 
-                Tangents.push_back(T);
-            }
-        }
-        
-        std::vector<vertex_weights> Weights;
-        if(Result.HasSkeleton){
-            Weights.insert(Weights.begin(), AssimpMesh->mNumVertices, {});
-            
-            // NOTE(Dima): Iterating through bones and getting vertex weights
-            for(int AssimpBoneIndex = 0;
-                AssimpBoneIndex < AssimpMesh->mNumBones;
-                AssimpBoneIndex++)
-            {
-                
-                aiBone* AssimpBone = AssimpMesh->mBones[AssimpBoneIndex];
-                
-                std::string BoneName(AssimpBone->mName.C_Str());
-                
-                int BoneIndex = BoneNameToBoneIndex[BoneName];
-                
-                for(int VertexWeightIndex = 0;
-                    VertexWeightIndex < AssimpBone->mNumWeights;
-                    VertexWeightIndex++)
-                {
-                    aiVertexWeight* AssimpWeight = &AssimpBone->mWeights[VertexWeightIndex];
-                    
-                    vertex_weights* Target = &Weights[AssimpWeight->mVertexId];
-                    
-                    vertex_weight NewWeight;
-                    
-                    NewWeight.BoneID = BoneIndex;
-                    NewWeight.Weight = AssimpWeight->mWeight;
-                    
-                    Target->Weights.push_back(NewWeight);
+                int NumberOfIndicesInPrimitive = AssimpFace->mNumIndices;
+                if (NumberOfIndicesInPrimitive == 3) {
+                    Indices.push_back(AssimpFace->mIndices[0]);
+                    Indices.push_back(AssimpFace->mIndices[1]);
+                    Indices.push_back(AssimpFace->mIndices[2]);
                 }
             }
-        }
-        
-        // NOTE(Dima): Generating and pushing mesh if needed
-        loaded_mesh_slot MeshSlot = {};
-        
-        MeshSlot.MeshLoaded = 0;
-        if(!InImportOnlyAnimation){
+            
+            //NOTE(Dima): Getting UVs
+            if (NumUVChannels) {
+                int UVChannelIndex = 0;
+                
+                for (int VIndex = 0; VIndex < AssimpMesh->mNumVertices; VIndex++) {
+                    v3 TexCoord = Assimp2JoyVector3(AssimpMesh->mTextureCoords[UVChannelIndex][VIndex]);
+                    
+                    TexCoords.push_back(V2(TexCoord.x, TexCoord.y));
+                }
+            }
+            
+            //NOTE(dima): Getting normals, positions, tangents
+            for (int VIndex = 0; VIndex < AssimpMesh->mNumVertices; VIndex++) {
+                v3 P = Assimp2JoyVector3(AssimpMesh->mVertices[VIndex]);
+                v3 N = Assimp2JoyVector3(AssimpMesh->mNormals[VIndex]);
+                
+                Vertices.push_back(P);
+                Normals.push_back(N);
+                
+                /*
+                NOTE(dima): For some reason ASSIMP sometimes fails to generate tangents.
+                So here i will skip tangent storing if they were not generated.
+                That way tangents will be generated by MakeMesh
+                */
+                if(AssimpMesh->mTangents){
+                    v3 T = Assimp2JoyVector3(AssimpMesh->mTangents[VIndex]);
+                    
+                    Tangents.push_back(T);
+                }
+            }
+            
+            std::vector<vertex_weights> Weights;
+            if(Result.HasSkeleton && AssimpMesh->mNumBones){
+                Weights.insert(Weights.begin(), AssimpMesh->mNumVertices, {});
+                
+                // NOTE(Dima): Iterating through bones and getting vertex weights
+                for(int AssimpBoneIndex = 0;
+                    AssimpBoneIndex < AssimpMesh->mNumBones;
+                    AssimpBoneIndex++)
+                {
+                    
+                    aiBone* AssimpBone = AssimpMesh->mBones[AssimpBoneIndex];
+                    
+                    std::string BoneName(AssimpBone->mName.C_Str());
+                    
+                    int BoneIndex = BoneNameToBoneIndex[BoneName];
+                    
+                    for(int VertexWeightIndex = 0;
+                        VertexWeightIndex < AssimpBone->mNumWeights;
+                        VertexWeightIndex++)
+                    {
+                        aiVertexWeight* AssimpWeight = &AssimpBone->mWeights[VertexWeightIndex];
+                        
+                        vertex_weights* Target = &Weights[AssimpWeight->mVertexId];
+                        
+                        vertex_weight NewWeight;
+                        
+                        NewWeight.BoneID = BoneIndex;
+                        NewWeight.Weight = AssimpWeight->mWeight;
+                        
+                        Target->Weights.push_back(NewWeight);
+                    }
+                }
+            }
+            
+            // NOTE(Dima): Generating and pushing mesh if needed
+            loaded_mesh_slot MeshSlot = {};
+            
+            MeshSlot.MeshLoaded = 0;
             MeshSlot.Mesh = MakeMesh(
                 Vertices,
                 TexCoords,
@@ -726,9 +775,10 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
                 Weights,
                 JoyShouldCalculateNormals,
                 JoyShouldCalculateTangents);
+            MeshSlot.Mesh.MaterialIndex = MaterialIndex;
+            
+            Result.Meshes.push_back(MeshSlot);
         }
-        
-        Result.Meshes.push_back(MeshSlot);
     }
     
     return(Result);
@@ -777,26 +827,13 @@ INTERNAL_FUNCTION tool_material_info LoadedToToolMaterialInfo(loaded_mat* Materi
     return(Result);
 }
 
-INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
-                                       u32 AssetGroupID,
-                                       loaded_model* Model,
-                                       model_loading_context* Context)
+INTERNAL_FUNCTION void StoreAnimationsToGroupID(asset_system* System,
+                                                load_model_source* Source,
+                                                loaded_model* Model,
+                                                u32 AssetGroupID)
 {
     Model->ToolModelInfo = LoadedToToolModelInfo(Model);
     tool_model_info* ToolModel = &Model->ToolModelInfo;
-    
-    // NOTE(Dima): Storing embeded textures
-    BeginAsset(System, GameAsset_Type_Bitmap);
-    for(int EmbedIndex = 0;
-        EmbedIndex < Model->EmbededTextures.size();
-        EmbedIndex++)
-    {
-        loaded_mat_texture* MatTex = &Model->EmbededTextures[EmbedIndex];
-        
-        added_asset Added = AddBitmapAssetManual(System, &MatTex->Bmp);
-        MatTex->StoredBitmapID = Added.ID;
-    }
-    EndAsset(System);
     
     BeginAsset(System, GameAsset_Type_NodeAnim);
     for(int AnimIndex = 0;
@@ -817,7 +854,7 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
     }
     EndAsset(System);
     
-    BeginAsset(System, GameAsset_Type_AnimationClip);
+    BeginAsset(System, AssetGroupID);
     for(int AnimIndex = 0;
         AnimIndex < Model->Animations.size();
         AnimIndex++)
@@ -829,9 +866,51 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
                         (char*)Animation->Name.c_str());
         
         added_asset Added = AddAnimationClipAsset(System, Animation);
+        if(Source->AnimationImport){
+            AddTagHubToAsset(System, &Source->TagHub);
+        }
         ToolModel->AnimationIDs.push_back(Added.ID);
     }
     ASSERT(ToolModel->AnimationCount == ToolModel->AnimationIDs.size());
+    EndAsset(System);
+}
+
+INTERNAL_FUNCTION void StoreAnimAsset(asset_system* System,
+                                      load_model_source* Source)
+{
+    loaded_model* Model = &Source->LoadedModel;
+    u32 AssetGroupID = Source->AssetGroup;
+    
+    // NOTE(Dima): Storing animations
+    StoreAnimationsToGroupID(System, Source, 
+                             Model, AssetGroupID);
+}
+
+INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
+                                       load_model_source* Source,
+                                       model_loading_context* Context)
+{
+    loaded_model* Model = &Source->LoadedModel;
+    u32 AssetGroupID = Source->AssetGroup;
+    
+    Model->ToolModelInfo = LoadedToToolModelInfo(Model);
+    tool_model_info* ToolModel = &Model->ToolModelInfo;
+    
+    // NOTE(Dima): Storing in-model embeded animations
+    StoreAnimationsToGroupID(System, Source, Model, 
+                             GameAsset_Type_AnimationClip);
+    
+    // NOTE(Dima): Storing embeded textures
+    BeginAsset(System, GameAsset_Type_Bitmap);
+    for(int EmbedIndex = 0;
+        EmbedIndex < Model->EmbededTextures.size();
+        EmbedIndex++)
+    {
+        loaded_mat_texture* MatTex = &Model->EmbededTextures[EmbedIndex];
+        
+        added_asset Added = AddBitmapAssetManual(System, &MatTex->Bmp);
+        MatTex->StoredBitmapID = Added.ID;
+    }
     EndAsset(System);
     
     // NOTE(Dima): Storing meshes
@@ -847,37 +926,6 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
         ToolModel->MeshIDs.push_back(Added.ID);
     }
     EndAsset(System);
-    
-    // NOTE(Dima): Storing nodes
-    for(int NodeIndex = 0;
-        NodeIndex < ToolModel->Nodes.size();
-        NodeIndex++)
-    {
-        tool_node_info* Node = &ToolModel->Nodes[NodeIndex];
-        
-        for(int NodeMeshIndex = 0;
-            NodeMeshIndex < Node->MeshIndices.size();
-            NodeMeshIndex++)
-        {
-            int MeshIndexInArray = Node->MeshIndices[NodeMeshIndex];
-            
-            u32 StoredMeshID = Model->Meshes[MeshIndexInArray].StoredMeshID;
-            Node->MeshIDs.push_back(StoredMeshID);
-        }
-        
-        auto InsertedIt = ToolModel->NodeMeshIndicesStorage.insert(
-            ToolModel->NodeMeshIndicesStorage.end(),
-            Node->MeshIDs.begin(),
-            Node->MeshIDs.end());
-        
-        Node->Shared.NodeMeshIndexCountInStorage = Node->MeshIDs.size();
-        Node->Shared.NodeMeshIndexFirstInStorage = std::distance(
-            ToolModel->NodeMeshIndicesStorage.begin(),
-            InsertedIt);
-        
-        ToolModel->NodesSharedDatas.push_back(Node->Shared);
-    }
-    
     
     // NOTE(Dima): Storing skeleton
     BeginAsset(System, GameAsset_Type_Skeleton);
@@ -921,8 +969,7 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
                     CorrespondingTexture = &Model->EmbededTextures[TexSource->EmbedIndex];
                 }
                 else{
-                    std::string FirstTypeTexturePath = TexSource->Path;
-                    CorrespondingTexture = &Context->PathToTextureMap[FirstTypeTexturePath];
+                    CorrespondingTexture = &Context->PathToTextureMap[TexSource->Path];
                 }
                 
                 u32 FirstIDInBitmaps = CorrespondingTexture->StoredBitmapID;
@@ -946,42 +993,164 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
         ToolModel->MaterialIDs.push_back(AddedMaterial.ID);
     }
     
+    // NOTE(Dima): Storing nodes
+    for(int NodeIndex = 0;
+        NodeIndex < ToolModel->Nodes.size();
+        NodeIndex++)
+    {
+        tool_node_info* Node = &ToolModel->Nodes[NodeIndex];
+        
+        for(int NodeMeshIndex = 0;
+            NodeMeshIndex < Node->MeshIndices.size();
+            NodeMeshIndex++)
+        {
+            int MeshIndexInArray = Node->MeshIndices[NodeMeshIndex];
+            
+            u32 StoredMeshID = Model->Meshes[MeshIndexInArray].StoredMeshID;
+            Node->MeshIDs.push_back(StoredMeshID);
+        }
+        
+        auto InsertedIt = ToolModel->NodeMeshIndicesStorage.insert(
+            ToolModel->NodeMeshIndicesStorage.end(),
+            Node->MeshIDs.begin(),
+            Node->MeshIDs.end());
+        
+        Node->Shared.NodeMeshIndexCountInStorage = Node->MeshIDs.size();
+        Node->Shared.NodeMeshIndexFirstInStorage = std::distance(
+            ToolModel->NodeMeshIndicesStorage.begin(),
+            InsertedIt);
+        
+        ToolModel->NodesSharedDatas.push_back(Node->Shared);
+    }
+    
     // NOTE(Dima): Storing actual model
     BeginAsset(System, AssetGroupID);
     AddModelAsset(System, ToolModel);
+    AddTagHubToAsset(System, &Source->TagHub);
     EndAsset(System);
 }
 
 INTERNAL_FUNCTION void StoreLoadingContext(asset_system* System, 
                                            model_loading_context* LoadingCtx)
 {
-    BeginAsset(System, GameAsset_Type_Bitmap);
-    // NOTE(Dima): Storing textures from loading context
-    for(auto it: LoadingCtx->PathToTextureMap){
-        added_asset AddedBitmap = AddBitmapAssetManual(System, &it.second.Bmp);
-        it.second.StoredBitmapID = AddedBitmap.ID;
-    }
-    EndAsset(System);
+    // NOTE(Dima): DirectoryStack should be empty
+    Assert(LoadingCtx->DirStack.empty());
     
+    // NOTE(Dima): Loading models
     for(int SourceIndex = 0; 
         SourceIndex < LoadingCtx->ModelSources.size();
         SourceIndex++)
     {
         load_model_source* Source = &LoadingCtx->ModelSources[SourceIndex];
         
-        Source->LoadedModel = LoadModelByASSIMP(Source->Path,
+        Source->LoadedModel = LoadModelByASSIMP((char*)Source->Path.c_str(),
                                                 Source->Flags,
                                                 LoadingCtx);
         
-        StoreModelAsset(System, 
-                        Source->AssetGroup, 
-                        &Source->LoadedModel,
-                        LoadingCtx);
+    }
+    
+    // NOTE(Dima): Storing bitmaps
+    BeginAsset(System, GameAsset_Type_Bitmap);
+    for(auto& it: LoadingCtx->PathToTextureMap){
+        added_asset AddedBitmap = AddBitmapAssetManual(System, &it.second.Bmp);
+        it.second.StoredBitmapID = AddedBitmap.ID;
+    }
+    EndAsset(System);
+    
+    // NOTE(Dima): Storing models or animations
+    for(int SourceIndex = 0; 
+        SourceIndex < LoadingCtx->ModelSources.size();
+        SourceIndex++)
+    {
+        load_model_source* Source = &LoadingCtx->ModelSources[SourceIndex];
+        
+        if(Source->AnimationImport){
+            StoreAnimAsset(System, Source);
+        }
+        else{
+            StoreModelAsset(System, Source, LoadingCtx);
+        }
+        
     }
 }
 
-inline void AddModelSource(model_loading_context* Ctx, load_model_source Source){
+inline void PushDirectory(model_loading_context* Ctx, char* DirPath){
+    // NOTE(Dima): DirectoryStack should be empty
+    Assert(Ctx->DirStack.empty());
+    
+    Ctx->DirStack.push(std::string(DirPath));
+}
+
+inline void PopDirectory(model_loading_context* Ctx){
+    // NOTE(Dima): DirectoryStack should be empty
+    Assert(!Ctx->DirStack.empty());
+    Assert(Ctx->DirStack.size() == 1);
+    
+    Ctx->DirStack.pop();
+}
+
+inline std::string GetAssetPathForLoadingContext(model_loading_context* Ctx, char* InitPath){
+    std::string Result = "";
+    
+    if(!Ctx->DirStack.empty()){
+        Result += Ctx->DirStack.top();
+        
+        if(Result[Result.length() - 1] != '/'){
+            Result += "/";
+        }
+    }
+    
+    Result += std::string(InitPath);
+    
+    return(Result);
+}
+
+inline void AddModelSource(model_loading_context* Ctx, 
+                           char* Path, 
+                           u32 AssetGroup,
+                           u32 Flags)
+{
+    std::string NewPath = GetAssetPathForLoadingContext(Ctx, Path);
+    
+    load_model_source Source = ModelSource(NewPath, AssetGroup, 
+                                           Flags, Ctx->TagHub);
+    
     Ctx->ModelSources.push_back(Source);
+}
+
+inline void AddAnimSource(model_loading_context* Ctx, 
+                          char* Path, 
+                          u32 AssetGroup,
+                          u32 Flags)
+{
+    std::string NewPath = GetAssetPathForLoadingContext(Ctx, Path);
+    
+    load_model_source Source = ModelSource(NewPath, AssetGroup, 
+                                           Flags | Load_ImportOnlyAnimation, Ctx->TagHub);
+    
+    Ctx->ModelSources.push_back(Source);
+}
+
+inline void BeginCharacter(model_loading_context* Ctx, u32 CharacterTagValue){
+    Assert(!Ctx->CharacterBeginned);
+    Ctx->CharacterBeginned = true;
+    
+    Ctx->TagHub.AddIntTag(AssetTag_Character, CharacterTagValue);
+}
+
+inline void EndCharacter(model_loading_context* Ctx){
+    Assert(Ctx->CharacterBeginned);
+    Ctx->CharacterBeginned = false;
+    
+    Ctx->TagHub.PopTag();
+}
+
+inline void PushIntTag(model_loading_context* Ctx, u32 AssetTag, u32 TagValue){
+    Ctx->TagHub.AddIntTag(AssetTag, TagValue);
+}
+
+inline void PopTag(model_loading_context* Ctx){
+    Ctx->TagHub.PopTag();
 }
 
 INTERNAL_FUNCTION void WriteMeshes1(){
@@ -993,53 +1162,12 @@ INTERNAL_FUNCTION void WriteMeshes1(){
     model_loading_context* Ctx = &LoadCtx;
     
     u32 DefaultFlags = 
-        AssimpLoadMesh_GenerateNormals |
-        AssimpLoadMesh_GenerateTangents;
+        Load_GenerateNormals |
+        Load_GenerateTangents;
     
-    // NOTE(Dima): Here load all models
-    AddModelSource(Ctx, ModelSource("../Data/Models/Animations/test.fbx",
-                                    GameAsset_Test,
-                                    DefaultFlags));
-    
-    AddModelSource(Ctx, ModelSource("../Data/Models/Animations/spider.fbx",
-                                    GameAsset_Spider,
-                                    DefaultFlags));
-    
-    AddModelSource(Ctx, ModelSource("../Data/Models/Animations/Male_Casual.fbx",
-                                    GameAsset_Man,
-                                    DefaultFlags));
-    
-    AddModelSource(Ctx, ModelSource("../Data/Models/Skyscraper/Skyscraper.fbx", 
-                                    GameAsset_Skyscraper,
-                                    DefaultFlags));
-    
-    AddModelSource(Ctx, ModelSource("../Data/Models/Bathroom/Bathroom.fbx", 
-                                    GameAsset_Bathroom, 
-                                    DefaultFlags));
-    AddModelSource(Ctx, ModelSource("../Data/Models/Heart/Heart.fbx", 
-                                    GameAsset_Heart, 
-                                    DefaultFlags));
-    AddModelSource(Ctx, ModelSource("../Data/Models/KindPlane/KindPlane.fbx", 
-                                    GameAsset_KindPlane, 
-                                    DefaultFlags));
-    AddModelSource(Ctx, ModelSource("../Data/Models/Podkova/Podkova.fbx", 
-                                    GameAsset_Podkova, 
-                                    DefaultFlags));
-    AddModelSource(Ctx, ModelSource("../Data/Models/RubbishBinBig/RubbishBin.fbx", 
-                                    GameAsset_RubbishBin, 
-                                    DefaultFlags));
-    AddModelSource(Ctx, ModelSource("../Data/Models/Snowman/snowman.fbx", 
-                                    GameAsset_Snowman, 
-                                    DefaultFlags));
-    AddModelSource(Ctx, ModelSource("../Data/Models/Stool/stool.fbx", 
-                                    GameAsset_Stool, 
-                                    DefaultFlags));
-    AddModelSource(Ctx, ModelSource("../Data/Models/Toilet/toilet.fbx", 
-                                    GameAsset_Toilet, 
-                                    DefaultFlags));
-    AddModelSource(Ctx, ModelSource("../Data/Models/Vaza/vaza1.fbx", 
-                                    GameAsset_Vase, 
-                                    DefaultFlags));
+    AddModelSource(Ctx, "../Data/Models/Animations/Male_Casual.fbx",
+                   GameAsset_Man,
+                   DefaultFlags);
     
     // NOTE(Dima): Storing loading context
     StoreLoadingContext(System, Ctx);
@@ -1047,7 +1175,149 @@ INTERNAL_FUNCTION void WriteMeshes1(){
     WriteAssetFile(System, "../Data/AssimpMeshes1.ja");
 }
 
+
+INTERNAL_FUNCTION void WriteBear(){
+    asset_system System_ = {};
+    asset_system* System = &System_;
+    InitAssetFile(System);
+    
+    model_loading_context LoadCtx = {};
+    model_loading_context* Ctx = &LoadCtx;
+    
+    u32 DefaultFlags = 
+        Load_GenerateNormals |
+        Load_GenerateTangents;
+    
+    // NOTE(Dima): Fox
+    BeginCharacter(Ctx, TagCharacter_Bear);
+    AddModelSource(Ctx, "../Data/Models/ForestAnimals/Bear/Bear.fbx",
+                   GameAsset_Model_Character,
+                   DefaultFlags);
+    
+    PushDirectory(Ctx, "../Data/Models/ForestAnimals/Bear/animations/");
+    
+    AddAnimSource(Ctx, "Failure.fbx",
+                  GameAsset_Anim_Failure, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Fall.fbx",
+                  GameAsset_Anim_Fall,
+                  DefaultFlags);
+    
+    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
+    AddAnimSource(Ctx, "Idle.fbx",
+                  GameAsset_Anim_Idle, DefaultFlags);
+    PopTag(Ctx);
+    
+    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
+    AddAnimSource(Ctx, "Idle_2.fbx",
+                  GameAsset_Anim_Idle, DefaultFlags);
+    PopTag(Ctx);
+    
+    AddAnimSource(Ctx, "Jump_Up.fbx",
+                  GameAsset_Anim_JumpUp, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Land.fbx",
+                  GameAsset_Anim_Land, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Roll_In_Place.fbx",
+                  GameAsset_Anim_Roll, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Run_In_Place.fbx",
+                  GameAsset_Anim_Run, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Sleep.fbx",
+                  GameAsset_Anim_Sleep, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Success.fbx",
+                  GameAsset_Anim_Success, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Talk.fbx",
+                  GameAsset_Anim_Talk, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Walk_In_Place.fbx",
+                  GameAsset_Anim_Walk, DefaultFlags);
+    PopDirectory(Ctx);
+    EndCharacter(Ctx);
+    
+    // NOTE(Dima): Storing loading context
+    StoreLoadingContext(System, Ctx);
+    
+    WriteAssetFile(System, "../Data/Bear.ja");
+}
+
+INTERNAL_FUNCTION void WriteFox(){
+    asset_system System_ = {};
+    asset_system* System = &System_;
+    InitAssetFile(System);
+    
+    model_loading_context LoadCtx = {};
+    model_loading_context* Ctx = &LoadCtx;
+    
+    u32 DefaultFlags = 
+        Load_GenerateNormals |
+        Load_GenerateTangents;
+    
+    // NOTE(Dima): Fox
+    BeginCharacter(Ctx, TagCharacter_Fox);
+    AddModelSource(Ctx, "../Data/Models/ForestAnimals/Fox/Fox.fbx",
+                   GameAsset_Model_Character, DefaultFlags);
+    
+    PushDirectory(Ctx, "../Data/Models/ForestAnimals/Fox/animations");
+    AddAnimSource(Ctx, "Failure.fbx", 
+                  GameAsset_Anim_Failure, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Fall.fbx",
+                  GameAsset_Anim_Fall, DefaultFlags);
+    
+    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
+    AddAnimSource(Ctx, "Idle.fbx",
+                  GameAsset_Anim_Idle, DefaultFlags);
+    
+    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
+    AddAnimSource(Ctx, "Idle_2.fbx",
+                  GameAsset_Anim_Idle, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Jump_Up.fbx",
+                  GameAsset_Anim_JumpUp, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Land.fbx",
+                  GameAsset_Anim_Land, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Roll_In_Place.fbx",
+                  GameAsset_Anim_Roll, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Run_In_Place.fbx",
+                  GameAsset_Anim_Run, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Sleep.fbx",
+                  GameAsset_Anim_Sleep, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Success.fbx",
+                  GameAsset_Anim_Success, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Talk.fbx",
+                  GameAsset_Anim_Talk, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Walk_In_Place.fbx",
+                  GameAsset_Anim_Walk, DefaultFlags);
+    PopDirectory(Ctx);
+    EndCharacter(Ctx);
+    
+    // NOTE(Dima): Storing loading context
+    StoreLoadingContext(System, Ctx);
+    
+    WriteAssetFile(System, "../Data/Fox.ja");
+}
+
 int main(int ArgsCount, char** Args){
+    
+    WriteFox();
+    WriteBear();
+#if 0    
+    WriteRabbit();
+    WriteDeer();
+    WriteMoose();
+#endif
     
     WriteMeshes1();
     

@@ -95,7 +95,6 @@ FindTagInAsset(game_asset* Asset,
     return(Result);
 }
 
-
 game_asset_tag* AddTag(asset_system* System, u32 TagType, u32 TagValueType) {
     game_asset_tag* Result = 0;
     
@@ -118,7 +117,7 @@ game_asset_tag* AddTag(asset_system* System, u32 TagType, u32 TagValueType) {
 }
 
 void AddFloatTag(asset_system* System, u32 TagType, float TagValue) {
-    game_asset_tag* Tag = AddTag(System, TagType, AssetTagValue_Float);
+    game_asset_tag* Tag = AddTag(System, TagType, TagValue_Float);
     
     if (Tag) {
         Tag->Value_Float = TagValue;
@@ -126,7 +125,7 @@ void AddFloatTag(asset_system* System, u32 TagType, float TagValue) {
 }
 
 void AddIntTag(asset_system* System, u32 TagType, int TagValue) {
-    game_asset_tag* Tag = AddTag(System, TagType, AssetTagValue_Int);
+    game_asset_tag* Tag = AddTag(System, TagType, TagValue_Int);
     
     if (Tag) {
         Tag->Value_Int = TagValue;
@@ -134,14 +133,14 @@ void AddIntTag(asset_system* System, u32 TagType, int TagValue) {
 }
 
 void AddEmptyTag(asset_system* System, u32 TagType) {
-    game_asset_tag* Tag = AddTag(System, TagType, AssetTagValue_Empty);
+    game_asset_tag* Tag = AddTag(System, TagType, TagValue_Empty);
     
     if (Tag) {
         Tag->Value_Int = 1;
     }
 }
 
-void AddTagHubToAsset(asset_system* System, game_asset_tag_hub* TagHub){
+void AddTagHubToAsset(asset_system* System, tag_hub* TagHub){
     // NOTE(Dima): Adding font tags
     for(int TagIndex = 0; 
         TagIndex < TagHub->Tags.size();
@@ -150,15 +149,15 @@ void AddTagHubToAsset(asset_system* System, game_asset_tag_hub* TagHub){
         game_asset_tag* Tag = &TagHub->Tags[TagIndex];
         
         switch(TagHub->TagValueTypes[TagIndex]){
-            case GameAssetTagValue_Float:{
+            case TagValue_Float:{
                 AddFloatTag(System, Tag->Type, Tag->Value_Float);
             }break;
             
-            case GameAssetTagValue_Int:{
+            case TagValue_Int:{
                 AddIntTag(System, Tag->Type, Tag->Value_Int);
             }break;
             
-            case GameAssetTagValue_Empty:{
+            case TagValue_Empty:{
                 AddEmptyTag(System, Tag->Type);
             }break;
         }
@@ -252,6 +251,7 @@ added_asset AddMeshAsset(asset_system* System,
     FileHeader->Mesh.IndicesCount = sizeof(u32);
     FileHeader->Mesh.IndicesCount = Mesh->IndicesCount;
     FileHeader->Mesh.VerticesCount = Mesh->VerticesCount;
+    FileHeader->Mesh.MaterialIndex = Mesh->MaterialIndex;
     
     FileHeader->Mesh.DataVerticesSize = Mesh->TypeCtx.VertexTypeSize * Mesh->VerticesCount;
     FileHeader->Mesh.DataIndicesSize = sizeof(u32) * Mesh->IndicesCount;
@@ -782,7 +782,7 @@ And forming group regions that are about to be written
                 
                 asset_tag_header NewTag;
                 NewTag.Type = From->Type;
-                NewTag.ValueType = From->ValueType;
+                NewTag.Value.Type = From->ValueType;
                 NewTag.Value.Value_Float = From->Value_Float;
                 
                 WriteTags.push_back(NewTag);

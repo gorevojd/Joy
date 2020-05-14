@@ -80,16 +80,13 @@ struct platform_mutex{
 typedef PLATFORM_MUTEX_FUNCTION(platform_mutex_function);
 
 #define PLATFORM_READ_FILE(name) Platform_Read_File_Result name(char* filePath)
-typedef PLATFORM_READ_FILE(Platform_Read_File);
-PLATFORM_READ_FILE(PlatformReadFile);
+typedef PLATFORM_READ_FILE(platform_read_file);
 
 #define PLATFORM_WRITE_FILE(name) b32 name(char* filePath, void* data, u64 size)
-typedef PLATFORM_WRITE_FILE(Platform_Write_File);
-PLATFORM_WRITE_FILE(PlatformWriteFile);
+typedef PLATFORM_WRITE_FILE(platform_write_file);
 
 #define PLATFORM_FREE_FILE_MEMORY(name) void name(Platform_Read_File_Result* fileReadResult)
-typedef PLATFORM_FREE_FILE_MEMORY(Platform_Free_File_Memory);
-PLATFORM_FREE_FILE_MEMORY(PlatformFreeFileMemory);
+typedef PLATFORM_FREE_FILE_MEMORY(platform_free_file_memory);
 
 enum Platform_Error_Type{
     PlatformError_Error,
@@ -214,15 +211,15 @@ struct render_platform_api{
 };
 
 struct platform_api{
-    Platform_Read_File* ReadFile;
-    Platform_Write_File* WriteFile;
-    Platform_Free_File_Memory* FreeFileMemory;
+    platform_job_queue HighPriorityQueue;
+    platform_job_queue LowPriorityQueue;
+    
+    platform_read_file* ReadFile;
+    platform_write_file* WriteFile;
+    platform_free_file_memory* FreeFileMemory;
     
     Platform_Show_Error* ShowError;
     Platform_Debug_Output_String* OutputString;
-    
-    platform_job_queue HighPriorityQueue;
-    platform_job_queue LowPriorityQueue;
     
     platform_memalloc* MemAlloc;
     platform_memfree* MemFree;
@@ -243,7 +240,6 @@ struct platform_api{
     Platform_Wait_For_Completion* WaitForCompletion;
     
     render_platform_api RenderAPI;
-    //input_platform_process* ProcessInput;
     
     platform_process_input* ProcessInput;
 };

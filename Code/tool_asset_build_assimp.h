@@ -7,11 +7,13 @@
 
 #include <iostream>
 #include <vector>
+#include <stack>
 #include <unordered_map>
 #include <unordered_set>
 #include <map>
 #include <string>
 #include <queue>
+#include <time.h>
 
 #include <assimp/Importer.hpp>      // C++ importer interface
 #include <assimp/scene.h>           // Output data structure
@@ -77,20 +79,21 @@ struct loaded_mat{
     u32 ColorEmissivePacked;
     
     /*
-I store here an array of paths to textures.
-FirstIDInArray serves as mapping to get first ID texture
-of specific texture type
-*/
+    I store here an array of paths to textures.
+    FirstIDInArray serves as mapping to get first ID texture
+    of specific texture type
+    */
     std::vector<mat_texture_source> TextureSourceArray;
     
     tool_material_info ToolMaterialInfo;
 };
 
 enum assimp_load_mesh_flags {
-	AssimpLoadMesh_GenerateNormals = (1 << 0),
-	AssimpLoadMesh_GenerateTangents = (1 << 1),
-	AssimpLoadMesh_GenerateSmoothNormals = (1 << 2),
-    AssimpLoadMesh_ImportOnlyAnimation = (1 << 3),
+	Load_GenerateNormals = (1 << 0),
+	Load_GenerateTangents = (1 << 1),
+	Load_GenerateSmoothNormals = (1 << 2),
+    
+    Load_ImportOnlyAnimation = (1 << 3),
 };
 
 struct loaded_mesh_slot{
@@ -113,8 +116,6 @@ struct loaded_model{
     std::unordered_map<std::string, int> TextureNameToEmbedIndex;
     std::vector<loaded_mat_texture> EmbededTextures;
     
-    // NOTE(Dima): These are temporary
-    
     // NOTE(Dima): Mapping node name to corresponding node in hierarchy
     std::unordered_map<std::string, int> NodeNameToNodeIndex;
     
@@ -124,23 +125,29 @@ struct loaded_model{
 };
 
 struct load_model_source{
-    char* Path;
+    std::string Path;
     u32 AssetGroup;
     u32 Flags;
+    b32 AnimationImport;
+    
+    tag_hub TagHub;
     
     loaded_model LoadedModel;
 };
 
 inline load_model_source ModelSource(
-char* Path,
+std::string Path,
 u32 AssetGroup,
-u32 Flags)
+u32 Flags,
+tag_hub TagHub)
 {
     load_model_source Result = {};
     
     Result.Path = Path;
     Result.AssetGroup = AssetGroup;
+    Result.TagHub = TagHub;
     Result.Flags = Flags;
+    Result.AnimationImport = (Flags & Load_ImportOnlyAnimation) != 0;
     
     return(Result);
 }
@@ -148,7 +155,12 @@ u32 Flags)
 struct model_loading_context{
     std::unordered_map<std::string, loaded_mat_texture> PathToTextureMap;
     
+    u32 Flags;
     std::vector<load_model_source> ModelSources;
+    std::stack<std::string> DirStack;
+    
+    b32 CharacterBeginned;
+    tag_hub TagHub;
 };
 
 inline m44 Assimp2JoyMatrix(const aiMatrix4x4& AssimpMatrix) {

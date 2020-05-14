@@ -49,12 +49,19 @@ struct debug_timing_stat{
     } Stat;
 };
 
+struct debug_frame_stat{
+    
+};
 
 #define DEBUG_PROFILED_FRAMES_COUNT 256
 #define DEBUG_STATS_TABLE_SIZE 128
 #define DEBUG_STATS_TO_SORT_SIZE 4096
 #define DEBUG_THREADS_TABLE_SIZE 32
 #define DEBUG_DEFAULT_FILTER_VALUE 0xFFFFFFFF
+
+struct debug_common_frame{
+    f32 FrameTime;
+};
 
 struct debug_thread_frame{
     debug_profiled_tree_node RootTreeNodeUse;
@@ -87,7 +94,6 @@ enum debug_profile_menu_type{
     DebugProfileMenu_TopClock,
     DebugProfileMenu_TopClockEx,
     DebugProfileMenu_RootNode,
-    DebugProfileMenu_Threads,
 };
 
 struct debug_state{
@@ -105,6 +111,7 @@ struct debug_state{
     b32 ShowDebugOverlay;
     b32 ShowDebugMenus;
     debug_window MainWindow;
+    debug_window TestWindow;
     
     u32 ToShowMenuType;
     
@@ -126,8 +133,11 @@ struct debug_state{
     
     debug_thread ThreadSentinel;
     debug_thread* MainThread;
+    debug_thread* WatchThread;
     debug_thread* ThreadHashTable[DEBUG_THREADS_TABLE_SIZE];
     int ProfiledThreadsCount;
+    
+    debug_common_frame Frames[DEBUG_PROFILED_FRAMES_COUNT];
     
     u32 ToShowProfileMenuType;
     
@@ -140,6 +150,12 @@ struct debug_state{
 inline debug_thread_frame* 
 GetThreadFrameByIndex(debug_thread* Thread, int FrameIndex){
     debug_thread_frame* Frame = &Thread->Frames[FrameIndex];
+    
+    return(Frame);
+}
+
+inline debug_common_frame* GetFrameByIndex(debug_state* State, int FrameIndex){
+    debug_common_frame* Frame = &State->Frames[FrameIndex];
     
     return(Frame);
 }

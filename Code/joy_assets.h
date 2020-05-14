@@ -57,6 +57,7 @@ struct asset{
         ASSET_PTR_MEMBER(bmp_info);
         ASSET_PTR_MEMBER(array_info);
         ASSET_PTR_MEMBER(mesh_info);
+        ASSET_PTR_MEMBER(material_info);
         ASSET_PTR_MEMBER(glyph_info);
         ASSET_PTR_MEMBER(sound_info);
         ASSET_PTR_MEMBER(model_info);
@@ -192,6 +193,9 @@ inline void* LoadAssetTypeInternal(assets* Assets,
 #define LOAD_ASSET(data_type, type, assets, id, immediate) \
 (data_type*)LoadAssetTypeInternal(assets, id, type, immediate)
 
+array_info* LoadArray(assets* Assets,
+                      u32 ArrayID);
+
 bmp_info* LoadBmp(assets* Assets,
                   u32 BmpID,
                   b32 Immediate);
@@ -203,6 +207,10 @@ font_info* LoadFont(assets* Assets,
 mesh_info* LoadMesh(assets* Assets,
                     u32 MeshID,
                     b32 Immediate);
+
+material_info* LoadMaterial(assets* Assets,
+                            u32 MaterialID,
+                            b32 Immediate);
 
 model_info* LoadModel(assets* Assets,
                       u32 ModelID,

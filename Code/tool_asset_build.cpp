@@ -7,7 +7,7 @@
 INTERNAL_FUNCTION void StoreFontAsset(asset_system* System, 
                                       u32 GameAssetGroup,
                                       tool_font_info* Font, 
-                                      game_asset_tag_hub* TagHub)
+                                      tag_hub* TagHub)
 {
     // NOTE(Dima): Adding glyphs
     BeginAsset(System, GameAsset_Type_Glyph);
@@ -38,8 +38,8 @@ INTERNAL_FUNCTION void WriteFonts(){
     tool_font_info PFDIN = LoadFont("../Data/Fonts/PFDinTextCondPro-Regular.ttf", 16.0f, LoadFont_BakeBlur);
     tool_font_info MollyJack = LoadFont("../Data/Fonts/MollyJack.otf", 40.0f, LoadFont_BakeBlur);
     
-    game_asset_tag_hub HubRegular = game_asset_tag_hub::Empty().AddIntTag(AssetTag_FontType, AssetFontTypeTag_Regular);
-    game_asset_tag_hub HubBold = game_asset_tag_hub::Empty().AddIntTag(AssetTag_FontType, AssetFontTypeTag_Bold);
+    tag_hub HubRegular = tag_hub::Empty().AddIntTag(AssetTag_FontType, TagFont_Regular);
+    tag_hub HubBold = tag_hub::Empty().AddIntTag(AssetTag_FontType, TagFont_Bold);
     
     StoreFontAsset(System, GameAsset_LiberationMono, &LibMono, &HubRegular);
     StoreFontAsset(System, GameAsset_LilitaOne, &Lilita, &HubRegular);

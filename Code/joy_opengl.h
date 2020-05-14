@@ -68,11 +68,12 @@ struct gl_simple_shader{
     GLint BoneTransformsLoc;
     GLint BonesCountLoc;
     
+    GLint AlbedoColorLoc;
     GLint AlbedoLoc;
     GLint NormalsLoc;
-    GLint NormalsIsSetLoc;
-    GLint AlbedoIsSetLoc;
-    GLint AlbedoColorLoc;
+    GLint SpecularLoc;
+    GLint EmissiveLoc;
+    GLint TexturesSetFlagsLoc;
     
     GLint PAttrLoc;
     GLint UVAttrLoc;

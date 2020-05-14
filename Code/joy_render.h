@@ -1,9 +1,6 @@
 #ifndef JOY_RENDER_H
 #define JOY_RENDER_H
 
-#include "joy_render_stack.h"
-#include "joy_memory.h"
-
 #define RENDER_DEFAULT_STACK_SIZE Megabytes(1)
 
 struct render_camera_setup{
@@ -585,7 +582,7 @@ inline void PushGlyph(render_stack* Stack,
 inline void PushMesh(render_stack* Stack,
                      mesh_info* Mesh,
                      m44 Transform,
-                     v3 AlbedoColor = V3(1.0f, 1.0f, 1.0f),
+                     material_info* Material = 0,
                      m44* BoneTransforms = 0,
                      int BoneCount = 0)
 {
@@ -595,17 +592,17 @@ inline void PushMesh(render_stack* Stack,
     entry->Transform = Transform;
     entry->BoneCount = BoneCount;
     entry->BoneTransforms = BoneTransforms;
-    entry->AlbedoColor = AlbedoColor;
+    entry->AlbedoColor = V3(1.0f, 1.0f, 1.0f);
+    entry->Material = Material;
 }
 
 inline void PushMesh(render_stack* Stack,
                      mesh_info* Mesh,
                      v3 P,
                      quat R,
-                     v3 S,
-                     v3 AlbedoColor = V3(1.0f, 1.0f, 1.0f))
+                     v3 S)
 {
-    PushMesh(Stack, Mesh, ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P), AlbedoColor);
+    PushMesh(Stack, Mesh, ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P));
 }
 
 inline void PushGuiChunk(render_stack* Stack, int ChunkIndex){

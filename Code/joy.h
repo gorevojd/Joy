@@ -35,11 +35,11 @@ struct task_data_pool{
 #include "joy_debug_menu_types.h"
 
 #include "joy_input.h"
-#include "joy_assets_render.h"
 #include "joy_assets.h"
-#include "joy_gui.h"
 #include "joy_render_stack.h"
 #include "joy_render.h"
+#include "joy_assets_render.h"
+#include "joy_gui.h"
 #include "joy_animation.h"
 #include "joy_debug.h"
 
