@@ -329,11 +329,11 @@ enum asset_tag_font_type_value{
 };
 
 enum asset_tag_character_type{
+    TagCharacter_Bear,
+    TagCharacter_Fox,
     TagCharacter_Rabbit,
     TagCharacter_Moose,
     TagCharacter_Deer,
-    TagCharacter_Bear,
-    TagCharacter_Fox,
 };
 
 enum asset_tag_idle_anim{
@@ -393,6 +393,7 @@ enum asset_group_type{
     GameAsset_Anim_Success,
     GameAsset_Anim_Talk,
     GameAsset_Anim_Walk,
+    GameAsset_Model_TempForCounting,
     
     // NOTE(Dima): Animations
     GameAsset_Man,

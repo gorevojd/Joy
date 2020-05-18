@@ -68,6 +68,7 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Animation)){
                     }
                     EndTree(Gui);
                     
+#if 0                    
                     // NOTE(Dima): Printing variables
                     BeginTree(Gui, "Variables");
                     anim_variable* VarAt = Control->FirstVariable;
@@ -98,8 +99,7 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Animation)){
                         ProgressSlider01(Gui, "Anim phase", 
                                          Control->PlayingStates[PlayingStateIndex]->PlayingAnimation.Phase01);
                     }
-                    
-                    
+#endif
                     
                     EndTree(Gui); // End anim controller tree
                     

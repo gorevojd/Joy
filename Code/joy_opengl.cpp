@@ -131,9 +131,9 @@ INTERNAL_FUNCTION gl_shader GlLoadProgram(gl_state* GL, char* vertexPath, char* 
     }
     
 	result->ID = GlLoadFromSource(
-		(char*)vFile.data, 
-		(char*)fFile.data, 
-        toPassGeometryData);
+                                  (char*)vFile.data, 
+                                  (char*)fFile.data, 
+                                  toPassGeometryData);
     
     ResultShader.ID = result->ID;
     ResultShader.Type = GlShader_Simple;
@@ -351,15 +351,15 @@ INTERNAL_FUNCTION GLuint GlAllocateTexture(bmp_info* bmp){
         glBindTexture(GL_TEXTURE_2D, GenerateTex);
         
         glTexImage2D(
-            GL_TEXTURE_2D,
-            0,
-            GL_RGBA,
-            bmp->Width,
-            bmp->Height,
-            0,
-            GL_RGBA,
-            GL_UNSIGNED_BYTE,
-            bmp->Pixels);
+                     GL_TEXTURE_2D,
+                     0,
+                     GL_RGBA,
+                     bmp->Width,
+                     bmp->Height,
+                     0,
+                     GL_RGBA,
+                     GL_UNSIGNED_BYTE,
+                     bmp->Pixels);
         
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -646,15 +646,15 @@ INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, bmp_info* bmp){
     glGenTextures(1, &BlitTex);
     glBindTexture(GL_TEXTURE_2D, BlitTex);
     glTexImage2D(
-        GL_TEXTURE_2D,
-        0,
-        GL_RGBA,
-        bmp->Width,
-        bmp->Height,
-        0,
-        GL_RGBA,
-        GL_UNSIGNED_BYTE,
-        bmp->Pixels);
+                 GL_TEXTURE_2D,
+                 0,
+                 GL_RGBA,
+                 bmp->Width,
+                 bmp->Height,
+                 0,
+                 GL_RGBA,
+                 GL_UNSIGNED_BYTE,
+                 bmp->Pixels);
     
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -1066,6 +1066,8 @@ INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
     };
     
     GL->GuiOrtho = Floats2Matrix(GuiOrtho);
+    
+    //glViewport(0.0f, 0.0f, WindowWidth, WindowHeight);
     
     // NOTE(Dima): Actual rendering
     if(Render->API.RendererType == Renderer_Software){

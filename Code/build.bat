@@ -40,8 +40,6 @@ SET THIS_PROJECT_NAME=Joy
 ECHO Compiling Joy
 cl /Fe%THIS_PROJECT_NAME% %COMP_OPTS% %INCLUDE_PATH% %COMPILATION_FILES% /link /NOLOGO /INCREMENTAL:no /OPT:ref kernel32.lib user32.lib gdi32.lib winmm.lib shell32.lib opengl32.lib dsound.lib Xinput.lib
 
-
-
 ECHO ____________________
 ECHO ********************
 ECHO *   AssetBuilder   *
@@ -53,8 +51,6 @@ set ASSBUILD_COMPFILES=%ASSBUILD_COMPFILES% ..\Code\tool_asset_build_commands.cp
 
 SET THIS_PROJECT_NAME=AssetBuilder
 cl /Fe%THIS_PROJECT_NAME% %COMP_OPTS% %ASSBUILD_COMPFILES% /link /NOLOGO /INCREMENTAL:no /OPT:ref kernel32.lib user32.lib gdi32.lib winmm.lib shell32.lib
-
-
 
 ECHO ____________________
 ECHO ********************

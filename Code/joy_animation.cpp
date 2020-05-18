@@ -307,16 +307,39 @@ INTERNAL_FUNCTION void CalculateToModelTransforms(model_info* Model){
     }
 }
 
-INTERNAL_FUNCTION void UpdateAnimController(assets* Assets,
-                                            model_info* Model, 
-                                            anim_controller* AC,
-                                            f64 GlobalTime,
-                                            f32 DeltaTime,
-                                            f32 PlaybackRate)
+void PlayStateAnimations(anim_state* State, 
+                         f64 GlobalStart, 
+                         f32 Phase)
+{
+    State->PlayingAnimation.GlobalStart = GlobalStart;
+    State->PlayingAnimation.Phase01 = Phase;
+}
+
+INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
+                                               model_info* Model, 
+                                               animated_component* AC,
+                                               f64 GlobalTime,
+                                               f32 DeltaTime,
+                                               f32 PlaybackRate)
 {
     FUNCTION_TIMING();
     
     if(AC){
+        anim_controller* Control = AC->Control;
+        
+        // NOTE(Dima): Setting states animations based on StateName->AnimID mapping
+        anim_animid* AnimIDAt = AC->FirstAnimID;
+        while(AnimIDAt != 0){
+            anim_state* State = FindState(AC->Control, AnimIDAt->Name);
+            
+            if(State){
+                State->PlayingAnimation.AnimationID = AnimIDAt->AnimID;
+            }
+            
+            AnimIDAt = AnimIDAt->NextInList;
+        }
+        
+        // NOTE(Dima): Updating playing states, conditions, transitions
         if(AC->PlayingStatesCount > 0){
             
             // NOTE(Dima): Updating transition
@@ -385,17 +408,20 @@ INTERNAL_FUNCTION void UpdateAnimController(assets* Assets,
                     {
                         anim_transition_condition* Cond = &TransitionAt->Conditions[ConditionIndex];
                         
+                        anim_variable* Variable = FindVariable(AC, Cond->Name);
+                        Assert(Cond->VariableValueType == Variable->ValueType);
+                        
                         b32 ConditionTrue = 0;
-                        if(Cond->Variable->ValueType == AnimVariable_Bool){
-                            b32 VariableBool = Cond->Variable->Value.Bool;
+                        if(Cond->VariableValueType == AnimVariable_Bool){
+                            b32 VariableBool = Variable->Value.Bool;
                             b32 CondBool = Cond->Value.Bool;
                             
                             if(Cond->ConditionType == TransitionCondition_Equal){
                                 ConditionTrue = (VariableBool == CondBool);
                             }
                         }
-                        else if(Cond->Variable->ValueType == AnimVariable_Float){
-                            float VariableFloat = Cond->Variable->Value.Float;
+                        else if(Cond->VariableValueType  == AnimVariable_Float){
+                            float VariableFloat = Variable->Value.Float;
                             float CondFloat = Cond->Value.Float;
                             
                             switch(Cond->ConditionType){
@@ -435,7 +461,6 @@ INTERNAL_FUNCTION void UpdateAnimController(assets* Assets,
                         PlayStateAnimations(AC->PlayingStates[PLAY_STATE_SECOND], 
                                             GlobalTime,
                                             0.0f);
-                        
                         
                         AC->TimeToTransit = TransitionAt->TimeToTransit;
                         AC->TransitionTimeLeft = TransitionAt->TimeToTransit;
@@ -551,7 +576,7 @@ INTERNAL_FUNCTION void UpdateAnimController(assets* Assets,
 
 INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(assets* Assets, 
                                                                  model_info* Model, 
-                                                                 anim_controller* Control)
+                                                                 animated_component* AC)
 {
     FUNCTION_TIMING();
     
@@ -561,7 +586,7 @@ INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(assets* Assets,
     m44* CalculatedBoneTransforms = 0;
     skeleton_info* Skeleton = 0;
     
-    if(Control && Model){
+    if(AC && Model){
         
         // NOTE(Dima): Getting skeleton if we can
         if(Model->HasSkeleton){
@@ -571,7 +596,7 @@ INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(assets* Assets,
         // NOTE(Dima): Updating skeleton
         if(Skeleton){
             BoneCount = Skeleton->BoneCount;
-            CalculatedBoneTransforms = Control->BoneTransformMatrices;
+            CalculatedBoneTransforms = AC->BoneTransformMatrices;
             
             for(int BoneIndex = 0;
                 BoneIndex < BoneCount;
@@ -595,7 +620,7 @@ INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(assets* Assets,
 
 anim_calculated_pose UpdateModelAnimation(assets* Assets,
                                           model_info* Model,
-                                          anim_controller* Control,
+                                          animated_component* AnimComp,
                                           f64 GlobalTime,
                                           f32 DeltaTime,
                                           f32 PlaybackRate)
@@ -615,11 +640,11 @@ anim_calculated_pose UpdateModelAnimation(assets* Assets,
     
     At the end of this function ToParentTransform calculated for each node
     */
-    UpdateAnimController(Assets, Model, 
-                         Control, 
-                         GlobalTime,
-                         DeltaTime,
-                         PlaybackRate);
+    UpdateAnimatedComponent(Assets, Model, 
+                            AnimComp, 
+                            GlobalTime,
+                            DeltaTime,
+                            PlaybackRate);
     
     // NOTE(Dima): This function calculates ToModel transform 
     // NOTE(Dima): based on ToParent of each node
@@ -628,7 +653,7 @@ anim_calculated_pose UpdateModelAnimation(assets* Assets,
     // NOTE(Dima): Updating skeleton data
     anim_calculated_pose Result = UpdateModelBoneTransforms(Assets, 
                                                             Model, 
-                                                            Control);
+                                                            AnimComp);
     
     return(Result);
 }
@@ -657,8 +682,7 @@ INTERNAL_FUNCTION anim_controller* DeallocateAnimController(anim_system* Anim,
 }
 
 anim_controller* CreateAnimControl(anim_system* Anim, 
-                                   char* Name, 
-                                   u32 NodesCheckSum)
+                                   char* Name)
 {
     anim_controller* Result = AllocateAnimController(Anim);
     
@@ -666,17 +690,6 @@ anim_controller* CreateAnimControl(anim_system* Anim,
     
     // NOTE(Dima): Initialize beginned transition to 0
     Result->BeginnedTransition = 0;
-    
-    // NOTE(Dima): Initialize skeleton check sum
-    Result->NodesCheckSum = NodesCheckSum;
-    
-    // NOTE(Dima): Initialize variable table
-    for(int Index = 0; 
-        Index < ANIM_VAR_TABLE_SIZE;
-        Index++)
-    {
-        Result->VariableHashTable[Index] = 0;
-    }
     
     // NOTE(Dima): Init anim state table
     for(int Index = 0;
@@ -690,32 +703,61 @@ anim_controller* CreateAnimControl(anim_system* Anim,
     Result->FirstState = 0;
     Result->LastState = 0;
     
-    // NOTE(Dima): Initializing variable list
-    Result->FirstVariable = 0;
-    Result->LastState = 0;
-    
     return(Result);
 }
 
-void PlayStateAnimations(anim_state* State, 
-                         f64 GlobalStart, 
-                         f32 Phase)
+void InitAnimComponent(animated_component* AC, 
+                       anim_controller* Control,
+                       u32 NodesCheckSum)
 {
-    State->PlayingAnimation.GlobalStart = GlobalStart;
-    State->PlayingAnimation.Phase01 = Phase;
+    AC->Control = Control;
+    
+    // NOTE(Dima): Initialize variable table
+    for(int Index = 0; 
+        Index < ANIM_VAR_TABLE_SIZE;
+        Index++)
+    {
+        AC->VariableHashTable[Index] = 0;
+    }
+    
+    // NOTE(Dima): Initializing variable list
+    AC->FirstVariable = 0;
+    AC->LastVariable = 0;
+    
+    // NOTE(Dima): Initializing AnimID table
+    for(int Index = 0; 
+        Index < ANIM_ANIMID_TABLE_SIZE;
+        Index++)
+    {
+        AC->AnimIDHashTable[Index] = 0;
+    }
+    
+    // NOTE(Dima): Initializing AnimID list
+    AC->FirstAnimID = 0;
+    AC->LastAnimID = 0;
+    
+    
+    // NOTE(Dima): Initialize skeleton check sum
+    AC->NodesCheckSum = NodesCheckSum;
+    
+    // NOTE(Dima): Init animations to play
+    AC->PlayingStatesCount = (Control->FirstState != 0);
+    AC->PlayingStates[PLAY_STATE_FIRST] = Control->FirstState;
+    AC->PlayingStates[PLAY_STATE_SECOND] = 0;
+    
+    PlayStateAnimations(AC->PlayingStates[PLAY_STATE_FIRST], 0.0f, 0.0f);
 }
-
 
 /*
 NOTE(Dima): This function selects default playing state(first)
 and enables it's all animations
 */
-void FinalizeCreation(anim_controller* Control){
-    Control->PlayingStatesCount = (Control->FirstState != 0);
-    Control->PlayingStates[PLAY_STATE_FIRST] = Control->FirstState;
-    Control->PlayingStates[PLAY_STATE_SECOND] = 0;
+void ClearStateAnimations(animated_component* AC){
+    anim_controller* Control = AC->Control;
     
-    PlayStateAnimations(Control->PlayingStates[PLAY_STATE_FIRST], 0.0f, 0.0f);
+    if(Control){
+        
+    }
 }
 
 // NOTE(Dima): !!!!!!!!!!!!!!!!!
@@ -744,15 +786,15 @@ INTERNAL_FUNCTION anim_state* DeallocateAnimState(anim_system* Anim,
     return(State);
 }
 
-INTERNAL_FUNCTION anim_state* 
-FindState(anim_controller* AC, char* Name)
+anim_state* 
+FindState(anim_controller* Control, char* Name)
 {
     u32 Hash = StringHashFNV(Name);
     
     int EntryIndex = Hash % ANIM_STATE_TABLE_SIZE;
     
     anim_state* Result = 0;
-    anim_state* At = AC->StateTable[EntryIndex];
+    anim_state* At = Control->StateTable[EntryIndex];
     while(At){
         
         if(StringsAreEqual(At->Name, Name)){
@@ -847,12 +889,12 @@ INTERNAL_FUNCTION anim_variable* DeallocateVariable(anim_system* Anim,
     return(Var);
 }
 
-void AddVariable(anim_controller* Control,
+void AddVariable(animated_component* AC,
                  char* Name,
                  u32 VarType)
 {
     // NOTE(Dima): Init new variable
-    anim_variable* New = AllocateVariable(Control->AnimState);
+    anim_variable* New = AllocateVariable(AC->Control->AnimState);
     
     New->ValueType = VarType;
     CopyStringsSafe(New->Name, ArrayCount(New->Name), Name);
@@ -862,7 +904,7 @@ void AddVariable(anim_controller* Control,
     
     int EntryIndex = Hash % ANIM_VAR_TABLE_SIZE;
     
-    anim_variable* At = Control->VariableHashTable[EntryIndex];
+    anim_variable* At = AC->VariableHashTable[EntryIndex];
     
     if(At){
         while(At->NextInHash != 0){
@@ -876,24 +918,24 @@ void AddVariable(anim_controller* Control,
         At->NextInHash = New;
     }
     else{
-        Control->VariableHashTable[EntryIndex] = New;
+        AC->VariableHashTable[EntryIndex] = New;
     }
     
     // NOTE(Dima): Inserting to list
     New->NextInList = 0;
-    if((Control->FirstVariable == 0) &&
-       (Control->LastVariable == 0))
+    if((AC->FirstVariable == 0) &&
+       (AC->LastVariable == 0))
     {
-        Control->FirstVariable = Control->LastVariable = New;
+        AC->FirstVariable = AC->LastVariable = New;
     }
     else{
-        Control->LastVariable->NextInList = New;
-        Control->LastVariable = New;
+        AC->LastVariable->NextInList = New;
+        AC->LastVariable = New;
     }
 }
 
-INTERNAL_FUNCTION anim_variable* 
-FindVariable(anim_controller* AC, char* Name)
+anim_variable* 
+FindVariable(animated_component* AC, char* Name)
 {
     // NOTE(Dima): Inserting to hash table
     u32 Hash = StringHashFNV(Name);
@@ -914,6 +956,90 @@ FindVariable(anim_controller* AC, char* Name)
     
     return(Result);
 }
+
+// NOTE(Dima): !!!!!!!!!!!!!!
+// NOTE(Dima): Anim IDs stuff
+// NOTE(Dima): !!!!!!!!!!!!!!
+
+INTERNAL_FUNCTION anim_animid* AllocateAnimID(anim_system* Anim)
+{
+    DLIST_ALLOCATE_FUNCTION_BODY(anim_animid, 
+                                 Anim->Region,
+                                 NextAlloc, PrevAlloc,
+                                 Anim->AnimIDFree,
+                                 Anim->AnimIDUse,
+                                 16,
+                                 Result);
+    
+    Result->NextInList = 0;
+    Result->NextInHash = 0;
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION anim_animid* DeallocateAnimID(anim_system* Anim, 
+                                                anim_animid* AnimID)
+{
+    DLIST_DEALLOCATE_FUNCTION_BODY(AnimID, 
+                                   NextAlloc, PrevAlloc,
+                                   Anim->AnimIDFree);
+    
+    return(AnimID);
+}
+
+anim_animid* ModifyOrAddAnimID(animated_component* AC,
+                               char* Name,
+                               u32 AnimationID)
+{
+    // NOTE(Dima): Init new animid
+    anim_animid* New = 0;
+    
+    // NOTE(Dima): Inserting to hash table
+    u32 Hash = StringHashFNV(Name);
+    
+    int EntryIndex = Hash % ANIM_ANIMID_TABLE_SIZE;
+    
+    anim_animid* At = AC->AnimIDHashTable[EntryIndex];
+    while(At != 0){
+        b32 CompareRes = StringsAreEqual(Name, At->Name);
+        
+        if(CompareRes){
+            New = At;
+            break;
+        }
+        
+        At = At->NextInHash;
+    }
+    
+    if(New == 0){
+        // NOTE(Dima): Allocating
+        New = AllocateAnimID(AC->Control->AnimState);
+        
+        CopyStringsSafe(New->Name, ArrayCount(New->Name), Name);
+        
+        // NOTE(Dima): Inserting to hash table
+        New->NextInHash = AC->AnimIDHashTable[EntryIndex];
+        AC->AnimIDHashTable[EntryIndex] = New;
+        
+        // NOTE(Dima): Inserting to list
+        New->NextInList = 0;
+        if((AC->FirstAnimID == 0) &&
+           (AC->LastAnimID == 0))
+        {
+            AC->FirstAnimID = AC->LastAnimID = New;
+        }
+        else{
+            AC->LastAnimID->NextInList = New;
+            AC->LastAnimID = New;
+        }
+    }
+    
+    // NOTE(Dima): Setting animation ID
+    New->AnimID = AnimationID;
+    
+    return(New);
+}
+
 
 // NOTE(Dima): !!!!!!!!!!!!!!!!!
 // NOTE(Dima): Transitions stuff
@@ -1012,12 +1138,16 @@ inline anim_transition_condition* AddCondition(anim_transition* Transition,
     Assert(Transition->ConditionsCount < MAX_TRANSITION_CONDITIONS);
     anim_transition_condition* Result = &Transition->Conditions[Transition->ConditionsCount++];
     
+#if 0    
     anim_variable* FoundVariable = FindVariable(Transition->AnimControl, VariableName);
     Assert(FoundVariable);
     Result->Variable = FoundVariable;
     
     Assert(FoundVariable->ValueType == VariableType);
+#endif
     
+    CopyStringsSafe(Result->Name, sizeof(Result->Name), VariableName);
+    Result->VariableValueType = VariableType;
     Result->ConditionType = ConditionType;
     
     return(Result);
@@ -1051,11 +1181,11 @@ void AddConditionBool(anim_controller* Control,
     Cond->Value.Bool = Value;
 }
 
-void SetFloat(anim_controller* Control, 
+void SetFloat(animated_component* AC, 
               char* VariableName, 
               float Value)
 {
-    anim_variable* FoundVariable = FindVariable(Control, VariableName);
+    anim_variable* FoundVariable = FindVariable(AC, VariableName);
     Assert(FoundVariable);
     
     Assert(FoundVariable->ValueType == AnimVariable_Float);
@@ -1063,11 +1193,11 @@ void SetFloat(anim_controller* Control,
     FoundVariable->Value.Float = Value;
 }
 
-void SetBool(anim_controller* Control, 
+void SetBool(animated_component* AC, 
              char* VariableName, 
              b32 Value)
 {
-    anim_variable* FoundVariable = FindVariable(Control, VariableName);
+    anim_variable* FoundVariable = FindVariable(AC, VariableName);
     Assert(FoundVariable);
     
     Assert(FoundVariable->ValueType == AnimVariable_Bool);
@@ -1075,15 +1205,13 @@ void SetBool(anim_controller* Control,
     FoundVariable->Value.Bool = Value;
 }
 
-
-void SetStateAnimation(anim_controller* Control,
+void SetStateAnimation(animated_component* AC,
                        char* StateName,
                        u32 AnimationID)
 {
-    anim_state* State = FindState(Control, StateName);
-    
+    anim_state* State = FindState(AC->Control, StateName);
     if(State){
-        State->PlayingAnimation.AnimationID = AnimationID;
+        ModifyOrAddAnimID(AC, StateName, AnimationID);
     }
 }
 
@@ -1105,9 +1233,10 @@ void InitAnimSystem(anim_system* Anim)
     DLIST_REFLECT_PTRS(Anim->TransitionUse, NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(Anim->TransitionFree, NextAlloc, PrevAlloc);
     
+    // NOTE(Dima): Initializing animids sentinels
+    DLIST_REFLECT_PTRS(Anim->AnimIDUse, NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(Anim->AnimIDFree, NextAlloc, PrevAlloc);
+    
+    
     DEBUGSetMenuDataSource(DebugMenu_Animation, Anim);
 }
-
-#if defined(JOY_DEBUG_BUILD)
-
-#endif

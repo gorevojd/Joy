@@ -15,6 +15,10 @@
 #endif
 
 /*
+// TODO(Dima): 
+
+Per-tag asset ids storage
+
 dima privet , kak dela? i tebia lybly
 */
 
@@ -41,10 +45,10 @@ debug_global_table* DEBUGGlobalTable;
 #endif
 
 BOOL CALLBACK DirectSoundEnumerateCallback( 
-LPGUID lpGuid, 
-LPCSTR lpcstrDescription, 
-LPCSTR lpcstrModule, 
-LPVOID lpContext )
+                                           LPGUID lpGuid, 
+                                           LPCSTR lpcstrDescription, 
+                                           LPCSTR lpcstrModule, 
+                                           LPVOID lpContext )
 {
     Win32DebugOutputString((char*)lpcstrDescription);
     
@@ -89,9 +93,9 @@ void DSoundInit(DSound_State* dsState, HWND hwnd){
             
             // NOTE(Dima): Creating primary buffer
             HRESULT primBufRes = dsState->dSound->CreateSoundBuffer(
-                &primBufDesc, 
-                &dsState->primBuf, 
-                0);
+                                                                    &primBufDesc, 
+                                                                    &dsState->primBuf, 
+                                                                    0);
             
             if(SUCCEEDED(primBufRes)){
                 // NOTE(Dima): setting wave format
@@ -113,31 +117,31 @@ void DSoundInit(DSound_State* dsState, HWND hwnd){
                     }
                     else{
                         Win32ShowError(
-                            PlatformError_Error, "DirectSound can not create secondary buffer");
+                                       PlatformError_Error, "DirectSound can not create secondary buffer");
                     }
                 }
                 else{
                     Win32ShowError(
-                        PlatformError_Error, 
-                        "Can not set DirectSound format");
+                                   PlatformError_Error, 
+                                   "Can not set DirectSound format");
                 }
             }
             else{
                 Win32ShowError(
-                    PlatformError_Error, 
-                    "Can not create DirectSound primary buffer");
+                               PlatformError_Error, 
+                               "Can not create DirectSound primary buffer");
             }
         }
         else{
             Win32ShowError(
-                PlatformError_Error, 
-                "DirectSound can not set cooperative level");
+                           PlatformError_Error, 
+                           "DirectSound can not set cooperative level");
         }
     }
     else{
         Win32ShowError(
-            PlatformError_Error, 
-            "Can not create DirectSound object");
+                       PlatformError_Error, 
+                       "Can not create DirectSound object");
     }
     
     if(SUCCEEDED(DirectSoundCaptureCreate8(0, &dsState->dCapture, 0))){
@@ -151,22 +155,22 @@ void DSoundInit(DSound_State* dsState, HWND hwnd){
 		dCaptureDesc.lpDSCFXDesc = NULL;
         
         if (SUCCEEDED(dsState->dCapture->CreateCaptureBuffer(
-            &dCaptureDesc,
-            &dsState->dCaptureBuf, 0)))
+                                                             &dCaptureDesc,
+                                                             &dsState->dCaptureBuf, 0)))
 		{
             dsState->dCaptureDesc = dCaptureDesc;
             dsState->captureBufferCreated = 1;
         }
         else{
             Win32ShowError(
-                PlatformError_Error, 
-                "Can not create DirectSoundCapture buffer");
+                           PlatformError_Error, 
+                           "Can not create DirectSoundCapture buffer");
         }
     }
     else{
         Win32ShowError(
-            PlatformError_Error, 
-            "Can not create DirectSoundCapture object");
+                       PlatformError_Error, 
+                       "Can not create DirectSoundCapture object");
     }
 }
 
@@ -197,13 +201,13 @@ Win32ClearSoundBuffer(DSound_State* ds)
     DWORD region2Size;
     
     HRESULT lockResult = ds->secBuf->Lock(
-        0, 
-        ds->secBufDesc.dwBufferBytes,
-        &region1,
-        &region1Size,
-        &region2,
-        &region2Size,
-        DSBLOCK_ENTIREBUFFER);
+                                          0, 
+                                          ds->secBufDesc.dwBufferBytes,
+                                          &region1,
+                                          &region1Size,
+                                          &region2,
+                                          &region2Size,
+                                          DSBLOCK_ENTIREBUFFER);
     
     if(SUCCEEDED(lockResult)){
         int r1NBlocks = region1Size / (ds->waveFormat.nBlockAlign);
@@ -241,13 +245,13 @@ Win32FillSoundBufferWithSound(DSound_State* ds, sound_info* sound)
     DWORD region2Size;
     
     HRESULT lockResult = ds->secBuf->Lock(
-        0, 
-        ds->secBufDesc.dwBufferBytes,
-        &region1,
-        &region1Size,
-        &region2,
-        &region2Size,
-        DSBLOCK_ENTIREBUFFER);
+                                          0, 
+                                          ds->secBufDesc.dwBufferBytes,
+                                          &region1,
+                                          &region1Size,
+                                          &region2,
+                                          &region2Size,
+                                          DSBLOCK_ENTIREBUFFER);
     
     if(SUCCEEDED(lockResult)){
         int r1NBlocks = region1Size / (ds->waveFormat.nBlockAlign);
@@ -291,10 +295,10 @@ Win32StopDirectSoundBuffer(DSound_State* ds){
 
 LRESULT CALLBACK
 TmpOpenGLWndProc(
-HWND Window,
-UINT Message,
-WPARAM WParam,
-LPARAM LParam)
+                 HWND Window,
+                 UINT Message,
+                 WPARAM WParam,
+                 LPARAM LParam)
 {
     return DefWindowProc(Window, Message, WParam, LParam);
 }
@@ -310,17 +314,17 @@ INTERNAL_FUNCTION void Win32LoadOpenglExtensions(){
     RegisterClassA(&WndClass);
     
     HWND tmpWND = CreateWindowExA(
-        0,
-        WndClass.lpszClassName,
-        "TmpWindow",
-        0,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        0, 0,
-        WndClass.hInstance,
-        0);
+                                  0,
+                                  WndClass.lpszClassName,
+                                  "TmpWindow",
+                                  0,
+                                  CW_USEDEFAULT,
+                                  CW_USEDEFAULT,
+                                  CW_USEDEFAULT,
+                                  CW_USEDEFAULT,
+                                  0, 0,
+                                  WndClass.hInstance,
+                                  0);
     
     HDC tmpDC = GetDC(tmpWND);
     
@@ -1293,12 +1297,12 @@ PLATFORM_READ_FILE(Win32ReadFile){
     Platform_Read_File_Result res = {};
     
     HANDLE fileHandle = CreateFileA(
-        filePath,
-        GENERIC_READ,
-        FILE_SHARE_READ,
-        0,
-        OPEN_EXISTING,
-        0, 0);
+                                    filePath,
+                                    GENERIC_READ,
+                                    FILE_SHARE_READ,
+                                    0,
+                                    OPEN_EXISTING,
+                                    0, 0);
     
     if (fileHandle != INVALID_HANDLE_VALUE){
         LARGE_INTEGER fileSizeLI;
@@ -1488,8 +1492,8 @@ PLATFORM_OPEN_FILES_BEGIN(Win32OpenFilesBegin){
     size_t MemNeeded = 0;
     
     GlobalWin32.OpenFilesFindHandle =  FindFirstFileA(
-        ActualFindString,
-        &GlobalWin32.OpenFilesFindData);
+                                                      ActualFindString,
+                                                      &GlobalWin32.OpenFilesFindData);
     
     GlobalWin32.OpenFilesNextFound = GlobalWin32.OpenFilesFindHandle != INVALID_HANDLE_VALUE;
 }
@@ -1568,13 +1572,13 @@ PLATFORM_FILE_OFFSET_READ(Win32FileOffsetRead){
     b32 Result = 0;
     
     HANDLE FileHandle = CreateFileA(
-        FilePath,
-        GENERIC_READ,
-        FILE_SHARE_READ,
-        0,
-        OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL,
-        0);
+                                    FilePath,
+                                    GENERIC_READ,
+                                    FILE_SHARE_READ,
+                                    0,
+                                    OPEN_EXISTING,
+                                    FILE_ATTRIBUTE_NORMAL,
+                                    0);
     
     if(FileHandle != INVALID_HANDLE_VALUE){
         
@@ -1584,11 +1588,11 @@ PLATFORM_FILE_OFFSET_READ(Win32FileOffsetRead){
         
         DWORD BytesRead;
         BOOL ReadSuccess = ReadFile(
-            FileHandle,
-            ReadTo,
-            (u32)ReadCount,
-            &BytesRead,
-            &Overlapped);
+                                    FileHandle,
+                                    ReadTo,
+                                    (u32)ReadCount,
+                                    &BytesRead,
+                                    &Overlapped);
         
         Result = ReadSuccess && (BytesRead == ReadCount);
     }
@@ -1910,8 +1914,8 @@ Win32ProcessInput(input_state* Input)
     
     if(Input->CapturingMouse){
         HMONITOR MonitorHandle = MonitorFromWindow(
-            GlobalWin32.window, 
-            MONITOR_DEFAULTTOPRIMARY);
+                                                   GlobalWin32.window, 
+                                                   MONITOR_DEFAULTTOPRIMARY);
         MONITORINFO MonitorInfo;
         MonitorInfo.cbSize = sizeof(MONITORINFO);
         GetMonitorInfoA(MonitorHandle, &MonitorInfo);
@@ -1978,9 +1982,9 @@ Win32ProcessInput(input_state* Input)
             // NOTE(Dima): Battery info getting
             XINPUT_BATTERY_INFORMATION BatteryInfo;
             DWORD GetBatteryRes = XInputGetBatteryInformation(
-                ControllerIndex,
-                BATTERY_DEVTYPE_GAMEPAD,
-                &BatteryInfo);
+                                                              ControllerIndex,
+                                                              BATTERY_DEVTYPE_GAMEPAD,
+                                                              &BatteryInfo);
             
             if(GetBatteryRes == ERROR_SUCCESS){
                 switch(BatteryInfo.BatteryLevel){
@@ -2242,10 +2246,10 @@ WIN32_DEBUG_OUTPUT(Win32DebugOutputLog){
 
 LRESULT CALLBACK
 Win32WindowProcessing(
-HWND Window,
-UINT Message,
-WPARAM WParam,
-LPARAM LParam)
+                      HWND Window,
+                      UINT Message,
+                      WPARAM WParam,
+                      LPARAM LParam)
 {
     switch (Message){
         
@@ -2303,7 +2307,7 @@ INTERNAL_FUNCTION void Win32InitWindow(HINSTANCE Instance,
     ClientRect.right = WindowWidth;
     ClientRect.bottom = WindowHeight;
     BOOL WindowRectAdjusted = AdjustWindowRect(
-        &ClientRect, (WS_OVERLAPPEDWINDOW | WS_VISIBLE) & (~WS_OVERLAPPED), 0);
+                                               &ClientRect, (WS_OVERLAPPEDWINDOW | WS_VISIBLE) & (~WS_OVERLAPPED), 0);
     
     if(WindowRectAdjusted){
         WindowCreateW = ClientRect.right - ClientRect.left;
@@ -2315,15 +2319,15 @@ INTERNAL_FUNCTION void Win32InitWindow(HINSTANCE Instance,
     }
     
     GlobalWin32.window = CreateWindowA(
-        wndClass.lpszClassName,
-        "Joy",
-        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        WindowCreateW,
-        WindowCreateH,
-        0, 0, 
-        Instance, 
-        0);
+                                       wndClass.lpszClassName,
+                                       "Joy",
+                                       WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                                       CW_USEDEFAULT, CW_USEDEFAULT,
+                                       WindowCreateW,
+                                       WindowCreateH,
+                                       0, 0, 
+                                       Instance, 
+                                       0);
     
     GlobalWin32.WindowWidth = WindowWidth;
     GlobalWin32.WindowHeight = WindowHeight;

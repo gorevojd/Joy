@@ -51,6 +51,10 @@ void main(){
     if(AlbedoIsSet){
         SampledAlbedo = texture2D(Albedo, FsIn.UV).rgb;
     }
+
+	if(NormalsIsSet){
+		SampledAlbedo = texture2D(Normals, FsIn.UV).rgb;
+	}
     
     vec3 ResultColor = vec3(0.0f, 0.0f, 0.0f);
     ResultColor += Ambient + CalcDirLit(FragP, FragN, SampledAlbedo);

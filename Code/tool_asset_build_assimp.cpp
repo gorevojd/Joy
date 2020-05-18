@@ -241,10 +241,10 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
     
     u64 AssimpFlags = 
 #if 0        
-        aiProcess_OptimizeMeshes |
+    aiProcess_OptimizeMeshes |
         aiProcess_OptimizeGraph |
 #endif
-        aiProcess_Triangulate |
+    aiProcess_Triangulate |
         aiProcess_JoinIdenticalVertices |
         aiProcess_SortByPType;
     
@@ -278,8 +278,8 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
     
     // NOTE(Dima): Reading scene
     const aiScene* scene = importer.ReadFile(
-        FileName,
-        AssimpFlags);
+                                             FileName,
+                                             AssimpFlags);
     
     double factor(0.0);
     scene->mMetaData->Get("UnitScaleFactor", factor);
@@ -405,11 +405,11 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
                 TTypeIndex++)
             {
                 assimp_loaded_textures_for_type LoadedRes = AiLoadMatTexturesForType(
-                    &Result, 
-                    &NewMaterial,
-                    LoadingCtx, 
-                    AssimpMaterial, 
-                    SupportedTexturesTypes[TTypeIndex]);
+                                                                                     &Result, 
+                                                                                     &NewMaterial,
+                                                                                     LoadingCtx, 
+                                                                                     AssimpMaterial, 
+                                                                                     SupportedTexturesTypes[TTypeIndex]);
                 
                 NewMaterial.TextureFirstIndexOfTypeInArray[TTypeIndex] = LoadedRes.FirstID;
                 NewMaterial.TextureCountOfType[TTypeIndex] = LoadedRes.Count;
@@ -767,14 +767,14 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
             
             MeshSlot.MeshLoaded = 0;
             MeshSlot.Mesh = MakeMesh(
-                Vertices,
-                TexCoords,
-                Normals,
-                Tangents,
-                Indices,
-                Weights,
-                JoyShouldCalculateNormals,
-                JoyShouldCalculateTangents);
+                                     Vertices,
+                                     TexCoords,
+                                     Normals,
+                                     Tangents,
+                                     Indices,
+                                     Weights,
+                                     JoyShouldCalculateNormals,
+                                     JoyShouldCalculateTangents);
             MeshSlot.Mesh.MaterialIndex = MaterialIndex;
             
             Result.Meshes.push_back(MeshSlot);
@@ -982,7 +982,7 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
             
             // NOTE(Dima): Setting corresponding array id in material info
             int OurTextureType = ConvertAssimpToOurTextureType(
-                SupportedTexturesTypes[TextureTypeIndex]);
+                                                               SupportedTexturesTypes[TextureTypeIndex]);
             ToolMatInfo->BitmapArrayIDs[OurTextureType] = AddedArrayID;
         }
         
@@ -1011,14 +1011,14 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
         }
         
         auto InsertedIt = ToolModel->NodeMeshIndicesStorage.insert(
-            ToolModel->NodeMeshIndicesStorage.end(),
-            Node->MeshIDs.begin(),
-            Node->MeshIDs.end());
+                                                                   ToolModel->NodeMeshIndicesStorage.end(),
+                                                                   Node->MeshIDs.begin(),
+                                                                   Node->MeshIDs.end());
         
         Node->Shared.NodeMeshIndexCountInStorage = Node->MeshIDs.size();
         Node->Shared.NodeMeshIndexFirstInStorage = std::distance(
-            ToolModel->NodeMeshIndicesStorage.begin(),
-            InsertedIt);
+                                                                 ToolModel->NodeMeshIndicesStorage.begin(),
+                                                                 InsertedIt);
         
         ToolModel->NodesSharedDatas.push_back(Node->Shared);
     }
@@ -1309,15 +1309,209 @@ INTERNAL_FUNCTION void WriteFox(){
     WriteAssetFile(System, "../Data/Fox.ja");
 }
 
+
+INTERNAL_FUNCTION void WriteDeer(){
+    asset_system System_ = {};
+    asset_system* System = &System_;
+    InitAssetFile(System);
+    
+    model_loading_context LoadCtx = {};
+    model_loading_context* Ctx = &LoadCtx;
+    
+    u32 DefaultFlags = 
+        Load_GenerateNormals |
+        Load_GenerateTangents;
+    
+    // NOTE(Dima): Deer
+    BeginCharacter(Ctx, TagCharacter_Deer);
+    AddModelSource(Ctx, "../Data/Models/ForestAnimals/Deer/Deer.fbx",
+                   GameAsset_Model_Character, DefaultFlags);
+    
+    PushDirectory(Ctx, "../Data/Models/ForestAnimals/Deer/animations");
+    AddAnimSource(Ctx, "Failure.fbx", 
+                  GameAsset_Anim_Failure, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Fall.fbx",
+                  GameAsset_Anim_Fall, DefaultFlags);
+    
+    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
+    AddAnimSource(Ctx, "Idle.fbx",
+                  GameAsset_Anim_Idle, DefaultFlags);
+    
+    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
+    AddAnimSource(Ctx, "Idle_2.fbx",
+                  GameAsset_Anim_Idle, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Jump_Up.fbx",
+                  GameAsset_Anim_JumpUp, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Land.fbx",
+                  GameAsset_Anim_Land, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Roll_In_Place.fbx",
+                  GameAsset_Anim_Roll, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Run_In_Place.fbx",
+                  GameAsset_Anim_Run, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Sleep.fbx",
+                  GameAsset_Anim_Sleep, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Success.fbx",
+                  GameAsset_Anim_Success, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Talk.fbx",
+                  GameAsset_Anim_Talk, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Walk_In_Place.fbx",
+                  GameAsset_Anim_Walk, DefaultFlags);
+    PopDirectory(Ctx);
+    EndCharacter(Ctx);
+    
+    // NOTE(Dima): Storing loading context
+    StoreLoadingContext(System, Ctx);
+    
+    WriteAssetFile(System, "../Data/Deer.ja");
+}
+
+
+INTERNAL_FUNCTION void WriteRabbit(){
+    asset_system System_ = {};
+    asset_system* System = &System_;
+    InitAssetFile(System);
+    
+    model_loading_context LoadCtx = {};
+    model_loading_context* Ctx = &LoadCtx;
+    
+    u32 DefaultFlags = 
+        Load_GenerateNormals |
+        Load_GenerateTangents;
+    
+    // NOTE(Dima): Rabbit
+    BeginCharacter(Ctx, TagCharacter_Rabbit);
+    AddModelSource(Ctx, "../Data/Models/ForestAnimals/Rabbit/Rabbit.fbx",
+                   GameAsset_Model_Character, DefaultFlags);
+    
+    PushDirectory(Ctx, "../Data/Models/ForestAnimals/Rabbit/animations");
+    AddAnimSource(Ctx, "Failure.fbx", 
+                  GameAsset_Anim_Failure, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Fall.fbx",
+                  GameAsset_Anim_Fall, DefaultFlags);
+    
+    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
+    AddAnimSource(Ctx, "Idle.fbx",
+                  GameAsset_Anim_Idle, DefaultFlags);
+    
+    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
+    AddAnimSource(Ctx, "Idle_2.fbx",
+                  GameAsset_Anim_Idle, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Jump_Up.fbx",
+                  GameAsset_Anim_JumpUp, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Land.fbx",
+                  GameAsset_Anim_Land, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Roll_In_Place.fbx",
+                  GameAsset_Anim_Roll, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Run_In_Place.fbx",
+                  GameAsset_Anim_Run, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Sleep.fbx",
+                  GameAsset_Anim_Sleep, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Success.fbx",
+                  GameAsset_Anim_Success, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Talk.fbx",
+                  GameAsset_Anim_Talk, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Walk_In_Place.fbx",
+                  GameAsset_Anim_Walk, DefaultFlags);
+    PopDirectory(Ctx);
+    EndCharacter(Ctx);
+    
+    // NOTE(Dima): Storing loading context
+    StoreLoadingContext(System, Ctx);
+    
+    WriteAssetFile(System, "../Data/Rabbit.ja");
+}
+
+
+INTERNAL_FUNCTION void WriteMoose(){
+    asset_system System_ = {};
+    asset_system* System = &System_;
+    InitAssetFile(System);
+    
+    model_loading_context LoadCtx = {};
+    model_loading_context* Ctx = &LoadCtx;
+    
+    u32 DefaultFlags = 
+        Load_GenerateNormals |
+        Load_GenerateTangents;
+    
+    // NOTE(Dima): Moose
+    BeginCharacter(Ctx, TagCharacter_Moose);
+    AddModelSource(Ctx, "../Data/Models/ForestAnimals/Moose/Moose.fbx",
+                   GameAsset_Model_Character, DefaultFlags);
+    
+    PushDirectory(Ctx, "../Data/Models/ForestAnimals/Moose/animations");
+    AddAnimSource(Ctx, "Failure.fbx", 
+                  GameAsset_Anim_Failure, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Fall.fbx",
+                  GameAsset_Anim_Fall, DefaultFlags);
+    
+    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
+    AddAnimSource(Ctx, "Idle.fbx",
+                  GameAsset_Anim_Idle, DefaultFlags);
+    
+    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
+    AddAnimSource(Ctx, "Idle_2.fbx",
+                  GameAsset_Anim_Idle, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Jump_Up.fbx",
+                  GameAsset_Anim_JumpUp, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Land.fbx",
+                  GameAsset_Anim_Land, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Roll_In_Place.fbx",
+                  GameAsset_Anim_Roll, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Run_In_Place.fbx",
+                  GameAsset_Anim_Run, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Sleep.fbx",
+                  GameAsset_Anim_Sleep, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Success.fbx",
+                  GameAsset_Anim_Success, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Talk.fbx",
+                  GameAsset_Anim_Talk, DefaultFlags);
+    
+    AddAnimSource(Ctx, "Walk_In_Place.fbx",
+                  GameAsset_Anim_Walk, DefaultFlags);
+    PopDirectory(Ctx);
+    EndCharacter(Ctx);
+    
+    // NOTE(Dima): Storing loading context
+    StoreLoadingContext(System, Ctx);
+    
+    WriteAssetFile(System, "../Data/Moose.ja");
+}
+
+
 int main(int ArgsCount, char** Args){
     
     WriteFox();
     WriteBear();
-#if 0    
     WriteRabbit();
     WriteDeer();
     WriteMoose();
-#endif
     
     WriteMeshes1();
     

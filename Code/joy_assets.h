@@ -171,7 +171,8 @@ u32 GetBestByTags(assets* Assets,
 
 void ImportAsset(assets* Assets, asset* Asset, b32 Immediate);
 
-
+// NOTE(Dima): This functions returns asset only if it was loaded.
+// NOTE(Dima): Otherwise it returns NULL
 inline void* LoadAssetTypeInternal(assets* Assets, 
                                    asset_id ID, 
                                    u32 CompareAssetType,
@@ -189,6 +190,21 @@ inline void* LoadAssetTypeInternal(assets* Assets,
     
     return(Result);
 }
+
+inline void* LoadAssetTypeRawInternal(assets* Assets, 
+                                      asset_id ID, 
+                                      u32 CompareAssetType)
+{
+    asset* Asset = GetAssetByID(Assets, ID);
+    ASSERT(Asset->Type == CompareAssetType);
+    
+    void* Result = (void*)(*((size_t*)&Asset->Data));
+    
+    return(Result);
+}
+
+#define GET_ASSET_DATA_BY_ID(data_type, type, assets, id) \
+(data_type*)LoadAssetTypeRawInternal(assets, id, type)
 
 #define LOAD_ASSET(data_type, type, assets, id, immediate) \
 (data_type*)LoadAssetTypeInternal(assets, id, type, immediate)

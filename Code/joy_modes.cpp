@@ -14,6 +14,36 @@ struct sphere_distribution{
     v3 *Samples;
 };
 
+enum character_id_type{
+    CharacterID_Model,
+    
+    CharacterID_Failure,
+    CharacterID_Fall,
+    CharacterID_Idle,
+    CharacterID_JumpUp,
+    CharacterID_Land,
+    CharacterID_Roll,
+    CharacterID_Run,
+    CharacterID_Sleep,
+    CharacterID_Success,
+    CharacterID_Talk,
+    CharacterID_Walk,
+    
+    CharacterID_Count,
+};
+
+struct entity_character{
+    v3 P;
+    v3 dP;
+    quat R;
+    v3 S;
+    
+    u32 CharacterIDs[CharacterID_Count];
+    
+    model_info* Model;
+    animated_component AnimComponent;
+};
+
 struct test_game_mode_state{
     game_camera Camera;
     
@@ -25,9 +55,13 @@ struct test_game_mode_state{
     sphere_distribution SphereDistributionTrig;
     sphere_distribution SphereDistributionFib;
     
-    anim_controller* PlayerAC;
-    anim_controller* FoxAC;
-    anim_controller* BearAC;
+    model_info* PlayerModel;
+    anim_controller* PlayerControl;
+    animated_component PlayerAnimComponent;
+    
+    anim_controller* FriendControl;
+    
+    entity_character Characters[100];
     
     b32 Initialized;
 };
@@ -148,9 +182,9 @@ INTERNAL_FUNCTION GEN_SPHERE_DISTRIBUTION_CALLBACK(GenTrigonometricSphereDistrib
 
 inline sphere_distribution 
 GenerateSphereDistribution(
-gen_sphere_distribution_callback* GenDistributions,
-int MaxCount,
-v3* TargetSamples)
+                           gen_sphere_distribution_callback* GenDistributions,
+                           int MaxCount,
+                           v3* TargetSamples)
 {
     sphere_distribution Result = {};
     
@@ -193,73 +227,71 @@ INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
     
 }
 
+#if 0
+// NOTE(Dima): Adding condition variables
+AddVariable(Control, "VelocityLength", AnimVariable_Float);
+AddVariable(Control, "IsFalling", AnimVariable_Bool);
 
-INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitPlayerAC)
+AddVariable(Control, "VelocityLength", AnimVariable_Float);
+#endif
+
+INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitPlayerControl)
 {
-    anim_controller* AC = CreateAnimControl(Anim, "PlayerAC", NodesCheckSum);
+    anim_controller* Control = CreateAnimControl(Anim, Name);
     
     // NOTE(Dima): Adding animation nodes
-    AddAnimState(AC, AnimState_Animation, "Idle");
-    AddAnimState(AC, AnimState_Animation, "Run");
-    AddAnimState(AC, AnimState_Animation, "Falling");
-    
-    // NOTE(Dima): Adding condition variables
-    AddVariable(AC, "VelocityLength", AnimVariable_Float);
-    AddVariable(AC, "IsFalling", AnimVariable_Bool);
+    AddAnimState(Control, AnimState_Animation, "Idle");
+    AddAnimState(Control, AnimState_Animation, "Run");
+    AddAnimState(Control, AnimState_Animation, "Falling");
     
     // NOTE(Dima): Idle -> Run
-    BeginTransition(AC, "Idle", "Run");
-    AddConditionFloat(AC, "VelocityLength", TransitionCondition_MoreEqThan, 0.05f);
-    EndTransition(AC);
+    BeginTransition(Control, "Idle", "Run");
+    AddConditionFloat(Control, "VelocityLength", TransitionCondition_MoreEqThan, 0.05f);
+    EndTransition(Control);
     
     // NOTE(Dima): Run -> Idle
-    BeginTransition(AC, "Run", "Idle");
-    AddConditionFloat(AC, "VelocityLength", TransitionCondition_LessThan, 0.05f);
-    EndTransition(AC);
+    BeginTransition(Control, "Run", "Idle");
+    AddConditionFloat(Control, "VelocityLength", TransitionCondition_LessThan, 0.05f);
+    EndTransition(Control);
     
     // NOTE(Dima): Run -> Falling
-    BeginTransition(AC, "Run", "Falling");
-    AddConditionBool(AC, "IsFalling", TransitionCondition_Equal, true);
-    EndTransition(AC);
+    BeginTransition(Control, "Run", "Falling");
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, true);
+    EndTransition(Control);
     
     // NOTE(Dima): Falling -> Idle
-    BeginTransition(AC, "Falling", "Idle");
-    AddConditionFloat(AC, "VelocityLength", TransitionCondition_LessThan, 0.05f);
-    AddConditionBool(AC, "IsFalling", TransitionCondition_Equal, false);
-    EndTransition(AC);
+    BeginTransition(Control, "Falling", "Idle");
+    AddConditionFloat(Control, "VelocityLength", TransitionCondition_LessThan, 0.05f);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
+    EndTransition(Control);
     
     // NOTE(Dima): Falling -> Run
-    BeginTransition(AC, "Falling", "Run");
-    AddConditionFloat(AC, "VelocityLength", TransitionCondition_MoreEqThan, 0.05f);
-    AddConditionBool(AC, "IsFalling", TransitionCondition_Equal, false);
-    EndTransition(AC);
+    BeginTransition(Control, "Falling", "Run");
+    AddConditionFloat(Control, "VelocityLength", TransitionCondition_MoreEqThan, 0.05f);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
+    EndTransition(Control);
     
-    FinalizeCreation(AC);
-    
-    return(AC);
+    return(Control);
 }
 
-INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFoxAC){
-    anim_controller* AC = CreateAnimControl(Anim, "FoxAC", NodesCheckSum);
+INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFriendControl){
+    anim_controller* Control = CreateAnimControl(Anim, Name);
     
     // NOTE(Dima): Adding animation nodes
-    AddAnimState(AC, AnimState_Animation, "Idle");
+    AddAnimState(Control, AnimState_Animation, "Idle");
+    AddAnimState(Control, AnimState_Animation, "Run");
     
-    FinalizeCreation(AC);
+    // NOTE(Dima): Idle -> Run
+    BeginTransition(Control, "Idle", "Run");
+    AddConditionFloat(Control, "VelocityLength", TransitionCondition_MoreEqThan, 0.05f);
+    EndTransition(Control);
     
-    return(AC);
-}
-
-
-INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitBearAC){
-    anim_controller* AC = CreateAnimControl(Anim, "FoxAC", NodesCheckSum);
+    // NOTE(Dima): Run -> Idle
+    BeginTransition(Control, "Run", "Idle");
+    AddConditionFloat(Control, "VelocityLength", TransitionCondition_LessThan, 0.05f);
+    EndTransition(Control);
     
-    // NOTE(Dima): Adding animation nodes
-    AddAnimState(AC, AnimState_Animation, "Idle");
-    
-    FinalizeCreation(AC);
-    
-    return(AC);
+    return(Control);
 }
 
 INTERNAL_FUNCTION void UpdateModel(assets* Assets, 
@@ -268,7 +300,7 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
                                    v3 Pos, quat Rot, v3 Scale, 
                                    f64 GlobalTime,
                                    f32 DeltaTime,
-                                   anim_controller* AC)
+                                   animated_component* AC)
 {
     FUNCTION_TIMING();
     
@@ -301,18 +333,101 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
                                                        Model->MaterialIDs[Mesh->MaterialIndex],
                                                        ASSET_IMPORT_DEFERRED);
                 
-#if 1                
                 PushMesh(Stack, Mesh, 
                          NodeTran, Material,
                          CalcPose.BoneTransforms, 
                          CalcPose.BoneTransformsCount);
-#else
-                PushMesh(Stack, Mesh, 
-                         NodeTran, Material);
-#endif
-                
             }
         }
+    }
+}
+
+
+INTERNAL_FUNCTION u32 LoadCharacterAssetID(assets* Assets, 
+                                           u32 GroupID, 
+                                           u32 TagCharacterValue)
+{
+    
+    u32 MatchTagTypes[] = {AssetTag_Character};
+    asset_tag_value MatchTagValue[] = {TagValue((int)TagCharacterValue)};
+    
+    u32 ResultID = GetBestByTags(Assets, GroupID, 
+                                 MatchTagTypes, MatchTagValue, 1);
+    
+    return(ResultID);
+}
+
+INTERNAL_FUNCTION void InitCharacter(assets* Assets, 
+                                     entity_character* Character,
+                                     u32 TagCharacterValue,
+                                     anim_controller* Control,
+                                     v3 P, quat R, v3 S)
+{
+    /*
+// NOTE(Dima): This check is just to make sure that CharacterID table
+has the same count of IDs as GameAssetID table for model and animations
+*/
+    Assert((CharacterID_Count - CharacterID_Model) == 
+           (GameAsset_Model_TempForCounting - GameAsset_Model_Character));
+    
+    // NOTE(Dima): Loading IDs
+    u32 *CharIDs = Character->CharacterIDs;
+    for(int Index = 0;
+        Index < CharacterID_Count;
+        Index++)
+    {
+        CharIDs[Index] = LoadCharacterAssetID(Assets, 
+                                              GameAsset_Model_Character + Index,
+                                              TagCharacterValue);
+    }
+    
+    Character->dP = V3(0.0f, 0.0f, 0.0f);
+    Character->P = P;
+    Character->R = R;
+    Character->S = S;
+    
+    model_info* ModelInfo = GET_ASSET_DATA_BY_ID(model_info, AssetType_Model, 
+                                                 Assets, CharIDs[CharacterID_Model]);
+    
+    InitAnimComponent(&Character->AnimComponent, 
+                      Control,
+                      ModelInfo->NodesCheckSum);
+    
+    AddVariable(&Character->AnimComponent, "VelocityLength", AnimVariable_Float);
+    AddVariable(&Character->AnimComponent, "IsFalling", AnimVariable_Bool);
+    
+    SetStateAnimation(&Character->AnimComponent, "Idle", Character->CharacterIDs[CharacterID_Idle]);
+    SetStateAnimation(&Character->AnimComponent, "Run", Character->CharacterIDs[CharacterID_Run]);
+}
+
+INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
+                                       render_stack* Stack,
+                                       input_state* Input,
+                                       entity_character* Character,
+                                       f64 GlobalTime,
+                                       f32 DeltaTime)
+{
+    Character->Model = LoadModel(Assets, 
+                                 Character->CharacterIDs[CharacterID_Model], 
+                                 ASSET_IMPORT_DEFERRED);
+    
+    model_info* Model = Character->Model;
+    
+    Character->dP = V3(0.0f, 0.0f, 0.0f);
+    if(KeyIsDown(Input, Key_Space)){
+        Character->dP = V3(0.0f, 0.0f, 1.0f);
+    }
+    
+    SetFloat(&Character->AnimComponent, 
+             "VelocityLength", 
+             Length(Character->dP));
+    
+    if(Model){
+        UpdateModel(Assets, Stack,
+                    Model, Character->P,
+                    Character->R, Character->S,
+                    GlobalTime, DeltaTime,
+                    &Character->AnimComponent);
     }
 }
 
@@ -341,7 +456,38 @@ GAME_MODE_UPDATE(TestUpdate){
                                                                   SphereDistributionsmaxCount,
                                                                   State->SphereDistributionsFib);
         
-        State->PlayerAC = 0;
+        State->PlayerControl = InitPlayerControl(Game->Anim, Game->Assets, "PlayerControl");
+        State->FriendControl = InitFriendControl(Game->Anim, Game->Assets, "FriendControl");
+        
+#if 0        
+        model_info* PlayerInfo = GET_ASSET_DATA_BY_ID(model_info, AssetType_Model, 
+                                                      Game->Assets, GameAsset_Man);
+        InitAnimComponent(&State->PlayerAnimComponent,
+                          State->PlayerControl,
+                          PlayerInfo->NodesCheckSum);
+#endif
+        
+        
+        for(int CharIndex = 0;
+            CharIndex < 100;
+            CharIndex++)
+        {
+            entity_character* Char = &State->Characters[CharIndex];
+            
+            
+            v3 P = V3((CharIndex % 10) * 2, 0.0f, 
+                      (CharIndex / 10) * 2);
+            
+            int CharType = (CharIndex * 1234567 - (CharIndex & 3)) % 5;
+            
+            InitCharacter(Game->Assets, 
+                          Char,
+                          CharType,
+                          State->FriendControl,
+                          P, 
+                          Quat(V3(1.0f, 0.0f, 0.0f), -JOY_PI_OVER_TWO),
+                          V3(0.01f));
+        }
         
         State->Initialized = true;
     }
@@ -505,92 +651,49 @@ GAME_MODE_UPDATE(TestUpdate){
     }
 #endif
     
+    f32 VelocityLen = 0.0f;
+    if(KeyIsDown(Game->Input, Key_Space)){
+        VelocityLen = 1.0f;
+    }
+    
     assets* Assets = Game->Assets;
     
-    model_info* Model = LoadModel(Game->Assets,
-                                  GetFirst(Game->Assets, GameAsset_Man),
-                                  ASSET_IMPORT_DEFERRED);
+#if 0    
+    State->PlayerModel = LoadModel(Game->Assets,
+                                   GetFirst(Game->Assets, GameAsset_Man),
+                                   ASSET_IMPORT_DEFERRED);
     
-    if(Model){
-        if(!State->PlayerAC){
-            State->PlayerAC = InitPlayerAC(Game->Anim, Game->Assets, Model->NodesCheckSum);
-            
-            SetStateAnimation(State->PlayerAC, "Idle", Model->AnimationIDs[0]);
-            SetStateAnimation(State->PlayerAC, "Run", Model->AnimationIDs[5]);
-            SetStateAnimation(State->PlayerAC, "Falling", Model->AnimationIDs[1]);
-        }
+    if(State->PlayerModel){
         
-        SetBool(State->PlayerAC, "IsFalling", false);
+        SetStateAnimation(&State->PlayerAnimComponent, "Idle", State->PlayerModel->AnimationIDs[0]);
+        SetStateAnimation(&State->PlayerAnimComponent, "Run", State->PlayerModel->AnimationIDs[5]);
+        SetStateAnimation(&State->PlayerAnimComponent, "Falling", State->PlayerModel->AnimationIDs[1]);
         
-        f32 VelocityLen = 0.0f;
-        if(KeyIsDown(Game->Input, Key_Space)){
-            VelocityLen = 1.0f;
-        }
+        SetBool(&State->PlayerAnimComponent, "IsFalling", false);
+        SetFloat(&State->PlayerAnimComponent, "VelocityLength", VelocityLen);
         
-        SetFloat(State->PlayerAC, "VelocityLength", VelocityLen);
-        
-        UpdateModel(Assets, Stack, Model, 
+        UpdateModel(Assets, Stack, 
+                    State->PlayerModel, 
                     V3(10.0f, 0.0f, 10.0f),
                     QuatI(), 
                     V3(1.0f),
                     Game->Input->Time,
                     Game->Input->DeltaTime,
-                    State->PlayerAC);
+                    &State->PlayerAnimComponent);
     }
+#endif
     
-    u32 MatchTagTypes[] = {AssetTag_Character};
-    asset_tag_value MatchTagFoxValue[] = {TagValue(TagCharacter_Fox)};
-    
-    u32 FoxModelID = GetBestByTags(Assets, GameAsset_Model_Character, 
-                                   MatchTagTypes, MatchTagFoxValue, 1);
-    
-    model_info* FoxModel = LoadModel(Game->Assets, FoxModelID,
-                                     ASSET_IMPORT_DEFERRED);
-    
-    if(FoxModel){
-        if(!State->FoxAC){
-            State->FoxAC = InitFoxAC(Game->Anim, Game->Assets, FoxModel->NodesCheckSum);
-            
-            u32 RunAnimID = GetBestByTags(Assets, GameAsset_Anim_Success,
-                                          MatchTagTypes, MatchTagFoxValue, 1);
-            SetStateAnimation(State->FoxAC, "Idle", RunAnimID);
-        }
-        
-        UpdateModel(Assets, Stack, FoxModel, 
-                    V3(3.0f, 0.0f, 5.0f),
-                    Quat(V3(1.0f, 0.0f, 0.0f), -JOY_PI_OVER_TWO), 
-                    V3(0.02f),
-                    Game->Input->Time,
-                    Game->Input->DeltaTime,
-                    State->FoxAC);
+    for(int CharIndex = 0;
+        CharIndex < 100;
+        CharIndex++)
+    {
+        UpdateCharacter(Game->Assets,
+                        Stack,
+                        Game->Input,
+                        &State->Characters[CharIndex],
+                        Game->Input->Time,
+                        Game->Input->DeltaTime);
     }
-    
-    
-    asset_tag_value MatchTagBearValue[] = {TagValue(TagCharacter_Bear)};
-    u32 BearModelID = GetBestByTags(Assets, GameAsset_Model_Character,
-                                    MatchTagTypes, MatchTagBearValue, 1);
-    
-    model_info* BearModel = LoadModel(Game->Assets, BearModelID,
-                                      ASSET_IMPORT_DEFERRED);
-    
-    if(BearModel){
-        if(!State->BearAC){
-            State->BearAC = InitBearAC(Game->Anim, Game->Assets, BearModel->NodesCheckSum);
-            
-            u32 RunAnimID = GetBestByTags(Assets, GameAsset_Anim_Success,
-                                          MatchTagTypes, MatchTagBearValue, 1);
-            SetStateAnimation(State->BearAC, "Idle", RunAnimID);
-        }
-        
-        UpdateModel(Assets, Stack, BearModel, 
-                    V3(1, 0.0f, 5.0f),
-                    Quat(V3(1.0f, 0.0f, 0.0f), -JOY_PI_OVER_TWO), 
-                    V3(0.02f),
-                    Game->Input->Time,
-                    Game->Input->DeltaTime,
-                    State->BearAC);
-    }
-    
     
 #if 0    
     ShowSphereDistributions(Game, Stack,
@@ -699,29 +802,29 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     
     if(ToShow){
         float ToShowH = CalcScreenFitHeight(
-            ToShow->Width, 
-            ToShow->Height,
-            Width, Height);
+                                            ToShow->Width, 
+                                            ToShow->Height,
+                                            Width, Height);
         
         PushBitmap(
-            Stack, 
-            ToShow, 
-            V2(0.0f, 0.0f), 
-            ToShowH, 
-            V4(1.0f, 1.0f, 1.0f, 1.0f));
+                   Stack, 
+                   ToShow, 
+                   V2(0.0f, 0.0f), 
+                   ToShowH, 
+                   V4(1.0f, 1.0f, 1.0f, 1.0f));
     }
     
     if(ToShowNext){
         float ToShowNextH = CalcScreenFitHeight(
-            ToShowNext->Width, ToShowNext->Height,
-            Width, Height);
+                                                ToShowNext->Width, ToShowNext->Height,
+                                                Width, Height);
         
         PushBitmap(
-            Stack, 
-            ToShowNext, 
-            V2(0.0f, 0.0f), 
-            ToShowNextH, 
-            V4(1.0f, 1.0f, 1.0f, FadeoutAlpha));
+                   Stack, 
+                   ToShowNext, 
+                   V2(0.0f, 0.0f), 
+                   ToShowNextH, 
+                   V4(1.0f, 1.0f, 1.0f, FadeoutAlpha));
     }
     
     State->TimeSinceShow += Game->Render->FrameInfo.dt * State->ShowSpeed;
