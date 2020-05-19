@@ -305,28 +305,6 @@ struct tag_hub{
     }
 };
 
-struct game_asset {
-    u32 ID;
-    
-    u32 Type;
-    
-    std::vector<game_asset_tag> Tags;
-    
-    union {
-        tool_bmp_info* Bitmap;
-        tool_font_info* Font;
-        tool_sound_info* Sound;
-        tool_mesh_info* Mesh;
-        tool_glyph_info* Glyph;
-        tool_model_info* Model;
-        tool_material_info* Material;
-        tool_skeleton_info* Skeleton;
-        tool_node_info* Node;
-        tool_animation_info* Animation;
-        tool_node_animation* NodeAnim;
-    };
-};
-
 /*
  NOTE(dima): Asset sources
 */
@@ -381,37 +359,55 @@ struct game_asset_source_glyph {
     tool_glyph_info* Glyph;
 };
 
-struct game_asset_source {
+union game_asset_source {
+    game_asset_source_bitmap BitmapSource;
+    game_asset_source_sound SoundSource;
+    game_asset_source_font FontSource;
+    game_asset_source_glyph GlyphSource;
+    game_asset_source_mesh MeshSource;
+    game_asset_source_model ModelSource;
+    game_asset_source_material MaterialSource;
+    game_asset_source_skeleton SkeletonSource;
+    game_asset_source_node NodeSource;
+    game_asset_source_animation_clip AnimationSource;
+    game_asset_source_node_anim NodeAnimSource;
+};
+
+
+#define FREEAREA_SLOTS_COUNT 8
+
+struct game_asset {
+    u32 ID;
+    
+    u32 Type;
+    
+    std::vector<game_asset_tag> Tags;
+    
+    void* FreePointers[FREEAREA_SLOTS_COUNT];
+    int FreeSetCount;
+    
+    asset_header FileHeader;
+    
+    game_asset_source Source;
+    
     union {
-        game_asset_source_bitmap BitmapSource;
-        game_asset_source_sound SoundSource;
-        game_asset_source_font FontSource;
-        game_asset_source_glyph GlyphSource;
-        game_asset_source_mesh MeshSource;
-        game_asset_source_model ModelSource;
-        game_asset_source_material MaterialSource;
-        game_asset_source_skeleton SkeletonSource;
-        game_asset_source_node NodeSource;
-        game_asset_source_animation_clip AnimationSource;
-        game_asset_source_node_anim NodeAnimSource;
+        tool_bmp_info* Bitmap;
+        tool_font_info* Font;
+        tool_sound_info* Sound;
+        tool_mesh_info* Mesh;
+        tool_glyph_info* Glyph;
+        tool_model_info* Model;
+        tool_material_info* Material;
+        tool_skeleton_info* Skeleton;
+        tool_node_info* Node;
+        tool_animation_info* Animation;
+        tool_node_animation* NodeAnim;
     };
 };
 
-//NOTE(dima): Assets freeareas
-#define FREEAREA_SLOTS_COUNT 4
-struct game_asset_freearea {
-    void* Pointers[FREEAREA_SLOTS_COUNT];
-    int SetCount;
-};
-
 //NOTE(dima): Asset system
-#define TEMP_STORED_ASSET_COUNT 2048
 struct asset_system {
-    u32 AssetTypes[TEMP_STORED_ASSET_COUNT];
-    game_asset Assets[TEMP_STORED_ASSET_COUNT];
-    game_asset_source AssetSources[TEMP_STORED_ASSET_COUNT];
-    game_asset_freearea AssetFreeareas[TEMP_STORED_ASSET_COUNT];
-    asset_header FileHeaders[TEMP_STORED_ASSET_COUNT];
+    std::vector<game_asset> Assets;
     
     game_asset_group AssetGroups[GameAsset_Count];
     

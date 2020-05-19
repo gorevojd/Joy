@@ -11,9 +11,8 @@ enum{
 
 struct added_asset {
 	game_asset* Asset;
-	game_asset_source* Source;
-	game_asset_freearea* Freearea;
 	asset_header* FileHeader;
+    u32 AssetType;
     u32 ID;
 };
 

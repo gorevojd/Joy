@@ -26,10 +26,9 @@ void EndAsset(asset_system* System) {
     System->PrevAssetPointer = 0;
 }
 
-INTERNAL_FUNCTION added_asset AddAsset(
-asset_system* System, 
-u32 AssetType, 
-b32 ImmediateLoad) 
+INTERNAL_FUNCTION added_asset AddAsset(asset_system* System, 
+                                       u32 AssetType, 
+                                       b32 ImmediateLoad) 
 {
     added_asset Result = {};
     
@@ -43,16 +42,23 @@ b32 ImmediateLoad)
     
     // NOTE(Dima): Setting needed data
     u32 AssetIndex = System->AssetCount;
-    Result.Asset = System->Assets + AssetIndex;
-    Result.Asset->Type = AssetType;
-    Result.Source = System->AssetSources + AssetIndex;
-    Result.Freearea = System->AssetFreeareas + AssetIndex;
-    Result.FileHeader = System->FileHeaders + AssetIndex;
-    Result.FileHeader->AssetType = AssetType;
-    Result.FileHeader->ImmediateLoad = ImmediateLoad;
     
+    game_asset Asset;
+    Asset.ID = AssetIndex;
+    Asset.Type = AssetType;
+    Asset.FreeSetCount = 0;
+    Asset.Source = {};
+    Asset.FileHeader = {};
+    System->Assets.push_back(Asset);
+    
+    Result.Asset = &System->Assets.back();
+    Result.FileHeader = &Result.Asset->FileHeader;
+    Result.Asset->Type = AssetType;
+    Result.AssetType = AssetType;
+    Result.FileHeader->ImmediateLoad = ImmediateLoad;
     Result.Asset->ID = AssetIndex;
     Result.ID = AssetIndex;
+    
     
     ++System->AssetCount;
     
@@ -67,12 +73,11 @@ AddFreeareaToAsset(asset_system* System,
                    game_asset* Asset, 
                    void* Pointer) 
 {
-    game_asset_freearea* Free = System->AssetFreeareas + Asset->ID;
     
-    int TargetFreeAreaIndex = Free->SetCount++;
+    int TargetFreeAreaIndex = Asset->FreeSetCount++;
     Assert(TargetFreeAreaIndex < FREEAREA_SLOTS_COUNT);
     
-    Free->Pointers[TargetFreeAreaIndex] = Pointer;
+    Asset->FreePointers[TargetFreeAreaIndex] = Pointer;
 }
 
 INTERNAL_FUNCTION game_asset_tag* 
@@ -168,7 +173,7 @@ added_asset AddBitmapAsset(asset_system* System, char* Path, u32 BitmapLoadFlags
     added_asset Added = AddAsset(System, AssetType_Bitmap, Immediate_No);
     
     // NOTE(Dima): Setting source
-    game_asset_source* Source = Added.Source;
+    game_asset_source* Source = &Added.Asset->Source;
     
     Source->BitmapSource.Path = Path;
     Source->BitmapSource.BitmapInfo = 0;
@@ -186,7 +191,7 @@ added_asset AddBitmapAssetManual(asset_system* System,
     asset_header* FileHeader = Added.FileHeader;
     
     // NOTE(Dima): Setting source
-    game_asset_source* Source = Added.Source;
+    game_asset_source* Source = &Added.Asset->Source;;
     Source->BitmapSource.BitmapInfo = Bitmap;
     Source->BitmapSource.Path = 0;
     Source->BitmapSource.LoadFlags = BitmapLoadFlags;
@@ -209,7 +214,7 @@ added_asset AddSoundAsset(asset_system* System,
     
     
     asset_header* FileHeader = Added.FileHeader;
-    game_asset_source* Source = Added.Source;
+    game_asset_source* Source = &Added.Asset->Source;;
     
     // NOTE(Dima): Setting source
     
@@ -225,7 +230,7 @@ added_asset AddSoundAssetManual(asset_system* System,
     added_asset Added = AddAsset(System, AssetType_Sound, Immediate_No);
     
     asset_header* FileHeader = Added.FileHeader;
-    game_asset_source* Source = Added.Source;
+    game_asset_source* Source = &Added.Asset->Source;;
     
     // NOTE(Dima): Setting source
     Source->SoundSource.Sound = Sound;
@@ -241,7 +246,7 @@ added_asset AddMeshAsset(asset_system* System,
     added_asset Added = AddAsset(System, AssetType_Mesh, Immediate_No);
     
     asset_header* FileHeader = Added.FileHeader;
-    game_asset_source* Source = Added.Source;
+    game_asset_source* Source = &Added.Asset->Source;;
     
     // NOTE(Dima): Setting source
     Source->MeshSource.MeshInfo = Mesh;
@@ -271,7 +276,7 @@ added_asset AddMaterialAsset(asset_system* System,
     added_asset Added = AddAsset(System, AssetType_Material, Immediate_No);
     
     asset_header* FileHeader = Added.FileHeader;
-    game_asset_source* Source = Added.Source;
+    game_asset_source* Source = &Added.Asset->Source;;
     
     // NOTE(Dima): Setting source
     Source->MaterialSource.MaterialInfo = Material;
@@ -299,7 +304,7 @@ added_asset AddModelAsset(asset_system* System, tool_model_info* Model){
     added_asset Added = AddAsset(System, AssetType_Model, Immediate_No);
     
     asset_header* FileHeader = Added.FileHeader;
-    game_asset_source* Source = Added.Source;
+    game_asset_source* Source = &Added.Asset->Source;;
     
     // NOTE(Dima): Setting source
     Source->ModelSource.ModelInfo = Model;
@@ -341,7 +346,7 @@ added_asset AddNodeAnimationAsset(asset_system* System, tool_node_animation* Nod
     added_asset Added = AddAsset(System, AssetType_NodeAnimation, Immediate_No);
     
     asset_header* FileHeader = Added.FileHeader;
-    game_asset_source* Source = Added.Source;
+    game_asset_source* Source = &Added.Asset->Source;;
     
     // NOTE(Dima): Setting source
     Source->NodeAnimSource.NodeAnimInfo = NodeAnim;
@@ -387,7 +392,7 @@ added_asset AddAnimationClipAsset(asset_system* System, tool_animation_info* Ani
     added_asset Added = AddAsset(System, AssetType_AnimationClip, Immediate_No);
     
     asset_header* FileHeader = Added.FileHeader;
-    game_asset_source* Source = Added.Source;
+    game_asset_source* Source = &Added.Asset->Source;;
     
     // NOTE(Dima): Setting source
     Source->AnimationSource.AnimationInfo = Animation;
@@ -413,7 +418,7 @@ added_asset AddSkeletonAsset(asset_system* System, tool_skeleton_info* Skeleton)
     added_asset Added = AddAsset(System, AssetType_Skeleton, Immediate_No);
     
     asset_header* FileHeader = Added.FileHeader;
-    game_asset_source* Source = Added.Source;
+    game_asset_source* Source = &Added.Asset->Source;;
     
     // NOTE(Dima): Setting source
     Source->SkeletonSource.SkeletonInfo = Skeleton;
@@ -429,12 +434,12 @@ added_asset AddSkeletonAsset(asset_system* System, tool_skeleton_info* Skeleton)
 }
 
 added_asset AddFontAsset(
-asset_system* System,
-tool_font_info* FontInfo)
+                         asset_system* System,
+                         tool_font_info* FontInfo)
 {
     added_asset Added = AddAsset(System, AssetType_Font, Immediate_No);
     
-    game_asset_source* Source = Added.Source;
+    game_asset_source* Source = &Added.Asset->Source;;
     asset_header* Header = Added.FileHeader;
     
     Source->FontSource.FontInfo = FontInfo;
@@ -453,13 +458,13 @@ tool_font_info* FontInfo)
 }
 
 added_asset AddGlyphAssetInternal(
-asset_system* System,
-tool_glyph_info* GlyphInfo, 
-u32 BitmapID)
+                                  asset_system* System,
+                                  tool_glyph_info* GlyphInfo, 
+                                  u32 BitmapID)
 {
     added_asset Added = AddAsset(System, AssetType_Glyph, Immediate_No);
     
-    game_asset_source* Source = Added.Source;
+    game_asset_source* Source = &Added.Asset->Source;;
     Source->GlyphSource.Glyph = GlyphInfo;
     
     asset_header* Header = Added.FileHeader;
@@ -503,8 +508,11 @@ added_asset AddArrayAsset(asset_system* System,
 
 void InitAssetFile(asset_system* Assets) {
     //NOTE(dima): Reserving first asset to make it NULL asset
+    
     Assets->AssetCount = 1;
     Assets->PrevAssetPointer = 0;
+    
+    Assets->Assets.resize(1);
     
     //NOTE(dima): Clearing asset groups
     for (int AssetGroupIndex = 0;
@@ -512,21 +520,6 @@ void InitAssetFile(asset_system* Assets) {
          AssetGroupIndex++)
     {
         game_asset_group* Group = Assets->AssetGroups + AssetGroupIndex;
-    }
-    
-    //NOTE(dima): Clearing free areas
-    for (int FreeAreaIndex = 0;
-         FreeAreaIndex < TEMP_STORED_ASSET_COUNT;
-         FreeAreaIndex++) 
-    {
-        game_asset_freearea* Free = Assets->AssetFreeareas + FreeAreaIndex;
-        
-        *Free = {};
-        
-        Free->SetCount = 0;
-        for (int PointerIndex = 0; PointerIndex < FREEAREA_SLOTS_COUNT; PointerIndex++) {
-            Free->Pointers[PointerIndex] = 0;
-        }
     }
 }
 
@@ -619,10 +612,9 @@ And forming group regions that are about to be written
             //NOTE(dima): Setting asset line offset
             AssetsLinesOffsets[AssetIndex - 1] = ftell(fp);
             
-            game_asset* Asset = Assets->Assets + AssetIndex;
-            game_asset_source* Source = Assets->AssetSources + AssetIndex;
-            game_asset_freearea* Free = Assets->AssetFreeareas + AssetIndex;
-            asset_header* Header = Assets->FileHeaders + AssetIndex;
+            game_asset* Asset = &Assets->Assets[AssetIndex];
+            game_asset_source* Source = &Asset->Source;
+            asset_header* Header = &Asset->FileHeader;
             
             u32 HeaderByteSize = sizeof(asset_header);
             int AssetTagCount = Asset->Tags.size();
@@ -802,27 +794,27 @@ And forming group regions that are about to be written
                 }break;
                 
                 case AssetType_Sound:{
-                    fwrite(Asset->Sound->Samples, DataByteSize, 1, fp);
+                    fwrite(Asset->Sound->Samples[0], DataByteSize, 1, fp);
                 }break;
                 
                 case AssetType_Font: {
                     // NOTE(Dima): FIRST - WRITING MAPPING
                     fwrite(
-						Asset->Font->Codepoint2Glyph,
-						Header->Font.MappingSize,
-						1, fp);
+                           Asset->Font->Codepoint2Glyph,
+                           Header->Font.MappingSize,
+                           1, fp);
                     
                     //NOTE(dima): SECOND - WRITING KERNING
                     fwrite(
-                        Asset->Font->KerningPairs,
-                        Header->Font.KerningSize,
-                        1, fp);
+                           Asset->Font->KerningPairs,
+                           Header->Font.KerningSize,
+                           1, fp);
                     
                     //NOTE(dima): THIRD - Write glyph IDs
                     fwrite(
-                        Asset->Font->GlyphIDs,
-                        Header->Font.IDsSize,
-                        1, fp);
+                           Asset->Font->GlyphIDs,
+                           Header->Font.IDsSize,
+                           1, fp);
                     
                 }break;
                 
@@ -838,9 +830,9 @@ And forming group regions that are about to be written
                     
                     //NOTE(dima): Writing indices
                     fwrite(
-                        Asset->Mesh->Indices,
-                        Header->Mesh.DataIndicesSize,
-                        1, fp);
+                           Asset->Mesh->Indices,
+                           Header->Mesh.DataIndicesSize,
+                           1, fp);
                 }break;
                 
                 case AssetType_Model:{
@@ -891,9 +883,9 @@ And forming group regions that are about to be written
                     
                     if(AnimH->SizeName){
                         fwrite(
-                            Asset->Animation->StoreName,
-                            AnimH->SizeName,
-                            1, fp);
+                               Asset->Animation->StoreName,
+                               AnimH->SizeName,
+                               1, fp);
                     }
                 }break;
                 
@@ -955,10 +947,10 @@ And forming group regions that are about to be written
             }
             
             //NOTE(dima): Freeing freareas
-            for (int FreeIndex = 0; FreeIndex < Free->SetCount; FreeIndex++) {
-                if(Free->Pointers[FreeIndex]){
-                    free(Free->Pointers[FreeIndex]);
-                    Free->Pointers[FreeIndex] = 0;
+            for (int FreeIndex = 0; FreeIndex < Asset->FreeSetCount; FreeIndex++) {
+                if(Asset->FreePointers[FreeIndex]){
+                    free(Asset->FreePointers[FreeIndex]);
+                    Asset->FreePointers[FreeIndex] = 0;
                 }
             }
             
@@ -1040,8 +1032,8 @@ And forming group regions that are about to be written
         //NOTE(dima): Rewriting asset data lines
         ASSERT(AssetLinesByteOffset == ftell(fp));
         fwrite(
-            (u8*)FileData + GroupsRegionsByteOffset + GroupsRegionsSize, 
-            AssetLinesBytesWritten, 1, fp);
+               (u8*)FileData + GroupsRegionsByteOffset + GroupsRegionsSize, 
+               AssetLinesBytesWritten, 1, fp);
         
         // NOTE(Dima): This should be done at the end
         fseek(fp, 0, SEEK_END);

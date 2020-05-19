@@ -6,6 +6,8 @@
 #include "joy_assets.h"
 #include "joy_strings.h"
 
+#define ANIM_ANY_STATE "#Any"
+
 struct node_transform{
     v3 T;
     quat R;
@@ -130,6 +132,7 @@ struct anim_calculated_pose{
 #define ANIM_STATE_TABLE_SIZE 64
 #define ANIM_VAR_TABLE_SIZE 32
 #define ANIM_ANIMID_TABLE_SIZE 32
+#define ANIM_MAX_STATE_COUNT 256
 
 struct anim_controller{
     struct anim_system* AnimState;
@@ -143,7 +146,9 @@ struct anim_controller{
     anim_state* LastState;
     anim_state* StateTable[ANIM_STATE_TABLE_SIZE];
     
-    anim_transition* BeginnedTransition;
+    anim_transition* BeginnedTransitions[ANIM_MAX_STATE_COUNT];
+    anim_transition_condition* BeginnedTransitionsConditions[ANIM_MAX_STATE_COUNT];
+    int BeginnedTransitionsCount;
 };
 
 struct animated_component{

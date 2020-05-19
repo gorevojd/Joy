@@ -242,7 +242,6 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitPlayerControl)
     // NOTE(Dima): Adding animation nodes
     AddAnimState(Control, AnimState_Animation, "Idle");
     AddAnimState(Control, AnimState_Animation, "Run");
-    AddAnimState(Control, AnimState_Animation, "Falling");
     
     // NOTE(Dima): Idle -> Run
     BeginTransition(Control, "Idle", "Run");
@@ -252,23 +251,6 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitPlayerControl)
     // NOTE(Dima): Run -> Idle
     BeginTransition(Control, "Run", "Idle");
     AddConditionFloat(Control, "VelocityLength", TransitionCondition_LessThan, 0.05f);
-    EndTransition(Control);
-    
-    // NOTE(Dima): Run -> Falling
-    BeginTransition(Control, "Run", "Falling");
-    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, true);
-    EndTransition(Control);
-    
-    // NOTE(Dima): Falling -> Idle
-    BeginTransition(Control, "Falling", "Idle");
-    AddConditionFloat(Control, "VelocityLength", TransitionCondition_LessThan, 0.05f);
-    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
-    EndTransition(Control);
-    
-    // NOTE(Dima): Falling -> Run
-    BeginTransition(Control, "Falling", "Run");
-    AddConditionFloat(Control, "VelocityLength", TransitionCondition_MoreEqThan, 0.05f);
-    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
     EndTransition(Control);
     
     return(Control);
@@ -280,15 +262,43 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFriendControl){
     // NOTE(Dima): Adding animation nodes
     AddAnimState(Control, AnimState_Animation, "Idle");
     AddAnimState(Control, AnimState_Animation, "Run");
+    AddAnimState(Control, AnimState_Animation, "Falling");
+    AddAnimState(Control, AnimState_Animation, "JumpUp");
+    AddAnimState(Control, AnimState_Animation, "Land");
     
     // NOTE(Dima): Idle -> Run
     BeginTransition(Control, "Idle", "Run");
-    AddConditionFloat(Control, "VelocityLength", TransitionCondition_MoreEqThan, 0.05f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, 0.05f);
     EndTransition(Control);
     
     // NOTE(Dima): Run -> Idle
     BeginTransition(Control, "Run", "Idle");
-    AddConditionFloat(Control, "VelocityLength", TransitionCondition_LessThan, 0.05f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_LessThan, 0.05f);
+    EndTransition(Control);
+    
+    BeginTransition(Control, ANIM_ANY_STATE, "JumpUp");
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, true);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_MoreThan, 0.05f);
+    EndTransition(Control);
+    
+    BeginTransition(Control, ANIM_ANY_STATE, "Falling", true, 0.5f);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, true);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, -0.05f);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Falling", "Land", true, 0.05f);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, -6.0f);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
+    EndTransition(Control);
+    
+    
+    BeginTransition(Control, "Falling", "Idle", true, 0.2f);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_MoreEqThan, -6.0f);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, 0.5f);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Land", "Idle");
     EndTransition(Control);
     
     return(Control);
@@ -393,11 +403,16 @@ has the same count of IDs as GameAssetID table for model and animations
                       Control,
                       ModelInfo->NodesCheckSum);
     
-    AddVariable(&Character->AnimComponent, "VelocityLength", AnimVariable_Float);
+    AddVariable(&Character->AnimComponent, "VelocityHorzLen", AnimVariable_Float);
+    AddVariable(&Character->AnimComponent, "VelocityVertValue", AnimVariable_Float);
     AddVariable(&Character->AnimComponent, "IsFalling", AnimVariable_Bool);
     
     SetStateAnimation(&Character->AnimComponent, "Idle", Character->CharacterIDs[CharacterID_Idle]);
     SetStateAnimation(&Character->AnimComponent, "Run", Character->CharacterIDs[CharacterID_Run]);
+    SetStateAnimation(&Character->AnimComponent, "JumpUp", Character->CharacterIDs[CharacterID_JumpUp]);
+    SetStateAnimation(&Character->AnimComponent, "Falling", Character->CharacterIDs[CharacterID_Fall]);
+    SetStateAnimation(&Character->AnimComponent, "Land", Character->CharacterIDs[CharacterID_Land]);
+    
 }
 
 INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
@@ -405,7 +420,7 @@ INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
                                        input_state* Input,
                                        entity_character* Character,
                                        f64 GlobalTime,
-                                       f32 DeltaTime)
+                                       f32 dt)
 {
     Character->Model = LoadModel(Assets, 
                                  Character->CharacterIDs[CharacterID_Model], 
@@ -413,20 +428,38 @@ INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
     
     model_info* Model = Character->Model;
     
-    Character->dP = V3(0.0f, 0.0f, 0.0f);
-    if(KeyIsDown(Input, Key_Space)){
-        Character->dP = V3(0.0f, 0.0f, 1.0f);
+    Character->dP.z = 0.0f;
+    if(KeyIsDown(Input, Key_Z)){
+        Character->dP.z = 1.0f;
+    }
+    if(KeyWentDown(Input, Key_Space)){
+        Character->dP.y += 5.0f;
     }
     
+    v3 Acc = V3(0.0f, -9.81f, 0.0f);
+    Character->P = Character->P + Character->dP * dt + Acc * dt * dt * 0.5f;
+    Character->dP = Character->dP + Acc * dt;
+    
+    float PrevVelocityY = Character->dP.y;
+    if(Character->P.y < 0.0f){
+        Character->P.y = 0.0f;
+        Character->dP.y = 0.0f;
+    }
+    
+    b32 IsFalling = Character->P.y > 0.0001f;
+    
     SetFloat(&Character->AnimComponent, 
-             "VelocityLength", 
-             Length(Character->dP));
+             "VelocityHorzLen", Character->dP.z);
+    SetFloat(&Character->AnimComponent,
+             "VelocityVertValue", PrevVelocityY);
+    SetBool(&Character->AnimComponent,
+            "IsFalling", IsFalling);
     
     if(Model){
         UpdateModel(Assets, Stack,
                     Model, Character->P,
                     Character->R, Character->S,
-                    GlobalTime, DeltaTime,
+                    GlobalTime, dt,
                     &Character->AnimComponent);
     }
 }
@@ -440,6 +473,7 @@ GAME_MODE_UPDATE(TestUpdate){
     if(!State->Initialized){
         
         State->Camera = {};
+        State->Camera.P = V3(0.0f, 5.0f, 40.0f);
         State->CameraSpeed = 5.0f;
         State->MouseSencitivity = 0.25f;
         
@@ -475,7 +509,7 @@ GAME_MODE_UPDATE(TestUpdate){
             entity_character* Char = &State->Characters[CharIndex];
             
             
-            v3 P = V3((CharIndex % 10) * 2, 0.0f, 
+            v3 P = V3((CharIndex % 10) * 2, 10.0f, 
                       (CharIndex / 10) * 2);
             
             int CharType = (CharIndex * 1234567 - (CharIndex & 3)) % 5;

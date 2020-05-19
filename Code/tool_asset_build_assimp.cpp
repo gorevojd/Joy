@@ -1176,141 +1176,63 @@ INTERNAL_FUNCTION void WriteMeshes1(){
 }
 
 
-INTERNAL_FUNCTION void WriteBear(){
-    asset_system System_ = {};
-    asset_system* System = &System_;
-    InitAssetFile(System);
-    
-    model_loading_context LoadCtx = {};
-    model_loading_context* Ctx = &LoadCtx;
-    
+INTERNAL_FUNCTION void AddCharacterToWrite(model_loading_context* Ctx, 
+                                           char* DataFolder,
+                                           u32 TagCharacterValue,
+                                           char* ModelName)
+{
     u32 DefaultFlags = 
         Load_GenerateNormals |
         Load_GenerateTangents;
     
-    // NOTE(Dima): Fox
-    BeginCharacter(Ctx, TagCharacter_Bear);
-    AddModelSource(Ctx, "../Data/Models/ForestAnimals/Bear/Bear.fbx",
-                   GameAsset_Model_Character,
-                   DefaultFlags);
+    BeginCharacter(Ctx, TagCharacterValue);
+    PushDirectory(Ctx, DataFolder);
     
-    PushDirectory(Ctx, "../Data/Models/ForestAnimals/Bear/animations/");
-    
-    AddAnimSource(Ctx, "Failure.fbx",
-                  GameAsset_Anim_Failure, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Fall.fbx",
-                  GameAsset_Anim_Fall,
-                  DefaultFlags);
-    
-    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
-    AddAnimSource(Ctx, "Idle.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags);
-    PopTag(Ctx);
-    
-    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
-    AddAnimSource(Ctx, "Idle_2.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags);
-    PopTag(Ctx);
-    
-    AddAnimSource(Ctx, "Jump_Up.fbx",
-                  GameAsset_Anim_JumpUp, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Land.fbx",
-                  GameAsset_Anim_Land, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Roll_In_Place.fbx",
-                  GameAsset_Anim_Roll, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Run_In_Place.fbx",
-                  GameAsset_Anim_Run, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Sleep.fbx",
-                  GameAsset_Anim_Sleep, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Success.fbx",
-                  GameAsset_Anim_Success, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Talk.fbx",
-                  GameAsset_Anim_Talk, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Walk_In_Place.fbx",
-                  GameAsset_Anim_Walk, DefaultFlags);
-    PopDirectory(Ctx);
-    EndCharacter(Ctx);
-    
-    // NOTE(Dima): Storing loading context
-    StoreLoadingContext(System, Ctx);
-    
-    WriteAssetFile(System, "../Data/Bear.ja");
-}
-
-INTERNAL_FUNCTION void WriteFox(){
-    asset_system System_ = {};
-    asset_system* System = &System_;
-    InitAssetFile(System);
-    
-    model_loading_context LoadCtx = {};
-    model_loading_context* Ctx = &LoadCtx;
-    
-    u32 DefaultFlags = 
-        Load_GenerateNormals |
-        Load_GenerateTangents;
-    
-    // NOTE(Dima): Fox
-    BeginCharacter(Ctx, TagCharacter_Fox);
-    AddModelSource(Ctx, "../Data/Models/ForestAnimals/Fox/Fox.fbx",
+    AddModelSource(Ctx, ModelName,
                    GameAsset_Model_Character, DefaultFlags);
     
-    PushDirectory(Ctx, "../Data/Models/ForestAnimals/Fox/animations");
-    AddAnimSource(Ctx, "Failure.fbx", 
+    AddAnimSource(Ctx, "animations/Failure.fbx", 
                   GameAsset_Anim_Failure, DefaultFlags);
     
-    AddAnimSource(Ctx, "Fall.fbx",
+    AddAnimSource(Ctx, "animations/Fall.fbx",
                   GameAsset_Anim_Fall, DefaultFlags);
     
     PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
-    AddAnimSource(Ctx, "Idle.fbx",
+    AddAnimSource(Ctx, "animations/Idle.fbx",
                   GameAsset_Anim_Idle, DefaultFlags);
     
     PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
-    AddAnimSource(Ctx, "Idle_2.fbx",
+    AddAnimSource(Ctx, "animations/Idle_2.fbx",
                   GameAsset_Anim_Idle, DefaultFlags);
     
-    AddAnimSource(Ctx, "Jump_Up.fbx",
+    AddAnimSource(Ctx, "animations/Jump_Up.fbx",
                   GameAsset_Anim_JumpUp, DefaultFlags);
     
-    AddAnimSource(Ctx, "Land.fbx",
+    AddAnimSource(Ctx, "animations/Land.fbx",
                   GameAsset_Anim_Land, DefaultFlags);
     
-    AddAnimSource(Ctx, "Roll_In_Place.fbx",
+    AddAnimSource(Ctx, "animations/Roll_In_Place.fbx",
                   GameAsset_Anim_Roll, DefaultFlags);
     
-    AddAnimSource(Ctx, "Run_In_Place.fbx",
+    AddAnimSource(Ctx, "animations/Run_In_Place.fbx",
                   GameAsset_Anim_Run, DefaultFlags);
     
-    AddAnimSource(Ctx, "Sleep.fbx",
+    AddAnimSource(Ctx, "animations/Sleep.fbx",
                   GameAsset_Anim_Sleep, DefaultFlags);
     
-    AddAnimSource(Ctx, "Success.fbx",
+    AddAnimSource(Ctx, "animations/Success.fbx",
                   GameAsset_Anim_Success, DefaultFlags);
     
-    AddAnimSource(Ctx, "Talk.fbx",
+    AddAnimSource(Ctx, "animations/Talk.fbx",
                   GameAsset_Anim_Talk, DefaultFlags);
     
-    AddAnimSource(Ctx, "Walk_In_Place.fbx",
+    AddAnimSource(Ctx, "animations/Walk_In_Place.fbx",
                   GameAsset_Anim_Walk, DefaultFlags);
     PopDirectory(Ctx);
     EndCharacter(Ctx);
-    
-    // NOTE(Dima): Storing loading context
-    StoreLoadingContext(System, Ctx);
-    
-    WriteAssetFile(System, "../Data/Fox.ja");
 }
 
-
-INTERNAL_FUNCTION void WriteDeer(){
+INTERNAL_FUNCTION void WriteForestAnimals(){
     asset_system System_ = {};
     asset_system* System = &System_;
     InitAssetFile(System);
@@ -1318,202 +1240,36 @@ INTERNAL_FUNCTION void WriteDeer(){
     model_loading_context LoadCtx = {};
     model_loading_context* Ctx = &LoadCtx;
     
-    u32 DefaultFlags = 
-        Load_GenerateNormals |
-        Load_GenerateTangents;
+    AddCharacterToWrite(Ctx, "../Data/Models/ForestAnimals/Deer",
+                        TagCharacter_Deer,
+                        "Deer.fbx");
     
-    // NOTE(Dima): Deer
-    BeginCharacter(Ctx, TagCharacter_Deer);
-    AddModelSource(Ctx, "../Data/Models/ForestAnimals/Deer/Deer.fbx",
-                   GameAsset_Model_Character, DefaultFlags);
+    AddCharacterToWrite(Ctx, "../Data/Models/ForestAnimals/Rabbit",
+                        TagCharacter_Rabbit,
+                        "Rabbit.fbx");
     
-    PushDirectory(Ctx, "../Data/Models/ForestAnimals/Deer/animations");
-    AddAnimSource(Ctx, "Failure.fbx", 
-                  GameAsset_Anim_Failure, DefaultFlags);
+    AddCharacterToWrite(Ctx, "../Data/Models/ForestAnimals/Fox",
+                        TagCharacter_Fox,
+                        "Fox.fbx");
     
-    AddAnimSource(Ctx, "Fall.fbx",
-                  GameAsset_Anim_Fall, DefaultFlags);
+    AddCharacterToWrite(Ctx, "../Data/Models/ForestAnimals/Moose",
+                        TagCharacter_Moose,
+                        "Moose.fbx");
     
-    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
-    AddAnimSource(Ctx, "Idle.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags);
-    
-    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
-    AddAnimSource(Ctx, "Idle_2.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Jump_Up.fbx",
-                  GameAsset_Anim_JumpUp, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Land.fbx",
-                  GameAsset_Anim_Land, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Roll_In_Place.fbx",
-                  GameAsset_Anim_Roll, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Run_In_Place.fbx",
-                  GameAsset_Anim_Run, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Sleep.fbx",
-                  GameAsset_Anim_Sleep, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Success.fbx",
-                  GameAsset_Anim_Success, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Talk.fbx",
-                  GameAsset_Anim_Talk, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Walk_In_Place.fbx",
-                  GameAsset_Anim_Walk, DefaultFlags);
-    PopDirectory(Ctx);
-    EndCharacter(Ctx);
+    AddCharacterToWrite(Ctx, "../Data/Models/ForestAnimals/Bear",
+                        TagCharacter_Bear,
+                        "Bear.fbx");
     
     // NOTE(Dima): Storing loading context
     StoreLoadingContext(System, Ctx);
     
-    WriteAssetFile(System, "../Data/Deer.ja");
+    WriteAssetFile(System, "../Data/ForestAnimals.ja");
 }
-
-
-INTERNAL_FUNCTION void WriteRabbit(){
-    asset_system System_ = {};
-    asset_system* System = &System_;
-    InitAssetFile(System);
-    
-    model_loading_context LoadCtx = {};
-    model_loading_context* Ctx = &LoadCtx;
-    
-    u32 DefaultFlags = 
-        Load_GenerateNormals |
-        Load_GenerateTangents;
-    
-    // NOTE(Dima): Rabbit
-    BeginCharacter(Ctx, TagCharacter_Rabbit);
-    AddModelSource(Ctx, "../Data/Models/ForestAnimals/Rabbit/Rabbit.fbx",
-                   GameAsset_Model_Character, DefaultFlags);
-    
-    PushDirectory(Ctx, "../Data/Models/ForestAnimals/Rabbit/animations");
-    AddAnimSource(Ctx, "Failure.fbx", 
-                  GameAsset_Anim_Failure, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Fall.fbx",
-                  GameAsset_Anim_Fall, DefaultFlags);
-    
-    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
-    AddAnimSource(Ctx, "Idle.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags);
-    
-    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
-    AddAnimSource(Ctx, "Idle_2.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Jump_Up.fbx",
-                  GameAsset_Anim_JumpUp, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Land.fbx",
-                  GameAsset_Anim_Land, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Roll_In_Place.fbx",
-                  GameAsset_Anim_Roll, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Run_In_Place.fbx",
-                  GameAsset_Anim_Run, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Sleep.fbx",
-                  GameAsset_Anim_Sleep, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Success.fbx",
-                  GameAsset_Anim_Success, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Talk.fbx",
-                  GameAsset_Anim_Talk, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Walk_In_Place.fbx",
-                  GameAsset_Anim_Walk, DefaultFlags);
-    PopDirectory(Ctx);
-    EndCharacter(Ctx);
-    
-    // NOTE(Dima): Storing loading context
-    StoreLoadingContext(System, Ctx);
-    
-    WriteAssetFile(System, "../Data/Rabbit.ja");
-}
-
-
-INTERNAL_FUNCTION void WriteMoose(){
-    asset_system System_ = {};
-    asset_system* System = &System_;
-    InitAssetFile(System);
-    
-    model_loading_context LoadCtx = {};
-    model_loading_context* Ctx = &LoadCtx;
-    
-    u32 DefaultFlags = 
-        Load_GenerateNormals |
-        Load_GenerateTangents;
-    
-    // NOTE(Dima): Moose
-    BeginCharacter(Ctx, TagCharacter_Moose);
-    AddModelSource(Ctx, "../Data/Models/ForestAnimals/Moose/Moose.fbx",
-                   GameAsset_Model_Character, DefaultFlags);
-    
-    PushDirectory(Ctx, "../Data/Models/ForestAnimals/Moose/animations");
-    AddAnimSource(Ctx, "Failure.fbx", 
-                  GameAsset_Anim_Failure, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Fall.fbx",
-                  GameAsset_Anim_Fall, DefaultFlags);
-    
-    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
-    AddAnimSource(Ctx, "Idle.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags);
-    
-    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
-    AddAnimSource(Ctx, "Idle_2.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Jump_Up.fbx",
-                  GameAsset_Anim_JumpUp, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Land.fbx",
-                  GameAsset_Anim_Land, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Roll_In_Place.fbx",
-                  GameAsset_Anim_Roll, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Run_In_Place.fbx",
-                  GameAsset_Anim_Run, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Sleep.fbx",
-                  GameAsset_Anim_Sleep, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Success.fbx",
-                  GameAsset_Anim_Success, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Talk.fbx",
-                  GameAsset_Anim_Talk, DefaultFlags);
-    
-    AddAnimSource(Ctx, "Walk_In_Place.fbx",
-                  GameAsset_Anim_Walk, DefaultFlags);
-    PopDirectory(Ctx);
-    EndCharacter(Ctx);
-    
-    // NOTE(Dima): Storing loading context
-    StoreLoadingContext(System, Ctx);
-    
-    WriteAssetFile(System, "../Data/Moose.ja");
-}
-
 
 int main(int ArgsCount, char** Args){
     
-    WriteFox();
-    WriteBear();
-    WriteRabbit();
-    WriteDeer();
-    WriteMoose();
-    
     WriteMeshes1();
+    WriteForestAnimals();
     
     system("pause");
     return(0);

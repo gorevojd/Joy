@@ -689,7 +689,7 @@ anim_controller* CreateAnimControl(anim_system* Anim,
     CopyStringsSafe(Result->Name, sizeof(Result->Name), Name);
     
     // NOTE(Dima): Initialize beginned transition to 0
-    Result->BeginnedTransition = 0;
+    Result->BeginnedTransitionsCount = 0;
     
     // NOTE(Dima): Init anim state table
     for(int Index = 0;
@@ -1068,25 +1068,17 @@ INTERNAL_FUNCTION anim_transition* DeallocateTransition(anim_system* Anim,
     return(Transition);
 }
 
-INTERNAL_FUNCTION anim_transition* 
-AddTransition(anim_controller* Control, 
-              char* FromAnim, 
-              char* ToAnim,
-              b32 AnimationShouldExit,
-              f32 TimeToTransit)
+INTERNAL_FUNCTION anim_transition* AddTransitionToStates(anim_controller* Control, 
+                                                         anim_state* FromState,
+                                                         anim_state* ToState,
+                                                         b32 AnimationShouldExit,
+                                                         float TimeToTransit)
 {
     anim_transition* Result = AllocateTransition(Control->AnimState);
     
     Result->ConditionsCount = 0;
     Result->AnimControl = Control;
     
-    // NOTE(Dima): Finding from
-    anim_state* FromState = FindState(Control, FromAnim);
-    Assert(FromState);
-    
-    // NOTE(Dima): Finding to
-    anim_state* ToState = FindState(Control, ToAnim);
-    Assert(ToState);
     
     Result->FromState = FromState;
     Result->ToState = ToState;
@@ -1109,48 +1101,103 @@ AddTransition(anim_controller* Control,
     return(Result);
 }
 
+INTERNAL_FUNCTION void
+AddTransition(anim_controller* Control, 
+              char* FromAnim, 
+              char* ToAnim,
+              b32 AnimationShouldExit,
+              f32 TimeToTransit)
+{
+    
+    
+    // NOTE(Dima): Finding to
+    anim_state* ToState = FindState(Control, ToAnim);
+    Assert(ToState);
+    
+    // NOTE(Dima): Finding from
+    b32 IsAnyState = StringsAreEqual(FromAnim, ANIM_ANY_STATE);
+    int TransitionsCount = 0;
+    
+    if(IsAnyState){
+        // NOTE(Dima): If this state is any state - then we should begin to add to all of these states
+        anim_state* StateAt = Control->FirstState;
+        
+        while(StateAt){
+            if(!StringsAreEqual(ToAnim, StateAt->Name)){
+                Assert(TransitionsCount < ANIM_MAX_STATE_COUNT);
+                
+                anim_transition* Transition = AddTransitionToStates(Control, 
+                                                                    StateAt, 
+                                                                    ToState,
+                                                                    AnimationShouldExit,
+                                                                    TimeToTransit);
+                
+                Control->BeginnedTransitions[TransitionsCount++] = Transition;
+            }
+            
+            StateAt = StateAt->NextInList;
+        }
+    }
+    else{
+        anim_state* FromState = FindState(Control, FromAnim);
+        Assert(FromState);
+        
+        anim_transition* Transition = AddTransitionToStates(Control, 
+                                                            FromState, 
+                                                            ToState,
+                                                            AnimationShouldExit,
+                                                            TimeToTransit);
+        
+        Control->BeginnedTransitions[TransitionsCount++] = Transition;
+    }
+    
+    Assert(TransitionsCount);
+    
+    Control->BeginnedTransitionsCount = TransitionsCount;
+}
+
 void BeginTransition(anim_controller* Control,
                      char* FromAnim, 
                      char* ToAnim, 
                      b32 AnimationShouldExit,
                      f32 TimeToTransit)
 {
-    Assert(Control->BeginnedTransition == 0);
-    Control->BeginnedTransition = AddTransition(Control, FromAnim, ToAnim,
-                                                AnimationShouldExit,
-                                                TimeToTransit);
-}
-
-void EndTransition(anim_controller* Control){
-    Assert(Control->BeginnedTransition);
-    Control->BeginnedTransition = 0;
+    Assert(Control->BeginnedTransitionsCount == 0);
+    AddTransition(Control, FromAnim, ToAnim,
+                  AnimationShouldExit,
+                  TimeToTransit);
 }
 
 // NOTE(Dima): !!!!!!!!!!!!!!!!
 // NOTE(Dima): Conditions stuff
 // NOTE(Dima): !!!!!!!!!!!!!!!!
 
-inline anim_transition_condition* AddCondition(anim_transition* Transition,
-                                               char* VariableName,
-                                               u32 VariableType,
-                                               u32 ConditionType)
+inline void AddCondition(anim_controller* Control, 
+                         char* VariableName,
+                         u32 VariableType,
+                         u32 ConditionType)
 {
-    Assert(Transition->ConditionsCount < MAX_TRANSITION_CONDITIONS);
-    anim_transition_condition* Result = &Transition->Conditions[Transition->ConditionsCount++];
+    for(int BeginnedTranIndex = 0;
+        BeginnedTranIndex < Control->BeginnedTransitionsCount;
+        BeginnedTranIndex++)
+    {
+        anim_transition* Transition = Control->BeginnedTransitions[BeginnedTranIndex];
+        
+        Assert(Transition->ConditionsCount < MAX_TRANSITION_CONDITIONS);
+        anim_transition_condition* Result = &Transition->Conditions[Transition->ConditionsCount++];
+        
+        CopyStringsSafe(Result->Name, sizeof(Result->Name), VariableName);
+        Result->VariableValueType = VariableType;
+        Result->ConditionType = ConditionType;
+        
+        Control->BeginnedTransitionsConditions[BeginnedTranIndex] = Result;
+    }
+}
+
+void EndTransition(anim_controller* Control){
+    Assert(Control->BeginnedTransitionsCount);
     
-#if 0    
-    anim_variable* FoundVariable = FindVariable(Transition->AnimControl, VariableName);
-    Assert(FoundVariable);
-    Result->Variable = FoundVariable;
-    
-    Assert(FoundVariable->ValueType == VariableType);
-#endif
-    
-    CopyStringsSafe(Result->Name, sizeof(Result->Name), VariableName);
-    Result->VariableValueType = VariableType;
-    Result->ConditionType = ConditionType;
-    
-    return(Result);
+    Control->BeginnedTransitionsCount = 0;
 }
 
 void AddConditionFloat(anim_controller* Control,
@@ -1158,13 +1205,20 @@ void AddConditionFloat(anim_controller* Control,
                        u32 ConditionType,
                        f32 Value)
 {
-    Assert(Control->BeginnedTransition);
-    anim_transition_condition* Cond = AddCondition(Control->BeginnedTransition,
-                                                   VariableName,
-                                                   AnimVariable_Float,
-                                                   ConditionType);
+    Assert(Control->BeginnedTransitionsCount);
+    AddCondition(Control,
+                 VariableName,
+                 AnimVariable_Float,
+                 ConditionType);
     
-    Cond->Value.Float = Value;
+    for(int BeginnedTranIndex = 0;
+        BeginnedTranIndex < Control->BeginnedTransitionsCount;
+        BeginnedTranIndex++)
+    {
+        anim_transition_condition* Cond = Control->BeginnedTransitionsConditions[BeginnedTranIndex];
+        
+        Cond->Value.Float = Value;
+    }
 }
 
 void AddConditionBool(anim_controller* Control,
@@ -1172,13 +1226,20 @@ void AddConditionBool(anim_controller* Control,
                       u32 ConditionType,
                       b32 Value)
 {
-    Assert(Control->BeginnedTransition);
-    anim_transition_condition* Cond = AddCondition(Control->BeginnedTransition,
-                                                   VariableName,
-                                                   AnimVariable_Bool,
-                                                   ConditionType);
+    Assert(Control->BeginnedTransitionsCount);
+    AddCondition(Control,
+                 VariableName,
+                 AnimVariable_Bool,
+                 ConditionType);
     
-    Cond->Value.Bool = Value;
+    for(int BeginnedTranIndex = 0;
+        BeginnedTranIndex < Control->BeginnedTransitionsCount;
+        BeginnedTranIndex++)
+    {
+        anim_transition_condition* Cond = Control->BeginnedTransitionsConditions[BeginnedTranIndex];
+        
+        Cond->Value.Bool = Value;
+    }
 }
 
 void SetFloat(animated_component* AC, 
