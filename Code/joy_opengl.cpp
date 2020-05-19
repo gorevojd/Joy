@@ -1050,13 +1050,18 @@ INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
     // NOTE(Dima): Calculating gui orthographic projection matrix
     int WindowWidth = 1366;
     int WindowHeight = 768;
+    int InitWindowWidth = WindowWidth;
+    int InitWindowHeight = WindowHeight;
+    
     if(Render->FrameInfoIsSet){
         WindowWidth = Render->FrameInfo.Width;
         WindowHeight = Render->FrameInfo.Height;
+        InitWindowWidth = Render->FrameInfo.InitWidth;
+        InitWindowHeight = Render->FrameInfo.InitHeight;
     }
     
-    float a = 2.0f / WindowWidth;
-    float b = 2.0f / WindowHeight;
+    float a = 2.0f / (float)InitWindowWidth;
+    float b = 2.0f / (float)InitWindowHeight;
     
     GLfloat GuiOrtho[16] = {
         a, 0.0f, 0.0f, 0.0f,
@@ -1067,7 +1072,7 @@ INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
     
     GL->GuiOrtho = Floats2Matrix(GuiOrtho);
     
-    //glViewport(0.0f, 0.0f, WindowWidth, WindowHeight);
+    glViewport(0.0f, 0.0f, WindowWidth, WindowHeight);
     
     // NOTE(Dima): Actual rendering
     if(Render->API.RendererType == Renderer_Software){

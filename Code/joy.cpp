@@ -224,8 +224,8 @@ void GameUpdate(game_state* Game, render_frame_info FrameInfo){
     gui_frame_info GuiFrameInfo = {};
     GuiFrameInfo.Stack = RenderFindStack(Game->Render, "GUI");
     GuiFrameInfo.Input = Game->Input;
-    GuiFrameInfo.Width = FrameInfo.Width;
-    GuiFrameInfo.Height = FrameInfo.Height;
+    GuiFrameInfo.Width = FrameInfo.InitWidth;
+    GuiFrameInfo.Height = FrameInfo.InitHeight;
     GuiFrameInfo.DeltaTime = FrameInfo.dt;
     
     GuiFrameBegin(Game->Gui, GuiFrameInfo);

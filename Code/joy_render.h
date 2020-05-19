@@ -102,8 +102,12 @@ struct render_lines_geom{
 
 struct render_frame_info{
     float dt;
+    
     int Width;
     int Height;
+    
+    int InitWidth;
+    int InitHeight;
     
     u32 RendererType;
     
@@ -506,9 +510,9 @@ inline void PushGradient(render_stack* Stack,
 }
 
 inline void PushRect(
-render_stack* Stack, 
-rc2 rect, 
-v4 multColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
+                     render_stack* Stack, 
+                     rc2 rect, 
+                     v4 multColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
     if(Stack->IsSoftwareRenderer){
         render_entry_rect* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Rect, render_entry_rect);

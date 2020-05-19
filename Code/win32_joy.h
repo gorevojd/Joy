@@ -175,8 +175,11 @@ struct win_critical_section_slot{
 
 struct win_state{
 	HWND window;
+    int InitWindowWidth;
+    int InitWindowHeight;
     int WindowWidth;
     int WindowHeight;
+    b32 ToggledFullscreen;
     
     std::vector<std::string> LoadedStringsHolder;
     b32 InListFilesBlock;

@@ -1639,28 +1639,41 @@ RENDER_PLATFORM_RENDER(Win32OpenGLRender){
 }
 
 INTERNAL_FUNCTION void
-Win32ToggleFullscreen(win_state* win32)
+Win32ToggleFullscreen(win_state* Win32, b32 IsFullscreen)
 {
-    DWORD style = GetWindowLong(win32->window, GWL_STYLE);
-    if (style & WS_OVERLAPPEDWINDOW)
+    Win32->ToggledFullscreen = IsFullscreen;
+    
+    DWORD Style = GetWindowLong(Win32->window, GWL_STYLE);
+    if (IsFullscreen && (Style & WS_OVERLAPPEDWINDOW))
     {
-        MONITORINFO monInfo = { sizeof(monInfo) };
-        if (GetWindowPlacement(win32->window, &win32->windowPlacement) &&
-            GetMonitorInfo(MonitorFromWindow(win32->window, MONITOR_DEFAULTTOPRIMARY), &monInfo))
+        MONITORINFO Monitor = { sizeof(Monitor) };
+        if (GetWindowPlacement(Win32->window, &Win32->windowPlacement) &&
+            GetMonitorInfo(MonitorFromWindow(Win32->window, MONITOR_DEFAULTTOPRIMARY), &Monitor))
         {
-            SetWindowLong(win32->window, GWL_STYLE, style & ~WS_OVERLAPPEDWINDOW);
-            SetWindowPos(win32->window, HWND_TOP,
-                         monInfo.rcMonitor.left, monInfo.rcMonitor.top,
-                         monInfo.rcMonitor.right - monInfo.rcMonitor.left,
-                         monInfo.rcMonitor.bottom - monInfo.rcMonitor.top,
+            RECT MonRect = Monitor.rcMonitor;
+            
+            int MonitorWidth = MonRect.right - MonRect.left;
+            int MonitorHeight = MonRect.bottom - MonRect.top;
+            
+            Win32->WindowWidth = MonitorWidth;
+            Win32->WindowHeight = MonitorHeight;
+            
+            SetWindowLong(Win32->window, GWL_STYLE, Style & ~WS_OVERLAPPEDWINDOW);
+            SetWindowPos(Win32->window, HWND_TOP,
+                         Monitor.rcMonitor.left, Monitor.rcMonitor.top,
+                         MonitorWidth,
+                         MonitorHeight,
                          SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
         }
     }
     else
     {
-        SetWindowLong(win32->window, GWL_STYLE, style | WS_OVERLAPPEDWINDOW);
-        SetWindowPlacement(win32->window, &win32->windowPlacement);
-        SetWindowPos(win32->window, 0, 0, 0, 0, 0,
+        Win32->WindowWidth = Win32->InitWindowWidth;
+        Win32->WindowHeight = Win32->InitWindowHeight;
+        
+        SetWindowLong(Win32->window, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
+        SetWindowPlacement(Win32->window, &Win32->windowPlacement);
+        SetWindowPos(Win32->window, 0, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
                      SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
     }
@@ -1807,7 +1820,7 @@ Win32ProcessMessages(input_state* Input){
                         }
                         
                         if(altKeyWasDown && vKey == VK_RETURN){
-                            Win32ToggleFullscreen(&GlobalWin32);
+                            Win32ToggleFullscreen(&GlobalWin32, !GlobalWin32.ToggledFullscreen);
                         }
                     }
                 }
@@ -1900,7 +1913,13 @@ Win32ProcessInput(input_state* Input)
     
     // NOTE(Dima): Getting current mouse P in-window
     ScreenToClient(GlobalWin32.window, &point);
-    v2 CurMouseP = V2(point.x, point.y);
+    
+    float MouseUVx = (float)point.x / (float)GlobalWin32.WindowWidth;
+    float MouseUVy = (float)point.y / (float)GlobalWin32.WindowHeight;
+    
+    v2 CurMouseP = V2(MouseUVx * (float)GlobalWin32.InitWindowWidth, 
+                      MouseUVy * (float)GlobalWin32.InitWindowHeight);
+    
     
     v2 MouseActualDelta = {};
     if(Input->NotFirstFrame){
@@ -1911,10 +1930,8 @@ Win32ProcessInput(input_state* Input)
     }
     
     // NOTE(Dima): Processing capturing mouse
-    
     if(Input->CapturingMouse){
-        HMONITOR MonitorHandle = MonitorFromWindow(
-                                                   GlobalWin32.window, 
+        HMONITOR MonitorHandle = MonitorFromWindow(GlobalWin32.window, 
                                                    MONITOR_DEFAULTTOPRIMARY);
         MONITORINFO MonitorInfo;
         MonitorInfo.cbSize = sizeof(MONITORINFO);
@@ -1953,7 +1970,12 @@ Win32ProcessInput(input_state* Input)
     }
     
     ScreenToClient(GlobalWin32.window, &point);
-    v2 MouseP = V2(point.x, point.y);
+    
+    MouseUVx = (float)point.x / (float)GlobalWin32.WindowWidth;
+    MouseUVy = (float)point.y / (float)GlobalWin32.WindowHeight;
+    
+    v2 MouseP = V2(MouseUVx * (float)GlobalWin32.InitWindowWidth, 
+                   MouseUVy * (float)GlobalWin32.InitWindowHeight);
     
     Input->MouseP = MouseP;
     
@@ -2331,6 +2353,8 @@ INTERNAL_FUNCTION void Win32InitWindow(HINSTANCE Instance,
     
     GlobalWin32.WindowWidth = WindowWidth;
     GlobalWin32.WindowHeight = WindowHeight;
+    GlobalWin32.InitWindowWidth = WindowWidth;
+    GlobalWin32.InitWindowHeight = WindowHeight;
     
     void* winBmpMemory = PushSomeMem(&GlobalMem, WindowWidth * WindowHeight * 4, 64);
     GlobalWin32.bitmap = AllocateBitmapInternal(WindowWidth, WindowHeight, winBmpMemory);
@@ -2461,8 +2485,10 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         
         // NOTE(Dima): Setting Frame info to Pass to game
         render_frame_info FrameInfo = {};
-        FrameInfo.Width = WindowWidth;
-        FrameInfo.Height = WindowHeight;
+        FrameInfo.Width = GlobalWin32.WindowWidth;
+        FrameInfo.Height = GlobalWin32.WindowHeight;
+        FrameInfo.InitWidth = GlobalWin32.InitWindowWidth;
+        FrameInfo.InitHeight = GlobalWin32.InitWindowHeight;
         FrameInfo.SoftwareBuffer = &GlobalWin32.bitmap;
         FrameInfo.dt = DeltaTime;
         FrameInfo.RendererType = Renderer_OpenGL;

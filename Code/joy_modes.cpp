@@ -536,8 +536,8 @@ GAME_MODE_UPDATE(TestUpdate){
     m44 CameraTransform = GetCameraMatrix(Camera);
     
     
-    int Width = Game->Render->FrameInfo.Width;
-    int Height = Game->Render->FrameInfo.Height;
+    int Width = Game->Render->FrameInfo.InitWidth;
+    int Height = Game->Render->FrameInfo.InitHeight;
     
     render_camera_setup CamSetup = DefaultPerspSetup(Width, Height, CameraTransform);
     
@@ -766,8 +766,8 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     array_info* Arr = GET_ASSET_PTR_MEMBER(Asset, array_info);
     
     
-    render_camera_setup CamSetup = DefaultOrthoSetup(Game->Render->FrameInfo.Width,
-                                                     Game->Render->FrameInfo.Height,
+    render_camera_setup CamSetup = DefaultOrthoSetup(Game->Render->FrameInfo.InitWidth,
+                                                     Game->Render->FrameInfo.InitHeight,
                                                      Identity());
     
     render_pass* Pass = BeginRenderPass(Game->Render, CamSetup);
