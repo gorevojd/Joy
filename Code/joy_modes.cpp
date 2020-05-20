@@ -267,7 +267,7 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFriendControl){
     AddAnimState(Control, AnimState_Animation, "Land");
     
     // NOTE(Dima): Idle -> Run
-    BeginTransition(Control, "Idle", "Run");
+    BeginTransition(Control, "Idle", "Run", 0.35f);
     AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, 0.05f);
     EndTransition(Control);
     
@@ -281,24 +281,31 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFriendControl){
     AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_MoreThan, 0.05f);
     EndTransition(Control);
     
-    BeginTransition(Control, ANIM_ANY_STATE, "Falling", true, 0.5f);
+    BeginTransition(Control, ANIM_ANY_STATE, "Falling", 0.5f, false);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, true);
     AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, -0.05f);
     EndTransition(Control);
     
-    BeginTransition(Control, "Falling", "Land", true, 0.05f);
+    BeginTransition(Control, "Falling", "Land", 0.05f, false);
     AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, -6.0f);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
     EndTransition(Control);
     
-    
-    BeginTransition(Control, "Falling", "Idle", true, 0.2f);
+    BeginTransition(Control, "Falling", "Idle", 0.2f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_LessThan, 0.05f);
     AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_MoreEqThan, -6.0f);
     AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, 0.5f);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
     EndTransition(Control);
     
-    BeginTransition(Control, "Land", "Idle");
+    BeginTransition(Control, "Falling", "Run", 0.2f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, 0.05f);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_MoreEqThan, -6.0f);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, 0.5f);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Land", "Idle", 0.2f, true);
     EndTransition(Control);
     
     return(Control);
@@ -428,8 +435,10 @@ INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
     
     model_info* Model = Character->Model;
     
+    b32 CanMove = (!StateIsPlaying(&Character->AnimComponent, "Land"));
+    
     Character->dP.z = 0.0f;
-    if(KeyIsDown(Input, Key_Z)){
+    if(CanMove && KeyIsDown(Input, Key_Z)){
         Character->dP.z = 1.0f;
     }
     if(KeyWentDown(Input, Key_Space)){

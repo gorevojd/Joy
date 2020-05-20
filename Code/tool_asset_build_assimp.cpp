@@ -499,6 +499,7 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         NewAnimation.Duration = AssimpAnim->mDuration;
         NewAnimation.TicksPerSecond = AssimpAnim->mTicksPerSecond;
         NewAnimation.NodesCheckSum = Result.NodesCheckSum;
+        NewAnimation.IsLooping = (Flags & Load_AnimationWillBeLooped) != 0;
         
         for(int NodeAnimIndex = 0;
             NodeAnimIndex < AssimpAnim->mNumChannels;
@@ -1121,12 +1122,19 @@ inline void AddModelSource(model_loading_context* Ctx,
 inline void AddAnimSource(model_loading_context* Ctx, 
                           char* Path, 
                           u32 AssetGroup,
-                          u32 Flags)
+                          u32 Flags,
+                          b32 IsLooped)
 {
     std::string NewPath = GetAssetPathForLoadingContext(Ctx, Path);
     
+    if(IsLooped){
+        Flags |= Load_AnimationWillBeLooped;
+    }
+    
     load_model_source Source = ModelSource(NewPath, AssetGroup, 
-                                           Flags | Load_ImportOnlyAnimation, Ctx->TagHub);
+                                           Flags | Load_ImportOnlyAnimation, 
+                                           Ctx->TagHub);
+    
     
     Ctx->ModelSources.push_back(Source);
 }
@@ -1192,42 +1200,42 @@ INTERNAL_FUNCTION void AddCharacterToWrite(model_loading_context* Ctx,
                    GameAsset_Model_Character, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Failure.fbx", 
-                  GameAsset_Anim_Failure, DefaultFlags);
+                  GameAsset_Anim_Failure, DefaultFlags, false);
     
     AddAnimSource(Ctx, "animations/Fall.fbx",
-                  GameAsset_Anim_Fall, DefaultFlags);
+                  GameAsset_Anim_Fall, DefaultFlags, true);
     
     PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
     AddAnimSource(Ctx, "animations/Idle.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags);
+                  GameAsset_Anim_Idle, DefaultFlags, true);
     
     PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
     AddAnimSource(Ctx, "animations/Idle_2.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags);
+                  GameAsset_Anim_Idle, DefaultFlags, true);
     
     AddAnimSource(Ctx, "animations/Jump_Up.fbx",
-                  GameAsset_Anim_JumpUp, DefaultFlags);
+                  GameAsset_Anim_JumpUp, DefaultFlags, true);
     
     AddAnimSource(Ctx, "animations/Land.fbx",
-                  GameAsset_Anim_Land, DefaultFlags);
+                  GameAsset_Anim_Land, DefaultFlags, false);
     
     AddAnimSource(Ctx, "animations/Roll_In_Place.fbx",
-                  GameAsset_Anim_Roll, DefaultFlags);
+                  GameAsset_Anim_Roll, DefaultFlags, false);
     
     AddAnimSource(Ctx, "animations/Run_In_Place.fbx",
-                  GameAsset_Anim_Run, DefaultFlags);
+                  GameAsset_Anim_Run, DefaultFlags, true);
     
     AddAnimSource(Ctx, "animations/Sleep.fbx",
-                  GameAsset_Anim_Sleep, DefaultFlags);
+                  GameAsset_Anim_Sleep, DefaultFlags, true);
     
     AddAnimSource(Ctx, "animations/Success.fbx",
-                  GameAsset_Anim_Success, DefaultFlags);
+                  GameAsset_Anim_Success, DefaultFlags, false);
     
     AddAnimSource(Ctx, "animations/Talk.fbx",
-                  GameAsset_Anim_Talk, DefaultFlags);
+                  GameAsset_Anim_Talk, DefaultFlags, true);
     
     AddAnimSource(Ctx, "animations/Walk_In_Place.fbx",
-                  GameAsset_Anim_Walk, DefaultFlags);
+                  GameAsset_Anim_Walk, DefaultFlags, true);
     PopDirectory(Ctx);
     EndCharacter(Ctx);
 }

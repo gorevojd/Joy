@@ -24,6 +24,7 @@ struct asset_file_source{
 struct asset{
     u32 ID;
     u32 Type;
+    int GroupIndex;
     
     std::atomic_uint State;
     
@@ -45,10 +46,6 @@ struct asset{
     // NOTE(Dima): Asset data memory entry
     mem_entry* DataMemoryEntry;
     
-    // NOTE(Dima): In list stuff
-    asset* Next;
-    asset* Prev;
-    
     mem_layer_entry* TypeMemEntry;
     
     // NOTE(Dima): Data
@@ -68,6 +65,16 @@ struct asset{
     }Data;
 };
 
+struct asset_slot{
+    asset* Asset;
+    
+    asset_slot* Next;
+    asset_slot* Prev;
+    
+    asset_slot* NextAlloc;
+    asset_slot* PrevAlloc;
+};
+
 struct added_asset{
     asset* Asset;
     u32 ID;
@@ -78,9 +85,12 @@ struct asset_id_range{
     int Count;
 };
 
+struct slots_group{
+};
+
 struct asset_group{
     int InGroupAssetCount;
-    asset Sentinel;
+    asset_slot Sentinel;
     asset** PointersToAssets;
 };
 
@@ -113,10 +123,14 @@ struct assets{
     
     // NOTE(Dima): Asset groups
     asset_group Groups[GameAsset_Count];
+    asset_group TagGroups[AssetTag_Count][GameAsset_Count];
     
     // NOTE(Dima): Actual asset storage
     asset_block AssetBlocks[MAX_ASSET_BLOCKS_COUNT];
     int CurrentBlockIndex;
+    
+    asset_slot UseSlot;
+    asset_slot FreeSlot;
 };
 
 struct parsed_asset_id{

@@ -94,6 +94,7 @@ enum assimp_load_mesh_flags {
 	Load_GenerateSmoothNormals = (1 << 2),
     
     Load_ImportOnlyAnimation = (1 << 3),
+    Load_AnimationWillBeLooped = (1 << 4),
 };
 
 struct loaded_mesh_slot{
@@ -135,11 +136,10 @@ struct load_model_source{
     loaded_model LoadedModel;
 };
 
-inline load_model_source ModelSource(
-std::string Path,
-u32 AssetGroup,
-u32 Flags,
-tag_hub TagHub)
+inline load_model_source ModelSource(std::string Path,
+                                     u32 AssetGroup,
+                                     u32 Flags,
+                                     tag_hub TagHub)
 {
     load_model_source Result = {};
     

@@ -92,6 +92,7 @@ struct asset_skeleton{
 struct asset_animation_clip{
     float Duration;
     float TicksPerSecond;
+    b32 IsLooping;
     
     u32 NodesCheckSum;
     
@@ -348,11 +349,12 @@ enum asset_tag_idle_anim{
 enum asset_tag_type{
     AssetTag_FontType,
     AssetTag_LOD,
-    AssetTag_Counter,
     AssetTag_Size,
     
     AssetTag_Character,
     AssetTag_IdleAnim,
+    
+    AssetTag_Count,
 };
 
 struct asset_tag{

@@ -315,6 +315,115 @@ void PlayStateAnimations(anim_state* State,
     State->PlayingAnimation.Phase01 = Phase;
 }
 
+b32 StateIsPlaying(animated_component* AC,
+                   char* StateName)
+{
+    b32 Result = false;
+    
+    if(AC->PlayingStatesCount > 1 && AC->PlayingStates[GetNextPlayingIndex(AC)]){
+        Result |= (StringsAreEqual(AC->PlayingStates[GetNextPlayingIndex(AC)]->Name, StateName));
+    }
+    
+    if(AC->PlayingStatesCount > 0 && AC->PlayingStates[AC->PlayingIndex]){
+        Result |= (StringsAreEqual(AC->PlayingStates[AC->PlayingIndex]->Name, StateName));
+    }
+    
+    return(Result);
+}
+
+INTERNAL_FUNCTION void ProcessTransitioning(animated_component* AC, 
+                                            int PlayingIndex,
+                                            b32 FirstAnimEnded,
+                                            f64 GlobalTime)
+{
+    Assert(PlayingIndex < 2);
+    Assert(PlayingIndex >= 0);
+    
+    anim_state* State = AC->PlayingStates[PlayingIndex];
+    
+    // NOTE(Dima): Iterating through all transitions
+    anim_transition* TransitionAt = State->FirstTransition;
+    while(TransitionAt != 0){
+        
+        // NOTE(Dima): From state of transition should be equal to current state
+        Assert(TransitionAt->FromState == State);
+        
+        b32 AllConditionsTrue = true;
+        
+        for(int ConditionIndex = 0;
+            ConditionIndex < TransitionAt->ConditionsCount;
+            ConditionIndex++)
+        {
+            anim_transition_condition* Cond = &TransitionAt->Conditions[ConditionIndex];
+            
+            anim_variable* Variable = FindVariable(AC, Cond->Name);
+            Assert(Cond->VariableValueType == Variable->ValueType);
+            
+            b32 ConditionTrue = 0;
+            if(Cond->VariableValueType == AnimVariable_Bool){
+                b32 VariableBool = Variable->Value.Bool;
+                b32 CondBool = Cond->Value.Bool;
+                
+                if(Cond->ConditionType == TransitionCondition_Equal){
+                    ConditionTrue = (VariableBool == CondBool);
+                }
+            }
+            else if(Cond->VariableValueType  == AnimVariable_Float){
+                float VariableFloat = Variable->Value.Float;
+                float CondFloat = Cond->Value.Float;
+                
+                switch(Cond->ConditionType){
+                    case TransitionCondition_MoreEqThan:{
+                        ConditionTrue = VariableFloat >= CondFloat;
+                    }break;
+                    
+                    case TransitionCondition_MoreThan:{
+                        ConditionTrue = VariableFloat > CondFloat;
+                    }break;
+                    
+                    case TransitionCondition_LessEqThan:{
+                        ConditionTrue = VariableFloat <= CondFloat;
+                    }break;
+                    
+                    case TransitionCondition_LessThan:{
+                        ConditionTrue = VariableFloat < CondFloat;
+                    }break;
+                    
+                    case TransitionCondition_Equal:{
+                        ConditionTrue = Abs(VariableFloat - CondFloat) < 0.00000001f;
+                    }break;
+                }
+            }
+            
+            if(!ConditionTrue){
+                AllConditionsTrue = false;
+                break;
+            }
+        }
+        
+        if((TransitionAt->AnimationShouldFinish && FirstAnimEnded) || 
+           (TransitionAt->ConditionsCount && AllConditionsTrue))
+        {
+            // NOTE(Dima): Initiating transition
+            int NextPlayIndex = GetNextPlayingIndex(AC);
+            AC->PlayingStates[NextPlayIndex] = TransitionAt->ToState;
+            AC->PlayingStatesCount = 2;
+            
+            PlayStateAnimations(AC->PlayingStates[NextPlayIndex], 
+                                GlobalTime,
+                                0.0f);
+            
+            AC->TimeToTransit = TransitionAt->TimeToTransit;
+            AC->TransitionTimeLeft = TransitionAt->TimeToTransit;
+            
+            break;
+        }
+        
+        // NOTE(Dima): Advancing iterator
+        TransitionAt = TransitionAt->NextInList;
+    } // end loop through all transitions
+}
+
 INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                                                model_info* Model, 
                                                animated_component* AC,
@@ -341,9 +450,12 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
         
         // NOTE(Dima): Updating playing states, conditions, transitions
         if(AC->PlayingStatesCount > 0){
+            int CurrPlayIndex = AC->PlayingIndex;
+            int NextPlayIndex = GetNextPlayingIndex(AC);
             
             // NOTE(Dima): Updating transition
             if(AC->PlayingStatesCount == 2){
+                
                 // NOTE(Dima): If transitioning
                 AC->TransitionTimeLeft -= DeltaTime * PlaybackRate;
                 
@@ -358,31 +470,36 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                     f32 Weight0 = Clamp01(AC->TransitionTimeLeft / AC->TimeToTransit);
                     f32 Weight1 = 1.0f - Weight0;
                     
-                    AC->PlayingStates[PLAY_STATE_FIRST]->Contribution = Weight0;
-                    AC->PlayingStates[PLAY_STATE_SECOND]->Contribution = Weight1;
+                    AC->PlayingStates[CurrPlayIndex]->Contribution = Weight0;
+                    AC->PlayingStates[NextPlayIndex]->Contribution = Weight1;
                 }
                 else{
                     // NOTE(Dima): 0 here because this animation ended
-                    AC->PlayingStates[PLAY_STATE_FIRST]->Contribution = 0.0f;
+                    AC->PlayingStates[CurrPlayIndex]->Contribution = 0.0f;
                     
                     // NOTE(Dima): 1 here because this animation is fully turned on
-                    AC->PlayingStates[PLAY_STATE_SECOND]->Contribution = 1.0f;
+                    AC->PlayingStates[NextPlayIndex]->Contribution = 1.0f;
                     
                     ShouldEndTransition = true;
                 }
                 
                 if(ShouldEndTransition){
-                    AC->PlayingStates[PLAY_STATE_FIRST] = AC->PlayingStates[PLAY_STATE_SECOND];
-                    AC->PlayingStates[PLAY_STATE_SECOND] = 0;
+                    AC->PlayingStates[CurrPlayIndex] = 0;
+                    AC->PlayingIndex = NextPlayIndex;
                     AC->PlayingStatesCount = 1;
+                    
+                    NextPlayIndex = CurrPlayIndex;
+                    CurrPlayIndex = AC->PlayingIndex;
                     
                     AC->TimeToTransit = 0.0f;
                     AC->TransitionTimeLeft = 0.0f;
                 }
             }
             else if(AC->PlayingStatesCount == 1){
-                AC->PlayingStates[PLAY_STATE_FIRST]->Contribution = 1.0f;
+                AC->PlayingStates[CurrPlayIndex]->Contribution = 1.0f;
             }
+            
+            b32 FirstAnimEnded = AC->PlayingStates[CurrPlayIndex]->PlayingAnimation.Phase01 > 0.999999f;
             
             /*
             PlayingStatesCount can change before this line so 
@@ -390,96 +507,19 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
             */
             b32 Transitioning = (AC->PlayingStatesCount == 2);
             if(!Transitioning){
-                Assert(AC->PlayingStatesCount == 1);
-                
-                anim_state* State = AC->PlayingStates[PLAY_STATE_FIRST];
-                
-                // NOTE(Dima): Iterating through all transitions
-                anim_transition* TransitionAt = State->FirstTransition;
-                while(TransitionAt != 0){
-                    
-                    // NOTE(Dima): From state of transition should be equal to current state
-                    Assert(TransitionAt->FromState == State);
-                    
-                    b32 AllConditionsTrue = true;
-                    for(int ConditionIndex = 0;
-                        ConditionIndex < TransitionAt->ConditionsCount;
-                        ConditionIndex++)
-                    {
-                        anim_transition_condition* Cond = &TransitionAt->Conditions[ConditionIndex];
-                        
-                        anim_variable* Variable = FindVariable(AC, Cond->Name);
-                        Assert(Cond->VariableValueType == Variable->ValueType);
-                        
-                        b32 ConditionTrue = 0;
-                        if(Cond->VariableValueType == AnimVariable_Bool){
-                            b32 VariableBool = Variable->Value.Bool;
-                            b32 CondBool = Cond->Value.Bool;
-                            
-                            if(Cond->ConditionType == TransitionCondition_Equal){
-                                ConditionTrue = (VariableBool == CondBool);
-                            }
-                        }
-                        else if(Cond->VariableValueType  == AnimVariable_Float){
-                            float VariableFloat = Variable->Value.Float;
-                            float CondFloat = Cond->Value.Float;
-                            
-                            switch(Cond->ConditionType){
-                                case TransitionCondition_MoreEqThan:{
-                                    ConditionTrue = VariableFloat >= CondFloat;
-                                }break;
-                                
-                                case TransitionCondition_MoreThan:{
-                                    ConditionTrue = VariableFloat > CondFloat;
-                                }break;
-                                
-                                case TransitionCondition_LessEqThan:{
-                                    ConditionTrue = VariableFloat <= CondFloat;
-                                }break;
-                                
-                                case TransitionCondition_LessThan:{
-                                    ConditionTrue = VariableFloat < CondFloat;
-                                }break;
-                                
-                                case TransitionCondition_Equal:{
-                                    ConditionTrue = Abs(VariableFloat - CondFloat) < 0.00000001f;
-                                }break;
-                            }
-                        }
-                        
-                        if(!ConditionTrue){
-                            AllConditionsTrue = false;
-                            break;
-                        }
-                    }
-                    
-                    if(AllConditionsTrue){
-                        // NOTE(Dima): Initiating transition
-                        AC->PlayingStates[PLAY_STATE_SECOND] = TransitionAt->ToState;
-                        AC->PlayingStatesCount = 2;
-                        
-                        PlayStateAnimations(AC->PlayingStates[PLAY_STATE_SECOND], 
-                                            GlobalTime,
-                                            0.0f);
-                        
-                        AC->TimeToTransit = TransitionAt->TimeToTransit;
-                        AC->TransitionTimeLeft = TransitionAt->TimeToTransit;
-                        
-                        break;
-                    }
-                    
-                    // NOTE(Dima): Advancing iterator
-                    TransitionAt = TransitionAt->NextInList;
-                } // end loop through all transitions
-            } // end if transitioninig
-            
+                ProcessTransitioning(AC,
+                                     Transitioning ? NextPlayIndex : CurrPlayIndex,
+                                     FirstAnimEnded,
+                                     GlobalTime);
+            }
             
             // NOTE(Dima): Update animations and blend trees of all playing graph nodes
             for(int PlayingStateIndex = 0;
                 PlayingStateIndex < AC->PlayingStatesCount;
                 PlayingStateIndex++)
             {
-                anim_state* AnimNode = AC->PlayingStates[PlayingStateIndex];
+                int ToGetIndex = PlayingStateIndex ? GetNextPlayingIndex(AC) : AC->PlayingIndex;
+                anim_state* AnimNode = AC->PlayingStates[ToGetIndex];
                 
                 playing_anim* Playing = &AnimNode->PlayingAnimation;
                 
@@ -526,7 +566,8 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                     PlayingStateIndex < AC->PlayingStatesCount;
                     PlayingStateIndex++)
                 {
-                    anim_state* AnimState = AC->PlayingStates[PlayingStateIndex];
+                    int ToGetIndex = PlayingStateIndex ? GetNextPlayingIndex(AC) : AC->PlayingIndex;
+                    anim_state* AnimState = AC->PlayingStates[ToGetIndex];
                     
                     float Contribution = AnimState->Contribution;
                     
@@ -742,10 +783,11 @@ void InitAnimComponent(animated_component* AC,
     
     // NOTE(Dima): Init animations to play
     AC->PlayingStatesCount = (Control->FirstState != 0);
-    AC->PlayingStates[PLAY_STATE_FIRST] = Control->FirstState;
-    AC->PlayingStates[PLAY_STATE_SECOND] = 0;
+    AC->PlayingIndex = 0;
+    AC->PlayingStates[AC->PlayingIndex] = Control->FirstState;
+    AC->PlayingStates[GetNextPlayingIndex(AC)] = 0;
     
-    PlayStateAnimations(AC->PlayingStates[PLAY_STATE_FIRST], 0.0f, 0.0f);
+    PlayStateAnimations(AC->PlayingStates[AC->PlayingIndex], 0.0f, 0.0f);
 }
 
 /*
@@ -1071,7 +1113,7 @@ INTERNAL_FUNCTION anim_transition* DeallocateTransition(anim_system* Anim,
 INTERNAL_FUNCTION anim_transition* AddTransitionToStates(anim_controller* Control, 
                                                          anim_state* FromState,
                                                          anim_state* ToState,
-                                                         b32 AnimationShouldExit,
+                                                         b32 AnimationShouldFinish,
                                                          float TimeToTransit)
 {
     anim_transition* Result = AllocateTransition(Control->AnimState);
@@ -1083,7 +1125,7 @@ INTERNAL_FUNCTION anim_transition* AddTransitionToStates(anim_controller* Contro
     Result->FromState = FromState;
     Result->ToState = ToState;
     
-    Result->AnimationShouldExit = AnimationShouldExit;
+    Result->AnimationShouldFinish = AnimationShouldFinish;
     Result->TimeToTransit = TimeToTransit;
     
     // NOTE(Dima): Inserting to the end of From's transitions list
@@ -1105,7 +1147,7 @@ INTERNAL_FUNCTION void
 AddTransition(anim_controller* Control, 
               char* FromAnim, 
               char* ToAnim,
-              b32 AnimationShouldExit,
+              b32 AnimationShouldFinish,
               f32 TimeToTransit)
 {
     
@@ -1129,7 +1171,7 @@ AddTransition(anim_controller* Control,
                 anim_transition* Transition = AddTransitionToStates(Control, 
                                                                     StateAt, 
                                                                     ToState,
-                                                                    AnimationShouldExit,
+                                                                    AnimationShouldFinish,
                                                                     TimeToTransit);
                 
                 Control->BeginnedTransitions[TransitionsCount++] = Transition;
@@ -1145,7 +1187,7 @@ AddTransition(anim_controller* Control,
         anim_transition* Transition = AddTransitionToStates(Control, 
                                                             FromState, 
                                                             ToState,
-                                                            AnimationShouldExit,
+                                                            AnimationShouldFinish,
                                                             TimeToTransit);
         
         Control->BeginnedTransitions[TransitionsCount++] = Transition;
@@ -1159,12 +1201,12 @@ AddTransition(anim_controller* Control,
 void BeginTransition(anim_controller* Control,
                      char* FromAnim, 
                      char* ToAnim, 
-                     b32 AnimationShouldExit,
-                     f32 TimeToTransit)
+                     f32 TimeToTransit,
+                     b32 AnimationShouldFinish)
 {
     Assert(Control->BeginnedTransitionsCount == 0);
     AddTransition(Control, FromAnim, ToAnim,
-                  AnimationShouldExit,
+                  AnimationShouldFinish,
                   TimeToTransit);
 }
 

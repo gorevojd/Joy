@@ -114,7 +114,7 @@ struct anim_transition{
     anim_state* ToState;
     
     f32 TimeToTransit;
-    b32 AnimationShouldExit;
+    b32 AnimationShouldFinish;
     
     struct anim_controller* AnimControl;
     
@@ -167,10 +167,12 @@ struct animated_component{
     // NOTE(Dima): Skeleton hash
     u32 NodesCheckSum;
     
-#define PLAY_STATE_FIRST 0
-#define PLAY_STATE_SECOND 1
+    //#define PLAY_STATE_FIRST 0
+    //#define PLAY_STATE_SECOND 1
     anim_state* PlayingStates[2];
+    int PlayingIndex;
     int PlayingStatesCount;
+    
     f32 TimeToTransit;
     f32 TransitionTimeLeft;
     
@@ -181,6 +183,12 @@ struct animated_component{
     //playing_anim* PlayingAnimations[2];
     //int PlayingAnimationsCount;
 };
+
+inline int GetNextPlayingIndex(animated_component* AC){
+    int Result = (AC->PlayingIndex + 1) & 1;
+    
+    return(Result);
+}
 
 struct anim_system{
     mem_region* Region;
@@ -215,10 +223,12 @@ anim_calculated_pose UpdateModelAnimation(assets* Assets,
 anim_controller* CreateAnimControl(anim_system* Anim, char* Name, u32 NodesCheckSum);
 void FinalizeCreation(anim_controller* Control);
 
+b32 StateIsPlaying(animated_component* AC,
+                   char* StateName);
+
 void AddAnimState(anim_controller* Control,
                   u32 StateType,
                   char* Name);
-
 
 void AddVariable(animated_component* AC,
                  char* Name,
@@ -230,8 +240,8 @@ anim_state* FindState(anim_controller* Control, char* Name);
 void BeginTransition(anim_controller* Control,
                      char* FromAnim, 
                      char* ToAnim,
-                     b32 AnimationShouldExit = true,
-                     f32 TimeToTransit = 0.15f);
+                     f32 TimeToTransit = 0.15f,
+                     b32 AnimationShouldFinish = false);
 
 void EndTransition(anim_controller* Control);
 
