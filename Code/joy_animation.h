@@ -30,6 +30,8 @@ enum anim_state_type{
     AnimState_BlendTree,
 };
 
+#define ANIM_TRANSFORMS_ARRAY_SIZE 256
+
 struct anim_state{
     char Name[64];
     
@@ -42,7 +44,10 @@ struct anim_state{
     
     anim_state* NextInHash;
     
-    node_transform ResultedTransforms[256];
+    node_transform ResultedTransforms[ANIM_TRANSFORMS_ARRAY_SIZE];
+    v3 ResultedTs[ANIM_TRANSFORMS_ARRAY_SIZE];
+    v3 ResultedSs[ANIM_TRANSFORMS_ARRAY_SIZE];
+    quat ResultedRs[ANIM_TRANSFORMS_ARRAY_SIZE];
     f32 Contribution;
     
     // NOTE(Dima): Transitions list

@@ -568,35 +568,41 @@ inline __m128 MulVecMatSSE(__m128 V, const m44& M){
 }
 #endif
 
-inline m44 MulRefs(const m44& A, const m44& B){
-    m44 res = {};
+inline void MulRefsToRef(m44& R, const m44& A, const m44& B){
     
 #if JOY_ENABLE_SIMD_MATH
-    res.mmRows[0] = MulVecMatSSE(A.mmRows[0], B);
-    res.mmRows[1] = MulVecMatSSE(A.mmRows[1], B);
-    res.mmRows[2] = MulVecMatSSE(A.mmRows[2], B);
-    res.mmRows[3] = MulVecMatSSE(A.mmRows[3], B);
+    R.mmRows[0] = MulVecMatSSE(A.mmRows[0], B);
+    R.mmRows[1] = MulVecMatSSE(A.mmRows[1], B);
+    R.mmRows[2] = MulVecMatSSE(A.mmRows[2], B);
+    R.mmRows[3] = MulVecMatSSE(A.mmRows[3], B);
 #else
-    res.e[0] = A.e[0] * B.e[0] + A.e[1] * B.e[4] + A.e[2] * B.e[8] + A.e[3] * B.e[12];
-    res.e[1] = A.e[0] * B.e[1] + A.e[1] * B.e[5] + A.e[2] * B.e[9] + A.e[3] * B.e[13];
-    res.e[2] = A.e[0] * B.e[2] + A.e[1] * B.e[6] + A.e[2] * B.e[10] + A.e[3] * B.e[14];
-    res.e[3] = A.e[0] * B.e[3] + A.e[1] * B.e[7] + A.e[2] * B.e[11] + A.e[3] * B.e[15];
+    R.e[0] = A.e[0] * B.e[0] + A.e[1] * B.e[4] + A.e[2] * B.e[8] + A.e[3] * B.e[12];
+    R.e[1] = A.e[0] * B.e[1] + A.e[1] * B.e[5] + A.e[2] * B.e[9] + A.e[3] * B.e[13];
+    R.e[2] = A.e[0] * B.e[2] + A.e[1] * B.e[6] + A.e[2] * B.e[10] + A.e[3] * B.e[14];
+    R.e[3] = A.e[0] * B.e[3] + A.e[1] * B.e[7] + A.e[2] * B.e[11] + A.e[3] * B.e[15];
     
-    res.e[4] = A.e[4] * B.e[0] + A.e[5] * B.e[4] + A.e[6] * B.e[8] + A.e[7] * B.e[12];
-    res.e[5] = A.e[4] * B.e[1] + A.e[5] * B.e[5] + A.e[6] * B.e[9] + A.e[7] * B.e[13];
-    res.e[6] = A.e[4] * B.e[2] + A.e[5] * B.e[6] + A.e[6] * B.e[10] + A.e[7] * B.e[14];
-    res.e[7] = A.e[4] * B.e[3] + A.e[5] * B.e[7] + A.e[6] * B.e[11] + A.e[7] * B.e[15];
+    R.e[4] = A.e[4] * B.e[0] + A.e[5] * B.e[4] + A.e[6] * B.e[8] + A.e[7] * B.e[12];
+    R.e[5] = A.e[4] * B.e[1] + A.e[5] * B.e[5] + A.e[6] * B.e[9] + A.e[7] * B.e[13];
+    R.e[6] = A.e[4] * B.e[2] + A.e[5] * B.e[6] + A.e[6] * B.e[10] + A.e[7] * B.e[14];
+    R.e[7] = A.e[4] * B.e[3] + A.e[5] * B.e[7] + A.e[6] * B.e[11] + A.e[7] * B.e[15];
     
-    res.e[8] = A.e[8] * B.e[0] + A.e[9] * B.e[4] + A.e[10] * B.e[8] + A.e[11] * B.e[12];
-    res.e[9] = A.e[8] * B.e[1] + A.e[9] * B.e[5] + A.e[10] * B.e[9] + A.e[11] * B.e[13];
-    res.e[10] = A.e[8] * B.e[2] + A.e[9] * B.e[6] + A.e[10] * B.e[10] + A.e[11] * B.e[14];
-    res.e[11] = A.e[8] * B.e[3] + A.e[9] * B.e[7] + A.e[10] * B.e[11] + A.e[11] * B.e[15];
+    R.e[8] = A.e[8] * B.e[0] + A.e[9] * B.e[4] + A.e[10] * B.e[8] + A.e[11] * B.e[12];
+    R.e[9] = A.e[8] * B.e[1] + A.e[9] * B.e[5] + A.e[10] * B.e[9] + A.e[11] * B.e[13];
+    R.e[10] = A.e[8] * B.e[2] + A.e[9] * B.e[6] + A.e[10] * B.e[10] + A.e[11] * B.e[14];
+    R.e[11] = A.e[8] * B.e[3] + A.e[9] * B.e[7] + A.e[10] * B.e[11] + A.e[11] * B.e[15];
     
-    res.e[12] = A.e[12] * B.e[0] + A.e[13] * B.e[4] + A.e[14] * B.e[8] + A.e[15] * B.e[12];
-    res.e[13] = A.e[12] * B.e[1] + A.e[13] * B.e[5] + A.e[14] * B.e[9] + A.e[15] * B.e[13];
-    res.e[14] = A.e[12] * B.e[2] + A.e[13] * B.e[6] + A.e[14] * B.e[10] + A.e[15] * B.e[14];
-    res.e[15] = A.e[12] * B.e[3] + A.e[13] * B.e[7] + A.e[14] * B.e[11] + A.e[15] * B.e[15];
+    R.e[12] = A.e[12] * B.e[0] + A.e[13] * B.e[4] + A.e[14] * B.e[8] + A.e[15] * B.e[12];
+    R.e[13] = A.e[12] * B.e[1] + A.e[13] * B.e[5] + A.e[14] * B.e[9] + A.e[15] * B.e[13];
+    R.e[14] = A.e[12] * B.e[2] + A.e[13] * B.e[6] + A.e[14] * B.e[10] + A.e[15] * B.e[14];
+    R.e[15] = A.e[12] * B.e[3] + A.e[13] * B.e[7] + A.e[14] * B.e[11] + A.e[15] * B.e[15];
 #endif
+    
+}
+
+inline m44 MulRefs(const m44& A, const m44& B){
+    m44 res;
+    
+    MulRefsToRef(res, A, B);
     
     return(res);
 }
@@ -1604,8 +1610,8 @@ inline int BoxIntersectsWithBox(rc2 Box1, rc2 Box2) {
 
 // NOTE(Dima): Other math
 inline float CalcScreenFitHeight(
-float bmpW, float bmpH,
-float scrW, float scrH)
+                                 float bmpW, float bmpH,
+                                 float scrW, float scrH)
 {
     float Result = scrH;
     
@@ -1708,17 +1714,17 @@ inline v2 SignNotZero(v2 Value){
 
 inline v2 AbsVector(v2 Vector){
     v2 AbsVector = V2(
-        abs(Vector.x),
-        abs(Vector.y));
+                      abs(Vector.x),
+                      abs(Vector.y));
     
     return(AbsVector);
 }
 
 inline v3 AbsVector(v3 Vector){
     v3 AbsVector = V3(
-        abs(Vector.x),
-        abs(Vector.y),
-        abs(Vector.z));
+                      abs(Vector.x),
+                      abs(Vector.y),
+                      abs(Vector.z));
     
     return(AbsVector);
 }

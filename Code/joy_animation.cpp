@@ -24,6 +24,39 @@ INTERNAL_FUNCTION inline int FindPrevFrameIndexForKey(float* Times,
     return(Result);
 }
 
+INTERNAL_FUNCTION inline int FindPrevFrameIndexForKeyBinary(float* Times, 
+                                                            int KeysCount, 
+                                                            f32 CurTickTime)
+{
+    int Result = -1;
+    
+    if((Times[KeysCount - 1] <= CurTickTime) || 
+       (KeysCount == 1))
+    {
+        Result = KeysCount - 1;
+    }
+    else{
+        int Start = 0;
+        int OnePastLast = KeysCount;
+        
+        while((OnePastLast - Start) > 1){
+            int MidIndex = (Start + OnePastLast) >> 1;
+            
+            if(Times[MidIndex] < CurTickTime){
+                Start = MidIndex;
+            }
+            else{
+                OnePastLast = MidIndex;
+            }
+        }
+        
+        Result = Start;
+    }
+    
+    return(Result);
+}
+
+
 struct find_anim_deltas_ctx{
     int PrevKeyIndex;
     int NextKeyIndex;
@@ -39,20 +72,18 @@ FindAnimDeltas(animation_clip* Animation,
     find_anim_deltas_ctx Result = {};
     
     // NOTE(Dima): Finding frame index before CurTickTime
-    int FoundPrevIndex = FindPrevFrameIndexForKey(Times,
-                                                  KeysCount,
-                                                  CurTickTime);
+    int FoundPrevIndex = FindPrevFrameIndexForKeyBinary(Times,
+                                                        KeysCount,
+                                                        CurTickTime);
     
     int LastFrameIndex = KeysCount - 1;
     
     // NOTE(Dima): If not last key frame
     float PrevKeyTime = Times[FoundPrevIndex];
     
-    f32 TickDistance = 0.0f;
-    
     // NOTE(Dima): If found frame is not last
     int NextKeyIndex = FoundPrevIndex + 1;
-    TickDistance = Times[NextKeyIndex] - PrevKeyTime;
+    f32 TickDistance = Times[NextKeyIndex] - PrevKeyTime;
     
     // NOTE(Dima): Else
     if(FoundPrevIndex == LastFrameIndex)
@@ -98,7 +129,12 @@ INTERNAL_FUNCTION v3 GetAnimatedVector(animation_clip* Animation,
         v3 PrevValue = Values[AnimDeltasCtx.PrevKeyIndex];
         v3 NextValue = Values[AnimDeltasCtx.NextKeyIndex];
         
-        Result = Lerp(PrevValue, NextValue, AnimDeltasCtx.t);
+        // NOTE(Dima): Lerping vectors
+        float t = AnimDeltasCtx.t;
+        float OneMinusT = 1.0f - t;
+        Result = V3(PrevValue.x * OneMinusT + NextValue.x * AnimDeltasCtx.t,
+                    PrevValue.y * OneMinusT + NextValue.y * AnimDeltasCtx.t,
+                    PrevValue.z * OneMinusT + NextValue.z * AnimDeltasCtx.t);
     }
     
     return(Result);
@@ -123,6 +159,7 @@ INTERNAL_FUNCTION quat GetAnimatedQuat(animation_clip* Animation,
         quat PrevValue = Values[AnimDeltasCtx.PrevKeyIndex];
         quat NextValue = Values[AnimDeltasCtx.NextKeyIndex];
         
+        // NOTE(Dima): Lerping quaternion
         Result = Lerp(PrevValue, NextValue, AnimDeltasCtx.t);
     }
     
@@ -155,15 +192,20 @@ DecomposeTransformsForNode(const m44& Matrix,
 }
 
 INTERNAL_FUNCTION void ClearNodeTransforms(node_transform* Transforms, int Count){
+    FUNCTION_TIMING();
+    
+    v3 NullVector = V3(0.0f, 0.0f, 0.0f);
+    quat NullQuat = Quat(0.0f, 0.0f, 0.0f, 0.0f);
+    
     for(int NodeIndex = 0; 
         NodeIndex < Count; 
         NodeIndex++)
     {
         node_transform* Tran = &Transforms[NodeIndex];
         
-        Tran->T = V3(0.0f, 0.0f, 0.0f);
-        Tran->S = V3(0.0f, 0.0f, 0.0f);
-        Tran->R = Quat(0.0f, 0.0f, 0.0f, 0.0f);
+        Tran->T = NullVector;
+        Tran->S = NullVector;
+        Tran->R = NullQuat;
     }
 }
 
@@ -240,6 +282,7 @@ INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
             Playing->TransformsCalculated[NodeAnim->NodeIndex] = true;
         }
         
+        
         // NOTE(Dima): Extract transforms that were not calculated
         for(int NodeIndex = 0;
             NodeIndex < Model->NodeCount;
@@ -280,10 +323,11 @@ INTERNAL_FUNCTION void CalculateToParentTransforms(model_info* Model, node_trans
         node_transform* NodeTran = &Transforms[NodeIndex];
         
         // NOTE(Dima): Calculating to parent transform
-        TargetNode->CalculatedToParent = 
-            ScalingMatrix(NodeTran->S) * 
-            RotationMatrix(NodeTran->R) * 
-            TranslationMatrix(NodeTran->T);
+        
+        MulRefsToRef(TargetNode->CalculatedToParent,
+                     MulRefs(ScalingMatrix(NodeTran->S),
+                             RotationMatrix(NodeTran->R)), 
+                     TranslationMatrix(NodeTran->T));
     }
 }
 
@@ -514,42 +558,46 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
             }
             
             // NOTE(Dima): Update animations and blend trees of all playing graph nodes
-            for(int PlayingStateIndex = 0;
-                PlayingStateIndex < AC->PlayingStatesCount;
-                PlayingStateIndex++)
             {
-                int ToGetIndex = PlayingStateIndex ? GetNextPlayingIndex(AC) : AC->PlayingIndex;
-                anim_state* AnimNode = AC->PlayingStates[ToGetIndex];
+                BLOCK_TIMING("UpdateAC:PreContribute");
                 
-                playing_anim* Playing = &AnimNode->PlayingAnimation;
-                
-                animation_clip* Animation = LoadAnimationClip(Assets, 
-                                                              Playing->AnimationID,
-                                                              ASSET_IMPORT_IMMEDIATE);
-                
-                Assert(Animation->NodesCheckSum == AC->NodesCheckSum);
-                
-                // NOTE(Dima): Clearing transforms in anim state to safely contribute
-                // NOTE(Dima): all in-state animations
-                ClearNodeTransforms(AnimNode->ResultedTransforms, Model->NodeCount);
-                
-                // NOTE(Dima): Updating animation and node transforms
-                UpdatePlayingAnimation(Assets, Model, 
-                                       Playing, Animation, 
-                                       GlobalTime, PlaybackRate);
-                
-                // NOTE(Dima): Updated resulted graph node transforms
-                for(int NodeIndex = 0; 
-                    NodeIndex < Model->NodeCount;
-                    NodeIndex++)
+                for(int PlayingStateIndex = 0;
+                    PlayingStateIndex < AC->PlayingStatesCount;
+                    PlayingStateIndex++)
                 {
-                    node_transform* Dst = &AnimNode->ResultedTransforms[NodeIndex];
-                    node_transform* Src = &Playing->NodeTransforms[NodeIndex];
+                    int ToGetIndex = PlayingStateIndex ? GetNextPlayingIndex(AC) : AC->PlayingIndex;
+                    anim_state* AnimNode = AC->PlayingStates[ToGetIndex];
                     
+                    playing_anim* Playing = &AnimNode->PlayingAnimation;
                     
-                    Dst->T += Src->T;
-                    Dst->R += Src->R;
-                    Dst->S += Src->S;
+                    animation_clip* Animation = LoadAnimationClip(Assets, 
+                                                                  Playing->AnimationID,
+                                                                  ASSET_IMPORT_IMMEDIATE);
+                    
+                    Assert(Animation->NodesCheckSum == AC->NodesCheckSum);
+                    
+                    // NOTE(Dima): Clearing transforms in anim state to safely contribute
+                    // NOTE(Dima): all in-state animations
+                    ClearNodeTransforms(AnimNode->ResultedTransforms, Model->NodeCount);
+                    
+                    // NOTE(Dima): Updating animation and node transforms
+                    UpdatePlayingAnimation(Assets, Model, 
+                                           Playing, Animation, 
+                                           GlobalTime, PlaybackRate);
+                    
+                    // NOTE(Dima): Updated resulted graph node transforms
+                    for(int NodeIndex = 0; 
+                        NodeIndex < Model->NodeCount;
+                        NodeIndex++)
+                    {
+                        node_transform* Dst = &AnimNode->ResultedTransforms[NodeIndex];
+                        node_transform* Src = &Playing->NodeTransforms[NodeIndex];
+                        
+                        
+                        Dst->T += Src->T;
+                        Dst->R += Src->R;
+                        Dst->S += Src->S;
+                    }
                 }
             }
             
@@ -606,11 +654,11 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                     // NOTE(Dima): Finaling normalization of rotation
                     NodeTran->R = Normalize(NodeTran->R);
                 }
-                
-                
-                // NOTE(Dima): Calculating to parent transforms
-                CalculateToParentTransforms(Model, AC->ResultedTransforms);
             }
+            
+            // NOTE(Dima): Calculating to parent transforms
+            CalculateToParentTransforms(Model, AC->ResultedTransforms);
+            
         } // NOTE(Dima): end if transitions count greater than zero
     }
 }

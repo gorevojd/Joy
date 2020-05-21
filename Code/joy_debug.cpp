@@ -1173,7 +1173,7 @@ INTERNAL_FUNCTION void DEBUGUpdate(debug_state* State){
     DEBUGUpdatePrimitives(State, State->Input->DeltaTime);
     DEBUGUpdateMenus(State);
     
-    DEBUGDummyThreadsWork();
+    //DEBUGDummyThreadsWork();
     
     DEBUGProcessRecords(State);
 }
