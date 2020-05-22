@@ -61,7 +61,8 @@ struct test_game_mode_state{
     
     anim_controller* FriendControl;
     
-    entity_character Characters[100];
+#define TEMP_CHARACTERS_COUNT 100
+    entity_character Characters[TEMP_CHARACTERS_COUNT];
     
     b32 Initialized;
 };
@@ -512,14 +513,14 @@ GAME_MODE_UPDATE(TestUpdate){
         
         
         for(int CharIndex = 0;
-            CharIndex < 100;
+            CharIndex < TEMP_CHARACTERS_COUNT;
             CharIndex++)
         {
             entity_character* Char = &State->Characters[CharIndex];
             
             
-            v3 P = V3((CharIndex % 10) * 2, 10.0f, 
-                      (CharIndex / 10) * 2);
+            v3 P = V3((CharIndex % (int)Sqrt(TEMP_CHARACTERS_COUNT)) * 2, 10.0f, 
+                      (CharIndex / (int)Sqrt(TEMP_CHARACTERS_COUNT)) * 2);
             
             int CharType = (CharIndex * 1234567 - (CharIndex & 3)) % 5;
             
@@ -726,8 +727,9 @@ GAME_MODE_UPDATE(TestUpdate){
     }
 #endif
     
+#if 1
     for(int CharIndex = 0;
-        CharIndex < 100;
+        CharIndex < TEMP_CHARACTERS_COUNT;
         CharIndex++)
     {
         UpdateCharacter(Game->Assets,
@@ -737,8 +739,9 @@ GAME_MODE_UPDATE(TestUpdate){
                         Game->Input->Time,
                         Game->Input->DeltaTime);
     }
+#endif
     
-#if 0    
+#if 0
     ShowSphereDistributions(Game, Stack,
                             &State->SphereDistributionTrig,
                             SphereID,

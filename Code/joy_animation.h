@@ -7,6 +7,7 @@
 #include "joy_strings.h"
 
 #define ANIM_ANY_STATE "#Any"
+#define ANIM_TRANSFORMS_ARRAY_SIZE 256
 
 struct node_transform{
     v3 T;
@@ -14,13 +15,18 @@ struct node_transform{
     v3 S;
 };
 
+struct node_transforms_block{
+    quat Rs[ANIM_TRANSFORMS_ARRAY_SIZE];
+    v3 Ts[ANIM_TRANSFORMS_ARRAY_SIZE];
+    v3 Ss[ANIM_TRANSFORMS_ARRAY_SIZE];
+};
+
 struct playing_anim{
     f64 GlobalStart;
     f32 Phase01;
     
-    // NOTE(Dima): Nodes array is potentially higher size than bones in skeleton
-    node_transform NodeTransforms[256];
-    b32 TransformsCalculated[256];
+    node_transforms_block NodeTransforms;
+    b32 TransformsCalculated[ANIM_TRANSFORMS_ARRAY_SIZE];
     
     u32 AnimationID;
 };
@@ -30,7 +36,6 @@ enum anim_state_type{
     AnimState_BlendTree,
 };
 
-#define ANIM_TRANSFORMS_ARRAY_SIZE 256
 
 struct anim_state{
     char Name[64];
@@ -44,10 +49,7 @@ struct anim_state{
     
     anim_state* NextInHash;
     
-    node_transform ResultedTransforms[ANIM_TRANSFORMS_ARRAY_SIZE];
-    v3 ResultedTs[ANIM_TRANSFORMS_ARRAY_SIZE];
-    v3 ResultedSs[ANIM_TRANSFORMS_ARRAY_SIZE];
-    quat ResultedRs[ANIM_TRANSFORMS_ARRAY_SIZE];
+    node_transforms_block ResultedTransforms;
     f32 Contribution;
     
     // NOTE(Dima): Transitions list
@@ -182,7 +184,7 @@ struct animated_component{
     f32 TransitionTimeLeft;
     
     // NOTE(Dima): Result transforms array that will be passed to shader
-    node_transform ResultedTransforms[256];
+    node_transforms_block ResultedTransforms;
     m44 BoneTransformMatrices[128];
     
     //playing_anim* PlayingAnimations[2];

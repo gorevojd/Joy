@@ -50,6 +50,7 @@ struct asset{
     
     // NOTE(Dima): Data
     union{
+        void* Stub;
         ASSET_PTR_MEMBER(font_info);
         ASSET_PTR_MEMBER(bmp_info);
         ASSET_PTR_MEMBER(array_info);
@@ -199,7 +200,7 @@ inline void* LoadAssetTypeInternal(assets* Assets,
     
     void* Result = 0;
     if(PotentiallyLoadedAsset(Asset, Immediate)){
-        Result = (void*)(*((size_t*)(&Asset->Data)));
+        Result = Asset->Data.Stub;
     }
     
     return(Result);
@@ -212,7 +213,7 @@ inline void* LoadAssetTypeRawInternal(assets* Assets,
     asset* Asset = GetAssetByID(Assets, ID);
     ASSERT(Asset->Type == CompareAssetType);
     
-    void* Result = (void*)(*((size_t*)&Asset->Data));
+    void* Result = Asset->Data.Stub;
     
     return(Result);
 }

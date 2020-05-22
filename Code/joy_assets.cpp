@@ -1034,6 +1034,7 @@ INTERNAL_FUNCTION void InitAssets(assets* Assets){
                     // NOTE(Dima): Allocating asset
                     asset* NewAsset = AllocateAsset(Assets, FileSource, FileAssetIndex);
                     
+                    NewAsset->Data = {};
                     NewAsset->State = AssetState_Unloaded;
                     NewAsset->Header = AssetHeader;
                     NewAsset->FileSource = FileSource;
