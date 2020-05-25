@@ -57,12 +57,6 @@ INTERNAL_FUNCTION inline int FindPrevFrameIndexForKeyBinary(float* Times,
 }
 
 
-struct find_anim_deltas_ctx{
-    int PrevKeyIndex;
-    int NextKeyIndex;
-    float t;
-};
-
 INTERNAL_FUNCTION inline find_anim_deltas_ctx
 FindAnimDeltas(animation_clip* Animation,
                float* Times,
@@ -110,12 +104,12 @@ FindAnimDeltas(animation_clip* Animation,
     return(Result);
 }
 
-INTERNAL_FUNCTION v3 GetAnimatedVector(animation_clip* Animation,
-                                       v3* Values,
-                                       float* Times,
-                                       int KeysCount,
-                                       f32 CurTickTime,
-                                       v3 DefaultValue)
+INTERNAL_FUNCTION inline v3 GetAnimatedVector(animation_clip* Animation,
+                                              v3* Values,
+                                              float* Times,
+                                              int KeysCount,
+                                              f32 CurTickTime,
+                                              v3 DefaultValue)
 {
     v3 Result = DefaultValue;
     
@@ -140,12 +134,12 @@ INTERNAL_FUNCTION v3 GetAnimatedVector(animation_clip* Animation,
     return(Result);
 }
 
-INTERNAL_FUNCTION quat GetAnimatedQuat(animation_clip* Animation,
-                                       quat* Values,
-                                       float* Times,
-                                       int KeysCount,
-                                       f32 CurTickTime,
-                                       quat DefaultValue)
+INTERNAL_FUNCTION inline quat GetAnimatedQuat(animation_clip* Animation,
+                                              quat* Values,
+                                              float* Times,
+                                              int KeysCount,
+                                              f32 CurTickTime,
+                                              quat DefaultValue)
 {
     quat Result = DefaultValue;
     
@@ -306,7 +300,6 @@ INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
                                                  CurrentTick,
                                                  V3(1.0f, 1.0f, 1.0f));
                 
-                
                 int NodeIndex = NodeAnim->NodeIndex;
                 Playing->NodeTransforms.Ts[NodeIndex] = AnimatedP;
                 Playing->NodeTransforms.Rs[NodeIndex] = AnimatedR;
@@ -431,12 +424,12 @@ INTERNAL_FUNCTION void CalculateToModelTransforms(model_info* Model){
     }
 }
 
-void PlayStateAnimations(anim_state* State, 
+void PlayStateAnimations(playing_state_slot* Slot, 
                          f64 GlobalStart, 
                          f32 Phase)
 {
-    State->PlayingAnimation.GlobalStart = GlobalStart;
-    State->PlayingAnimation.Phase01 = Phase;
+    Slot->PlayingAnimation.GlobalStart = GlobalStart;
+    Slot->PlayingAnimation.Phase01 = Phase;
 }
 
 b32 StateIsPlaying(animated_component* AC,
@@ -444,26 +437,27 @@ b32 StateIsPlaying(animated_component* AC,
 {
     b32 Result = false;
     
-    if(AC->PlayingStatesCount > 1 && AC->PlayingStates[GetNextPlayingIndex(AC)]){
-        Result |= (StringsAreEqual(AC->PlayingStates[GetNextPlayingIndex(AC)]->Name, StateName));
-    }
-    
-    if(AC->PlayingStatesCount > 0 && AC->PlayingStates[AC->PlayingIndex]){
-        Result |= (StringsAreEqual(AC->PlayingStates[AC->PlayingIndex]->Name, StateName));
+    for(int PlayingSlotIndex = 0;
+        PlayingSlotIndex < ANIM_MAX_PLAYING_STATES;
+        PlayingSlotIndex++)
+    {
+        anim_state* State = AC->PlayingStates[PlayingSlotIndex].State;
+        if(State && StringsAreEqual(State->Name, StateName)){
+            Result = true;
+            break;
+        }
     }
     
     return(Result);
 }
 
-INTERNAL_FUNCTION void ProcessTransitioning(animated_component* AC, 
-                                            int PlayingIndex,
-                                            b32 FirstAnimEnded,
-                                            f64 GlobalTime)
+INTERNAL_FUNCTION void ProcessInitTransitioning(animated_component* AC,
+                                                b32 FirstAnimEnded,
+                                                f64 GlobalTime)
 {
-    Assert(PlayingIndex < 2);
-    Assert(PlayingIndex >= 0);
+    b32 Transitioning = (AC->PlayingStatesCount == 2);
     
-    anim_state* State = AC->PlayingStates[PlayingIndex];
+    anim_state* State = AC->PlayingStates[AC->PlayingIndex].State;
     
     // NOTE(Dima): Iterating through all transitions
     anim_transition* TransitionAt = State->FirstTransition;
@@ -529,16 +523,18 @@ INTERNAL_FUNCTION void ProcessTransitioning(animated_component* AC,
            (TransitionAt->ConditionsCount && AllConditionsTrue))
         {
             // NOTE(Dima): Initiating transition
-            int NextPlayIndex = GetNextPlayingIndex(AC);
-            AC->PlayingStates[NextPlayIndex] = TransitionAt->ToState;
-            AC->PlayingStatesCount = 2;
+            int NextPlayIndex = GetNextPlayingIndex(AC->PlayingIndex);
+            AC->PlayingStates[NextPlayIndex].State = TransitionAt->ToState;
+            AC->PlayingIndex = NextPlayIndex;
+            AC->PlayingStatesCount++;
             
-            PlayStateAnimations(AC->PlayingStates[NextPlayIndex], 
+            
+            PlayStateAnimations(&AC->PlayingStates[NextPlayIndex], 
                                 GlobalTime,
                                 0.0f);
             
-            AC->TimeToTransit = TransitionAt->TimeToTransit;
-            AC->TransitionTimeLeft = TransitionAt->TimeToTransit;
+            AC->PlayingStates[NextPlayIndex].TimeToTransit = TransitionAt->TimeToTransit;
+            AC->PlayingStates[NextPlayIndex].TransitionTimeLeft = TransitionAt->TimeToTransit;
             
             break;
         }
@@ -560,182 +556,205 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
     if(AC){
         anim_controller* Control = AC->Control;
         
-        // NOTE(Dima): Setting states animations based on StateName->AnimID mapping
-        anim_animid* AnimIDAt = AC->FirstAnimID;
-        while(AnimIDAt != 0){
-            anim_state* State = FindState(AC->Control, AnimIDAt->Name);
-            
-            if(State){
-                State->PlayingAnimation.AnimationID = AnimIDAt->AnimID;
-            }
-            
-            AnimIDAt = AnimIDAt->NextInList;
-        }
+        b32 FirstAnimEnded = AC->PlayingStates[AC->PlayingIndex].PlayingAnimation.Phase01 > 0.999999f;
+        
+        ProcessInitTransitioning(AC,
+                                 FirstAnimEnded,
+                                 GlobalTime);
         
         // NOTE(Dima): Updating playing states, conditions, transitions
         if(AC->PlayingStatesCount > 0){
-            int CurrPlayIndex = AC->PlayingIndex;
-            int NextPlayIndex = GetNextPlayingIndex(AC);
-            
             // NOTE(Dima): Updating transition
-            if(AC->PlayingStatesCount == 2){
-                
-                // NOTE(Dima): If transitioning
-                AC->TransitionTimeLeft -= DeltaTime * PlaybackRate;
-                
-                b32 ShouldEndTransition = false;
-                
-                if(AC->TimeToTransit > 0.0f){
-                    if(AC->TransitionTimeLeft < 0.0000001f){
-                        AC->TransitionTimeLeft = 0.0f;
-                        ShouldEndTransition = true;
+            if(AC->PlayingStatesCount > 1){
+                float TransitionPercentageLeft = 1.0f;
+                b32 ShouldBreakTransitions = false;
+                int TransitionsCount = AC->PlayingStatesCount - 1;
+                for(int TransitionIndex = 0;
+                    TransitionIndex < TransitionsCount;
+                    TransitionIndex++)
+                {
+                    int CurrPlayIndex = GetModulatedPlayintIndex(AC->PlayingIndex - TransitionIndex);
+                    int PrevPlayIndex = GetModulatedPlayintIndex(AC->PlayingIndex - TransitionIndex - 1);
+                    
+                    playing_state_slot* CurrSlot = &AC->PlayingStates[CurrPlayIndex];
+                    playing_state_slot* PrevSlot = &AC->PlayingStates[PrevPlayIndex];
+                    
+                    if(!ShouldBreakTransitions){
+                        // NOTE(Dima): If transitioning
+                        b32 ShouldEndTransition = false;
+                        
+                        CurrSlot->TransitionTimeLeft -= DeltaTime * PlaybackRate;
+                        if(CurrSlot->TimeToTransit > 0.0f){
+                            if(CurrSlot->TransitionTimeLeft < 0.0000001f){
+                                CurrSlot->TransitionTimeLeft = 0.0f;
+                                ShouldEndTransition = true;
+                            }
+                            
+                            f32 Weight0 = Clamp01(CurrSlot->TransitionTimeLeft / CurrSlot->TimeToTransit);
+                            f32 Weight1 = 1.0f - Weight0;
+                            
+                            AC->PlayingStates[CurrPlayIndex].Contribution = Weight1 * TransitionPercentageLeft;
+                            
+                            if(TransitionIndex == (TransitionsCount - 1)){
+                                AC->PlayingStates[PrevPlayIndex].Contribution = Weight0 * TransitionPercentageLeft;
+                            }
+                            else{
+                                TransitionPercentageLeft = Weight0 * TransitionPercentageLeft;
+                            }
+                        }
+                        else{
+                            // NOTE(Dima): 0 here because this animation ended
+                            AC->PlayingStates[PrevPlayIndex].Contribution = 0.0f;
+                            
+                            // NOTE(Dima): 1 here because this animation is fully turned on
+                            AC->PlayingStates[CurrPlayIndex].Contribution = 1.0f * TransitionPercentageLeft;
+                            
+                            ShouldEndTransition = true;
+                        }
+                        
+                        if(ShouldEndTransition){
+                            AC->PlayingStatesCount = TransitionIndex + 1;
+                            
+                            CurrSlot->TimeToTransit = 0.0f;
+                            CurrSlot->TransitionTimeLeft = 0.0f;
+                            
+                            PrevSlot->State = 0;
+                            
+                            ShouldBreakTransitions = true;
+                        }
                     }
-                    
-                    f32 Weight0 = Clamp01(AC->TransitionTimeLeft / AC->TimeToTransit);
-                    f32 Weight1 = 1.0f - Weight0;
-                    
-                    AC->PlayingStates[CurrPlayIndex]->Contribution = Weight0;
-                    AC->PlayingStates[NextPlayIndex]->Contribution = Weight1;
-                }
-                else{
-                    // NOTE(Dima): 0 here because this animation ended
-                    AC->PlayingStates[CurrPlayIndex]->Contribution = 0.0f;
-                    
-                    // NOTE(Dima): 1 here because this animation is fully turned on
-                    AC->PlayingStates[NextPlayIndex]->Contribution = 1.0f;
-                    
-                    ShouldEndTransition = true;
-                }
-                
-                if(ShouldEndTransition){
-                    AC->PlayingStates[CurrPlayIndex] = 0;
-                    AC->PlayingIndex = NextPlayIndex;
-                    AC->PlayingStatesCount = 1;
-                    
-                    NextPlayIndex = CurrPlayIndex;
-                    CurrPlayIndex = AC->PlayingIndex;
-                    
-                    AC->TimeToTransit = 0.0f;
-                    AC->TransitionTimeLeft = 0.0f;
+                    else{
+                        CurrSlot->State = 0;
+                        PrevSlot->State = 0;
+                    }
                 }
             }
             else if(AC->PlayingStatesCount == 1){
-                AC->PlayingStates[CurrPlayIndex]->Contribution = 1.0f;
+                AC->PlayingStates[AC->PlayingIndex].Contribution = 1.0f;
             }
             
-            b32 FirstAnimEnded = AC->PlayingStates[CurrPlayIndex]->PlayingAnimation.Phase01 > 0.999999f;
-            
-            /*
-            PlayingStatesCount can change before this line so 
-            we should recalculate if we are transitioning right now
-            */
-            b32 Transitioning = (AC->PlayingStatesCount == 2);
-            if(!Transitioning){
-                ProcessTransitioning(AC,
-                                     Transitioning ? NextPlayIndex : CurrPlayIndex,
-                                     FirstAnimEnded,
-                                     GlobalTime);
+            // NOTE(Dima): Setting states animations based on StateName->AnimID mapping
+            for(int PlayingSlotIndex = 0;
+                PlayingSlotIndex < ANIM_MAX_PLAYING_STATES;
+                PlayingSlotIndex++)
+            {
+                anim_state* State = AC->PlayingStates[PlayingSlotIndex].State;
+                if(State){
+                    anim_animid* AnimID = FindAnimID(AC, State->Name);
+                    
+                    if(AnimID){
+                        AC->PlayingStates[PlayingSlotIndex].PlayingAnimation.AnimationID = AnimID->AnimID;
+                    }
+                    else{
+                        // TODO(Dima): Do something
+                    }
+                }
             }
             
             // NOTE(Dima): Update animations and blend trees of all playing graph nodes
             {
                 BLOCK_TIMING("UpdateAC:PreContribute");
                 
-                for(int PlayingStateIndex = 0;
-                    PlayingStateIndex < AC->PlayingStatesCount;
-                    PlayingStateIndex++)
+                int PlayingStateIndex = AC->PlayingIndex;
+                for(int Index  = 0;
+                    Index < AC->PlayingStatesCount;
+                    Index++)
                 {
-                    int ToGetIndex = PlayingStateIndex ? GetNextPlayingIndex(AC) : AC->PlayingIndex;
-                    anim_state* AnimNode = AC->PlayingStates[ToGetIndex];
+                    playing_state_slot* Slot = &AC->PlayingStates[PlayingStateIndex];
                     
-                    playing_anim* Playing = &AnimNode->PlayingAnimation;
+                    anim_state* AnimState = Slot->State;
+                    playing_anim* Playing = &Slot->PlayingAnimation;
                     
-                    animation_clip* Animation = LoadAnimationClip(Assets, 
-                                                                  Playing->AnimationID,
-                                                                  ASSET_IMPORT_IMMEDIATE);
-                    
-                    Assert(Animation->NodesCheckSum == AC->NodesCheckSum);
-                    
-                    // NOTE(Dima): Clearing transforms in anim state to safely contribute
-                    // NOTE(Dima): all in-state animations
-                    ClearNodeTransforms(&AnimNode->ResultedTransforms, Model->NodeCount);
-                    
-                    // NOTE(Dima): Updating animation and node transforms
-                    UpdatePlayingAnimation(Assets, Model, 
-                                           Playing, Animation, 
-                                           GlobalTime, PlaybackRate);
-                    
-                    // NOTE(Dima): Updated resulted graph node transforms
-                    
-                    node_transforms_block* Dst = &AnimNode->ResultedTransforms;
-                    node_transforms_block* Src = &Playing->NodeTransforms;
-                    
+                    Assert(Playing->AnimationID != 0);
+                    if(Playing->AnimationID != 0){
+                        animation_clip* Animation = LoadAnimationClip(Assets, 
+                                                                      Playing->AnimationID,
+                                                                      ASSET_IMPORT_IMMEDIATE);
+                        
+                        Assert(Animation->NodesCheckSum == AC->NodesCheckSum);
+                        
+                        // NOTE(Dima): Clearing transforms in anim state to safely contribute
+                        // NOTE(Dima): all in-state animations
+                        ClearNodeTransforms(&Slot->ResultedTransforms, Model->NodeCount);
+                        
+                        // NOTE(Dima): Updating animation and node transforms
+                        UpdatePlayingAnimation(Assets, Model, 
+                                               Playing, Animation, 
+                                               GlobalTime, PlaybackRate);
+                        
+                        // NOTE(Dima): Updated resulted graph node transforms
+                        
+                        node_transforms_block* Dst = &Slot->ResultedTransforms;
+                        node_transforms_block* Src = &Playing->NodeTransforms;
+                        
 #if 0                    
-                    for(int NodeIndex = 0; 
-                        NodeIndex < Model->NodeCount;
-                        NodeIndex++)
-                    {
-                        Dst->Ts[NodeIndex] += Src->Ts[NodeIndex];;
-                        Dst->Rs[NodeIndex] += Src->Rs[NodeIndex];
-                        Dst->Ss[NodeIndex] += Src->Ss[NodeIndex];
-                    }
+                        for(int NodeIndex = 0; 
+                            NodeIndex < Model->NodeCount;
+                            NodeIndex++)
+                        {
+                            Dst->Ts[NodeIndex] += Src->Ts[NodeIndex];
+                            Dst->Rs[NodeIndex] += Src->Rs[NodeIndex];
+                            Dst->Ss[NodeIndex] += Src->Ss[NodeIndex];
+                        }
 #else
-                    for(int NodeIndex = 0; 
-                        NodeIndex < Model->NodeCount;
-                        NodeIndex+=4)
-                    {
-                        v3_4x SrcT = V3_4X(Src->Ts[NodeIndex + 0],
-                                           Src->Ts[NodeIndex + 1],
-                                           Src->Ts[NodeIndex + 2],
-                                           Src->Ts[NodeIndex + 3]);
-                        
-                        v4_4x SrcR = V4_4X(Src->Rs[NodeIndex + 0],
-                                           Src->Rs[NodeIndex + 1],
-                                           Src->Rs[NodeIndex + 2],
-                                           Src->Rs[NodeIndex + 3]);
-                        
-                        v3_4x SrcS = V3_4X(Src->Ss[NodeIndex + 0],
-                                           Src->Ss[NodeIndex + 1],
-                                           Src->Ss[NodeIndex + 2],
-                                           Src->Ss[NodeIndex + 3]);
-                        
-                        v3_4x DstT = V3_4X(Dst->Ts[NodeIndex + 0],
-                                           Dst->Ts[NodeIndex + 1],
-                                           Dst->Ts[NodeIndex + 2],
-                                           Dst->Ts[NodeIndex + 3]);
-                        
-                        v4_4x DstR = V4_4X(Dst->Rs[NodeIndex + 0],
-                                           Dst->Rs[NodeIndex + 1],
-                                           Dst->Rs[NodeIndex + 2],
-                                           Dst->Rs[NodeIndex + 3]);
-                        
-                        v3_4x DstS = V3_4X(Dst->Ss[NodeIndex + 0],
-                                           Dst->Ss[NodeIndex + 1],
-                                           Dst->Ss[NodeIndex + 2],
-                                           Dst->Ss[NodeIndex + 3]);
-                        
-                        DstT += SrcT;
-                        DstS += SrcS;
-                        DstR += SrcR;
-                        
-                        V3_4X_Store(DstT, 
-                                    &Dst->Ts[NodeIndex + 0],
-                                    &Dst->Ts[NodeIndex + 1],
-                                    &Dst->Ts[NodeIndex + 2],
-                                    &Dst->Ts[NodeIndex + 3]);
-                        V3_4X_Store(DstS, 
-                                    &Dst->Ss[NodeIndex + 0],
-                                    &Dst->Ss[NodeIndex + 1],
-                                    &Dst->Ss[NodeIndex + 2],
-                                    &Dst->Ss[NodeIndex + 3]);
-                        V4_4X_Store(DstR,
-                                    &Dst->Rs[NodeIndex + 0],
-                                    &Dst->Rs[NodeIndex + 1],
-                                    &Dst->Rs[NodeIndex + 2],
-                                    &Dst->Rs[NodeIndex + 3]);
-                    }
+                        for(int NodeIndex = 0; 
+                            NodeIndex < Model->NodeCount;
+                            NodeIndex+=4)
+                        {
+                            v3_4x SrcT = V3_4X(Src->Ts[NodeIndex + 0],
+                                               Src->Ts[NodeIndex + 1],
+                                               Src->Ts[NodeIndex + 2],
+                                               Src->Ts[NodeIndex + 3]);
+                            
+                            v4_4x SrcR = V4_4X(Src->Rs[NodeIndex + 0],
+                                               Src->Rs[NodeIndex + 1],
+                                               Src->Rs[NodeIndex + 2],
+                                               Src->Rs[NodeIndex + 3]);
+                            
+                            v3_4x SrcS = V3_4X(Src->Ss[NodeIndex + 0],
+                                               Src->Ss[NodeIndex + 1],
+                                               Src->Ss[NodeIndex + 2],
+                                               Src->Ss[NodeIndex + 3]);
+                            
+                            v3_4x DstT = V3_4X(Dst->Ts[NodeIndex + 0],
+                                               Dst->Ts[NodeIndex + 1],
+                                               Dst->Ts[NodeIndex + 2],
+                                               Dst->Ts[NodeIndex + 3]);
+                            
+                            v4_4x DstR = V4_4X(Dst->Rs[NodeIndex + 0],
+                                               Dst->Rs[NodeIndex + 1],
+                                               Dst->Rs[NodeIndex + 2],
+                                               Dst->Rs[NodeIndex + 3]);
+                            
+                            v3_4x DstS = V3_4X(Dst->Ss[NodeIndex + 0],
+                                               Dst->Ss[NodeIndex + 1],
+                                               Dst->Ss[NodeIndex + 2],
+                                               Dst->Ss[NodeIndex + 3]);
+                            
+                            DstT += SrcT;
+                            DstS += SrcS;
+                            DstR += SrcR;
+                            
+                            V3_4X_Store(DstT, 
+                                        &Dst->Ts[NodeIndex + 0],
+                                        &Dst->Ts[NodeIndex + 1],
+                                        &Dst->Ts[NodeIndex + 2],
+                                        &Dst->Ts[NodeIndex + 3]);
+                            V3_4X_Store(DstS, 
+                                        &Dst->Ss[NodeIndex + 0],
+                                        &Dst->Ss[NodeIndex + 1],
+                                        &Dst->Ss[NodeIndex + 2],
+                                        &Dst->Ss[NodeIndex + 3]);
+                            V4_4X_Store(DstR,
+                                        &Dst->Rs[NodeIndex + 0],
+                                        &Dst->Rs[NodeIndex + 1],
+                                        &Dst->Rs[NodeIndex + 2],
+                                        &Dst->Rs[NodeIndex + 3]);
+                        }
 #endif
+                    }
                     
+                    PlayingStateIndex = GetPrevPlayingIndex(PlayingStateIndex);
                 }
             }
             
@@ -748,15 +767,16 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                 
                 // NOTE(Dima): Sum every state resulted transforms based on contribution factor
                 // TODO(Dima): Potentially we can SIMD this loop
-                for(int PlayingStateIndex = 0;
-                    PlayingStateIndex < AC->PlayingStatesCount;
-                    PlayingStateIndex++)
+                int PlayingStateIndex = AC->PlayingIndex;
+                for(int Index = 0;
+                    Index < AC->PlayingStatesCount;
+                    Index++)
                 {
-                    int ToGetIndex = PlayingStateIndex ? GetNextPlayingIndex(AC) : AC->PlayingIndex;
-                    anim_state* AnimState = AC->PlayingStates[ToGetIndex];
+                    playing_state_slot* Slot = &AC->PlayingStates[PlayingStateIndex];
+                    anim_state* AnimState = Slot->State;
                     
                     node_transforms_block* Dst = &AC->ResultedTransforms;
-                    node_transforms_block* Src = &AnimState->ResultedTransforms;
+                    node_transforms_block* Src = &Slot->ResultedTransforms;
                     
 #if 0                    
                     float Contribution = AnimState->Contribution;
@@ -778,7 +798,7 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                         Dst->Rs[NodeIndex] += Src->Rs[NodeIndex] * SignDot * Contribution;
                     }
 #else
-                    f32_4x Contribution = F32_4x(AnimState->Contribution);
+                    f32_4x Contribution = F32_4x(Slot->Contribution);
                     
                     for(int NodeIndex = 0; 
                         NodeIndex < Model->NodeCount;
@@ -838,6 +858,7 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                                     &Dst->Rs[NodeIndex + 3]);
                     }
 #endif
+                    PlayingStateIndex = GetPrevPlayingIndex(PlayingStateIndex);
                 }
             }
             
@@ -1050,12 +1071,18 @@ void InitAnimComponent(animated_component* AC,
     AC->NodesCheckSum = NodesCheckSum;
     
     // NOTE(Dima): Init animations to play
-    AC->PlayingStatesCount = (Control->FirstState != 0);
-    AC->PlayingIndex = 0;
-    AC->PlayingStates[AC->PlayingIndex] = Control->FirstState;
-    AC->PlayingStates[GetNextPlayingIndex(AC)] = 0;
+    for(int SlotIndex = 0;
+        SlotIndex < ANIM_MAX_PLAYING_STATES;
+        SlotIndex++)
+    {
+        AC->PlayingStates[SlotIndex].State = 0;
+    }
     
-    PlayStateAnimations(AC->PlayingStates[AC->PlayingIndex], 0.0f, 0.0f);
+    
+    AC->PlayingIndex = 0;
+    AC->PlayingStates[AC->PlayingIndex].State = Control->FirstState;
+    AC->PlayingStatesCount = (Control->FirstState != 0);
+    PlayStateAnimations(&AC->PlayingStates[AC->PlayingIndex], 0.0f, 0.0f);
 }
 
 /*
@@ -1350,6 +1377,28 @@ anim_animid* ModifyOrAddAnimID(animated_component* AC,
     return(New);
 }
 
+anim_animid* FindAnimID(animated_component* AC, char* Name){
+    anim_animid* Result = 0;
+    
+    // NOTE(Dima): Inserting to hash table
+    u32 Hash = StringHashFNV(Name);
+    
+    int EntryIndex = Hash % ANIM_ANIMID_TABLE_SIZE;
+    
+    anim_animid* At = AC->AnimIDHashTable[EntryIndex];
+    while(At != 0){
+        b32 CompareRes = StringsAreEqual(Name, At->Name);
+        
+        if(CompareRes){
+            Result = At;
+            break;
+        }
+        
+        At = At->NextInHash;
+    }
+    
+    return(Result);
+}
 
 // NOTE(Dima): !!!!!!!!!!!!!!!!!
 // NOTE(Dima): Transitions stuff

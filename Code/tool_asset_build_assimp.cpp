@@ -484,80 +484,6 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
     // NOTE(Dima): Calculating check sums
     Result.NodesCheckSum = CalculateCheckSumForNodes(&Result);
     
-    // NOTE(Dima): Loading nodes animations
-    int AnimationsCount = scene->mNumAnimations;
-    
-    for(int AnimIndex = 0;
-        AnimIndex < AnimationsCount;
-        AnimIndex++)
-    {
-        aiAnimation* AssimpAnim = scene->mAnimations[AnimIndex];
-        
-        tool_animation_info NewAnimation;
-        
-        NewAnimation.Name = std::string(AssimpAnim->mName.C_Str());
-        NewAnimation.Duration = AssimpAnim->mDuration;
-        NewAnimation.TicksPerSecond = AssimpAnim->mTicksPerSecond;
-        NewAnimation.NodesCheckSum = Result.NodesCheckSum;
-        NewAnimation.IsLooping = (Flags & Load_AnimationWillBeLooped) != 0;
-        
-        for(int NodeAnimIndex = 0;
-            NodeAnimIndex < AssimpAnim->mNumChannels;
-            NodeAnimIndex++)
-        {
-            aiNodeAnim* AssimpNodeAnim = AssimpAnim->mChannels[NodeAnimIndex];
-            
-            tool_node_animation NewNodeAnim = {};
-            
-            // NOTE(Dima): Setting name
-            NewNodeAnim.NodeName = std::string(AssimpNodeAnim->mNodeName.C_Str());
-            
-            // NOTE(Dima): Finding node index in a mapping
-            auto FindIterator = Result.NodeNameToNodeIndex.find(NewNodeAnim.NodeName);
-            ASSERT(FindIterator != Result.NodeNameToNodeIndex.end());
-            NewNodeAnim.NodeIndex = FindIterator->second;
-            
-            // NOTE(Dima): Loading position keys
-            for(int KeyIndex = 0; 
-                KeyIndex < AssimpNodeAnim->mNumPositionKeys; 
-                KeyIndex++)
-            {
-                aiVectorKey* Key = &AssimpNodeAnim->mPositionKeys[KeyIndex];
-                
-                NewNodeAnim.PositionValues.push_back(Assimp2JoyVector3(Key->mValue));
-                NewNodeAnim.PositionTimes.push_back(Key->mTime);
-            }
-            
-            // NOTE(Dima): Loading rotation keys
-            for(int KeyIndex = 0; 
-                KeyIndex < AssimpNodeAnim->mNumRotationKeys; 
-                KeyIndex++)
-            {
-                aiQuatKey* Key = &AssimpNodeAnim->mRotationKeys[KeyIndex];
-                
-                NewNodeAnim.RotationValues.push_back(Assimp2JoyQuat(Key->mValue));
-                NewNodeAnim.RotationTimes.push_back(Key->mTime);
-            }
-            
-            // NOTE(Dima): Loading scaling keys
-            for(int KeyIndex = 0; 
-                KeyIndex < AssimpNodeAnim->mNumScalingKeys; 
-                KeyIndex++)
-            {
-                aiVectorKey* Key = &AssimpNodeAnim->mScalingKeys[KeyIndex];
-                
-                NewNodeAnim.ScalingValues.push_back(Assimp2JoyVector3(Key->mValue));
-                NewNodeAnim.ScalingTimes.push_back(Key->mTime);
-            }
-            
-            // NOTE(Dima): Pushing node animation to vector
-            NewAnimation.NodeAnimations.push_back(NewNodeAnim);
-        }
-        
-        // NOTE(Dima): Pushing animation to vector
-        Result.Animations.push_back(NewAnimation);
-    }
-    
     std::unordered_set<std::string> BoneNames;
     std::unordered_map<std::string, int> BoneNameToBoneIndex;
     
@@ -610,9 +536,10 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
     
     
     Result.HasSkeleton = Skeleton->Bones.size() > 0;
+    int RootBoneNodeIndex = -1;
+    
     if(Result.HasSkeleton){
         // NOTE(Dima): Now just go through the hierarchy and store loaded skeleton bones
-        int RootBoneNodeIndex = -1;
         
         /*
         NOTE(Dima): Nodes are organized in tree like structure so first found node 
@@ -668,6 +595,113 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
             }
         }
     }
+    
+    // NOTE(Dima): Loading nodes animations
+    int AnimationsCount = scene->mNumAnimations;
+    
+    for(int AnimIndex = 0;
+        AnimIndex < AnimationsCount;
+        AnimIndex++)
+    {
+        aiAnimation* AssimpAnim = scene->mAnimations[AnimIndex];
+        
+        // NOTE(Dima): Getting animated node names
+        std::set<std::string> AnimatedNodeNames;
+        for(int NodeAnimIndex = 0;
+            NodeAnimIndex < AssimpAnim->mNumChannels;
+            NodeAnimIndex++)
+        {
+            aiNodeAnim* AssimpNodeAnim = AssimpAnim->mChannels[NodeAnimIndex];
+            
+            std::string NodeName = std::string(AssimpNodeAnim->mNodeName.C_Str());
+            AnimatedNodeNames.insert(NodeName);
+        }
+        
+        // NOTE(Dima): Finding root animated node name
+        std::string RootAnimatedNodeName = "";
+        for(int ScanIndex = 0; 
+            ScanIndex < Result.Nodes.size();
+            ScanIndex++)
+        {
+            loaded_node* CurNode = &Result.Nodes[ScanIndex];
+            
+            std::string CurNodeName = std::string(CurNode->Name);
+            if(AnimatedNodeNames.find(CurNodeName) != AnimatedNodeNames.end()){
+                RootAnimatedNodeName = CurNodeName;
+                break;
+            }
+        }
+        
+        tool_animation_info NewAnimation;
+        
+        NewAnimation.Name = std::string(AssimpAnim->mName.C_Str());
+        NewAnimation.Duration = AssimpAnim->mDuration;
+        NewAnimation.TicksPerSecond = AssimpAnim->mTicksPerSecond;
+        NewAnimation.NodesCheckSum = Result.NodesCheckSum;
+        NewAnimation.IsLooping = (Flags & Load_AnimationWillBeLooped) != 0;
+        
+        for(int NodeAnimIndex = 0;
+            NodeAnimIndex < AssimpAnim->mNumChannels;
+            NodeAnimIndex++)
+        {
+            aiNodeAnim* AssimpNodeAnim = AssimpAnim->mChannels[NodeAnimIndex];
+            
+            std::string NodeName = std::string(AssimpNodeAnim->mNodeName.C_Str());
+            
+            // NOTE(Dima): Ignoring root node animation
+            //b32 ShouldLoadTranslation = !(IgnoreRootTranslation && (NodeName == RootAnimatedNodeName));
+            //b32 ShouldLoadRotation = !(IgnoreRootRotation && (NodeName == RootAnimatedNodeName));
+            tool_node_animation NewNodeAnim = {};
+            
+            // NOTE(Dima): Setting name
+            NewNodeAnim.NodeName = NodeName;
+            
+            // NOTE(Dima): Finding node index in a mapping
+            auto FindIterator = Result.NodeNameToNodeIndex.find(NewNodeAnim.NodeName);
+            ASSERT(FindIterator != Result.NodeNameToNodeIndex.end());
+            NewNodeAnim.NodeIndex = FindIterator->second;
+            
+            // NOTE(Dima): Loading position keys
+            for(int KeyIndex = 0; 
+                KeyIndex < AssimpNodeAnim->mNumPositionKeys; 
+                KeyIndex++)
+            {
+                aiVectorKey* Key = &AssimpNodeAnim->mPositionKeys[KeyIndex];
+                
+                NewNodeAnim.PositionValues.push_back(Assimp2JoyVector3(Key->mValue));
+                NewNodeAnim.PositionTimes.push_back(Key->mTime);
+            }
+            
+            // NOTE(Dima): Loading rotation keys
+            for(int KeyIndex = 0; 
+                KeyIndex < AssimpNodeAnim->mNumRotationKeys; 
+                KeyIndex++)
+            {
+                aiQuatKey* Key = &AssimpNodeAnim->mRotationKeys[KeyIndex];
+                
+                NewNodeAnim.RotationValues.push_back(Assimp2JoyQuat(Key->mValue));
+                NewNodeAnim.RotationTimes.push_back(Key->mTime);
+            }
+            
+            // NOTE(Dima): Loading scaling keys
+            for(int KeyIndex = 0; 
+                KeyIndex < AssimpNodeAnim->mNumScalingKeys; 
+                KeyIndex++)
+            {
+                aiVectorKey* Key = &AssimpNodeAnim->mScalingKeys[KeyIndex];
+                
+                NewNodeAnim.ScalingValues.push_back(Assimp2JoyVector3(Key->mValue));
+                NewNodeAnim.ScalingTimes.push_back(Key->mTime);
+            }
+            
+            // NOTE(Dima): Pushing node animation to vector
+            NewAnimation.NodeAnimations.push_back(NewNodeAnim);
+        }
+        
+        // NOTE(Dima): Pushing animation to vector
+        Result.Animations.push_back(NewAnimation);
+    }
+    
     
     if(!IsOnlyAnim){
         // NOTE(Dima): Loading meshes

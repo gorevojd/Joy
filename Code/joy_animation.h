@@ -9,6 +9,12 @@
 #define ANIM_ANY_STATE "#Any"
 #define ANIM_TRANSFORMS_ARRAY_SIZE 256
 
+struct find_anim_deltas_ctx{
+    int PrevKeyIndex;
+    int NextKeyIndex;
+    float t;
+};
+
 struct node_transform{
     v3 T;
     quat R;
@@ -25,8 +31,9 @@ struct playing_anim{
     f64 GlobalStart;
     f32 Phase01;
     
-    node_transforms_block NodeTransforms;
     b32 TransformsCalculated[ANIM_TRANSFORMS_ARRAY_SIZE];
+    f32 Deltas[ANIM_TRANSFORMS_ARRAY_SIZE];
+    node_transforms_block NodeTransforms;
     
     u32 AnimationID;
 };
@@ -40,8 +47,6 @@ enum anim_state_type{
 struct anim_state{
     char Name[64];
     
-    playing_anim PlayingAnimation;
-    
     anim_state* NextInList;
     
     anim_state* NextAlloc;
@@ -49,14 +54,28 @@ struct anim_state{
     
     anim_state* NextInHash;
     
-    node_transforms_block ResultedTransforms;
-    f32 Contribution;
-    
     // NOTE(Dima): Transitions list
     struct anim_transition* FirstTransition;
     struct anim_transition* LastTransition;
     
     u32 Type;
+};
+
+struct playing_state_slot{
+    anim_state* State;
+    
+    playing_anim PlayingAnimation;
+    
+    node_transforms_block ResultedTransforms;
+    f32 Contribution;
+    
+    /*
+NOTE(dima): Fot n'th element in playing states
+this transition data hold info for transitioning 
+from n - 1 -> n
+*/
+    f32 TimeToTransit;
+    f32 TransitionTimeLeft;
 };
 
 enum anim_variable_type{
@@ -140,6 +159,7 @@ struct anim_calculated_pose{
 #define ANIM_VAR_TABLE_SIZE 32
 #define ANIM_ANIMID_TABLE_SIZE 32
 #define ANIM_MAX_STATE_COUNT 256
+#define ANIM_MAX_PLAYING_STATES 4
 
 struct anim_controller{
     struct anim_system* AnimState;
@@ -176,12 +196,9 @@ struct animated_component{
     
     //#define PLAY_STATE_FIRST 0
     //#define PLAY_STATE_SECOND 1
-    anim_state* PlayingStates[2];
+    playing_state_slot PlayingStates[ANIM_MAX_PLAYING_STATES];
     int PlayingIndex;
     int PlayingStatesCount;
-    
-    f32 TimeToTransit;
-    f32 TransitionTimeLeft;
     
     // NOTE(Dima): Result transforms array that will be passed to shader
     node_transforms_block ResultedTransforms;
@@ -191,8 +208,26 @@ struct animated_component{
     //int PlayingAnimationsCount;
 };
 
-inline int GetNextPlayingIndex(animated_component* AC){
-    int Result = (AC->PlayingIndex + 1) & 1;
+inline int GetModulatedPlayintIndex(int Index){
+    if(Index < 0){
+        Index += ((Abs(Index) / ANIM_MAX_PLAYING_STATES) + 1) * ANIM_MAX_PLAYING_STATES;
+    }
+    
+    Index = Index % ANIM_MAX_PLAYING_STATES;
+    
+    Assert((Index >= 0) && (Index < ANIM_MAX_PLAYING_STATES));
+    
+    return(Index);
+}
+
+inline int GetNextPlayingIndex(int CurIndex){
+    int Result = GetModulatedPlayintIndex(CurIndex + 1);
+    
+    return(Result);
+}
+
+inline int GetPrevPlayingIndex(int Index){
+    int Result = GetModulatedPlayintIndex(Index - 1);
     
     return(Result);
 }
@@ -243,6 +278,7 @@ void AddVariable(animated_component* AC,
 
 anim_variable* FindVariable(animated_component* AC, char* Name);
 anim_state* FindState(anim_controller* Control, char* Name);
+anim_animid* FindAnimID(animated_component* AC, char* Name);
 
 void BeginTransition(anim_controller* Control,
                      char* FromAnim, 

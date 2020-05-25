@@ -30,9 +30,11 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Animation)){
                             CopyStrings(StateTypeBuf, "BlendTree");
                         }
                         
+#if 0                        
                         stbsp_sprintf(StateBuf, "%s###: %.0f%%, %s", 
                                       StateAt->Name, StateAt->Contribution * 100.0f,
                                       StateTypeBuf);
+#endif
                         
                         
                         // NOTE(Dima): Begin state tree 
