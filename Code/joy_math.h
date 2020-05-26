@@ -14,7 +14,7 @@
 
 #define JOY_ONE_OVER_255 0.00392156862f;
 
-#define JOY_ENABLE_SIMD_MATH 1
+#define JOY_ENABLE_SIMD_MATH 0
 
 #define JOY_MATH_MIN(a, b) ((a) > (b) ? (b) : (a))
 #define JOY_MATH_MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -129,11 +129,17 @@ union m33 {
     v3 Rows[3];
 };
 
-union m44 {
-	float e[16];
-    float e2[4][4];
-	v4 Rows[4];
-    __m128 mmRows[4];
+struct m44{
+    
+    union {
+        float e[16];
+        //float e2[4][4];
+        v4 Rows[4];
+        
+#if JOY_ENABLE_SIMD_MATH
+        __m128 mmRows[4];
+#endif
+    };
 };
 
 union quat {

@@ -346,9 +346,7 @@ INTERNAL_FUNCTION void ResetToParentTransforms(model_info* Model){
 INTERNAL_FUNCTION void CalculateToParentTransforms(model_info* Model, 
                                                    node_transforms_block* Transforms)
 {
-    FUNCTION_TIMING();
-    
-#if 1    
+#if 0 
     for(int NodeIndex = 0; 
         NodeIndex < Model->NodeCount;
         NodeIndex++)

@@ -89,20 +89,19 @@ struct render_entry_in_atlas_bmp{
 
 struct render_entry_mesh{
     mesh_info* Mesh;
+    material_info* Material;
+    
+    m44 Transform;
     
     m44* BoneTransforms;
     int BoneCount;
-    material_info* Material;
     
     v3 AlbedoColor;
-    
-    m44 Transform;
 };
 
 struct render_entry_gui_chunk{
     int ChunkIndex;
 };
-
 #pragma pack(pop)
 
 inline void* RenderPushMem(render_stack* Stack, mi Size, mi Align = 8){
@@ -112,7 +111,7 @@ inline void* RenderPushMem(render_stack* Stack, mi Size, mi Align = 8){
 }
 
 inline void* RenderPushEntryToStack(render_stack* stack, u32 sizeOfType, u32 typeEnum) {
-	render_entry_header* header =
+    render_entry_header* header =
 		(render_entry_header*)RenderPushMem(stack, sizeof(render_entry_header) + sizeOfType, RENDER_ENTRY_MEMORY_ALIGN);
     
 	stack->EntryCount++;
@@ -126,6 +125,5 @@ inline void* RenderPushEntryToStack(render_stack* stack, u32 sizeOfType, u32 typ
 }
 
 #define PUSH_RENDER_ENTRY(stack, type_enum, type) (type*)RenderPushEntryToStack(stack, sizeof(type), type_enum)
-
 
 #endif

@@ -381,6 +381,8 @@ INTERNAL_FUNCTION void InitCorrespondingGroups(assets* Assets){
     }
 }
 
+#define GET_DATA(type, offset) (type*)((u8*)Data + (offset))
+
 void ImportAssetDirectly(assets* Assets, 
                          asset* Asset, 
                          void* Data, 
@@ -426,8 +428,9 @@ void ImportAssetDirectly(assets* Assets,
             u32 VertSize = Src->DataVerticesSize;
             u32 IndiSize = Src->DataIndicesSize;
             
-            void* Vertices = (u8*)Data + Src->DataOffsetToVertices;
-            u32* Indices = (u32*)((u8*)Data + Src->DataOffsetToIndices);
+            
+            void* Vertices = GET_DATA(void, Src->DataOffsetToVertices);
+            u32* Indices = GET_DATA(u32, Src->DataOffsetToIndices);
             
             Result->Vertices = Vertices;
             Result->Indices = Indices;
@@ -437,17 +440,17 @@ void ImportAssetDirectly(assets* Assets,
             sound_info* Result = GET_ASSET_PTR_MEMBER(Asset, sound_info);
             asset_sound* Src = &Header->Sound;
             
-            Result->Samples[0] = (i16*)((u8*)Data + Src->DataOffsetToLeftChannel);
-            Result->Samples[1] = (i16*)((u8*)Data + Src->DataOffsetToRightChannel);
+            Result->Samples[0] = GET_DATA(i16, Src->DataOffsetToLeftChannel);
+            Result->Samples[1] = GET_DATA(i16, Src->DataOffsetToRightChannel);
         }break;
         
         case AssetType_Font:{
             font_info* Result = GET_ASSET_PTR_MEMBER(Asset, font_info);
             asset_font* Src = &Header->Font;
             
-            int* Mapping = (int*)((u8*)Data + Src->DataOffsetToMapping);
-            float* KerningPairs = (float*)((u8*)Data + Src->DataOffsetToKerning);
-            u32* GlyphIDs = (u32*)((u8*)Data + Src->DataOffsetToIDs);
+            int* Mapping = GET_DATA(int, Src->DataOffsetToMapping);
+            float* KerningPairs = GET_DATA(float, Src->DataOffsetToKerning);
+            u32* GlyphIDs = GET_DATA(u32, Src->DataOffsetToIDs);
             
             u32 MappingSize = Src->MappingSize;
             u32 KerningSize = Src->KerningSize;
@@ -476,8 +479,6 @@ void ImportAssetDirectly(assets* Assets,
             // NOTE(Dima): Setting kerning
             Result->KerningPairs = KerningPairs;
         }break;
-        
-#define GET_DATA(type, offset) (type*)((u8*)Data + (offset))
         
         case AssetType_Model:{
             model_info* Result = GET_ASSET_PTR_MEMBER(Asset, model_info);
@@ -534,7 +535,7 @@ void ImportAssetDirectly(assets* Assets,
             {
                 node_info* Node = &Result->Nodes[NodeIndex];
                 
-                Node->Shared = Result->NodesSharedDatas + NodeIndex;
+                Node->Shared = &Result->NodesSharedDatas[NodeIndex];
                 Node->MeshIDs = &Result->NodeMeshIDsStorage[Node->Shared->NodeMeshIndexFirstInStorage];
                 Node->MeshCount = Node->Shared->NodeMeshIndexCountInStorage;
             }
@@ -607,7 +608,7 @@ void ImportAssetDirectly(assets* Assets,
     }
     
     // NOTE(Dima): Setting asset state
-    std::atomic_thread_fence(std::memory_order_release);
+    std::atomic_thread_fence(std::memory_order_seq_cst);
     Asset->State.store(AssetState_Loaded);
 }
 

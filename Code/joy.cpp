@@ -158,9 +158,8 @@ void GameInit(game_state* Game){
     Game->RenderMemory = {};
     PushMemoryStruct(&Game->RenderMemory, render_state, Game->Render, MemRegion);
     RenderInit(Game->Render, Platform.RenderAPI);
-    RenderAddStack(Game->Render, "Main", Megabytes(1));
+    RenderAddStack(Game->Render, "Main", Megabytes(5));
     RenderAddStack(Game->Render, "GUI", Megabytes(1));
-    RenderAddStack(Game->Render, "Meshes", Megabytes(1));
     RenderAddStack(Game->Render, "DEBUG", Megabytes(1));
     // NOTE(Dima): Init platform render stuff
     Game->Render->API.Init(Game->Assets);

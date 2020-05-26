@@ -324,6 +324,7 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
     
     asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
     
+#if 1
     anim_calculated_pose CalcPose = UpdateModelAnimation(Assets, Model, AC,
                                                          GlobalTime, DeltaTime, 
                                                          1.0f);
@@ -358,6 +359,8 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
             }
         }
     }
+#endif
+    
 }
 
 

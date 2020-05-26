@@ -590,14 +590,15 @@ inline void PushMesh(render_stack* Stack,
                      m44* BoneTransforms = 0,
                      int BoneCount = 0)
 {
+    
     render_entry_mesh* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Mesh, render_entry_mesh);
     
     entry->Mesh = Mesh;
-    entry->Transform = Transform;
     entry->BoneCount = BoneCount;
     entry->BoneTransforms = BoneTransforms;
     entry->AlbedoColor = V3(1.0f, 1.0f, 1.0f);
     entry->Material = Material;
+    entry->Transform = Transform;
 }
 
 inline void PushMesh(render_stack* Stack,
@@ -606,7 +607,8 @@ inline void PushMesh(render_stack* Stack,
                      quat R,
                      v3 S)
 {
-    PushMesh(Stack, Mesh, ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P));
+    m44 Matrix = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
+    PushMesh(Stack, Mesh, Matrix);
 }
 
 inline void PushGuiChunk(render_stack* Stack, int ChunkIndex){

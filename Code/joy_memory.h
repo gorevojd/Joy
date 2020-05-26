@@ -322,8 +322,8 @@ inline mem_region PushSplit(mem_region* Region, mi Size)
 
 #define PushMemoryStruct(region, type, name, region_member_name) \
 {\
-    name = PushStruct(region, type);\
-    name->##region_member_name = region;\
+name = PushStruct(region, type);\
+name->##region_member_name = region;\
 }
 
 // NOTE(Dima): Definitions

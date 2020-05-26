@@ -1041,7 +1041,7 @@ INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
 
 void DEBUGInitGlobalTable(mem_region* Region){
     // NOTE(Dima): Initialize record arrays
-    int RecordArrayCount = 100000;
+    int RecordArrayCount = 1000000;
     DEBUGGlobalTable->TableMaxRecordCount = RecordArrayCount;
     DEBUGGlobalTable->RecordAndTableIndex = 0;
     DEBUGGlobalTable->RecordTables[0] = PushArray(Region, debug_record, RecordArrayCount);
