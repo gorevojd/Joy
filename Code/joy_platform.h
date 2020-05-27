@@ -192,7 +192,7 @@ enum renderer_type{
 #define RENDER_PLATFORM_SWAPBUFFERS(name) void name()
 typedef RENDER_PLATFORM_SWAPBUFFERS(render_platform_swapbuffers);
 
-#define RENDER_PLATFORM_INIT(name) void name(struct assets* Assets)
+#define RENDER_PLATFORM_INIT(name) void name(struct render_state* Render)
 typedef RENDER_PLATFORM_INIT(render_platform_init);
 
 #define RENDER_PLATFORM_FREE(name) void name()

@@ -335,6 +335,7 @@ enum asset_tag_character_type{
     TagCharacter_Rabbit,
     TagCharacter_Moose,
     TagCharacter_Deer,
+    TagCharacter_Coyote,
 };
 
 enum asset_tag_idle_anim{

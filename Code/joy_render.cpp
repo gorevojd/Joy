@@ -130,8 +130,8 @@ INTERNAL_FUNCTION void RenderInitGuiGeom(render_state* Render){
     Render->GuiGeom.Vertices = PushArray(Render->MemRegion, render_gui_geom_vertex, VerticesCount);
     Render->GuiGeom.Indices = PushArray(Render->MemRegion, u32, IndCount);
     Render->GuiGeom.TriangleGeomTypes = PushArray(
-        Render->MemRegion, u8, 
-        Render->GuiGeom.MaxTriangleGeomTypesCount);
+                                                  Render->MemRegion, u8, 
+                                                  Render->GuiGeom.MaxTriangleGeomTypesCount);
     
     // NOTE(Dima): Init GUI lines
     int LinesCount = 100000;
@@ -154,16 +154,57 @@ INTERNAL_FUNCTION void RenderInitLinesGeom(render_state* Render){
     Render->LinesGeom.ChunksAllocated = 0;
 }
 
-INTERNAL_FUNCTION void RenderInit(render_state* Render, render_platform_api API){
+INTERNAL_FUNCTION void RenderInit(render_state* Render, 
+                                  int InitWindowWidth,
+                                  int InitWindowHeight,
+                                  render_platform_api API){
     Render->StacksCount = 0;
     
+    InitRandomGeneration(&Render->Random, 12);
+    
     Render->FrameInfoIsSet = 0;
+    Render->InitWindowWidth = InitWindowWidth;
+    Render->InitWindowHeight = InitWindowHeight;
     
     // NOTE(Dima): Init render API
     Render->API = API;
     
+    // NOTE(Dima): Init SSAO kernel
+    for(int KernelSampleIndex = 0;
+        KernelSampleIndex < SSAO_KERNEL_SIZE;
+        KernelSampleIndex++)
+    {
+        v3 RandomVector = V3(RandomBi(&Render->Random),
+                             RandomBi(&Render->Random),
+                             RandomUni(&Render->Random));
+        
+        RandomVector = Normalize(RandomVector);
+        
+        float Scale = float(KernelSampleIndex) / float(SSAO_KERNEL_SIZE);
+        float RandomScale = RandomUni(&Render->Random);
+        RandomScale = Lerp(RandomScale, 0.1f, 1.0f);
+        
+        RandomVector *= RandomScale;
+        
+        Render->SSAOKernelSamples[KernelSampleIndex] = RandomVector;
+    }
+    
+    // NOTE(Dima): Init SSAO noise texture
+    for(int NoiseIndex = 0;
+        NoiseIndex < SSAO_NOISE_TEXTURE_SIZE;
+        NoiseIndex++)
+    {
+        v3 Noise = V3(RandomBi(&Render->Random),
+                      RandomBi(&Render->Random),
+                      0.0f);
+        
+        Render->SSAONoiseTexture[NoiseIndex] = NOZ(Noise);
+    }
+    
     RenderInitGuiGeom(Render);
     RenderInitLinesGeom(Render);
+    
+    Render->API.Init(Render);
 }
 
 INTERNAL_FUNCTION render_stack* RenderFindStack(render_state* Render, char* Name){

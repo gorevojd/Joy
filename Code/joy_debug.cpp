@@ -1076,7 +1076,7 @@ INTERNAL_FUNCTION void DEBUGInit(debug_state* State,
     State->Input = Input;
     
     // NOTE(Dima): Init menus
-    State->ShowDebugOverlay = true;
+    State->ShowDebugOverlay = false;
     State->ShowDebugMenus = true;
     State->MainWindow.P = V2(850, 50);
     State->MainWindow.Dim = V2(500, 700);

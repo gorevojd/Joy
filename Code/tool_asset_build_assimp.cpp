@@ -159,6 +159,10 @@ AiLoadMatTexturesForType(loaded_model* Model,
                                        "..\\");
                     
                     ReplaceSpecialPath(TexturePathNew, 
+                                       "..\\..\\..\\",
+                                       "..\\");
+                    
+                    ReplaceSpecialPath(TexturePathNew, 
                                        "..\\..\\",
                                        "..\\");
                     
@@ -1301,6 +1305,10 @@ INTERNAL_FUNCTION void WriteForestAnimals(){
     AddCharacterToWrite(Ctx, "../Data/Models/ForestAnimals/Bear",
                         TagCharacter_Bear,
                         "Bear.fbx");
+    
+    AddCharacterToWrite(Ctx, "../Data/Models/ForestAnimals/Coyote",
+                        TagCharacter_Coyote,
+                        "Coyote.fbx");
     
     // NOTE(Dima): Storing loading context
     StoreLoadingContext(System, Ctx);

@@ -162,6 +162,10 @@ struct gl_state{
     GLuint GuiLinesVBO;
     GLuint GuiLinesColorsTBO;
     
+    // NOTE(Dima): SSAO
+    GLuint SSAONoiseTex;
+    GLuint SSAOKernelTex;
+    
     m44 GuiOrtho;
 };
 

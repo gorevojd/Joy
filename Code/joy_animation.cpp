@@ -435,27 +435,39 @@ b32 StateIsPlaying(animated_component* AC,
 {
     b32 Result = false;
     
-    for(int PlayingSlotIndex = 0;
-        PlayingSlotIndex < ANIM_MAX_PLAYING_STATES;
-        PlayingSlotIndex++)
-    {
-        anim_state* State = AC->PlayingStates[PlayingSlotIndex].State;
-        if(State && StringsAreEqual(State->Name, StateName)){
-            Result = true;
-            break;
-        }
+    //for(int SlotIndex = 0; SlotIndex < ANIM_MAX_PLAYING_STATES; SlotIndex++){
+    //playing_state_slot* Slot = &AC->PlayingStates[SlotIndex];
+    playing_state_slot* Slot = &AC->PlayingStates[AC->PlayingIndex];
+    
+    anim_state* State = Slot->State;
+    if(State && StringsAreEqual(State->Name, StateName)){
+        Result = true;
+        //break;
+    }
+    //}
+    
+    return(Result);
+}
+
+f32 GetPlayingStatePhase(animated_component* AC)
+{
+    playing_state_slot* Slot = &AC->PlayingStates[AC->PlayingIndex];
+    
+    f32 Result = 0.0f;
+    if(Slot->State){
+        Result = Slot->PlayingAnimation.Phase01;
     }
     
     return(Result);
 }
 
 INTERNAL_FUNCTION void ProcessInitTransitioning(animated_component* AC,
-                                                b32 FirstAnimEnded,
                                                 f64 GlobalTime)
 {
     b32 Transitioning = (AC->PlayingStatesCount == 2);
     
-    anim_state* State = AC->PlayingStates[AC->PlayingIndex].State;
+    playing_state_slot* Slot = &AC->PlayingStates[AC->PlayingIndex];
+    anim_state* State = Slot->State;
     
     // NOTE(Dima): Iterating through all transitions
     anim_transition* TransitionAt = State->FirstTransition;
@@ -466,6 +478,7 @@ INTERNAL_FUNCTION void ProcessInitTransitioning(animated_component* AC,
         
         b32 AllConditionsTrue = true;
         
+        // NOTE(Dima): Checking conditions loop
         for(int ConditionIndex = 0;
             ConditionIndex < TransitionAt->ConditionsCount;
             ConditionIndex++)
@@ -517,15 +530,23 @@ INTERNAL_FUNCTION void ProcessInitTransitioning(animated_component* AC,
             }
         }
         
-        if((TransitionAt->AnimationShouldFinish && FirstAnimEnded) || 
-           (TransitionAt->ConditionsCount && AllConditionsTrue))
-        {
+        b32 StateCanTransition = false;
+        if(TransitionAt->AnimationShouldFinish){
+            StateCanTransition = Slot->PlayingAnimation.Phase01 > (TransitionAt->TransitStartPhase - 0.00001f);
+            if(TransitionAt->ConditionsCount){
+                StateCanTransition &= AllConditionsTrue;
+            }
+        }
+        else{
+            StateCanTransition = TransitionAt->ConditionsCount && AllConditionsTrue;
+        }
+        
+        if(StateCanTransition){
             // NOTE(Dima): Initiating transition
             int NextPlayIndex = GetNextPlayingIndex(AC->PlayingIndex);
             AC->PlayingStates[NextPlayIndex].State = TransitionAt->ToState;
             AC->PlayingIndex = NextPlayIndex;
             AC->PlayingStatesCount++;
-            
             
             PlayStateAnimations(&AC->PlayingStates[NextPlayIndex], 
                                 GlobalTime,
@@ -554,11 +575,7 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
     if(AC){
         anim_controller* Control = AC->Control;
         
-        b32 FirstAnimEnded = AC->PlayingStates[AC->PlayingIndex].PlayingAnimation.Phase01 > 0.999999f;
-        
-        ProcessInitTransitioning(AC,
-                                 FirstAnimEnded,
-                                 GlobalTime);
+        ProcessInitTransitioning(AC, GlobalTime);
         
         // NOTE(Dima): Updating playing states, conditions, transitions
         if(AC->PlayingStatesCount > 0){
@@ -1145,7 +1162,8 @@ FindState(anim_controller* Control, char* Name)
 
 void AddAnimState(anim_controller* Control,
                   u32 AnimStateType,
-                  char* Name)
+                  char* Name,
+                  f32 EarlyTerminatePhase)
 {
     // NOTE(Dima): Initializing new state
     anim_state* New = AllocateAnimState(Control->AnimState);
@@ -1429,7 +1447,8 @@ INTERNAL_FUNCTION anim_transition* AddTransitionToStates(anim_controller* Contro
                                                          anim_state* FromState,
                                                          anim_state* ToState,
                                                          b32 AnimationShouldFinish,
-                                                         float TimeToTransit)
+                                                         f32 TimeToTransit,
+                                                         f32 TransitPhaseStart)
 {
     anim_transition* Result = AllocateTransition(Control->AnimState);
     
@@ -1442,6 +1461,7 @@ INTERNAL_FUNCTION anim_transition* AddTransitionToStates(anim_controller* Contro
     
     Result->AnimationShouldFinish = AnimationShouldFinish;
     Result->TimeToTransit = TimeToTransit;
+    Result->TransitStartPhase = TransitPhaseStart;
     
     // NOTE(Dima): Inserting to the end of From's transitions list
     Result->NextInList = 0;
@@ -1463,10 +1483,9 @@ AddTransition(anim_controller* Control,
               char* FromAnim, 
               char* ToAnim,
               b32 AnimationShouldFinish,
-              f32 TimeToTransit)
+              f32 TimeToTransit,
+              f32 TransitPhaseStart)
 {
-    
-    
     // NOTE(Dima): Finding to
     anim_state* ToState = FindState(Control, ToAnim);
     Assert(ToState);
@@ -1487,7 +1506,8 @@ AddTransition(anim_controller* Control,
                                                                     StateAt, 
                                                                     ToState,
                                                                     AnimationShouldFinish,
-                                                                    TimeToTransit);
+                                                                    TimeToTransit,
+                                                                    TransitPhaseStart);
                 
                 Control->BeginnedTransitions[TransitionsCount++] = Transition;
             }
@@ -1503,7 +1523,8 @@ AddTransition(anim_controller* Control,
                                                             FromState, 
                                                             ToState,
                                                             AnimationShouldFinish,
-                                                            TimeToTransit);
+                                                            TimeToTransit,
+                                                            TransitPhaseStart);
         
         Control->BeginnedTransitions[TransitionsCount++] = Transition;
     }
@@ -1517,12 +1538,14 @@ void BeginTransition(anim_controller* Control,
                      char* FromAnim, 
                      char* ToAnim, 
                      f32 TimeToTransit,
-                     b32 AnimationShouldFinish)
+                     b32 AnimationShouldFinish,
+                     f32 TransitPhaseStart)
 {
     Assert(Control->BeginnedTransitionsCount == 0);
     AddTransition(Control, FromAnim, ToAnim,
                   AnimationShouldFinish,
-                  TimeToTransit);
+                  TimeToTransit,
+                  TransitPhaseStart);
 }
 
 // NOTE(Dima): !!!!!!!!!!!!!!!!

@@ -3,6 +3,10 @@
 
 #define RENDER_DEFAULT_STACK_SIZE Megabytes(1)
 
+#define SSAO_KERNEL_SIZE 256
+#define SSAO_NOISE_TEXTURE_SIZE 16
+
+
 struct render_camera_setup{
     
     m44 Projection;
@@ -114,9 +118,10 @@ struct render_frame_info{
     bmp_info* SoftwareBuffer;
 };
 
-
 struct render_state{
     mem_region* MemRegion;
+    
+    random_generation Random;
     
     render_platform_api API;
     
@@ -126,8 +131,15 @@ struct render_state{
     render_pass Passes[256];
     int PassCount;
     
+    int InitWindowWidth;
+    int InitWindowHeight;
+    
     b32 FrameInfoIsSet;
     render_frame_info FrameInfo;
+    
+    v3 SSAONoiseTexture[SSAO_NOISE_TEXTURE_SIZE];
+    v3 SSAOKernelSamples[SSAO_KERNEL_SIZE];
+    int SSAOKernelSampleCount;
     
     render_gui_geom GuiGeom;
     render_lines_geom LinesGeom;

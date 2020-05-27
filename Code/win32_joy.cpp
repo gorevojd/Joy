@@ -1609,7 +1609,7 @@ RENDER_PLATFORM_INIT(Win32OpenGLRenderInit){
     GlobalWin32.renderCtx = Win32InitOpenGL(GlobalWin32.glDC);
     
 #if JOY_USE_OPENGL
-    GlInit(&GlobalGL, Assets);
+    GlInit(&GlobalGL, GlobalGame->Render, GlobalGame->Assets);
 #endif
     
 #if JOY_USE_DIRECTX
@@ -2393,13 +2393,6 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     // TODO(Dima): Add array of count Renderer_Count and init all renderers
     // TODO(Dima): Or leave if not supported
     // NOTE(Dima): Init render API
-    render_platform_api RenderPlatformAPI = {};
-    RenderPlatformAPI.RendererType = Renderer_OpenGL;
-    RenderPlatformAPI.SwapBuffers = Win32OpenGLSwapBuffers;
-    RenderPlatformAPI.Init = Win32OpenGLRenderInit;
-    RenderPlatformAPI.Free = Win32OpenGLRenderFree;
-    RenderPlatformAPI.Render = Win32OpenGLRender;
-    
     render_platform_api* RenderAPI = &Platform.RenderAPI;
     RenderAPI->RendererType = Renderer_OpenGL;
     RenderAPI->SwapBuffers = Win32OpenGLSwapBuffers;
@@ -2448,7 +2441,11 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     Win32InitWindow(hInstance, WindowWidth, WindowHeight);
     
     GlobalGame = PushStruct(&GlobalMem, game_state);
-    GameInit(GlobalGame);
+    
+    game_init_params GameParams = {};
+    GameParams.InitWindowWidth = WindowWidth;
+    GameParams.InitWindowHeight = WindowHeight;
+    GameInit(GlobalGame, GameParams);
     
     // NOTE(Dima): Xinput Init
     for(int ControllerIndex = 0;

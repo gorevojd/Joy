@@ -139,7 +139,7 @@ INTERNAL_FUNCTION inline b32 AdvanceGameMode(game_state* Game){
     return(Result);
 }
 
-void GameInit(game_state* Game){
+void GameInit(game_state* Game, game_init_params Params){
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!
     // NOTE(Dima): Init engine systems
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!
@@ -157,12 +157,15 @@ void GameInit(game_state* Game){
     // NOTE(Dima): Render
     Game->RenderMemory = {};
     PushMemoryStruct(&Game->RenderMemory, render_state, Game->Render, MemRegion);
-    RenderInit(Game->Render, Platform.RenderAPI);
+    RenderInit(Game->Render,
+               Params.InitWindowWidth,
+               Params.InitWindowHeight,
+               Platform.RenderAPI);
     RenderAddStack(Game->Render, "Main", Megabytes(5));
     RenderAddStack(Game->Render, "GUI", Megabytes(1));
     RenderAddStack(Game->Render, "DEBUG", Megabytes(1));
+    
     // NOTE(Dima): Init platform render stuff
-    Game->Render->API.Init(Game->Assets);
     
     // NOTE(Dima): Gui
     Game->GuiMemory = {};

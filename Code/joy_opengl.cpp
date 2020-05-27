@@ -480,7 +480,10 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
     return(Result);
 }
 
-INTERNAL_FUNCTION void GlInit(gl_state* GL, assets* Assets){
+INTERNAL_FUNCTION void GlInit(gl_state* GL, 
+                              render_state* Render, 
+                              assets* Assets)
+{
     GL->ProgramsCount = 0;
     LoadScreenShader(GL, 
                      "../Data/Shaders/screen.vs",
@@ -582,6 +585,32 @@ INTERNAL_FUNCTION void GlInit(gl_state* GL, assets* Assets){
     glBindBuffer(GL_ARRAY_BUFFER, GL->GuiLinesVBO);
     InitVertexAttribFloat(GL->GuiLinesShader.PAttrLoc,
                           2, 2 * FS, 0);
+    
+    // NOTE(Dima): Init SSAO textures
+    glGenTextures(1, &GL->SSAONoiseTex);
+    glGenTextures(1, &GL->SSAOKernelTex);
+    
+    glBindTexture(GL_TEXTURE_2D, GL->SSAOKernelTex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, 
+                 GL_RGB32F,
+                 Render->SSAOKernelSampleCount, 1, 0,
+                 GL_RGB, GL_FLOAT,
+                 Render->SSAOKernelSamples);
+    
+    glBindTexture(GL_TEXTURE_2D, GL->SSAONoiseTex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, 
+                 GL_RGB32F,
+                 4, 4, 0,
+                 GL_RGB, GL_FLOAT,
+                 Render->SSAONoiseTexture);
     
     glBindVertexArray(0);
 }

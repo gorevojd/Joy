@@ -32,6 +32,11 @@ struct task_data_pool{
     task_data FreeSentinel;
 };
 
+struct game_init_params{
+    int InitWindowWidth;
+    int InitWindowHeight;
+};
+
 #include "joy_debug_menu_types.h"
 
 #include "joy_input.h"
@@ -46,8 +51,8 @@ struct task_data_pool{
 #define GAME_GET_MODE_STATE(state_type, state_var_name) \
 state_type* state_var_name = (state_type*)Mode->ModeState;\
 if(!state_var_name){\
-    state_var_name = PushStruct(&Mode->Memory, state_type);\
-    Mode->ModeState = state_var_name;\
+state_var_name = PushStruct(&Mode->Memory, state_type);\
+Mode->ModeState = state_var_name;\
 }
 
 #define GAME_MODE_UPDATE(name) void name(struct game_state* Game, struct game_mode* Mode)
@@ -95,7 +100,7 @@ struct game_state{
 };
 
 // NOTE(Dima): Game API
-void GameInit(game_state* Game);
+void GameInit(game_state* Game, game_init_params Params);
 void GameUpdate(game_state* Game, render_frame_info FrameInfo);
 void GameFree(game_state* Game);
 

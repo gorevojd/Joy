@@ -8,6 +8,7 @@
 
 #define ANIM_ANY_STATE "#Any"
 #define ANIM_TRANSFORMS_ARRAY_SIZE 256
+#define ANIM_DEFAULT_TRANSITION_TIME 0.15f
 
 struct find_anim_deltas_ctx{
     int PrevKeyIndex;
@@ -141,6 +142,7 @@ struct anim_transition{
     
     f32 TimeToTransit;
     b32 AnimationShouldFinish;
+    f32 TransitStartPhase;
     
     struct anim_controller* AnimControl;
     
@@ -267,10 +269,12 @@ void FinalizeCreation(anim_controller* Control);
 
 b32 StateIsPlaying(animated_component* AC,
                    char* StateName);
+f32 GetPlayingStatePhase(animated_component* AC);
 
 void AddAnimState(anim_controller* Control,
                   u32 StateType,
-                  char* Name);
+                  char* Name,
+                  f32 EarlyTerminatePhase = 1.0f);
 
 void AddVariable(animated_component* AC,
                  char* Name,
@@ -283,8 +287,9 @@ anim_animid* FindAnimID(animated_component* AC, char* Name);
 void BeginTransition(anim_controller* Control,
                      char* FromAnim, 
                      char* ToAnim,
-                     f32 TimeToTransit = 0.15f,
-                     b32 AnimationShouldFinish = false);
+                     f32 TimeToTransit = ANIM_DEFAULT_TRANSITION_TIME,
+                     b32 AnimationShouldFinish = false,
+                     f32 TransitStartPhase = 1.0f);
 
 void EndTransition(anim_controller* Control);
 

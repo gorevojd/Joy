@@ -47,8 +47,12 @@ struct entity_character{
 struct test_game_mode_state{
     game_camera Camera;
     
-    float CameraSpeed;
-    float MouseSencitivity;
+    f64 GameTime;
+    f32 GameDeltaTime;
+    f32 WorldSpeedUp;
+    
+    f32 CameraSpeed;
+    f32 MouseSencitivity;
     
     v3* SphereDistributionsTrig;
     v3* SphereDistributionsFib;
@@ -267,6 +271,8 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFriendControl){
     AddAnimState(Control, AnimState_Animation, "JumpUp");
     AddAnimState(Control, AnimState_Animation, "Land");
     
+    f32 SpeedShiftPoint = 0.05f;
+    
     // NOTE(Dima): Idle -> Run
     BeginTransition(Control, "Idle", "Run", 0.35f);
     AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, 0.05f);
@@ -274,17 +280,17 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFriendControl){
     
     // NOTE(Dima): Run -> Idle
     BeginTransition(Control, "Run", "Idle");
-    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_LessThan, 0.05f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_LessThan, SpeedShiftPoint);
     EndTransition(Control);
     
     BeginTransition(Control, ANIM_ANY_STATE, "JumpUp");
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, true);
-    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_MoreThan, 0.05f);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_MoreThan, SpeedShiftPoint);
     EndTransition(Control);
     
     BeginTransition(Control, ANIM_ANY_STATE, "Falling", 0.5f, false);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, true);
-    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, -0.05f);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, -SpeedShiftPoint);
     EndTransition(Control);
     
     BeginTransition(Control, "Falling", "Land", 0.05f, false);
@@ -293,20 +299,24 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFriendControl){
     EndTransition(Control);
     
     BeginTransition(Control, "Falling", "Idle", 0.2f);
-    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_LessThan, 0.05f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_LessThan, SpeedShiftPoint);
     AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_MoreEqThan, -6.0f);
     AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, 0.5f);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
     EndTransition(Control);
     
     BeginTransition(Control, "Falling", "Run", 0.2f);
-    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, 0.05f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, SpeedShiftPoint);
     AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_MoreEqThan, -6.0f);
     AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, 0.5f);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
     EndTransition(Control);
     
     BeginTransition(Control, "Land", "Idle", 0.2f, true);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Land", "Run", 0.3f, true, 0.55f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, SpeedShiftPoint);
     EndTransition(Control);
     
     return(Control);
@@ -439,7 +449,9 @@ INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
     
     model_info* Model = Character->Model;
     
-    b32 CanMove = (!StateIsPlaying(&Character->AnimComponent, "Land"));
+    b32 IsLanded = StateIsPlaying(&Character->AnimComponent, "Land") && 
+        (GetPlayingStatePhase(&Character->AnimComponent) < 0.55f);
+    b32 CanMove = !IsLanded;
     
     Character->dP.z = 0.0f;
     if(CanMove && KeyIsDown(Input, Key_Z)){
@@ -485,6 +497,9 @@ GAME_MODE_UPDATE(TestUpdate){
     
     if(!State->Initialized){
         
+        State->GameTime = 0.0;
+        State->GameDeltaTime = 0.0001f;
+        State->WorldSpeedUp = 1.0f;
         State->Camera = {};
         State->Camera.P = V3(0.0f, 5.0f, 40.0f);
         State->CameraSpeed = 5.0f;
@@ -525,7 +540,7 @@ GAME_MODE_UPDATE(TestUpdate){
             v3 P = V3((CharIndex % (int)Sqrt(TEMP_CHARACTERS_COUNT)) * 2, 10.0f, 
                       (CharIndex / (int)Sqrt(TEMP_CHARACTERS_COUNT)) * 2);
             
-            int CharType = (CharIndex * 1234567 - (CharIndex & 3)) % 5;
+            int CharType = CharIndex % 6;
             
             InitCharacter(Game->Assets, 
                           Char,
@@ -540,6 +555,8 @@ GAME_MODE_UPDATE(TestUpdate){
     }
     
     f64 DeltaTime = Game->Render->FrameInfo.dt;
+    State->GameDeltaTime = DeltaTime * State->WorldSpeedUp;
+    State->GameTime += DeltaTime * State->WorldSpeedUp;
     
     // NOTE(Dima): Processing camera
     game_camera* Camera = &State->Camera;
@@ -617,6 +634,11 @@ GAME_MODE_UPDATE(TestUpdate){
                 &FindSphereQuality, 
                 0.0f, 1.0f,
                 "LOD");
+    
+    SliderFloat(Game->Gui,
+                &State->WorldSpeedUp,
+                0.1f, 3.0f,
+                "World speedup");
     
     u32 FindTagTypes[1] = {AssetTag_LOD};
     asset_tag_value FindTagValues[1] = {FindSphereQuality};
@@ -724,8 +746,8 @@ GAME_MODE_UPDATE(TestUpdate){
                     V3(10.0f, 0.0f, 10.0f),
                     QuatI(), 
                     V3(1.0f),
-                    Game->Input->Time,
-                    Game->Input->DeltaTime,
+                    State->GameTime,
+                    State->GameDeltaTime,
                     &State->PlayerAnimComponent);
     }
 #endif
@@ -739,8 +761,8 @@ GAME_MODE_UPDATE(TestUpdate){
                         Stack,
                         Game->Input,
                         &State->Characters[CharIndex],
-                        Game->Input->Time,
-                        Game->Input->DeltaTime);
+                        State->GameTime,
+                        State->GameDeltaTime);
     }
 #endif
     
