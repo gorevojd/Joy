@@ -165,9 +165,6 @@ struct Win_Memory_Region{
     Win_Memory_Region* Prev;
 };
 
-#define WIN32_DEBUG_OUTPUT(name) void name(const char* Str)
-typedef WIN32_DEBUG_OUTPUT(win32_debug_output);
-
 struct win_critical_section_slot{
     CRITICAL_SECTION Section;
     b32 InUse;
@@ -206,8 +203,6 @@ struct win_state{
     
     ticket_mutex memoryMutex;
     Win_Memory_Region memorySentinel;
-    
-    win32_debug_output* DebugOutputFunc;
     
     LARGE_INTEGER PerformanceFreqLI;
     double OneOverPerformanceFreq;

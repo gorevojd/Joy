@@ -405,6 +405,8 @@ added_asset AddAnimationClipAsset(asset_system* System, tool_animation_info* Ani
     AnimationHeader->NodeAnimationIDsCount = Animation->NodeAnimations.size();
     AnimationHeader->NodesCheckSum = Animation->NodesCheckSum;
     AnimationHeader->IsLooping = Animation->IsLooping;
+    AnimationHeader->UsesRootMotion = Animation->UsesRootMotion;
+    AnimationHeader->RootMotionNodeAnimID = Animation->RootMotionNodeAnimID;
     
     AnimationHeader->DataOffsetToNodeAnimationIDs = 0;
     AnimationHeader->SizeNodeAnimationIDs = sizeof(u32) * Animation->NodeAnimations.size();

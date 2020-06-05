@@ -189,6 +189,8 @@ enum renderer_type{
     Renderer_Count,
 };
 
+//#define RENDER_PLATFORM_CREATE_TEXTURE(name) render_texture name()
+
 #define RENDER_PLATFORM_SWAPBUFFERS(name) void name()
 typedef RENDER_PLATFORM_SWAPBUFFERS(render_platform_swapbuffers);
 
@@ -211,8 +213,8 @@ struct render_platform_api{
 };
 
 struct platform_api{
-    platform_job_queue HighPriorityQueue;
-    platform_job_queue LowPriorityQueue;
+    platform_job_queue ImmediateQueue;
+    platform_job_queue AsyncQueue;
     
     platform_read_file* ReadFile;
     platform_write_file* WriteFile;

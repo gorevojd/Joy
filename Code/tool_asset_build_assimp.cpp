@@ -1,8 +1,7 @@
 #include "tool_asset_build_assimp.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_STATIC
-#include "stb_image.h"
+#include "tool_asset_build_loading.cpp"
+#include "tool_asset_build_commands.cpp"
 
 inline int ConvertAssimpToOurTextureType(u32 Assimp){
     int Result = MaterialTexture_Unknown;
@@ -60,6 +59,16 @@ inline int ConvertAssimpToOurTextureType(u32 Assimp){
     return(Result);
 }
 
+
+void ReplaceSlashes(std::string& Path){
+    for(int i = 0; i < Path.length(); i++){
+        if(Path[i] == '\\'){
+            Path[i] = '/';
+        }
+    }
+}
+
+
 void ReplaceSpecialPath(std::string& Path,
                         char* SpecialPath,
                         char* NewPath)
@@ -70,14 +79,6 @@ void ReplaceSpecialPath(std::string& Path,
     
     if(IsSpecial){
         Path.replace(SpecialFindIndex, StringLength(SpecialPath), NewPath);
-    }
-}
-
-void ReplaceSlashes(std::string& Path){
-    for(int i = 0; i < Path.length(); i++){
-        if(Path[i] == '\\'){
-            Path[i] = '/';
-        }
     }
 }
 
@@ -170,6 +171,14 @@ AiLoadMatTexturesForType(loaded_model* Model,
                                        "..\\Forest Animals Unity Project\\Forest Animals Unity\\Assets\\Forest Animals\\",
                                        "../Data/Models/ForestAnimals/");
                     
+                    ReplaceSpecialPath(TexturePathNew, 
+                                       "..\\Farm Animals Unity Project\\Assets\\Farm Animals\\",
+                                       "../Data/Models/FarmAnimals/");
+                    
+                    ReplaceSpecialPath(TexturePathNew, 
+                                       "..\\Assets\\Insect Characters\\",
+                                       "../Data/Models/Insects/");
+                    
                     ReplaceSlashes(TexturePathNew);
                     
                     loaded_mat_texture Tex;
@@ -233,7 +242,9 @@ struct temp_bone_storage{
     std::vector<int> ChildStorageIndices;
 };
 
-loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context* LoadingCtx)
+loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, 
+                               model_loading_context* LoadingCtx,
+                               const std::string& RootMotionNodeName)
 {
     loaded_model Result = {};
     
@@ -256,6 +267,9 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
     b32 InGenNorm = Flags & Load_GenerateNormals;
     b32 InGenSmNorm = Flags & Load_GenerateSmoothNormals;
     b32 IsOnlyAnim = Flags & Load_ImportOnlyAnimation;
+    b32 ExtractRootMotionY = (Flags & Load_ExtractRootMotionY) != 0;
+    b32 ExtractRootMotionZ = (Flags & Load_ExtractRootMotionZ) != 0;
+    b32 UsesRootMotion = ExtractRootMotionY || ExtractRootMotionZ;
     
     // NOTE(Dima): Generating tangents if needed
     if (InGenTangents) {
@@ -284,6 +298,8 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
     const aiScene* scene = importer.ReadFile(
                                              FileName,
                                              AssimpFlags);
+    
+    //scene->mMetaData->Get("UnitScaleFactor", factor);
     
     double factor(0.0);
     scene->mMetaData->Get("UnitScaleFactor", factor);
@@ -623,17 +639,25 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         
         // NOTE(Dima): Finding root animated node name
         std::string RootAnimatedNodeName = "";
-        for(int ScanIndex = 0; 
-            ScanIndex < Result.Nodes.size();
-            ScanIndex++)
-        {
-            loaded_node* CurNode = &Result.Nodes[ScanIndex];
-            
-            std::string CurNodeName = std::string(CurNode->Name);
-            if(AnimatedNodeNames.find(CurNodeName) != AnimatedNodeNames.end()){
-                RootAnimatedNodeName = CurNodeName;
-                break;
+        if(RootMotionNodeName == ""){
+            for(int ScanIndex = 0; 
+                ScanIndex < Result.Nodes.size();
+                ScanIndex++)
+            {
+                loaded_node* CurNode = &Result.Nodes[ScanIndex];
+                
+                std::string CurNodeName = std::string(CurNode->Name);
+                if(AnimatedNodeNames.find(CurNodeName) != AnimatedNodeNames.end()){
+                    RootAnimatedNodeName = CurNodeName;
+                    break;
+                }
             }
+        }
+        else{
+            RootAnimatedNodeName = RootMotionNodeName;
+            
+            b32 RootNodeNameExist = AnimatedNodeNames.find(RootAnimatedNodeName) != AnimatedNodeNames.end();
+            Assert(RootNodeNameExist);
         }
         
         tool_animation_info NewAnimation;
@@ -643,6 +667,9 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         NewAnimation.TicksPerSecond = AssimpAnim->mTicksPerSecond;
         NewAnimation.NodesCheckSum = Result.NodesCheckSum;
         NewAnimation.IsLooping = (Flags & Load_AnimationWillBeLooped) != 0;
+        NewAnimation.UsesRootMotion = UsesRootMotion;
+        
+        tool_node_animation* RootMotionNodeAnim = &NewAnimation.RootMotionNodeAnim;
         
         for(int NodeAnimIndex = 0;
             NodeAnimIndex < AssimpAnim->mNumChannels;
@@ -653,8 +680,8 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
             std::string NodeName = std::string(AssimpNodeAnim->mNodeName.C_Str());
             
             // NOTE(Dima): Ignoring root node animation
-            //b32 ShouldLoadTranslation = !(IgnoreRootTranslation && (NodeName == RootAnimatedNodeName));
-            //b32 ShouldLoadRotation = !(IgnoreRootRotation && (NodeName == RootAnimatedNodeName));
+            b32 IsRootMotionNode = (NodeName == RootAnimatedNodeName);
+            
             tool_node_animation NewNodeAnim = {};
             
             // NOTE(Dima): Setting name
@@ -672,8 +699,33 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
             {
                 aiVectorKey* Key = &AssimpNodeAnim->mPositionKeys[KeyIndex];
                 
-                NewNodeAnim.PositionValues.push_back(Assimp2JoyVector3(Key->mValue));
-                NewNodeAnim.PositionTimes.push_back(Key->mTime);
+                float Time = Key->mTime;
+                v3 Value = Assimp2JoyVector3(Key->mValue);
+                
+                if(UsesRootMotion && IsRootMotionNode){
+                    v3 Extracted = {};
+                    
+                    if(ExtractRootMotionY){
+                        Extracted.x = Value.x;
+                        Extracted.z = Value.z;
+                        
+                        Value.x = 0.0f;
+                        Value.z = 0.0f;
+                    }
+                    else if(ExtractRootMotionZ){
+                        Extracted.x = Value.x;
+                        Extracted.y = Value.y;
+                        
+                        Value.x = 0.0f;
+                        Value.y = 0.0f;
+                    }
+                    
+                    RootMotionNodeAnim->PositionValues.push_back(Extracted);
+                    RootMotionNodeAnim->PositionTimes.push_back(Time);
+                }
+                
+                NewNodeAnim.PositionValues.push_back(Value);
+                NewNodeAnim.PositionTimes.push_back(Time);
             }
             
             // NOTE(Dima): Loading rotation keys
@@ -683,8 +735,18 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
             {
                 aiQuatKey* Key = &AssimpNodeAnim->mRotationKeys[KeyIndex];
                 
-                NewNodeAnim.RotationValues.push_back(Assimp2JoyQuat(Key->mValue));
-                NewNodeAnim.RotationTimes.push_back(Key->mTime);
+                float Time = Key->mTime;
+                quat Value = Assimp2JoyQuat(Key->mValue);
+                
+                if(ExtractRootMotionY){
+                    
+                }
+                else if(ExtractRootMotionZ){
+                    
+                }
+                
+                NewNodeAnim.RotationValues.push_back(Value);
+                NewNodeAnim.RotationTimes.push_back(Time);
             }
             
             // NOTE(Dima): Loading scaling keys
@@ -705,7 +767,6 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags, model_loading_context*
         // NOTE(Dima): Pushing animation to vector
         Result.Animations.push_back(NewAnimation);
     }
-    
     
     if(!IsOnlyAnim){
         // NOTE(Dima): Loading meshes
@@ -889,6 +950,25 @@ INTERNAL_FUNCTION void StoreAnimationsToGroupID(asset_system* System,
             
             added_asset Added = AddNodeAnimationAsset(System, NodeAnim);
             Animation->NodeAnimationsStoredIDs.push_back(Added.ID);
+        }
+    }
+    
+    // NOTE(Dima): Storing root motion node animations and saving IDs
+    for(int AnimIndex = 0;
+        AnimIndex < Model->Animations.size();
+        AnimIndex++)
+    {
+        tool_animation_info* Animation = &Model->Animations[AnimIndex];
+        
+        if(Animation->UsesRootMotion){
+            
+            tool_node_animation* NodeAnim = &Animation->RootMotionNodeAnim;
+            
+            added_asset Added = AddNodeAnimationAsset(System, NodeAnim);
+            Animation->RootMotionNodeAnimID = Added.ID;
+        }
+        else{
+            Animation->RootMotionNodeAnimID = 0xFFFFFFFF;
         }
     }
     EndAsset(System);
@@ -1084,8 +1164,8 @@ INTERNAL_FUNCTION void StoreLoadingContext(asset_system* System,
         
         Source->LoadedModel = LoadModelByASSIMP((char*)Source->Path.c_str(),
                                                 Source->Flags,
-                                                LoadingCtx);
-        
+                                                LoadingCtx,
+                                                Source->RootMotionNodeName);
     }
     
     // NOTE(Dima): Storing bitmaps
@@ -1111,216 +1191,4 @@ INTERNAL_FUNCTION void StoreLoadingContext(asset_system* System,
         }
         
     }
-}
-
-inline void PushDirectory(model_loading_context* Ctx, char* DirPath){
-    // NOTE(Dima): DirectoryStack should be empty
-    Assert(Ctx->DirStack.empty());
-    
-    Ctx->DirStack.push(std::string(DirPath));
-}
-
-inline void PopDirectory(model_loading_context* Ctx){
-    // NOTE(Dima): DirectoryStack should be empty
-    Assert(!Ctx->DirStack.empty());
-    Assert(Ctx->DirStack.size() == 1);
-    
-    Ctx->DirStack.pop();
-}
-
-inline std::string GetAssetPathForLoadingContext(model_loading_context* Ctx, char* InitPath){
-    std::string Result = "";
-    
-    if(!Ctx->DirStack.empty()){
-        Result += Ctx->DirStack.top();
-        
-        if(Result[Result.length() - 1] != '/'){
-            Result += "/";
-        }
-    }
-    
-    Result += std::string(InitPath);
-    
-    return(Result);
-}
-
-inline void AddModelSource(model_loading_context* Ctx, 
-                           char* Path, 
-                           u32 AssetGroup,
-                           u32 Flags)
-{
-    std::string NewPath = GetAssetPathForLoadingContext(Ctx, Path);
-    
-    load_model_source Source = ModelSource(NewPath, AssetGroup, 
-                                           Flags, Ctx->TagHub);
-    
-    Ctx->ModelSources.push_back(Source);
-}
-
-inline void AddAnimSource(model_loading_context* Ctx, 
-                          char* Path, 
-                          u32 AssetGroup,
-                          u32 Flags,
-                          b32 IsLooped)
-{
-    std::string NewPath = GetAssetPathForLoadingContext(Ctx, Path);
-    
-    if(IsLooped){
-        Flags |= Load_AnimationWillBeLooped;
-    }
-    
-    load_model_source Source = ModelSource(NewPath, AssetGroup, 
-                                           Flags | Load_ImportOnlyAnimation, 
-                                           Ctx->TagHub);
-    
-    
-    Ctx->ModelSources.push_back(Source);
-}
-
-inline void BeginCharacter(model_loading_context* Ctx, u32 CharacterTagValue){
-    Assert(!Ctx->CharacterBeginned);
-    Ctx->CharacterBeginned = true;
-    
-    Ctx->TagHub.AddIntTag(AssetTag_Character, CharacterTagValue);
-}
-
-inline void EndCharacter(model_loading_context* Ctx){
-    Assert(Ctx->CharacterBeginned);
-    Ctx->CharacterBeginned = false;
-    
-    Ctx->TagHub.PopTag();
-}
-
-inline void PushIntTag(model_loading_context* Ctx, u32 AssetTag, u32 TagValue){
-    Ctx->TagHub.AddIntTag(AssetTag, TagValue);
-}
-
-inline void PopTag(model_loading_context* Ctx){
-    Ctx->TagHub.PopTag();
-}
-
-INTERNAL_FUNCTION void WriteMeshes1(){
-    asset_system System_ = {};
-    asset_system* System = &System_;
-    InitAssetFile(System);
-    
-    model_loading_context LoadCtx = {};
-    model_loading_context* Ctx = &LoadCtx;
-    
-    u32 DefaultFlags = 
-        Load_GenerateNormals |
-        Load_GenerateTangents;
-    
-    AddModelSource(Ctx, "../Data/Models/Animations/Male_Casual.fbx",
-                   GameAsset_Man,
-                   DefaultFlags);
-    
-    // NOTE(Dima): Storing loading context
-    StoreLoadingContext(System, Ctx);
-    
-    WriteAssetFile(System, "../Data/AssimpMeshes1.ja");
-}
-
-
-INTERNAL_FUNCTION void AddCharacterToWrite(model_loading_context* Ctx, 
-                                           char* DataFolder,
-                                           u32 TagCharacterValue,
-                                           char* ModelName)
-{
-    u32 DefaultFlags = 
-        Load_GenerateNormals |
-        Load_GenerateTangents;
-    
-    BeginCharacter(Ctx, TagCharacterValue);
-    PushDirectory(Ctx, DataFolder);
-    
-    AddModelSource(Ctx, ModelName,
-                   GameAsset_Model_Character, DefaultFlags);
-    
-    AddAnimSource(Ctx, "animations/Failure.fbx", 
-                  GameAsset_Anim_Failure, DefaultFlags, false);
-    
-    AddAnimSource(Ctx, "animations/Fall.fbx",
-                  GameAsset_Anim_Fall, DefaultFlags, true);
-    
-    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
-    AddAnimSource(Ctx, "animations/Idle.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags, true);
-    
-    PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
-    AddAnimSource(Ctx, "animations/Idle_2.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags, true);
-    
-    AddAnimSource(Ctx, "animations/Jump_Up.fbx",
-                  GameAsset_Anim_JumpUp, DefaultFlags, true);
-    
-    AddAnimSource(Ctx, "animations/Land.fbx",
-                  GameAsset_Anim_Land, DefaultFlags, false);
-    
-    AddAnimSource(Ctx, "animations/Roll_In_Place.fbx",
-                  GameAsset_Anim_Roll, DefaultFlags, false);
-    
-    AddAnimSource(Ctx, "animations/Run_In_Place.fbx",
-                  GameAsset_Anim_Run, DefaultFlags, true);
-    
-    AddAnimSource(Ctx, "animations/Sleep.fbx",
-                  GameAsset_Anim_Sleep, DefaultFlags, true);
-    
-    AddAnimSource(Ctx, "animations/Success.fbx",
-                  GameAsset_Anim_Success, DefaultFlags, false);
-    
-    AddAnimSource(Ctx, "animations/Talk.fbx",
-                  GameAsset_Anim_Talk, DefaultFlags, true);
-    
-    AddAnimSource(Ctx, "animations/Walk_In_Place.fbx",
-                  GameAsset_Anim_Walk, DefaultFlags, true);
-    PopDirectory(Ctx);
-    EndCharacter(Ctx);
-}
-
-INTERNAL_FUNCTION void WriteForestAnimals(){
-    asset_system System_ = {};
-    asset_system* System = &System_;
-    InitAssetFile(System);
-    
-    model_loading_context LoadCtx = {};
-    model_loading_context* Ctx = &LoadCtx;
-    
-    AddCharacterToWrite(Ctx, "../Data/Models/ForestAnimals/Deer",
-                        TagCharacter_Deer,
-                        "Deer.fbx");
-    
-    AddCharacterToWrite(Ctx, "../Data/Models/ForestAnimals/Rabbit",
-                        TagCharacter_Rabbit,
-                        "Rabbit.fbx");
-    
-    AddCharacterToWrite(Ctx, "../Data/Models/ForestAnimals/Fox",
-                        TagCharacter_Fox,
-                        "Fox.fbx");
-    
-    AddCharacterToWrite(Ctx, "../Data/Models/ForestAnimals/Moose",
-                        TagCharacter_Moose,
-                        "Moose.fbx");
-    
-    AddCharacterToWrite(Ctx, "../Data/Models/ForestAnimals/Bear",
-                        TagCharacter_Bear,
-                        "Bear.fbx");
-    
-    AddCharacterToWrite(Ctx, "../Data/Models/ForestAnimals/Coyote",
-                        TagCharacter_Coyote,
-                        "Coyote.fbx");
-    
-    // NOTE(Dima): Storing loading context
-    StoreLoadingContext(System, Ctx);
-    
-    WriteAssetFile(System, "../Data/ForestAnimals.ja");
-}
-
-int main(int ArgsCount, char** Args){
-    
-    WriteMeshes1();
-    WriteForestAnimals();
-    
-    system("pause");
-    return(0);
 }

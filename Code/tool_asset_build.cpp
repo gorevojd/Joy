@@ -1,8 +1,7 @@
 #include "tool_asset_build.h"
 
-#define STB_SPRINTF_STATIC
-#define STB_SPRINTF_IMPLEMENTATION
-#include "stb_sprintf.h"
+#include "tool_asset_build_loading.cpp"
+#include "tool_asset_build_commands.cpp"
 
 INTERNAL_FUNCTION void StoreFontAsset(asset_system* System, 
                                       u32 GameAssetGroup,

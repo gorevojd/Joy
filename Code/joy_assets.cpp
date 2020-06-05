@@ -681,7 +681,7 @@ void ImportAsset(assets* Assets, asset* Asset, b32 Immediate){
                 CallbackData->LoadDestSize = DataSize;
                 CallbackData->Task = Task;
                 
-                Platform.AddEntry(&Platform.LowPriorityQueue,
+                Platform.AddEntry(&Platform.AsyncQueue,
                                   ImportAssetCallback, CallbackData);
             }
             else{
@@ -1200,6 +1200,9 @@ corresponding asset groups (Main groups, and tag groups for each tag
                             Clip->TicksPerSecond = Src->TicksPerSecond;
                             Clip->NodeAnimationsCount = Src->NodeAnimationIDsCount;
                             Clip->NodesCheckSum = Src->NodesCheckSum;
+                            Clip->UsesRootMotion = Src->UsesRootMotion;
+                            Clip->RootMotionNodeAnimID = FileToIntegratedID(FileSource, 
+                                                                            Src->RootMotionNodeAnimID);
                         }break;
                         
                         case AssetType_Skeleton:{

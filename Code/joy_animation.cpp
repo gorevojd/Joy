@@ -56,7 +56,6 @@ INTERNAL_FUNCTION inline int FindPrevFrameIndexForKeyBinary(float* Times,
     return(Result);
 }
 
-
 INTERNAL_FUNCTION inline find_anim_deltas_ctx
 FindAnimDeltas(animation_clip* Animation,
                float* Times,
@@ -65,96 +64,98 @@ FindAnimDeltas(animation_clip* Animation,
 {
     find_anim_deltas_ctx Result = {};
     
-    // NOTE(Dima): Finding frame index before CurTickTime
-    int FoundPrevIndex = FindPrevFrameIndexForKeyBinary(Times,
-                                                        KeysCount,
-                                                        CurTickTime);
-    
-    int LastFrameIndex = KeysCount - 1;
-    
-    // NOTE(Dima): If not last key frame
-    float PrevKeyTime = Times[FoundPrevIndex];
-    
-    // NOTE(Dima): If found frame is not last
-    int NextKeyIndex = FoundPrevIndex + 1;
-    f32 TickDistance = Times[NextKeyIndex] - PrevKeyTime;
-    
-    // NOTE(Dima): Else
-    if(FoundPrevIndex == LastFrameIndex)
-    {
-        if(Animation->IsLooping){
-            NextKeyIndex = 0;
-            
-            TickDistance = Animation->DurationTicks - PrevKeyTime + 1.0f;
+    Result.Success = KeysCount > 0;
+    if(Result.Success){
+        // NOTE(Dima): Finding frame index before CurTickTime
+        int FoundPrevIndex = 0;
+        
+#if 1
+        if((int)Animation->DurationTicks == KeysCount - 1){
+            FoundPrevIndex = (int)(CurTickTime);
         }
         else{
-            // NOTE(Dima): If animation is not looping - set next key to previous to make
-            // NOTE(Dima): sure transform stays the same
-            NextKeyIndex = FoundPrevIndex;
-            
-            TickDistance = 1.0f;
+            FoundPrevIndex = FindPrevFrameIndexForKeyBinary(Times,
+                                                            KeysCount,
+                                                            CurTickTime);
         }
+#else
+        FoundPrevIndex = FindPrevFrameIndexForKeyBinary(Times,
+                                                        KeysCount,
+                                                        CurTickTime);
+#endif
+        
+        int NextKeyIndex = 0;
+        f32 TickDistance = 1.0f;
+        f32 PrevKeyTime = 0.0f;
+        int LastFrameIndex = KeysCount - 1;
+        
+        if(FoundPrevIndex >= LastFrameIndex)
+        {
+            FoundPrevIndex = LastFrameIndex;
+            PrevKeyTime = Times[LastFrameIndex];
+            if(Animation->IsLooping){
+                NextKeyIndex = 0;
+                
+                TickDistance = Animation->DurationTicks - PrevKeyTime + 1.0f;
+            }
+            else{
+                // NOTE(Dima): If animation is not looping - set next key to previous to make
+                // NOTE(Dima): sure transform stays the same
+                NextKeyIndex = FoundPrevIndex;
+                
+                TickDistance = 1.0f;
+            }
+        }
+        else{
+            PrevKeyTime = Times[FoundPrevIndex];
+            NextKeyIndex = FoundPrevIndex + 1;
+            TickDistance = Times[NextKeyIndex] - PrevKeyTime;
+        }
+        
+        // NOTE(Dima): Lerping
+        Result.PrevKeyIndex = FoundPrevIndex;
+        Result.NextKeyIndex = NextKeyIndex;
+        Result.t = (CurTickTime - PrevKeyTime) / TickDistance;
     }
-    
-    // NOTE(Dima): Lerping
-    Result.PrevKeyIndex = FoundPrevIndex;
-    Result.NextKeyIndex = NextKeyIndex;
-    Result.t = (CurTickTime - PrevKeyTime) / TickDistance;
     
     return(Result);
 }
 
-INTERNAL_FUNCTION inline v3 GetAnimatedVector(animation_clip* Animation,
+INTERNAL_FUNCTION inline v3 GetAnimatedVector(const find_anim_deltas_ctx& AnimDeltas,
                                               v3* Values,
-                                              float* Times,
-                                              int KeysCount,
-                                              f32 CurTickTime,
                                               v3 DefaultValue)
 {
     v3 Result = DefaultValue;
     
     // NOTE(Dima): Loading first frame's values
-    if(KeysCount){
-        find_anim_deltas_ctx AnimDeltasCtx = FindAnimDeltas(Animation,
-                                                            Times,
-                                                            KeysCount,
-                                                            CurTickTime);
+    if(AnimDeltas.Success){
         
-        v3 PrevValue = Values[AnimDeltasCtx.PrevKeyIndex];
-        v3 NextValue = Values[AnimDeltasCtx.NextKeyIndex];
+        v3 PrevValue = Values[AnimDeltas.PrevKeyIndex];
+        v3 NextValue = Values[AnimDeltas.NextKeyIndex];
         
         // NOTE(Dima): Lerping vectors
-        float t = AnimDeltasCtx.t;
-        float OneMinusT = 1.0f - t;
-        Result = V3(PrevValue.x * OneMinusT + NextValue.x * AnimDeltasCtx.t,
-                    PrevValue.y * OneMinusT + NextValue.y * AnimDeltasCtx.t,
-                    PrevValue.z * OneMinusT + NextValue.z * AnimDeltasCtx.t);
+        float OneMinusT = 1.0f - AnimDeltas.t;
+        Result = V3(PrevValue.x * OneMinusT + NextValue.x * AnimDeltas.t,
+                    PrevValue.y * OneMinusT + NextValue.y * AnimDeltas.t,
+                    PrevValue.z * OneMinusT + NextValue.z * AnimDeltas.t);
     }
     
     return(Result);
 }
 
-INTERNAL_FUNCTION inline quat GetAnimatedQuat(animation_clip* Animation,
+INTERNAL_FUNCTION inline quat GetAnimatedQuat(const find_anim_deltas_ctx& AnimDeltas,
                                               quat* Values,
-                                              float* Times,
-                                              int KeysCount,
-                                              f32 CurTickTime,
                                               quat DefaultValue)
 {
     quat Result = DefaultValue;
     
     // NOTE(Dima): Loading first frame's values
-    if(KeysCount){
-        find_anim_deltas_ctx AnimDeltasCtx = FindAnimDeltas(Animation,
-                                                            Times,
-                                                            KeysCount,
-                                                            CurTickTime);
-        
-        quat PrevValue = Values[AnimDeltasCtx.PrevKeyIndex];
-        quat NextValue = Values[AnimDeltasCtx.NextKeyIndex];
+    if(AnimDeltas.Success){
+        quat PrevValue = Values[AnimDeltas.PrevKeyIndex];
+        quat NextValue = Values[AnimDeltas.NextKeyIndex];
         
         // NOTE(Dima): Lerping quaternion
-        Result = Lerp(PrevValue, NextValue, AnimDeltasCtx.t);
+        Result = Lerp(PrevValue, NextValue, AnimDeltas.t);
     }
     
     return(Result);
@@ -232,6 +233,40 @@ INTERNAL_FUNCTION void ClearNodeTransforms(node_transforms_block* Transforms, in
     
 }
 
+struct update_pa_nodes_work{
+    animation_clip* Animation;
+    
+    node_transforms_block Transforms;
+    b32 Calculated[ANIM_TRANSFORMS_ARRAY_SIZE];
+};
+
+struct update_node_anim_data{
+    node_animation* NodeAnim;
+    find_anim_deltas_ctx PosDeltas;
+    find_anim_deltas_ctx RotDeltas;
+    find_anim_deltas_ctx ScaDeltas;
+};
+
+PLATFORM_CALLBACK(UpdatePANodesWork){
+    update_pa_nodes_work* Work = (update_pa_nodes_work*)Data;
+    
+    
+}
+
+inline update_node_anim_data* GetNodeAnimData(update_node_anim_data* Datas,
+                                              int Index, int Count,
+                                              update_node_anim_data* Default)
+{
+    update_node_anim_data* Result = &Datas[Index];
+    
+    if(Index >= Count){
+        Assert(Default);
+        Result = Default;
+    }
+    
+    return(Result);
+}
+
 INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
                                               model_info* Model,
                                               playing_anim* Playing,
@@ -264,6 +299,7 @@ INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
             Playing->Phase01 = Clamp01(CurrentTick / Animation->DurationTicks);
         }
         
+        update_node_anim_data NodeAnimationDatas[ANIM_TRANSFORMS_ARRAY_SIZE];
         for(int NodeAnimIndex = 0;
             NodeAnimIndex < Animation->NodeAnimationsCount;
             NodeAnimIndex++)
@@ -276,28 +312,56 @@ INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
             
             ASSERT(NodeAnim);
             
+            NodeAnimationDatas[NodeAnimIndex].NodeAnim = NodeAnim;
+        }
+        
+        {
+            BLOCK_TIMING("UpdatePA::Finding deltas");
+            
+            for(int NodeAnimIndex = 0;
+                NodeAnimIndex < Animation->NodeAnimationsCount;
+                NodeAnimIndex++)
             {
-                BLOCK_TIMING("UpdatePA::Getting");
                 
-                v3 AnimatedP = GetAnimatedVector(Animation,
+                node_animation* NodeAnim = NodeAnimationDatas[NodeAnimIndex].NodeAnim;
+                
+                NodeAnimationDatas[NodeAnimIndex].PosDeltas = FindAnimDeltas(Animation,
+                                                                             NodeAnim->PositionKeysTimes,
+                                                                             NodeAnim->PositionKeysCount,
+                                                                             CurrentTick);
+                NodeAnimationDatas[NodeAnimIndex].RotDeltas = FindAnimDeltas(Animation,
+                                                                             NodeAnim->RotationKeysTimes,
+                                                                             NodeAnim->RotationKeysCount,
+                                                                             CurrentTick);
+                NodeAnimationDatas[NodeAnimIndex].ScaDeltas = FindAnimDeltas(Animation,
+                                                                             NodeAnim->ScalingKeysTimes,
+                                                                             NodeAnim->ScalingKeysCount,
+                                                                             CurrentTick);
+            }
+        }
+        
+        {
+            BLOCK_TIMING("UpdatePA::Lerping");
+#if 0
+            for(int NodeAnimIndex = 0;
+                NodeAnimIndex < Animation->NodeAnimationsCount;
+                NodeAnimIndex++)
+            {
+                
+                update_node_anim_data* NodeAnimData = &NodeAnimationDatas[NodeAnimIndex];
+                
+                node_animation* NodeAnim = NodeAnimData->NodeAnim;
+                
+                v3 AnimatedP = GetAnimatedVector(NodeAnimData->PosDeltas,
                                                  NodeAnim->PositionKeysValues,
-                                                 NodeAnim->PositionKeysTimes,
-                                                 NodeAnim->PositionKeysCount,
-                                                 CurrentTick,
                                                  V3(0.0f, 0.0f, 0.0f));
                 
-                quat AnimatedR = GetAnimatedQuat(Animation,
+                quat AnimatedR = GetAnimatedQuat(NodeAnimData->RotDeltas,
                                                  NodeAnim->RotationKeysValues,
-                                                 NodeAnim->RotationKeysTimes,
-                                                 NodeAnim->RotationKeysCount,
-                                                 CurrentTick,
                                                  QuatI());
                 
-                v3 AnimatedS = GetAnimatedVector(Animation,
+                v3 AnimatedS = GetAnimatedVector(NodeAnimData->ScaDeltas,
                                                  NodeAnim->ScalingKeysValues,
-                                                 NodeAnim->ScalingKeysTimes,
-                                                 NodeAnim->ScalingKeysCount,
-                                                 CurrentTick,
                                                  V3(1.0f, 1.0f, 1.0f));
                 
                 int NodeIndex = NodeAnim->NodeIndex;
@@ -306,8 +370,175 @@ INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
                 Playing->NodeTransforms.Ss[NodeIndex] = AnimatedS;
                 Playing->TransformsCalculated[NodeIndex] = true;
             }
+#else
+            v3_4x DefaultT = V3_4X(V3(0.0f));
+            v4_4x DefaultR = V4_4X(QuatI());
+            v3_4x DefaultS = V3_4X(V3(1.0f));
+            
+            int NodeAnimIndex = 0;
+            for(NodeAnimIndex;
+                NodeAnimIndex < Animation->NodeAnimationsCount;
+                NodeAnimIndex += 4)
+            {
+                __m128i Indices = _mm_setr_epi32(NodeAnimIndex + 0,
+                                                 NodeAnimIndex + 1,
+                                                 NodeAnimIndex + 2,
+                                                 NodeAnimIndex + 3);
+                
+                i32_4x ResultCalculatedI = I32_4X((NodeAnimIndex + 0 < Animation->NodeAnimationsCount),
+                                                  (NodeAnimIndex + 1 < Animation->NodeAnimationsCount),
+                                                  (NodeAnimIndex + 2 < Animation->NodeAnimationsCount),
+                                                  (NodeAnimIndex + 3 < Animation->NodeAnimationsCount));
+                __m128i CompareResMaskI = _mm_cmplt_epi32(Indices, _mm_set1_epi32(Animation->NodeAnimationsCount));
+                
+                int MovedMask = _mm_movemask_ps(_mm_castsi128_ps(CompareResMaskI));
+                
+                // NOTE(Dima): If at least one of node animations exist
+                if(MovedMask){
+                    update_node_anim_data* NodeAnimData0 = &NodeAnimationDatas[NodeAnimIndex + 0];
+                    update_node_anim_data* NodeAnimData1 = GetNodeAnimData(NodeAnimationDatas, 
+                                                                           NodeAnimIndex + 1,
+                                                                           Animation->NodeAnimationsCount, 
+                                                                           NodeAnimData0);
+                    update_node_anim_data* NodeAnimData2 = GetNodeAnimData(NodeAnimationDatas, 
+                                                                           NodeAnimIndex + 2,
+                                                                           Animation->NodeAnimationsCount, 
+                                                                           NodeAnimData0);
+                    update_node_anim_data* NodeAnimData3 = GetNodeAnimData(NodeAnimationDatas, 
+                                                                           NodeAnimIndex + 3,
+                                                                           Animation->NodeAnimationsCount, 
+                                                                           NodeAnimData0);
+                    
+                    node_animation* NodeAnim0 = NodeAnimData0->NodeAnim;
+                    node_animation* NodeAnim1 = NodeAnimData1->NodeAnim;
+                    node_animation* NodeAnim2 = NodeAnimData2->NodeAnim;
+                    node_animation* NodeAnim3 = NodeAnimData3->NodeAnim;
+                    
+                    find_anim_deltas_ctx* PosDeltas0 = &NodeAnimData0->PosDeltas;
+                    find_anim_deltas_ctx* PosDeltas1 = &NodeAnimData1->PosDeltas;
+                    find_anim_deltas_ctx* PosDeltas2 = &NodeAnimData2->PosDeltas;
+                    find_anim_deltas_ctx* PosDeltas3 = &NodeAnimData3->PosDeltas;
+                    
+                    find_anim_deltas_ctx* RotDeltas0 = &NodeAnimData0->RotDeltas;
+                    find_anim_deltas_ctx* RotDeltas1 = &NodeAnimData1->RotDeltas;
+                    find_anim_deltas_ctx* RotDeltas2 = &NodeAnimData2->RotDeltas;
+                    find_anim_deltas_ctx* RotDeltas3 = &NodeAnimData3->RotDeltas;
+                    
+                    find_anim_deltas_ctx* ScaDeltas0 = &NodeAnimData0->ScaDeltas;
+                    find_anim_deltas_ctx* ScaDeltas1 = &NodeAnimData1->ScaDeltas;
+                    find_anim_deltas_ctx* ScaDeltas2 = &NodeAnimData2->ScaDeltas;
+                    find_anim_deltas_ctx* ScaDeltas3 = &NodeAnimData3->ScaDeltas;
+                    
+                    // NOTE(Dima): Setting position
+                    v3_4x PrevValueT = V3_4X(NodeAnim0->PositionKeysValues[PosDeltas0->PrevKeyIndex],
+                                             NodeAnim1->PositionKeysValues[PosDeltas1->PrevKeyIndex],
+                                             NodeAnim2->PositionKeysValues[PosDeltas2->PrevKeyIndex],
+                                             NodeAnim3->PositionKeysValues[PosDeltas3->PrevKeyIndex]);
+                    
+                    v3_4x NextValueT = V3_4X(NodeAnim0->PositionKeysValues[PosDeltas0->NextKeyIndex],
+                                             NodeAnim1->PositionKeysValues[PosDeltas1->NextKeyIndex],
+                                             NodeAnim2->PositionKeysValues[PosDeltas2->NextKeyIndex],
+                                             NodeAnim3->PositionKeysValues[PosDeltas3->NextKeyIndex]);
+                    
+                    f32_4x TimeDeltaT = F32_4X(PosDeltas0->t,
+                                               PosDeltas1->t,
+                                               PosDeltas2->t,
+                                               PosDeltas3->t);
+                    
+                    // NOTE(Dima): Setting rotation
+                    v4_4x PrevValueR = V4_4X(NodeAnim0->RotationKeysValues[RotDeltas0->PrevKeyIndex],
+                                             NodeAnim1->RotationKeysValues[RotDeltas1->PrevKeyIndex],
+                                             NodeAnim2->RotationKeysValues[RotDeltas2->PrevKeyIndex],
+                                             NodeAnim3->RotationKeysValues[RotDeltas3->PrevKeyIndex]);
+                    
+                    v4_4x NextValueR = V4_4X(NodeAnim0->RotationKeysValues[RotDeltas0->NextKeyIndex],
+                                             NodeAnim1->RotationKeysValues[RotDeltas1->NextKeyIndex],
+                                             NodeAnim2->RotationKeysValues[RotDeltas2->NextKeyIndex],
+                                             NodeAnim3->RotationKeysValues[RotDeltas3->NextKeyIndex]);
+                    
+                    f32_4x TimeDeltaR = F32_4X(RotDeltas0->t,
+                                               RotDeltas1->t,
+                                               RotDeltas2->t,
+                                               RotDeltas3->t);
+                    
+                    // NOTE(Dima): Setting scale
+                    v3_4x PrevValueS = V3_4X(NodeAnim0->ScalingKeysValues[ScaDeltas0->PrevKeyIndex],
+                                             NodeAnim1->ScalingKeysValues[ScaDeltas1->PrevKeyIndex],
+                                             NodeAnim2->ScalingKeysValues[ScaDeltas2->PrevKeyIndex],
+                                             NodeAnim3->ScalingKeysValues[ScaDeltas3->PrevKeyIndex]);
+                    
+                    v3_4x NextValueS = V3_4X(NodeAnim0->ScalingKeysValues[ScaDeltas0->NextKeyIndex],
+                                             NodeAnim1->ScalingKeysValues[ScaDeltas1->NextKeyIndex],
+                                             NodeAnim2->ScalingKeysValues[ScaDeltas2->NextKeyIndex],
+                                             NodeAnim3->ScalingKeysValues[ScaDeltas3->NextKeyIndex]);
+                    
+                    f32_4x TimeDeltaS = F32_4X(ScaDeltas0->t,
+                                               ScaDeltas1->t,
+                                               ScaDeltas2->t,
+                                               ScaDeltas3->t);
+                    
+                    // NOTE(Dima): Lerping
+                    v3_4x LerpedT = Lerp_4X(PrevValueT, NextValueT, TimeDeltaT);
+                    
+                    v4_4x LerpedR = LerpQuat_4X(PrevValueR, NextValueR, TimeDeltaR);
+                    
+                    v3_4x LerpedS = Lerp_4X(PrevValueS, NextValueS, TimeDeltaS);
+                    
+                    f32_4x SucceededT = IsTrue_4X(I32_4X(PosDeltas0->Success,
+                                                         PosDeltas1->Success,
+                                                         PosDeltas2->Success,
+                                                         PosDeltas3->Success));
+                    f32_4x SucceededR = IsTrue_4X(I32_4X(RotDeltas0->Success,
+                                                         RotDeltas1->Success,
+                                                         RotDeltas2->Success,
+                                                         RotDeltas3->Success));
+                    f32_4x SucceededS = IsTrue_4X(I32_4X(ScaDeltas0->Success,
+                                                         ScaDeltas1->Success,
+                                                         ScaDeltas2->Success,
+                                                         ScaDeltas3->Success));
+                    
+                    LerpedT = ConditionalCombine(SucceededT, LerpedT, DefaultT);
+                    LerpedR = ConditionalCombine(SucceededR, LerpedR, DefaultR);
+                    LerpedS = ConditionalCombine(SucceededS, LerpedS, DefaultS);
+                    
+                    // NOTE(Dima): Storing values
+                    v3* StoreToT[4] = {
+                        &Playing->NodeTransforms.Ts[NodeAnim0->NodeIndex],
+                        &Playing->NodeTransforms.Ts[NodeAnim1->NodeIndex],
+                        &Playing->NodeTransforms.Ts[NodeAnim2->NodeIndex],
+                        &Playing->NodeTransforms.Ts[NodeAnim3->NodeIndex]};
+                    V3_4X_StoreConditional(LerpedT, MovedMask, StoreToT);
+                    
+                    quat* StoreToR[4] = {
+                        &Playing->NodeTransforms.Rs[NodeAnim0->NodeIndex],
+                        &Playing->NodeTransforms.Rs[NodeAnim1->NodeIndex],
+                        &Playing->NodeTransforms.Rs[NodeAnim2->NodeIndex],
+                        &Playing->NodeTransforms.Rs[NodeAnim3->NodeIndex]};
+                    V4_4X_StoreConditional(LerpedR, MovedMask, StoreToR);
+                    
+                    v3* StoreToS[4] = {
+                        &Playing->NodeTransforms.Ss[NodeAnim0->NodeIndex],
+                        &Playing->NodeTransforms.Ss[NodeAnim1->NodeIndex],
+                        &Playing->NodeTransforms.Ss[NodeAnim2->NodeIndex],
+                        &Playing->NodeTransforms.Ss[NodeAnim3->NodeIndex]
+                    };
+                    V3_4X_StoreConditional(LerpedS, MovedMask, StoreToS);
+                    
+                    b32* StoreToCalc[4] = {
+                        &Playing->TransformsCalculated[NodeAnim0->NodeIndex],
+                        &Playing->TransformsCalculated[NodeAnim1->NodeIndex],
+                        &Playing->TransformsCalculated[NodeAnim2->NodeIndex],
+                        &Playing->TransformsCalculated[NodeAnim3->NodeIndex]
+                    };
+                    
+                    I32_4X_StoreConditional(ResultCalculatedI, MovedMask, StoreToCalc);
+                }
+                else{
+                    break;
+                }
+            }
+#endif
         }
-        
         {
             BLOCK_TIMING("UpdatePA::Decomposing");
             // NOTE(Dima): Extract transforms that were not calculated
@@ -346,7 +577,9 @@ INTERNAL_FUNCTION void ResetToParentTransforms(model_info* Model){
 INTERNAL_FUNCTION void CalculateToParentTransforms(model_info* Model, 
                                                    node_transforms_block* Transforms)
 {
-#if 0 
+    FUNCTION_TIMING();
+    
+#if 0
     for(int NodeIndex = 0; 
         NodeIndex < Model->NodeCount;
         NodeIndex++)
@@ -362,53 +595,56 @@ INTERNAL_FUNCTION void CalculateToParentTransforms(model_info* Model,
 #else
     int NodeIndex;
     for(NodeIndex = 0; 
-        NodeIndex < Model->NodeCount - 3;
+        NodeIndex < Model->NodeCount;
         NodeIndex+=4)
     {
-        m44_4x Tra = M44_4X(TranslationMatrix(Transforms->Ts[NodeIndex + 0]),
-                            TranslationMatrix(Transforms->Ts[NodeIndex + 1]),
-                            TranslationMatrix(Transforms->Ts[NodeIndex + 2]),
-                            TranslationMatrix(Transforms->Ts[NodeIndex + 3]));
-        m44_4x Rot = M44_4X(RotationMatrix(Transforms->Rs[NodeIndex + 0]),
-                            RotationMatrix(Transforms->Rs[NodeIndex + 1]),
-                            RotationMatrix(Transforms->Rs[NodeIndex + 2]),
-                            RotationMatrix(Transforms->Rs[NodeIndex + 3]));
-        m44_4x Sca = M44_4X(ScalingMatrix(Transforms->Ss[NodeIndex + 0]),
-                            ScalingMatrix(Transforms->Ss[NodeIndex + 1]),
-                            ScalingMatrix(Transforms->Ss[NodeIndex + 2]),
-                            ScalingMatrix(Transforms->Ss[NodeIndex + 3]));
+        __m128i Indices = _mm_setr_epi32(NodeIndex + 0, NodeIndex + 1,
+                                         NodeIndex + 2, NodeIndex + 3);
+        
+        __m128i IndicesFit = _mm_cmplt_epi32(Indices, _mm_set1_epi32(Model->NodeCount));
+        
+        __m128i StepIndices = _mm_or_si128(_mm_and_si128(IndicesFit, Indices),
+                                           _mm_andnot_si128(IndicesFit, _mm_set1_epi32(Model->NodeCount - 1)));
+        
+        m44_4x Tra = TranslationMatrix_4X(Transforms->Ts[MMI(StepIndices, 0)],
+                                          Transforms->Ts[MMI(StepIndices, 1)],
+                                          Transforms->Ts[MMI(StepIndices, 2)],
+                                          Transforms->Ts[MMI(StepIndices, 3)]);
+        
+        m44_4x Rot = RotationMatrix_4X(Transforms->Rs[MMI(StepIndices, 0)],
+                                       Transforms->Rs[MMI(StepIndices, 1)],
+                                       Transforms->Rs[MMI(StepIndices, 2)],
+                                       Transforms->Rs[MMI(StepIndices, 3)]);
+        
+        m44_4x Sca = ScalingMatrix_4X(Transforms->Ss[MMI(StepIndices, 0)],
+                                      Transforms->Ss[MMI(StepIndices, 1)],
+                                      Transforms->Ss[MMI(StepIndices, 2)],
+                                      Transforms->Ss[MMI(StepIndices, 3)]);
         
         m44_4x Res = Sca * Rot * Tra;
         
         M44_4X_Store(Res, 
-                     &Model->Nodes[NodeIndex + 0].CalculatedToParent,
-                     &Model->Nodes[NodeIndex + 1].CalculatedToParent,
-                     &Model->Nodes[NodeIndex + 2].CalculatedToParent,
-                     &Model->Nodes[NodeIndex + 3].CalculatedToParent);
-    }
-    
-    for(NodeIndex; 
-        NodeIndex < Model->NodeCount;
-        NodeIndex++)
-    {
-        node_info* TargetNode = &Model->Nodes[NodeIndex];
-        
-        // NOTE(Dima): Calculating to parent transform
-        MulRefsToRef(TargetNode->CalculatedToParent,
-                     MulRefs(ScalingMatrix(Transforms->Ss[NodeIndex]),
-                             RotationMatrix(Transforms->Rs[NodeIndex])), 
-                     TranslationMatrix(Transforms->Ts[NodeIndex]));
+                     &Model->Nodes[MMI(StepIndices, 0)].CalculatedToParent,
+                     &Model->Nodes[MMI(StepIndices, 1)].CalculatedToParent,
+                     &Model->Nodes[MMI(StepIndices, 2)].CalculatedToParent,
+                     &Model->Nodes[MMI(StepIndices, 3)].CalculatedToParent);
     }
 #endif
 }
 
 INTERNAL_FUNCTION void CalculateToModelTransforms(model_info* Model){
+    FUNCTION_TIMING();
+    
     // NOTE(Dima): Calculating to to modelspace transforms
+    
+#if 0    
     for(int NodeIndex = 0;
         NodeIndex < Model->NodeCount;
         NodeIndex++)
     {
         node_info* Node = &Model->Nodes[NodeIndex];
+        
+        
         
         if(Node->Shared->ParentIndex != -1){
             // NOTE(Dima): If is not root
@@ -420,6 +656,62 @@ INTERNAL_FUNCTION void CalculateToModelTransforms(model_info* Model){
             Node->CalculatedToModel = Node->CalculatedToParent;
         }
     }
+#else
+    __m128i MinusOne = _mm_set1_epi32(-1);
+    
+    for(int NodeIndex = 0;
+        NodeIndex < Model->NodeCount;
+        NodeIndex += 4)
+    {
+        __m128i Indices = _mm_setr_epi32(NodeIndex + 0, NodeIndex + 1,
+                                         NodeIndex + 2, NodeIndex + 3);
+        
+        __m128i IndicesFit = _mm_cmplt_epi32(Indices, _mm_set1_epi32(Model->NodeCount));
+        
+        __m128i StepIndices = _mm_or_si128(_mm_and_si128(IndicesFit, Indices),
+                                           _mm_andnot_si128(IndicesFit, _mm_set1_epi32(Model->NodeCount - 1)));
+        
+        node_info* Node0 = &Model->Nodes[MMI(StepIndices, 0)];
+        node_info* Node1 = &Model->Nodes[MMI(StepIndices, 1)];
+        node_info* Node2 = &Model->Nodes[MMI(StepIndices, 2)];
+        node_info* Node3 = &Model->Nodes[MMI(StepIndices, 3)];
+        
+        node_info* ParentNode0 = &Model->Nodes[Node0->Shared->ParentIndex];
+        node_info* ParentNode1 = &Model->Nodes[Node1->Shared->ParentIndex];
+        node_info* ParentNode2 = &Model->Nodes[Node2->Shared->ParentIndex];
+        node_info* ParentNode3 = &Model->Nodes[Node3->Shared->ParentIndex];
+        
+        m44_4x CalcToParent = M44_4X(Node0->CalculatedToParent,
+                                     Node1->CalculatedToParent,
+                                     Node2->CalculatedToParent,
+                                     Node3->CalculatedToParent);
+        
+        m44_4x ParentToModel = M44_4X(ParentNode0->CalculatedToModel,
+                                      ParentNode1->CalculatedToModel,
+                                      ParentNode2->CalculatedToModel,
+                                      ParentNode3->CalculatedToModel);
+        
+        m44_4x Result = CalcToParent * ParentToModel;
+        
+        __m128 ParentIndexCheckMask = _mm_castsi128_ps(_mm_cmpeq_epi32(MinusOne,
+                                                                       _mm_setr_epi32(Node0->Shared->ParentIndex,
+                                                                                      Node1->Shared->ParentIndex,
+                                                                                      Node2->Shared->ParentIndex,
+                                                                                      Node3->Shared->ParentIndex)));
+        
+        int MovedMask = _mm_movemask_ps(ParentIndexCheckMask);
+        if(MovedMask){
+            Result = ConditionalCombine(F32_4X(ParentIndexCheckMask),
+                                        CalcToParent, Result);
+        }
+        
+        M44_4X_Store(Result,
+                     &Node0->CalculatedToModel,
+                     &Node1->CalculatedToModel,
+                     &Node2->CalculatedToModel,
+                     &Node3->CalculatedToModel);
+    }
+#endif
 }
 
 void PlayStateAnimations(playing_state_slot* Slot, 
@@ -461,106 +753,147 @@ f32 GetPlayingStatePhase(animated_component* AC)
     return(Result);
 }
 
+INTERNAL_FUNCTION void TransitionToStateInternal(animated_component* AC,
+                                                 anim_state* ToState,
+                                                 f32 TimeToTransit,
+                                                 f64 GlobalTime,
+                                                 f32 Phase)
+{
+    int NextPlayIndex = GetNextPlayingIndex(AC->PlayingIndex);
+    AC->PlayingStates[NextPlayIndex].State = ToState;
+    AC->PlayingIndex = NextPlayIndex;
+    AC->PlayingStatesCount++;
+    
+    PlayStateAnimations(&AC->PlayingStates[NextPlayIndex], 
+                        GlobalTime,
+                        0.0f);
+    
+    AC->PlayingStates[NextPlayIndex].TimeToTransit = TimeToTransit;
+    AC->PlayingStates[NextPlayIndex].TransitionTimeLeft = TimeToTransit;
+}
+
+void ForceTransitionRequest(animated_component* AC,
+                            char* StateName,
+                            f32 TimeToTransit,
+                            f32 Phase)
+{
+    
+    anim_transition_request* Request = &AC->ForceTransitionRequest;
+    
+    Request->ToState = FindState(AC->Control, StateName);
+    Assert(Request->ToState);
+    Request->Requested = true;
+    Request->TimeToTransit = TimeToTransit;
+    Request->Phase = Phase;
+}
+
 INTERNAL_FUNCTION void ProcessInitTransitioning(animated_component* AC,
                                                 f64 GlobalTime)
 {
-    b32 Transitioning = (AC->PlayingStatesCount == 2);
-    
-    playing_state_slot* Slot = &AC->PlayingStates[AC->PlayingIndex];
-    anim_state* State = Slot->State;
-    
-    // NOTE(Dima): Iterating through all transitions
-    anim_transition* TransitionAt = State->FirstTransition;
-    while(TransitionAt != 0){
+    if(AC->ForceTransitionRequest.Requested && 
+       AC->ForceTransitionRequest.ToState)
+    {
+        anim_transition_request* Request = &AC->ForceTransitionRequest;
         
-        // NOTE(Dima): From state of transition should be equal to current state
-        Assert(TransitionAt->FromState == State);
+        TransitionToStateInternal(AC, 
+                                  Request->ToState,
+                                  Request->TimeToTransit,
+                                  GlobalTime, 
+                                  Request->Phase);
         
-        b32 AllConditionsTrue = true;
+        Request->Requested = false;
+    }
+    else{
+        b32 Transitioning = (AC->PlayingStatesCount == 2);
         
-        // NOTE(Dima): Checking conditions loop
-        for(int ConditionIndex = 0;
-            ConditionIndex < TransitionAt->ConditionsCount;
-            ConditionIndex++)
-        {
-            anim_transition_condition* Cond = &TransitionAt->Conditions[ConditionIndex];
+        playing_state_slot* Slot = &AC->PlayingStates[AC->PlayingIndex];
+        anim_state* State = Slot->State;
+        
+        // NOTE(Dima): Iterating through all transitions
+        anim_transition* TransitionAt = State->FirstTransition;
+        while(TransitionAt != 0){
             
-            anim_variable* Variable = FindVariable(AC, Cond->Name);
-            Assert(Cond->VariableValueType == Variable->ValueType);
+            // NOTE(Dima): From state of transition should be equal to current state
+            Assert(TransitionAt->FromState == State);
             
-            b32 ConditionTrue = 0;
-            if(Cond->VariableValueType == AnimVariable_Bool){
-                b32 VariableBool = Variable->Value.Bool;
-                b32 CondBool = Cond->Value.Bool;
+            b32 AllConditionsTrue = true;
+            
+            // NOTE(Dima): Checking conditions loop
+            for(int ConditionIndex = 0;
+                ConditionIndex < TransitionAt->ConditionsCount;
+                ConditionIndex++)
+            {
+                anim_transition_condition* Cond = &TransitionAt->Conditions[ConditionIndex];
                 
-                if(Cond->ConditionType == TransitionCondition_Equal){
-                    ConditionTrue = (VariableBool == CondBool);
+                anim_variable* Variable = FindVariable(AC, Cond->Name);
+                Assert(Cond->VariableValueType == Variable->ValueType);
+                
+                b32 ConditionTrue = 0;
+                if(Cond->VariableValueType == AnimVariable_Bool){
+                    b32 VariableBool = Variable->Value.Bool;
+                    b32 CondBool = Cond->Value.Bool;
+                    
+                    if(Cond->ConditionType == TransitionCondition_Equal){
+                        ConditionTrue = (VariableBool == CondBool);
+                    }
+                }
+                else if(Cond->VariableValueType  == AnimVariable_Float){
+                    float VariableFloat = Variable->Value.Float;
+                    float CondFloat = Cond->Value.Float;
+                    
+                    switch(Cond->ConditionType){
+                        case TransitionCondition_MoreEqThan:{
+                            ConditionTrue = VariableFloat >= CondFloat;
+                        }break;
+                        
+                        case TransitionCondition_MoreThan:{
+                            ConditionTrue = VariableFloat > CondFloat;
+                        }break;
+                        
+                        case TransitionCondition_LessEqThan:{
+                            ConditionTrue = VariableFloat <= CondFloat;
+                        }break;
+                        
+                        case TransitionCondition_LessThan:{
+                            ConditionTrue = VariableFloat < CondFloat;
+                        }break;
+                        
+                        case TransitionCondition_Equal:{
+                            ConditionTrue = Abs(VariableFloat - CondFloat) < 0.00000001f;
+                        }break;
+                    }
+                }
+                
+                if(!ConditionTrue){
+                    AllConditionsTrue = false;
+                    break;
                 }
             }
-            else if(Cond->VariableValueType  == AnimVariable_Float){
-                float VariableFloat = Variable->Value.Float;
-                float CondFloat = Cond->Value.Float;
-                
-                switch(Cond->ConditionType){
-                    case TransitionCondition_MoreEqThan:{
-                        ConditionTrue = VariableFloat >= CondFloat;
-                    }break;
-                    
-                    case TransitionCondition_MoreThan:{
-                        ConditionTrue = VariableFloat > CondFloat;
-                    }break;
-                    
-                    case TransitionCondition_LessEqThan:{
-                        ConditionTrue = VariableFloat <= CondFloat;
-                    }break;
-                    
-                    case TransitionCondition_LessThan:{
-                        ConditionTrue = VariableFloat < CondFloat;
-                    }break;
-                    
-                    case TransitionCondition_Equal:{
-                        ConditionTrue = Abs(VariableFloat - CondFloat) < 0.00000001f;
-                    }break;
+            
+            b32 StateCanTransition = false;
+            if(TransitionAt->AnimationShouldFinish){
+                StateCanTransition = Slot->PlayingAnimation.Phase01 > (TransitionAt->TransitStartPhase - 0.00001f);
+                if(TransitionAt->ConditionsCount){
+                    StateCanTransition &= AllConditionsTrue;
                 }
             }
+            else{
+                StateCanTransition = TransitionAt->ConditionsCount && AllConditionsTrue;
+            }
             
-            if(!ConditionTrue){
-                AllConditionsTrue = false;
+            if(StateCanTransition){
+                TransitionToStateInternal(AC, TransitionAt->ToState,
+                                          TransitionAt->TimeToTransit,
+                                          GlobalTime, 0.0f);
+                
                 break;
             }
-        }
-        
-        b32 StateCanTransition = false;
-        if(TransitionAt->AnimationShouldFinish){
-            StateCanTransition = Slot->PlayingAnimation.Phase01 > (TransitionAt->TransitStartPhase - 0.00001f);
-            if(TransitionAt->ConditionsCount){
-                StateCanTransition &= AllConditionsTrue;
-            }
-        }
-        else{
-            StateCanTransition = TransitionAt->ConditionsCount && AllConditionsTrue;
-        }
-        
-        if(StateCanTransition){
-            // NOTE(Dima): Initiating transition
-            int NextPlayIndex = GetNextPlayingIndex(AC->PlayingIndex);
-            AC->PlayingStates[NextPlayIndex].State = TransitionAt->ToState;
-            AC->PlayingIndex = NextPlayIndex;
-            AC->PlayingStatesCount++;
             
-            PlayStateAnimations(&AC->PlayingStates[NextPlayIndex], 
-                                GlobalTime,
-                                0.0f);
-            
-            AC->PlayingStates[NextPlayIndex].TimeToTransit = TransitionAt->TimeToTransit;
-            AC->PlayingStates[NextPlayIndex].TransitionTimeLeft = TransitionAt->TimeToTransit;
-            
-            break;
-        }
+            // NOTE(Dima): Advancing iterator
+            TransitionAt = TransitionAt->NextInList;
+        } // end loop through all transitions
         
-        // NOTE(Dima): Advancing iterator
-        TransitionAt = TransitionAt->NextInList;
-    } // end loop through all transitions
+    }
 }
 
 INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
@@ -666,113 +999,6 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                 }
             }
             
-            // NOTE(Dima): Update animations and blend trees of all playing graph nodes
-            {
-                BLOCK_TIMING("UpdateAC:PreContribute");
-                
-                int PlayingStateIndex = AC->PlayingIndex;
-                for(int Index  = 0;
-                    Index < AC->PlayingStatesCount;
-                    Index++)
-                {
-                    playing_state_slot* Slot = &AC->PlayingStates[PlayingStateIndex];
-                    
-                    anim_state* AnimState = Slot->State;
-                    playing_anim* Playing = &Slot->PlayingAnimation;
-                    
-                    Assert(Playing->AnimationID != 0);
-                    if(Playing->AnimationID != 0){
-                        animation_clip* Animation = LoadAnimationClip(Assets, 
-                                                                      Playing->AnimationID,
-                                                                      ASSET_IMPORT_IMMEDIATE);
-                        
-                        Assert(Animation->NodesCheckSum == AC->NodesCheckSum);
-                        
-                        // NOTE(Dima): Clearing transforms in anim state to safely contribute
-                        // NOTE(Dima): all in-state animations
-                        ClearNodeTransforms(&Slot->ResultedTransforms, Model->NodeCount);
-                        
-                        // NOTE(Dima): Updating animation and node transforms
-                        UpdatePlayingAnimation(Assets, Model, 
-                                               Playing, Animation, 
-                                               GlobalTime, PlaybackRate);
-                        
-                        // NOTE(Dima): Updated resulted graph node transforms
-                        
-                        node_transforms_block* Dst = &Slot->ResultedTransforms;
-                        node_transforms_block* Src = &Playing->NodeTransforms;
-                        
-#if 0                    
-                        for(int NodeIndex = 0; 
-                            NodeIndex < Model->NodeCount;
-                            NodeIndex++)
-                        {
-                            Dst->Ts[NodeIndex] += Src->Ts[NodeIndex];
-                            Dst->Rs[NodeIndex] += Src->Rs[NodeIndex];
-                            Dst->Ss[NodeIndex] += Src->Ss[NodeIndex];
-                        }
-#else
-                        for(int NodeIndex = 0; 
-                            NodeIndex < Model->NodeCount;
-                            NodeIndex+=4)
-                        {
-                            v3_4x SrcT = V3_4X(Src->Ts[NodeIndex + 0],
-                                               Src->Ts[NodeIndex + 1],
-                                               Src->Ts[NodeIndex + 2],
-                                               Src->Ts[NodeIndex + 3]);
-                            
-                            v4_4x SrcR = V4_4X(Src->Rs[NodeIndex + 0],
-                                               Src->Rs[NodeIndex + 1],
-                                               Src->Rs[NodeIndex + 2],
-                                               Src->Rs[NodeIndex + 3]);
-                            
-                            v3_4x SrcS = V3_4X(Src->Ss[NodeIndex + 0],
-                                               Src->Ss[NodeIndex + 1],
-                                               Src->Ss[NodeIndex + 2],
-                                               Src->Ss[NodeIndex + 3]);
-                            
-                            v3_4x DstT = V3_4X(Dst->Ts[NodeIndex + 0],
-                                               Dst->Ts[NodeIndex + 1],
-                                               Dst->Ts[NodeIndex + 2],
-                                               Dst->Ts[NodeIndex + 3]);
-                            
-                            v4_4x DstR = V4_4X(Dst->Rs[NodeIndex + 0],
-                                               Dst->Rs[NodeIndex + 1],
-                                               Dst->Rs[NodeIndex + 2],
-                                               Dst->Rs[NodeIndex + 3]);
-                            
-                            v3_4x DstS = V3_4X(Dst->Ss[NodeIndex + 0],
-                                               Dst->Ss[NodeIndex + 1],
-                                               Dst->Ss[NodeIndex + 2],
-                                               Dst->Ss[NodeIndex + 3]);
-                            
-                            DstT += SrcT;
-                            DstS += SrcS;
-                            DstR += SrcR;
-                            
-                            V3_4X_Store(DstT, 
-                                        &Dst->Ts[NodeIndex + 0],
-                                        &Dst->Ts[NodeIndex + 1],
-                                        &Dst->Ts[NodeIndex + 2],
-                                        &Dst->Ts[NodeIndex + 3]);
-                            V3_4X_Store(DstS, 
-                                        &Dst->Ss[NodeIndex + 0],
-                                        &Dst->Ss[NodeIndex + 1],
-                                        &Dst->Ss[NodeIndex + 2],
-                                        &Dst->Ss[NodeIndex + 3]);
-                            V4_4X_Store(DstR,
-                                        &Dst->Rs[NodeIndex + 0],
-                                        &Dst->Rs[NodeIndex + 1],
-                                        &Dst->Rs[NodeIndex + 2],
-                                        &Dst->Rs[NodeIndex + 3]);
-                        }
-#endif
-                    }
-                    
-                    PlayingStateIndex = GetPrevPlayingIndex(PlayingStateIndex);
-                }
-            }
-            
             {
                 BLOCK_TIMING("UpdateAC::Contribute");
                 
@@ -790,8 +1016,21 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                     playing_state_slot* Slot = &AC->PlayingStates[PlayingStateIndex];
                     anim_state* AnimState = Slot->State;
                     
+                    animation_clip* Animation = LoadAnimationClip(Assets, 
+                                                                  Slot->PlayingAnimation.AnimationID,
+                                                                  ASSET_IMPORT_IMMEDIATE);
+                    
+                    Assert(Animation->NodesCheckSum == AC->NodesCheckSum);
+                    
+                    // NOTE(Dima): Updating animation and node transforms
+                    UpdatePlayingAnimation(Assets, Model, 
+                                           &Slot->PlayingAnimation, Animation, 
+                                           GlobalTime, PlaybackRate);
+                    
+                    
                     node_transforms_block* Dst = &AC->ResultedTransforms;
-                    node_transforms_block* Src = &Slot->ResultedTransforms;
+                    //node_transforms_block* Src = &Slot->ResultedTransforms;
+                    node_transforms_block* Src = &Slot->PlayingAnimation.NodeTransforms;
                     
 #if 0                    
                     float Contribution = AnimState->Contribution;
@@ -813,7 +1052,7 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                         Dst->Rs[NodeIndex] += Src->Rs[NodeIndex] * SignDot * Contribution;
                     }
 #else
-                    f32_4x Contribution = F32_4x(Slot->Contribution);
+                    f32_4x Contribution = F32_4X(Slot->Contribution);
                     
                     for(int NodeIndex = 0; 
                         NodeIndex < Model->NodeCount;
@@ -852,8 +1091,8 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                         DstT += SrcT * Contribution;
                         DstS += SrcS * Contribution;
                         
-                        f32_4x DotRot = Dot(DstR, SrcR);
-                        f32_4x SignDot = SignNotZero(DotRot);
+                        f32_4x DotRot = Dot_4X(DstR, SrcR);
+                        f32_4x SignDot = SignNotZero_4X(DotRot);
                         DstR += (SrcR * SignDot * Contribution);
                         
                         V3_4X_Store(DstT, 
@@ -901,7 +1140,7 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                                        Src->Rs[NodeIndex + 2],
                                        Src->Rs[NodeIndex + 3]);
                     
-                    v4_4x Res = Normalize(SrcR);
+                    v4_4x Res = Normalize_4X(SrcR);
                     
                     V4_4X_Store(Res,
                                 &Src->Rs[NodeIndex + 0],
@@ -932,7 +1171,6 @@ INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(assets* Assets,
     skeleton_info* Skeleton = 0;
     
     if(AC && Model){
-        
         // NOTE(Dima): Getting skeleton if we can
         if(Model->HasSkeleton){
             Skeleton = LoadSkeleton(Assets, Model->SkeletonID, ASSET_IMPORT_DEFERRED);
@@ -943,6 +1181,7 @@ INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(assets* Assets,
             BoneCount = Skeleton->BoneCount;
             CalculatedBoneTransforms = AC->BoneTransformMatrices;
             
+#if 0     
             for(int BoneIndex = 0;
                 BoneIndex < BoneCount;
                 BoneIndex++)
@@ -954,6 +1193,50 @@ INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(assets* Assets,
                 CalculatedBoneTransforms[BoneIndex] = 
                     Bone->InvBindPose * CorrespondingNode->CalculatedToModel;
             }
+#else
+            
+            for(int BoneIndex = 0;
+                BoneIndex < BoneCount;
+                BoneIndex += 4)
+            {
+                __m128i Indices = _mm_setr_epi32(BoneIndex + 0, BoneIndex + 1,
+                                                 BoneIndex + 2, BoneIndex + 3);
+                
+                __m128i IndicesFit = _mm_cmplt_epi32(Indices, _mm_set1_epi32(BoneCount));
+                int MovedMask = _mm_movemask_ps(_mm_castsi128_ps(IndicesFit));
+                
+                if(MovedMask){
+                    bone_info* Bone = &Skeleton->Bones[BoneIndex];
+                    node_info* CorrespondingNode = &Model->Nodes[Bone->NodeIndex];
+                    
+                    __m128i StepIndices = _mm_or_si128(_mm_and_si128(IndicesFit, Indices),
+                                                       _mm_andnot_si128(IndicesFit, _mm_set1_epi32(BoneCount - 1)));
+                    
+                    bone_info* Bone0 = &Skeleton->Bones[MMI(StepIndices, 0)];
+                    bone_info* Bone1 = &Skeleton->Bones[MMI(StepIndices, 1)];
+                    bone_info* Bone2 = &Skeleton->Bones[MMI(StepIndices, 2)];
+                    bone_info* Bone3 = &Skeleton->Bones[MMI(StepIndices, 3)];
+                    
+                    m44_4x InvBindPose = M44_4X(Bone0->InvBindPose,
+                                                Bone1->InvBindPose,
+                                                Bone2->InvBindPose,
+                                                Bone3->InvBindPose);
+                    
+                    m44_4x NodeCalcToModel = M44_4X(Model->Nodes[Bone0->NodeIndex].CalculatedToModel,
+                                                    Model->Nodes[Bone1->NodeIndex].CalculatedToModel,
+                                                    Model->Nodes[Bone2->NodeIndex].CalculatedToModel,
+                                                    Model->Nodes[Bone3->NodeIndex].CalculatedToModel);
+                    
+                    m44_4x Result = InvBindPose * NodeCalcToModel;
+                    
+                    M44_4X_Store(Result,
+                                 &CalculatedBoneTransforms[MMI(StepIndices, 0)],
+                                 &CalculatedBoneTransforms[MMI(StepIndices, 1)],
+                                 &CalculatedBoneTransforms[MMI(StepIndices, 2)],
+                                 &CalculatedBoneTransforms[MMI(StepIndices, 3]));
+                }
+            }
+#endif
             
             Result.BoneTransforms = CalculatedBoneTransforms;
             Result.BoneTransformsCount = BoneCount;
@@ -985,10 +1268,8 @@ anim_calculated_pose UpdateModelAnimation(assets* Assets,
     
     At the end of this function ToParentTransform calculated for each node
     */
-    UpdateAnimatedComponent(Assets, Model, 
-                            AnimComp, 
-                            GlobalTime,
-                            DeltaTime,
+    UpdateAnimatedComponent(Assets, Model, AnimComp, 
+                            GlobalTime, DeltaTime,
                             PlaybackRate);
     
     // NOTE(Dima): This function calculates ToModel transform 
@@ -996,9 +1277,7 @@ anim_calculated_pose UpdateModelAnimation(assets* Assets,
     CalculateToModelTransforms(Model);
     
     // NOTE(Dima): Updating skeleton data
-    anim_calculated_pose Result = UpdateModelBoneTransforms(Assets, 
-                                                            Model, 
-                                                            AnimComp);
+    anim_calculated_pose Result = UpdateModelBoneTransforms(Assets, Model, AnimComp);
     
     return(Result);
 }

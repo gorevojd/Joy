@@ -1382,8 +1382,8 @@ PLATFORM_SHOW_ERROR(Win32ShowError){
 }
 
 PLATFORM_DEBUG_OUTPUT_STRING(Win32DebugOutputString){
-    GlobalWin32.DebugOutputFunc(text);
-    GlobalWin32.DebugOutputFunc("\n");
+    OutputDebugString(text);
+    OutputDebugString("\n");
 }
 
 PLATFORM_MEMALLOC(Win32MemAlloc){
@@ -2259,13 +2259,6 @@ INTERNAL_FUNCTION u32 UTF16_To_UTF8(u16* UTF16String,
     return len;
 }
 
-WIN32_DEBUG_OUTPUT(Win32DebugOutputLog){
-    HANDLE HandleOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    DWORD CharsWritten; // ignored
-    DWORD Len = StringLength((char*)Str);
-    WriteConsoleA(HandleOut, Str, Len, &CharsWritten, 0);
-}
-
 LRESULT CALLBACK
 Win32WindowProcessing(
                       HWND Window,
@@ -2387,8 +2380,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     Win32InitInternalCriticalSections();
     
     // NOTE(Dima): Initializing platform API
-    InitJobQueue(&Platform.HighPriorityQueue, 2048, 8);
-    InitJobQueue(&Platform.LowPriorityQueue, 2048, 4);
+    InitJobQueue(&Platform.ImmediateQueue, 2048, 8);
+    InitJobQueue(&Platform.AsyncQueue, 2048, 4);
     
     // TODO(Dima): Add array of count Renderer_Count and init all renderers
     // TODO(Dima): Or leave if not supported
@@ -2501,8 +2494,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     
     DestroyWindow(GlobalWin32.window);
     
-    FreeJobQueue(&Platform.HighPriorityQueue);
-    FreeJobQueue(&Platform.LowPriorityQueue);
+    FreeJobQueue(&Platform.ImmediateQueue);
+    FreeJobQueue(&Platform.AsyncQueue);
     
     return (0);
 }

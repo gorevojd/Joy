@@ -9,8 +9,12 @@
 #define ANIM_ANY_STATE "#Any"
 #define ANIM_TRANSFORMS_ARRAY_SIZE 256
 #define ANIM_DEFAULT_TRANSITION_TIME 0.15f
+#define ANIM_OPTIMIZE 1
 
 struct find_anim_deltas_ctx{
+    // NOTE(Dima): Fail if KeysCount was 0
+    b32 Success;
+    
     int PrevKeyIndex;
     int NextKeyIndex;
     float t;
@@ -28,22 +32,29 @@ struct node_transforms_block{
     v3 Ss[ANIM_TRANSFORMS_ARRAY_SIZE];
 };
 
+enum playing_anim_exit_action_type{
+    AnimExitAction_Looping,
+    AnimExitAction_ExitState,
+    AnimExitAction_Next,
+};
+
 struct playing_anim{
     f64 GlobalStart;
     f32 Phase01;
     
     b32 TransformsCalculated[ANIM_TRANSFORMS_ARRAY_SIZE];
-    f32 Deltas[ANIM_TRANSFORMS_ARRAY_SIZE];
     node_transforms_block NodeTransforms;
     
     u32 AnimationID;
+    
+    u32 ExitAction;
 };
 
 enum anim_state_type{
     AnimState_Animation,
+    AnimState_Queue,
     AnimState_BlendTree,
 };
-
 
 struct anim_state{
     char Name[64];
@@ -67,7 +78,6 @@ struct playing_state_slot{
     
     playing_anim PlayingAnimation;
     
-    node_transforms_block ResultedTransforms;
     f32 Contribution;
     
     /*
@@ -161,7 +171,14 @@ struct anim_calculated_pose{
 #define ANIM_VAR_TABLE_SIZE 32
 #define ANIM_ANIMID_TABLE_SIZE 32
 #define ANIM_MAX_STATE_COUNT 256
-#define ANIM_MAX_PLAYING_STATES 4
+#define ANIM_MAX_PLAYING_STATES 128
+
+struct anim_transition_request{
+    anim_state* ToState;
+    b32 Requested;
+    f32 TimeToTransit;
+    f32 Phase;
+};
 
 struct anim_controller{
     struct anim_system* AnimState;
@@ -196,8 +213,6 @@ struct animated_component{
     // NOTE(Dima): Skeleton hash
     u32 NodesCheckSum;
     
-    //#define PLAY_STATE_FIRST 0
-    //#define PLAY_STATE_SECOND 1
     playing_state_slot PlayingStates[ANIM_MAX_PLAYING_STATES];
     int PlayingIndex;
     int PlayingStatesCount;
@@ -206,8 +221,7 @@ struct animated_component{
     node_transforms_block ResultedTransforms;
     m44 BoneTransformMatrices[128];
     
-    //playing_anim* PlayingAnimations[2];
-    //int PlayingAnimationsCount;
+    anim_transition_request ForceTransitionRequest;
 };
 
 inline int GetModulatedPlayintIndex(int Index){
@@ -310,6 +324,11 @@ void SetFloat(animated_component* AC,
 void SetBool(animated_component* AC, 
              char* VariableName, 
              b32 Value);
+
+void ForceTransitionRequest(animated_component* AC,
+                            char* StateName,
+                            f32 TimeToTransit,
+                            f32 Phase);
 
 void SetStateAnimation(animated_component* AC,
                        char* StateName,

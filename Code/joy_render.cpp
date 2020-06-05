@@ -1,7 +1,8 @@
 INTERNAL_FUNCTION render_camera_setup SetupCamera(const m44& Projection, 
                                                   const m44& View, 
                                                   int FramebufferWidth,
-                                                  int FramebufferHeight, 
+                                                  int FramebufferHeight,
+                                                  float Far, float Near,
                                                   b32 CalcFrustumPlanes)
 {
     render_camera_setup Result = {};
@@ -14,6 +15,9 @@ INTERNAL_FUNCTION render_camera_setup SetupCamera(const m44& Projection,
     
     Result.FramebufferWidth = FramebufferWidth;
     Result.FramebufferHeight = FramebufferHeight;
+    
+    Result.Far = Far;
+    Result.Near = Near;
     
     if(CalcFrustumPlanes){
         v4 *FrustumPlanes = Result.FrustumPlanes;
@@ -66,12 +70,16 @@ INTERNAL_FUNCTION render_camera_setup SetupCamera(const m44& Projection,
     return(Result);
 }
 
-INTERNAL_FUNCTION render_camera_setup DefaultPerspSetup(int Width, int Height, const m44& CameraTransform)
+INTERNAL_FUNCTION render_camera_setup DefaultPerspSetup(int Width, int Height, 
+                                                        float Far, float Near, 
+                                                        const m44& CameraTransform)
 {
     render_camera_setup CamSetup = SetupCamera(PerspectiveProjection(Width, Height, 
-                                                                     1000.0f, 0.01f),
+                                                                     RENDER_DEFAULT_FAR, 
+                                                                     RENDER_DEFAULT_NEAR),
                                                CameraTransform,
-                                               Width, Height, true);
+                                               Width, Height, 
+                                               Far, Near, true);
     
     return(CamSetup);
 }
@@ -80,7 +88,10 @@ INTERNAL_FUNCTION render_camera_setup DefaultOrthoSetup(int Width, int Height,
                                                         const m44& CameraTransform){
     render_camera_setup CamSetup = SetupCamera(OrthographicProjection(Width, Height),
                                                CameraTransform,
-                                               Width, Height, true);
+                                               Width, Height, 
+                                               RENDER_DEFAULT_FAR, 
+                                               RENDER_DEFAULT_NEAR, 
+                                               true);
     
     return(CamSetup);
 }
@@ -165,6 +176,11 @@ INTERNAL_FUNCTION void RenderInit(render_state* Render,
     Render->FrameInfoIsSet = 0;
     Render->InitWindowWidth = InitWindowWidth;
     Render->InitWindowHeight = InitWindowHeight;
+    
+    Render->FogEnabled = RENDER_FOG_ENABLED;
+    Render->FogDensity = RENDER_FOG_DENSITY;
+    Render->FogGradient = RENDER_FOG_GRADIENT;
+    Render->FogColor = V3(0.8f, 0.8f, 0.8f);
     
     // NOTE(Dima): Init render API
     Render->API = API;

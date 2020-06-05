@@ -98,6 +98,9 @@ struct asset_animation_clip{
     
     int NodeAnimationIDsCount;
     
+    b32 UsesRootMotion;
+    u32 RootMotionNodeAnimID;
+    
     u32 DataOffsetToNodeAnimationIDs;
     u32 SizeNodeAnimationIDs;
     
@@ -336,6 +339,20 @@ enum asset_tag_character_type{
     TagCharacter_Moose,
     TagCharacter_Deer,
     TagCharacter_Coyote,
+    
+    TagCharacter_Bull,
+    TagCharacter_Chicken,
+    TagCharacter_Cow,
+    TagCharacter_Horse,
+    TagCharacter_Pig,
+    //TagCharacter_Sheep,
+    
+    TagCharacter_Caterpillar,
+    TagCharacter_Hornet,
+    TagCharacter_LadyBug,
+    TagCharacter_Mantis,
+    TagCharacter_Moth,
+    TagCharacter_Rhinoceros,
 };
 
 enum asset_tag_idle_anim{
@@ -345,6 +362,28 @@ enum asset_tag_idle_anim{
     TagIdleAnim_Idle3,
     TagIdleAnim_Idle4,
     TagIdleAnim_Idle5,
+};
+
+enum asset_tag_attack_anim{
+    TagAttack_0,
+    TagAttack_1,
+    TagAttack_2,
+    TagAttack_3,
+    TagAttack_4,
+    TagAttack_5,
+};
+
+enum asset_tag_damage{
+    TagDamage_Low,
+    TagDamage_Medium,
+    TagDamage_Heavy,
+};
+
+enum asset_tag_direction{
+    TagDirection_Forward,
+    TagDirection_Left,
+    TagDirection_Back,
+    TagDirection_Right,
 };
 
 enum asset_tag_type{
@@ -396,6 +435,10 @@ enum asset_group_type{
     GameAsset_Anim_Success,
     GameAsset_Anim_Talk,
     GameAsset_Anim_Walk,
+    GameAsset_Anim_Die,
+    GameAsset_Anim_Attack,
+    GameAsset_Anim_TakeDamage,
+    GameAsset_Anim_Throw,
     GameAsset_Model_TempForCounting,
     
     // NOTE(Dima): Animations

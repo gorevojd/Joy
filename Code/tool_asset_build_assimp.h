@@ -19,6 +19,9 @@
 #include <assimp/scene.h>           // Output data structure
 #include <assimp/postprocess.h>     // Post processing flags
 
+#define LOAD_ANIM_LOOPING true
+#define LOAD_ANIM_NOT_LOOPING false
+
 GLOBAL_VARIABLE aiTextureType SupportedTexturesTypes[] = {
     aiTextureType_DIFFUSE,
     aiTextureType_SPECULAR,
@@ -95,6 +98,10 @@ enum assimp_load_mesh_flags {
     
     Load_ImportOnlyAnimation = (1 << 3),
     Load_AnimationWillBeLooped = (1 << 4),
+    
+    Load_ExtractRootMotionY = (1 << 5),
+    // NOTE(Dima): Remove Load_ExtractRootMotionZ once Assimp bug fixed with rotated models 
+    Load_ExtractRootMotionZ = (1 << 6),
 };
 
 struct loaded_mesh_slot{
@@ -134,12 +141,14 @@ struct load_model_source{
     tag_hub TagHub;
     
     loaded_model LoadedModel;
+    std::string RootMotionNodeName;
 };
 
 inline load_model_source ModelSource(std::string Path,
                                      u32 AssetGroup,
                                      u32 Flags,
-                                     tag_hub TagHub)
+                                     tag_hub TagHub,
+                                     std::string RootMotionNodeName)
 {
     load_model_source Result = {};
     
@@ -148,6 +157,7 @@ inline load_model_source ModelSource(std::string Path,
     Result.TagHub = TagHub;
     Result.Flags = Flags;
     Result.AnimationImport = (Flags & Load_ImportOnlyAnimation) != 0;
+    Result.RootMotionNodeName = RootMotionNodeName;
     
     return(Result);
 }
@@ -161,6 +171,9 @@ struct model_loading_context{
     
     b32 CharacterBeginned;
     tag_hub TagHub;
+    
+    b32 RootMotionNodeNameBeginned;
+    std::string RootMotionNodeName;
 };
 
 inline m44 Assimp2JoyMatrix(const aiMatrix4x4& AssimpMatrix) {

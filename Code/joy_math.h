@@ -1281,8 +1281,8 @@ inline quat QuatFromM33(m33 Mat){
 }
 
 inline quat QuatLookAt(v3 Front, v3 Up){
-    v3 Fwd = Normalize(Front);
-    v3 Lft = Normalize(Cross(Up, Fwd));
+    v3 Fwd = NOZ(Front);
+    v3 Lft = NOZ(Cross(Up, Fwd));
     Up = Cross(Fwd, Lft);
     
     m33 Mat = MatrixFromRows(Lft, Up, Fwd);

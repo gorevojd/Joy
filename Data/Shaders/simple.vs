@@ -11,6 +11,10 @@ uniform mat4 Model;
 uniform mat4 View;
 uniform mat4 Projection;
 
+uniform bool FogEnabled;
+uniform float FogDensity;
+uniform float FogGradient;
+
 uniform bool HasSkinning;
 uniform int BonesCount;
 uniform mat4 BoneTransforms[128];
@@ -19,6 +23,7 @@ out Vertex_Shader_Out{
     vec3 WorldP;
     vec3 WorldN;
     vec2 UV;
+	float Visibility;
 } VsOut;
 
 void main(){
@@ -33,30 +38,13 @@ void main(){
         uint BoneIndex2 = (BoneIDs >> 16u) & 255u;
         uint BoneIndex3 = (BoneIDs >> 24u) & 255u;
         
-#if 0        
-        mat4 Tran0 = BoneTransforms[0] * Weights.x;
-        mat4 Tran1 = BoneTransforms[0] * Weights.y;
-        mat4 Tran2 = BoneTransforms[0] * Weights.z;
-        mat4 Tran3 = BoneTransforms[0] * Weights.w;
-#endif
+        mat4 Tran = BoneTransforms[BoneIndex0] * Weights.x;
+        Tran += BoneTransforms[BoneIndex1] * Weights.y;
+        Tran += BoneTransforms[BoneIndex2] * Weights.z;
+        Tran += BoneTransforms[BoneIndex3] * Weights.w;
         
-        mat4 Tran0 = BoneTransforms[BoneIndex0] * Weights.x;
-        mat4 Tran1 = BoneTransforms[BoneIndex1] * Weights.y;
-        mat4 Tran2 = BoneTransforms[BoneIndex2] * Weights.z;
-        mat4 Tran3 = BoneTransforms[BoneIndex3] * Weights.w;
-        
-        vec4 TempP = vec4(ModelSpaceP, 1.0f);
-        vec4 TempN = vec4(ModelSpaceN, 0.0f);
-        
-        vec4 SumP = TempP * Tran0;
-        SumP += TempP * Tran1;
-        SumP += TempP * Tran2;
-        SumP += TempP * Tran3;
-        
-        vec4 SumN = TempN * Tran0;
-        SumN += TempN * Tran1;
-        SumN += TempN * Tran2;
-        SumN += TempN * Tran3;
+        vec4 SumP = vec4(ModelSpaceP, 1.0f) * Tran;
+        vec4 SumN = vec4(ModelSpaceN, 0.0f) * Tran;
         
         ModelSpaceP = SumP.xyz;
         ModelSpaceN = SumN.xyz;
@@ -67,6 +55,12 @@ void main(){
     vec4 ViewP = WorldP * View;
     vec4 ProjectedP = ViewP * Projection;
     
+	float CamToVertexLen = length(ViewP.xyz);
+	VsOut.Visibility = 1.0f;
+	if(FogEnabled){
+		VsOut.Visibility = exp(-pow((FogDensity * CamToVertexLen), FogGradient));
+		VsOut.Visibility = clamp(VsOut.Visibility, 0.0f, 1.0f);
+	}
     VsOut.WorldP = WorldP.xyz;
     VsOut.WorldN = normalize(ModelSpaceN * transpose(inverse(mat3(Model))));
     VsOut.UV = vec2(UV.x, 1.0f - UV.y);

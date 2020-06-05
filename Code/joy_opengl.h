@@ -8,7 +8,6 @@
 #include "joy_render.h"
 #include "joy_assets.h"
 
-
 #define GLGET_HELP(a) #a
 #define GLGETU(unamewithoutloc) Result.##unamewithoutloc##Loc = glGetUniformLocation(Result.Shader.ID, GLGET_HELP(unamewithoutloc))
 #define GLGETA(atxtwithouattrloc) Result.##atxtwithouattrloc##AttrLoc = glGetAttribLocation(Result.Shader.ID, GLGET_HELP(atxtwithouattrloc))
@@ -55,7 +54,15 @@ struct gl_shader{
 struct gl_screen_shader{
     gl_shader Shader;
     
+    GLint UVInvertYLoc;
     GLint ScreenTextureLoc;
+};
+
+struct gl_resolve_depth_shader{
+    gl_shader Shader;
+    
+    GLint UVInvertYLoc;
+    GLint DepthTextureLoc;
 };
 
 struct gl_simple_shader{
@@ -74,6 +81,11 @@ struct gl_simple_shader{
     GLint SpecularLoc;
     GLint EmissiveLoc;
     GLint TexturesSetFlagsLoc;
+    
+    GLint FogEnabledLoc;
+    GLint FogColorLoc;
+    GLint FogDensityLoc;
+    GLint FogGradientLoc;
     
     GLint PAttrLoc;
     GLint UVAttrLoc;
@@ -135,6 +147,7 @@ struct gl_state{
     gl_guigeom_shader GuiGeomShader;
     gl_guigeom_lines_shader GuiLinesShader;
     gl_lines_shader LinesShader;
+    gl_resolve_depth_shader ResolveDepth;
     
     GLuint ScreenVAO;
     GLuint ScreenVBO;
@@ -165,6 +178,10 @@ struct gl_state{
     // NOTE(Dima): SSAO
     GLuint SSAONoiseTex;
     GLuint SSAOKernelTex;
+    
+    GLuint RenderFBO;
+    GLuint RenderColorTex0;
+    GLuint RenderDepthTex;
     
     m44 GuiOrtho;
 };

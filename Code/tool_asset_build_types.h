@@ -186,6 +186,10 @@ struct tool_animation_info{
     std::vector<u32> NodeAnimationsStoredIDs;
     
     u32 NodesCheckSum;
+    
+    b32 UsesRootMotion;
+    tool_node_animation RootMotionNodeAnim;
+    u32 RootMotionNodeAnimID;
 };
 
 struct tool_skeleton_info{

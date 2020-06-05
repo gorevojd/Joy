@@ -239,6 +239,10 @@ void GameUpdate(game_state* Game, render_frame_info FrameInfo){
     }
     
 #if defined(JOY_DEBUG_BUILD)
+    if(KeyWentDown(Game->Input, Key_F2)){
+        Game->Render->ToShowBufferType = (Game->Render->ToShowBufferType + 1) % RenderShowBuffer_Count;
+    }
+    
     {
         BLOCK_TIMING("Frame: DEBUG");
         

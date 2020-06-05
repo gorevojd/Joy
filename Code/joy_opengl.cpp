@@ -164,6 +164,11 @@ void UniformInt(GLint Loc, int Value){
     glUniform1i(Loc, Value);
 }
 
+
+void UniformFloat(GLint Loc, float Value){
+    glUniform1f(Loc, Value);
+}
+
 void UniformVec3(GLint Loc, float x, float y, float z){
     glUniform3f(Loc, x, y, z);
 }
@@ -196,6 +201,15 @@ INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadScreenShader){
     Result.Shader = GlLoadProgram(GL, PathV, PathF);
     
     GLGETU(ScreenTexture);
+    GLGETU(UVInvertY);
+}
+
+INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadResolveDepthShader){
+    gl_resolve_depth_shader& Result = GL->ResolveDepth;
+    Result.Shader = GlLoadProgram(GL, PathV, PathF);
+    
+    GLGETU(DepthTexture);
+    GLGETU(UVInvertY);
 }
 
 INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadSimpleShader){
@@ -215,6 +229,11 @@ INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadSimpleShader){
     GLGETU(Emissive);
     GLGETU(Specular);
     GLGETU(TexturesSetFlags);
+    
+    GLGETU(FogEnabled);
+    GLGETU(FogColor);
+    GLGETU(FogDensity);
+    GLGETU(FogGradient);
     
     GLGETA(P);
     GLGETA(UV);
@@ -503,6 +522,9 @@ INTERNAL_FUNCTION void GlInit(gl_state* GL,
     LoadGuiLinesShader(GL,
                        "../Data/Shaders/gui_geom_lines.vs",
                        "../Data/Shaders/gui_geom_lines.fs");
+    LoadResolveDepthShader(GL,
+                           "../Data/Shaders/screen.vs",
+                           "../Data/Shaders/screen_resolve_depth.fs");
     
     size_t FS = sizeof(float);
     
@@ -585,6 +607,8 @@ INTERNAL_FUNCTION void GlInit(gl_state* GL,
     glBindBuffer(GL_ARRAY_BUFFER, GL->GuiLinesVBO);
     InitVertexAttribFloat(GL->GuiLinesShader.PAttrLoc,
                           2, 2 * FS, 0);
+    glBindVertexArray(0);
+    
     
     // NOTE(Dima): Init SSAO textures
     glGenTextures(1, &GL->SSAONoiseTex);
@@ -612,7 +636,56 @@ INTERNAL_FUNCTION void GlInit(gl_state* GL,
                  GL_RGB, GL_FLOAT,
                  Render->SSAONoiseTexture);
     
-    glBindVertexArray(0);
+    // NOTE(Dima): Init render FBO
+    glGenFramebuffers(1, &GL->RenderFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, GL->RenderFBO);
+    
+    // NOTE(Dima): Color component init
+    glGenTextures(1, &GL->RenderColorTex0);
+    glBindTexture(GL_TEXTURE_2D, GL->RenderColorTex0);
+    glTexImage2D(GL_TEXTURE_2D, 0, 
+                 GL_RGB, 
+                 Render->InitWindowWidth,
+                 Render->InitWindowHeight,
+                 0, GL_RGB, 
+                 GL_UNSIGNED_BYTE, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);  
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    
+    glFramebufferTexture2D(GL_FRAMEBUFFER, 
+                           GL_COLOR_ATTACHMENT0, 
+                           GL_TEXTURE_2D, 
+                           GL->RenderColorTex0, 0);
+    
+    // NOTE(Dima): Depth component init
+    glGenTextures(1, &GL->RenderDepthTex);
+    glBindTexture(GL_TEXTURE_2D, GL->RenderDepthTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, 
+                 GL_DEPTH_COMPONENT32, 
+                 Render->InitWindowWidth,
+                 Render->InitWindowHeight,
+                 0, GL_DEPTH_COMPONENT, 
+                 GL_UNSIGNED_INT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    
+    glFramebufferTexture2D(GL_FRAMEBUFFER,
+                           GL_DEPTH_ATTACHMENT, 
+                           GL_TEXTURE_2D, 
+                           GL->RenderDepthTex, 0);
+    
+    // TODO(Dima): Maybe add stencil buffer here
+    GLenum FramebufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    Assert(FramebufferStatus == GL_FRAMEBUFFER_COMPLETE);
+    if(FramebufferStatus != GL_FRAMEBUFFER_COMPLETE){
+        Platform.OutputString("Can not create render framebuffer\n");
+    }
 }
 
 INTERNAL_FUNCTION void GlFree(gl_state* GL){
@@ -632,6 +705,13 @@ INTERNAL_FUNCTION void GlFree(gl_state* GL){
     glDeleteBuffers(1, &GL->GuiGeomVBO);
     glDeleteBuffers(1, &GL->GuiGeomTB);
     glDeleteVertexArrays(1, &GL->GuiGeomVAO);
+    
+    // NOTE(Dima): Deleting render framebuffer
+    glDeleteFramebuffers(1, &GL->RenderFBO);
+    
+    // NOTE(Dima): Deleting for SSAO
+    glDeleteTextures(1, &GL->SSAONoiseTex);
+    glDeleteTextures(1, &GL->SSAOKernelTex);
 }
 
 INTERNAL_FUNCTION void GlRenderGuiRect(gl_state* GL,
@@ -768,6 +848,8 @@ void GlOutputStack(gl_state* GL, render_stack* Stack, render_camera_setup* Camer
                 
                 glEnable(GL_DEPTH_TEST);
                 
+                
+                
                 UseShader(&GL->SimpleShader.Shader);
                 
                 // NOTE(Dima): Setting VS uniforms
@@ -788,6 +870,13 @@ void GlOutputStack(gl_state* GL, render_stack* Stack, render_camera_setup* Camer
                                        GL_TRUE,
                                        (const GLfloat*)entry->BoneTransforms[0].e);
                 }
+                
+                
+                UniformBool(GL->SimpleShader.FogEnabledLoc, Stack->Render->FogEnabled);
+                UniformFloat(GL->SimpleShader.FogGradientLoc, Stack->Render->FogGradient);
+                UniformFloat(GL->SimpleShader.FogDensityLoc, Stack->Render->FogDensity);
+                UniformVec3(GL->SimpleShader.FogColorLoc, Stack->Render->FogColor);
+                
                 
                 // NOTE(Dima): Setting FS uniforms
                 b32 AlbedoIsSet = 0;
@@ -1068,14 +1157,6 @@ INTERNAL_FUNCTION void GlFinalOutput(gl_state* GL, render_state* Render){
 INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
     FUNCTION_TIMING();
     
-    glEnable(GL_BLEND);
-    //glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    //glBlendEquation(GL_FUNC_ADD);
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA); 
-    
-    glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
     // NOTE(Dima): Calculating gui orthographic projection matrix
     int WindowWidth = 1366;
     int WindowHeight = 768;
@@ -1101,7 +1182,17 @@ INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
     
     GL->GuiOrtho = Floats2Matrix(GuiOrtho);
     
-    glViewport(0.0f, 0.0f, WindowWidth, WindowHeight);
+    glBindFramebuffer(GL_FRAMEBUFFER, GL->RenderFBO);
+    glViewport(0.0f, 0.0f, InitWindowWidth, InitWindowHeight);
+    
+    
+    glEnable(GL_BLEND);
+    //glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    //glBlendEquation(GL_FUNC_ADD);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA); 
+    
+    glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     // NOTE(Dima): Actual rendering
     if(Render->API.RendererType == Renderer_Software){
@@ -1123,5 +1214,42 @@ INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
         }
         
         GlFinalOutput(GL, Render);
+        
+        GLint TexLoc;
+        GLuint Tex;
+        GLuint ProgramID;
+        GLint UVInvertYLoc;
+        if(Render->ToShowBufferType == RenderShowBuffer_Color){
+            TexLoc = GL->ScreenShader.ScreenTextureLoc;
+            UVInvertYLoc = GL->ScreenShader.UVInvertYLoc;
+            ProgramID = GL->ScreenShader.Shader.ID;
+            Tex = GL->RenderColorTex0;
+        }
+        else if(Render->ToShowBufferType == RenderShowBuffer_Depth){
+            TexLoc = GL->ResolveDepth.DepthTextureLoc;
+            UVInvertYLoc = GL->ResolveDepth.UVInvertYLoc;
+            ProgramID = GL->ResolveDepth.Shader.ID;
+            Tex = GL->RenderDepthTex;
+        }
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0.0f, 0.0f, WindowWidth, WindowHeight);
+        
+        glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
+        // NOTE(Dima): Drawing screen rect
+        glBindVertexArray(GL->ScreenVAO);
+        glUseProgram(ProgramID);
+        
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, Tex);
+        glUniform1i(TexLoc, 0);
+        glUniform1i(UVInvertYLoc, true);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        
+        glUseProgram(0);
+        glBindVertexArray(0);
     }
 }

@@ -28,6 +28,10 @@ enum character_id_type{
     CharacterID_Success,
     CharacterID_Talk,
     CharacterID_Walk,
+    CharacterID_Die,
+    CharacterID_Attack,
+    CharacterID_TakeDamage,
+    CharacterID_Throw,
     
     CharacterID_Count,
 };
@@ -38,7 +42,13 @@ struct entity_character{
     quat R;
     v3 S;
     
+    v3 InitP;
+    v3 InitS;
+    quat InitR;
+    
     u32 CharacterIDs[CharacterID_Count];
+    
+    b32 IsInsect;
     
     model_info* Model;
     animated_component AnimComponent;
@@ -64,9 +74,11 @@ struct test_game_mode_state{
     animated_component PlayerAnimComponent;
     
     anim_controller* FriendControl;
+    anim_controller* CaterpillarControl;
     
-#define TEMP_CHARACTERS_COUNT 100
+#define TEMP_CHARACTERS_COUNT 400
     entity_character Characters[TEMP_CHARACTERS_COUNT];
+    entity_character Caterpillar;
     
     b32 Initialized;
 };
@@ -270,6 +282,86 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFriendControl){
     AddAnimState(Control, AnimState_Animation, "Falling");
     AddAnimState(Control, AnimState_Animation, "JumpUp");
     AddAnimState(Control, AnimState_Animation, "Land");
+    AddAnimState(Control, AnimState_Animation, "Roll");
+    
+    f32 SpeedShiftPoint = 0.05f;
+    f32 VeryHighFallSpeed = -6.0f;
+    
+    // NOTE(Dima): Idle -> Run
+    BeginTransition(Control, "Idle", "Run", 0.35f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, 0.05f);
+    EndTransition(Control);
+    
+    // NOTE(Dima): Run -> Idle
+    BeginTransition(Control, "Run", "Idle");
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_LessThan, SpeedShiftPoint);
+    EndTransition(Control);
+    
+    BeginTransition(Control, ANIM_ANY_STATE, "JumpUp");
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, true);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_MoreThan, SpeedShiftPoint);
+    EndTransition(Control);
+    
+    BeginTransition(Control, ANIM_ANY_STATE, "Falling", 0.5f, false);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, true);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, -SpeedShiftPoint);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Falling", "Land", 0.05f, false);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, VeryHighFallSpeed);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Falling", "Idle", 0.2f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_LessThan, SpeedShiftPoint);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_MoreEqThan, VeryHighFallSpeed);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, 0.5f);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Falling", "Run", 0.2f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, SpeedShiftPoint);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_MoreEqThan, VeryHighFallSpeed);
+    AddConditionFloat(Control, "VelocityVertValue", TransitionCondition_LessThan, 0.5f);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Land", "Idle", 0.2f, true);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Land", "Run", 0.3f, true, 0.55f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, SpeedShiftPoint);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Roll", "Idle", 0.25f, true, 0.8f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_LessThan, SpeedShiftPoint);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Roll", "Run", 0.15f, true, 0.85f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, SpeedShiftPoint);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Roll", "Falling", 0.1f, true);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, true);
+    EndTransition(Control);
+    
+    return(Control);
+}
+
+
+INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitCaterpillarControl){
+    anim_controller* Control = CreateAnimControl(Anim, Name);
+    
+    // NOTE(Dima): Adding animation nodes
+    AddAnimState(Control, AnimState_Animation, "Idle");
+    AddAnimState(Control, AnimState_Animation, "Run");
+    AddAnimState(Control, AnimState_Animation, "Falling");
+    AddAnimState(Control, AnimState_Animation, "JumpUp");
+    AddAnimState(Control, AnimState_Animation, "Land");
+    AddAnimState(Control, AnimState_Animation, "Roll");
+    AddAnimState(Control, AnimState_Animation, "Die");
     
     f32 SpeedShiftPoint = 0.05f;
     
@@ -319,6 +411,22 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFriendControl){
     AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, SpeedShiftPoint);
     EndTransition(Control);
     
+    
+    BeginTransition(Control, "Roll", "Idle", 0.25f, true, 0.8f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_LessThan, SpeedShiftPoint);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Roll", "Run", 0.15f, true, 0.85f);
+    AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, SpeedShiftPoint);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
+    EndTransition(Control);
+    
+    BeginTransition(Control, "Roll", "Falling", 0.1f, true);
+    AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, true);
+    EndTransition(Control);
+    
+    
     return(Control);
 }
 
@@ -334,7 +442,6 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
     
     asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
     
-#if 1
     anim_calculated_pose CalcPose = UpdateModelAnimation(Assets, Model, AC,
                                                          GlobalTime, DeltaTime, 
                                                          1.0f);
@@ -369,10 +476,7 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
             }
         }
     }
-#endif
-    
 }
-
 
 INTERNAL_FUNCTION u32 LoadCharacterAssetID(assets* Assets, 
                                            u32 GroupID, 
@@ -392,7 +496,8 @@ INTERNAL_FUNCTION void InitCharacter(assets* Assets,
                                      entity_character* Character,
                                      u32 TagCharacterValue,
                                      anim_controller* Control,
-                                     v3 P, quat R, v3 S)
+                                     v3 P, quat R, v3 S, 
+                                     b32 IsInsect)
 {
     /*
 // NOTE(Dima): This check is just to make sure that CharacterID table
@@ -416,6 +521,10 @@ has the same count of IDs as GameAssetID table for model and animations
     Character->P = P;
     Character->R = R;
     Character->S = S;
+    Character->InitP = P;
+    Character->InitR = R;
+    Character->InitS = S;
+    Character->IsInsect = IsInsect;
     
     model_info* ModelInfo = GET_ASSET_DATA_BY_ID(model_info, AssetType_Model, 
                                                  Assets, CharIDs[CharacterID_Model]);
@@ -433,7 +542,11 @@ has the same count of IDs as GameAssetID table for model and animations
     SetStateAnimation(&Character->AnimComponent, "JumpUp", Character->CharacterIDs[CharacterID_JumpUp]);
     SetStateAnimation(&Character->AnimComponent, "Falling", Character->CharacterIDs[CharacterID_Fall]);
     SetStateAnimation(&Character->AnimComponent, "Land", Character->CharacterIDs[CharacterID_Land]);
+    SetStateAnimation(&Character->AnimComponent, "Roll", Character->CharacterIDs[CharacterID_Roll]);
     
+    if(IsInsect){
+        SetStateAnimation(&Character->AnimComponent, "Die", Character->CharacterIDs[CharacterID_Die]);
+    }
 }
 
 INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
@@ -449,17 +562,42 @@ INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
     
     model_info* Model = Character->Model;
     
-    b32 IsLanded = StateIsPlaying(&Character->AnimComponent, "Land") && 
+    b32 IsLandedPlaying = StateIsPlaying(&Character->AnimComponent, "Land") && 
         (GetPlayingStatePhase(&Character->AnimComponent) < 0.55f);
-    b32 CanMove = !IsLanded;
+    b32 IsRollingPlaying = StateIsPlaying(&Character->AnimComponent, "Roll");
     
+    b32 CanMove = !IsLandedPlaying && !IsRollingPlaying;
+    
+    f32 MoveSpeed = 0.0f;
     Character->dP.z = 0.0f;
     if(CanMove && KeyIsDown(Input, Key_Z)){
+        MoveSpeed = 1.0f;
         Character->dP.z = 1.0f;
     }
     if(KeyWentDown(Input, Key_Space)){
         Character->dP.y += 5.0f;
     }
+    
+#if 0    
+    f32 RadialFrequency = 1.0f;
+    f32 MoveRadius = 5.0f;
+    
+    v2 RadialP1 = V2(Cos(GlobalTime * RadialFrequency) * MoveRadius,
+                     Sin(GlobalTime * RadialFrequency) * MoveRadius);
+    
+    v2 RadialP2 = V2(Cos((GlobalTime + dt) * RadialFrequency) * MoveRadius,
+                     Sin((GlobalTime + dt) * RadialFrequency) * MoveRadius);
+    
+    v2 MoveHorzDirection = Normalize(RadialP2 - RadialP1);
+    v2 MoveHorz = MoveHorzDirection * MoveSpeed;
+    
+    Character->dP.x = MoveHorz.x;
+    Character->dP.z = MoveHorz.y;
+    
+    quat LookRotation = QuatLookAt(V3(MoveHorzDirection.x, 0.0f, MoveHorzDirection.y),
+                                   V3(0.0f, 1.0f, 0.0f));
+    Character->R = Normalize(LookRotation * Character->InitR);
+#endif
     
     v3 Acc = V3(0.0f, -9.81f, 0.0f);
     Character->P = Character->P + Character->dP * dt + Acc * dt * dt * 0.5f;
@@ -473,12 +611,20 @@ INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
     
     b32 IsFalling = Character->P.y > 0.0001f;
     
+    
+    if(KeyWentDown(Input, Key_X) && CanMove && !IsFalling){
+        ForceTransitionRequest(&Character->AnimComponent,
+                               "Roll", 0.1f, 0.0f);
+    }
+    
+    
     SetFloat(&Character->AnimComponent, 
-             "VelocityHorzLen", Character->dP.z);
+             "VelocityHorzLen", MoveSpeed);
     SetFloat(&Character->AnimComponent,
              "VelocityVertValue", PrevVelocityY);
     SetBool(&Character->AnimComponent,
             "IsFalling", IsFalling);
+    
     
     if(Model){
         UpdateModel(Assets, Stack,
@@ -520,6 +666,7 @@ GAME_MODE_UPDATE(TestUpdate){
         
         State->PlayerControl = InitPlayerControl(Game->Anim, Game->Assets, "PlayerControl");
         State->FriendControl = InitFriendControl(Game->Anim, Game->Assets, "FriendControl");
+        State->CaterpillarControl = InitCaterpillarControl(Game->Anim, Game->Assets, "CaterpillarControl");
         
 #if 0        
         model_info* PlayerInfo = GET_ASSET_DATA_BY_ID(model_info, AssetType_Model, 
@@ -540,7 +687,7 @@ GAME_MODE_UPDATE(TestUpdate){
             v3 P = V3((CharIndex % (int)Sqrt(TEMP_CHARACTERS_COUNT)) * 2, 10.0f, 
                       (CharIndex / (int)Sqrt(TEMP_CHARACTERS_COUNT)) * 2);
             
-            int CharType = CharIndex % 6;
+            int CharType = CharIndex % 11;
             
             InitCharacter(Game->Assets, 
                           Char,
@@ -548,8 +695,17 @@ GAME_MODE_UPDATE(TestUpdate){
                           State->FriendControl,
                           P, 
                           Quat(V3(1.0f, 0.0f, 0.0f), -JOY_PI_OVER_TWO),
-                          V3(0.01f));
+                          V3(0.01f),
+                          false);
         }
+        
+        InitCharacter(Game->Assets, &State->Caterpillar,
+                      TagCharacter_Caterpillar,
+                      State->CaterpillarControl,
+                      V3(-10.0f, 10.0f, 10.0f), 
+                      Quat(V3(1.0f, 0.0f, 0.0f), -JOY_PI_OVER_TWO),
+                      V3(0.01f),
+                      true);
         
         State->Initialized = true;
     }
@@ -603,7 +759,10 @@ GAME_MODE_UPDATE(TestUpdate){
     int Width = Game->Render->FrameInfo.InitWidth;
     int Height = Game->Render->FrameInfo.InitHeight;
     
-    render_camera_setup CamSetup = DefaultPerspSetup(Width, Height, CameraTransform);
+    render_camera_setup CamSetup = DefaultPerspSetup(Width, Height,
+                                                     RENDER_DEFAULT_FAR,
+                                                     RENDER_DEFAULT_NEAR,
+                                                     CameraTransform);
     
     render_pass* Pass = BeginRenderPass(Game->Render, CamSetup);
     render_stack* Stack = RenderFindStack(Game->Render, "Main");
@@ -639,6 +798,35 @@ GAME_MODE_UPDATE(TestUpdate){
                 &State->WorldSpeedUp,
                 0.1f, 3.0f,
                 "World speedup");
+    
+    SliderFloat(Game->Gui,
+                &Game->Render->FogGradient,
+                0.1f, 10.0f,
+                "Fog gradient");
+    
+    SliderFloat(Game->Gui,
+                &Game->Render->FogDensity,
+                0.0f, 0.5f,
+                "Fog density");
+    
+    
+    SliderFloat(Game->Gui,
+                &Game->Render->FogColor.r,
+                0.0f, 1.0f,
+                "Fog color R");
+    
+    SliderFloat(Game->Gui,
+                &Game->Render->FogColor.g,
+                0.0f, 1.0f,
+                "Fog color G");
+    
+    SliderFloat(Game->Gui,
+                &Game->Render->FogColor.b,
+                0.0f, 1.0f,
+                "Fog color B");
+    
+    BoolButtonOnOff(Game->Gui, "Fog enabled", &Game->Render->FogEnabled);
+    
     
     u32 FindTagTypes[1] = {AssetTag_LOD};
     asset_tag_value FindTagValues[1] = {FindSphereQuality};
@@ -764,6 +952,13 @@ GAME_MODE_UPDATE(TestUpdate){
                         State->GameTime,
                         State->GameDeltaTime);
     }
+    
+    UpdateCharacter(Game->Assets,
+                    Stack,
+                    Game->Input,
+                    &State->Caterpillar,
+                    State->GameTime,
+                    State->GameDeltaTime);
 #endif
     
 #if 0

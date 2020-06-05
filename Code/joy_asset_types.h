@@ -226,6 +226,9 @@ struct animation_clip{
     
     u32* NodeAnimationIDs;
     int NodeAnimationsCount;
+    
+    b32 UsesRootMotion;
+    u32 RootMotionNodeAnimID;
 };
 
 #endif

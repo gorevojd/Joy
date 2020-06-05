@@ -2,16 +2,30 @@
 #define JOY_RENDER_H
 
 #define RENDER_DEFAULT_STACK_SIZE Megabytes(1)
+#define RENDER_DEFAULT_FAR 500.0f
+#define RENDER_DEFAULT_NEAR 0.2f
+#define RENDER_FOG_DENSITY 0.035f
+#define RENDER_FOG_GRADIENT 3.0f
+#define RENDER_FOG_ENABLED false
 
 #define SSAO_KERNEL_SIZE 256
 #define SSAO_NOISE_TEXTURE_SIZE 16
 
+enum render_show_buffer_type{
+    RenderShowBuffer_Color,
+    RenderShowBuffer_Depth,
+    
+    RenderShowBuffer_Count,
+};
 
 struct render_camera_setup{
     
     m44 Projection;
     m44 View;
     m44 ViewProjection;
+    
+    float Far;
+    float Near;
     
     int FramebufferWidth;
     int FramebufferHeight;
@@ -120,14 +134,11 @@ struct render_frame_info{
 
 struct render_state{
     mem_region* MemRegion;
-    
     random_generation Random;
-    
     render_platform_api API;
     
     render_stack Stacks[16];
     int StacksCount;
-    
     render_pass Passes[256];
     int PassCount;
     
@@ -136,10 +147,16 @@ struct render_state{
     
     b32 FrameInfoIsSet;
     render_frame_info FrameInfo;
+    u32 ToShowBufferType;
     
     v3 SSAONoiseTexture[SSAO_NOISE_TEXTURE_SIZE];
     v3 SSAOKernelSamples[SSAO_KERNEL_SIZE];
     int SSAOKernelSampleCount;
+    
+    b32 FogEnabled;
+    float FogDensity;
+    float FogGradient;
+    v3 FogColor;
     
     render_gui_geom GuiGeom;
     render_lines_geom LinesGeom;

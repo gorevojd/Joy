@@ -4,6 +4,7 @@ in Vertex_Shader_Out{
     vec3 WorldP;
     vec3 WorldN;
     vec2 UV;
+	float Visibility;
 } FsIn;
 
 out vec4 Color;
@@ -16,6 +17,8 @@ uniform sampler2D Specular;
 uniform sampler2D Emissive;
 
 uniform int TexturesSetFlags;
+
+uniform vec3 FogColor;
 
 const int ALBEDO_SET_FLAG = 1;
 const int NORMALS_SET_FLAG = 1 << 1;
@@ -59,5 +62,7 @@ void main(){
     vec3 ResultColor = vec3(0.0f, 0.0f, 0.0f);
     ResultColor += Ambient + CalcDirLit(FragP, FragN, SampledAlbedo);
     
+	ResultColor = (1.0f - FsIn.Visibility) * FogColor + (FsIn.Visibility) * ResultColor; 
+
     Color = vec4(ResultColor, 1.0f);
 }
