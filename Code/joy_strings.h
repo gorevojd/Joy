@@ -55,6 +55,46 @@ inline void CopyStringsSafe(char* Dst, int DstSize, char* Src){
     }
 }
 
+
+inline int StringLength(char* Text) {
+	int Res = 0;
+    
+	char* At = Text;
+	while (*At) {
+		Res++;
+        
+		At++;
+	}
+    
+	return(Res);
+}
+
+inline void AppendCharacterSafe(char* Dst, int DstSize, char ToAppend){
+    int DstLen = StringLength(Dst);
+    
+    if(DstLen < DstSize - 1){
+        Dst[DstLen] = ToAppend;
+        Dst[DstLen + 1] = 0;
+    }
+}
+
+inline void CopyStringsToEndSafe(char* Dst, int DstSize, char* Src){
+    int DstLen = StringLength(Dst);
+    
+    if(DstLen < DstSize - 1){
+        Dst = Dst + DstLen;
+        
+        if(Src && Dst){
+            int SpaceInDstAvailable = DstSize - 1 - DstLen;
+            while(*Src && (SpaceInDstAvailable > 0)){
+                *Dst++ = *Src++;
+                SpaceInDstAvailable--;
+            }
+            *Dst = 0;
+        }
+    }
+}
+
 inline void ConcatStringsUnsafe(char* Dst, char* Src1, char* Src2) {
 	int Index = 0;
     
@@ -89,20 +129,6 @@ inline void ConcatStringsUnsafe(char* Dst, int Count, ...){
     
     *To = 0;
 }
-
-inline int StringLength(char* Text) {
-	int Res = 0;
-    
-	char* At = Text;
-	while (*At) {
-		Res++;
-        
-		At++;
-	}
-    
-	return(Res);
-}
-
 
 inline void ChangeAllChars(char* String, char From, char To){
     char* At = String;

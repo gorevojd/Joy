@@ -19,9 +19,6 @@
 #include <assimp/scene.h>           // Output data structure
 #include <assimp/postprocess.h>     // Post processing flags
 
-#define LOAD_ANIM_LOOPING true
-#define LOAD_ANIM_NOT_LOOPING false
-
 GLOBAL_VARIABLE aiTextureType SupportedTexturesTypes[] = {
     aiTextureType_DIFFUSE,
     aiTextureType_SPECULAR,

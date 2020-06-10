@@ -92,7 +92,6 @@ struct asset_skeleton{
 struct asset_animation_clip{
     float Duration;
     float TicksPerSecond;
-    b32 IsLooping;
     
     u32 NodesCheckSum;
     

@@ -220,8 +220,6 @@ struct animation_clip{
     
     char* Name;
     
-    b32 IsLooping;
-    
     u32 NodesCheckSum;
     
     u32* NodeAnimationIDs;

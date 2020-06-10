@@ -666,7 +666,6 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags,
         NewAnimation.Duration = AssimpAnim->mDuration;
         NewAnimation.TicksPerSecond = AssimpAnim->mTicksPerSecond;
         NewAnimation.NodesCheckSum = Result.NodesCheckSum;
-        NewAnimation.IsLooping = (Flags & Load_AnimationWillBeLooped) != 0;
         NewAnimation.UsesRootMotion = UsesRootMotion;
         
         tool_node_animation* RootMotionNodeAnim = &NewAnimation.RootMotionNodeAnim;

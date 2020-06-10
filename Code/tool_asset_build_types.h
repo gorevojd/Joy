@@ -176,7 +176,6 @@ struct tool_node_animation{
 struct tool_animation_info{
     float Duration;
     float TicksPerSecond;
-    b32 IsLooping;
     
     std::string Name;
     

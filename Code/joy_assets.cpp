@@ -1195,7 +1195,6 @@ corresponding asset groups (Main groups, and tag groups for each tag
                             animation_clip* Clip = ALLOC_ASS_PTR_MEMBER(animation_clip);
                             asset_animation_clip* Src = &AssetHeader.AnimationClip;
                             
-                            Clip->IsLooping = Src->IsLooping;
                             Clip->DurationTicks = Src->Duration;
                             Clip->TicksPerSecond = Src->TicksPerSecond;
                             Clip->NodeAnimationsCount = Src->NodeAnimationIDsCount;

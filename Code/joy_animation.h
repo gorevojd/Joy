@@ -7,9 +7,17 @@
 #include "joy_strings.h"
 
 #define ANIM_ANY_STATE "#Any"
+#define ANIM_ANIMATION_NAME_SEPARATOR '.'
 #define ANIM_TRANSFORMS_ARRAY_SIZE 256
 #define ANIM_DEFAULT_TRANSITION_TIME 0.15f
 #define ANIM_OPTIMIZE 1
+#define ANIM_DEFAULT_NAME_SIZE 64
+#define ANIM_MAX_ANIMATIONS_PER_STATE 128
+#define ANIM_STATE_TABLE_SIZE 64
+#define ANIM_VAR_TABLE_SIZE 32
+#define ANIM_ANIMID_TABLE_SIZE 32
+#define ANIM_MAX_STATE_COUNT 256
+#define ANIM_MAX_PLAYING_STATES 16
 
 struct find_anim_deltas_ctx{
     // NOTE(Dima): Fail if KeysCount was 0
@@ -32,13 +40,36 @@ struct node_transforms_block{
     v3 Ss[ANIM_TRANSFORMS_ARRAY_SIZE];
 };
 
+
 enum playing_anim_exit_action_type{
+    // NOTE(Dima): For Blend tree only Looping is valid
     AnimExitAction_Looping,
+    
     AnimExitAction_ExitState,
+    AnimExitAction_Clamp,
+    AnimExitAction_Stop,
     AnimExitAction_Next,
+    AnimExitAction_Random,
 };
 
+
+struct playing_anim_source{
+    char Name[ANIM_DEFAULT_NAME_SIZE];
+    
+    u32 ExitAction;
+    int IndexInArray;
+    
+    playing_anim_source* NextInList;
+    
+    playing_anim_source* NextAlloc;
+    playing_anim_source* PrevAlloc;
+};
+
+
 struct playing_anim{
+    char* Name;
+    u32 ExitAction;
+    
     f64 GlobalStart;
     f32 Phase01;
     
@@ -47,7 +78,9 @@ struct playing_anim{
     
     u32 AnimationID;
     
-    u32 ExitAction;
+    struct playing_state_slot* StateSlot;
+    f32 InStateContribution;
+    
 };
 
 enum anim_state_type{
@@ -56,8 +89,9 @@ enum anim_state_type{
     AnimState_BlendTree,
 };
 
+// IMPORTANT(Dima): Never store individual data here (ex. data that will be updated per character)
 struct anim_state{
-    char Name[64];
+    char Name[ANIM_DEFAULT_NAME_SIZE];
     
     anim_state* NextInList;
     
@@ -70,15 +104,27 @@ struct anim_state{
     struct anim_transition* FirstTransition;
     struct anim_transition* LastTransition;
     
+    playing_anim_source* FirstAnimSource;
+    playing_anim_source* LastAnimSource;
+    
+    // NOTE(Dima): These are indices to anim sources array
+    int FirstAnimIndex;
+    int OnePastLastAnim;
+    
     u32 Type;
+};
+
+struct playing_anim_indices {
+    int* Indices;
+    int Count;
 };
 
 struct playing_state_slot{
     anim_state* State;
-    
-    playing_anim PlayingAnimation;
+    struct animated_component* AC;
     
     f32 Contribution;
+    node_transforms_block ResultedTransforms;
     
     /*
 NOTE(dima): Fot n'th element in playing states
@@ -87,6 +133,13 @@ from n - 1 -> n
 */
     f32 TimeToTransit;
     f32 TransitionTimeLeft;
+    
+    b32 StateShouldBeExited;
+    
+    playing_anim* PlayingAnimations[ANIM_MAX_ANIMATIONS_PER_STATE];
+    int PlayingAnimationsCount;
+    int PlayingAnimIndex;
+    int PlayingAnimIndices[ANIM_MAX_ANIMATIONS_PER_STATE];
 };
 
 enum anim_variable_type{
@@ -101,7 +154,7 @@ union anim_variable_data{
 };
 
 struct anim_variable{
-    char Name[64];
+    char Name[ANIM_DEFAULT_NAME_SIZE];
     
     anim_variable_data Value;
     u32 ValueType;
@@ -114,7 +167,7 @@ struct anim_variable{
 };
 
 struct anim_animid{
-    char Name[64];
+    char Name[ANIM_DEFAULT_NAME_SIZE];
     
     u32 AnimID;
     
@@ -136,7 +189,7 @@ enum anim_transition_condition_type{
 struct anim_transition_condition{
     anim_variable_data Value;
     
-    char Name[64];
+    char Name[ANIM_DEFAULT_NAME_SIZE];
     u32 VariableValueType;
     
     u32 ConditionType;
@@ -167,12 +220,6 @@ struct anim_calculated_pose{
     int BoneTransformsCount;
 };
 
-#define ANIM_STATE_TABLE_SIZE 64
-#define ANIM_VAR_TABLE_SIZE 32
-#define ANIM_ANIMID_TABLE_SIZE 32
-#define ANIM_MAX_STATE_COUNT 256
-#define ANIM_MAX_PLAYING_STATES 128
-
 struct anim_transition_request{
     anim_state* ToState;
     b32 Requested;
@@ -181,9 +228,7 @@ struct anim_transition_request{
 };
 
 struct anim_controller{
-    struct anim_system* AnimState;
-    
-    char Name[64];
+    struct anim_system* AnimSystem;
     
     anim_controller* Next;
     anim_controller* Prev;
@@ -195,6 +240,11 @@ struct anim_controller{
     anim_transition* BeginnedTransitions[ANIM_MAX_STATE_COUNT];
     anim_transition_condition* BeginnedTransitionsConditions[ANIM_MAX_STATE_COUNT];
     int BeginnedTransitionsCount;
+    
+    playing_anim_source* AnimSources[2048];
+    int AnimSourcesCount;
+    
+    anim_state* BeginnedState;
 };
 
 struct animated_component{
@@ -212,7 +262,6 @@ struct animated_component{
     
     // NOTE(Dima): Skeleton hash
     u32 NodesCheckSum;
-    
     playing_state_slot PlayingStates[ANIM_MAX_PLAYING_STATES];
     int PlayingIndex;
     int PlayingStatesCount;
@@ -220,6 +269,9 @@ struct animated_component{
     // NOTE(Dima): Result transforms array that will be passed to shader
     node_transforms_block ResultedTransforms;
     m44 BoneTransformMatrices[128];
+    
+    playing_anim* Anims;
+    int AnimsCount;
     
     anim_transition_request ForceTransitionRequest;
 };
@@ -251,7 +303,7 @@ inline int GetPrevPlayingIndex(int Index){
 struct anim_system{
     mem_region* Region;
     
-    f64 GlobalTime;
+    random_generation Random;
     
     anim_variable VariableUse;
     anim_variable VariableFree;
@@ -267,6 +319,9 @@ struct anim_system{
     
     anim_animid AnimIDUse;
     anim_animid AnimIDFree;
+    
+    playing_anim_source PlayingAnimSourceUse;
+    playing_anim_source PlayingAnimSourceFree;
 };
 
 anim_calculated_pose UpdateModelAnimation(assets* Assets,
@@ -286,9 +341,8 @@ b32 StateIsPlaying(animated_component* AC,
 f32 GetPlayingStatePhase(animated_component* AC);
 
 void AddAnimState(anim_controller* Control,
-                  u32 StateType,
                   char* Name,
-                  f32 EarlyTerminatePhase = 1.0f);
+                  u32 AnimExitAction);
 
 void AddVariable(animated_component* AC,
                  char* Name,
@@ -330,9 +384,9 @@ void ForceTransitionRequest(animated_component* AC,
                             f32 TimeToTransit,
                             f32 Phase);
 
-void SetStateAnimation(animated_component* AC,
-                       char* StateName,
-                       u32 AnimationID);
+void SetAnimationID(animated_component* AC,
+                    char* AnimName,
+                    u32 AnimationID);
 
 void InitAnimSystem(anim_system* Anim);
 

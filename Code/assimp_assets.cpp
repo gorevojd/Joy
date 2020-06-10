@@ -62,14 +62,9 @@ inline void AddModelSource(model_loading_context* Ctx,
 inline void AddAnimSource(model_loading_context* Ctx, 
                           char* Path, 
                           u32 AssetGroup,
-                          u32 Flags,
-                          b32 IsLooped)
+                          u32 Flags)
 {
     std::string NewPath = GetAssetPathForLoadingContext(Ctx, Path);
-    
-    if(IsLooped){
-        Flags |= Load_AnimationWillBeLooped;
-    }
     
     load_model_source Source = ModelSource(NewPath, AssetGroup, 
                                            Flags | Load_ImportOnlyAnimation, 
@@ -140,56 +135,44 @@ INTERNAL_FUNCTION void AddCharacterToWrite(model_loading_context* Ctx,
                    GameAsset_Model_Character, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Failure.fbx", 
-                  GameAsset_Anim_Failure, DefaultFlags, 
-                  LOAD_ANIM_NOT_LOOPING);
+                  GameAsset_Anim_Failure, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Fall.fbx",
-                  GameAsset_Anim_Fall, DefaultFlags, 
-                  LOAD_ANIM_LOOPING);
+                  GameAsset_Anim_Fall, DefaultFlags);
     
     PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
     AddAnimSource(Ctx, "animations/Idle.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags, 
-                  LOAD_ANIM_LOOPING);
+                  GameAsset_Anim_Idle, DefaultFlags);
     PopTag(Ctx);
     
     PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
     AddAnimSource(Ctx, "animations/Idle_2.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags, 
-                  LOAD_ANIM_LOOPING);
+                  GameAsset_Anim_Idle, DefaultFlags);
     PopTag(Ctx);
     
     AddAnimSource(Ctx, "animations/Jump_Up.fbx",
-                  GameAsset_Anim_JumpUp, DefaultFlags, 
-                  LOAD_ANIM_LOOPING);
+                  GameAsset_Anim_JumpUp, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Land.fbx",
-                  GameAsset_Anim_Land, DefaultFlags, 
-                  LOAD_ANIM_NOT_LOOPING);
+                  GameAsset_Anim_Land, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Roll.fbx",
-                  GameAsset_Anim_Roll, DefaultFlags | Load_ExtractRootMotionZ, 
-                  LOAD_ANIM_NOT_LOOPING);
+                  GameAsset_Anim_Roll, DefaultFlags | Load_ExtractRootMotionZ);
     
     AddAnimSource(Ctx, "animations/Run.fbx",
-                  GameAsset_Anim_Run, DefaultFlags | Load_ExtractRootMotionZ, 
-                  LOAD_ANIM_LOOPING);
+                  GameAsset_Anim_Run, DefaultFlags | Load_ExtractRootMotionZ);
     
     AddAnimSource(Ctx, "animations/Sleep.fbx",
-                  GameAsset_Anim_Sleep, DefaultFlags, 
-                  LOAD_ANIM_LOOPING);
+                  GameAsset_Anim_Sleep, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Success.fbx",
-                  GameAsset_Anim_Success, DefaultFlags, 
-                  LOAD_ANIM_NOT_LOOPING);
+                  GameAsset_Anim_Success, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Talk.fbx",
-                  GameAsset_Anim_Talk, DefaultFlags, 
-                  LOAD_ANIM_LOOPING);
+                  GameAsset_Anim_Talk, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Walk.fbx",
-                  GameAsset_Anim_Walk, DefaultFlags | Load_ExtractRootMotionZ, 
-                  LOAD_ANIM_LOOPING);
+                  GameAsset_Anim_Walk, DefaultFlags | Load_ExtractRootMotionZ);
     PopDirectory(Ctx);
     EndCharacter(Ctx);
 }
@@ -211,35 +194,29 @@ INTERNAL_FUNCTION void AddCaterpillar(model_loading_context* Ctx)
                    GameAsset_Model_Character, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Fall.fbx",
-                  GameAsset_Anim_Fall, DefaultFlags, LOAD_ANIM_LOOPING);
+                  GameAsset_Anim_Fall, DefaultFlags);
     
     PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
     AddAnimSource(Ctx, "animations/Idle.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags, 
-                  LOAD_ANIM_LOOPING);
+                  GameAsset_Anim_Idle, DefaultFlags);
     PopTag(Ctx);
     
     AddAnimSource(Ctx, "animations/Jump_Up.fbx",
-                  GameAsset_Anim_JumpUp, DefaultFlags, 
-                  LOAD_ANIM_LOOPING);
+                  GameAsset_Anim_JumpUp, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Land.fbx",
-                  GameAsset_Anim_Land, DefaultFlags, 
-                  LOAD_ANIM_NOT_LOOPING);
+                  GameAsset_Anim_Land, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Roll.fbx",
                   GameAsset_Anim_Roll, 
-                  DefaultFlags | Load_ExtractRootMotionZ, 
-                  LOAD_ANIM_NOT_LOOPING);
+                  DefaultFlags | Load_ExtractRootMotionZ);
     
     AddAnimSource(Ctx, "animations/Run.fbx",
                   GameAsset_Anim_Run, 
-                  DefaultFlags | Load_ExtractRootMotionZ, 
-                  LOAD_ANIM_LOOPING);
+                  DefaultFlags | Load_ExtractRootMotionZ);
     
     AddAnimSource(Ctx, "animations/Die.fbx",
-                  GameAsset_Anim_Die, DefaultFlags, 
-                  LOAD_ANIM_NOT_LOOPING);
+                  GameAsset_Anim_Die, DefaultFlags);
     
     PopDirectory(Ctx);
     EndCharacter(Ctx);

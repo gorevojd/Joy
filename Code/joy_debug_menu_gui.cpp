@@ -1,4 +1,6 @@
 DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Animation)){
+#if 0
+    
     if(Data){
         anim_system* AnimSys = (anim_system*)Data;
         
@@ -124,6 +126,7 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Animation)){
     else{
         ShowText(Gui, "ERROR. Data was NULL");
     }
+#endif
 }
 
 DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Input)){

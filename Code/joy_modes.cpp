@@ -76,7 +76,7 @@ struct test_game_mode_state{
     anim_controller* FriendControl;
     anim_controller* CaterpillarControl;
     
-#define TEMP_CHARACTERS_COUNT 400
+#define TEMP_CHARACTERS_COUNT 100
     entity_character Characters[TEMP_CHARACTERS_COUNT];
     entity_character Caterpillar;
     
@@ -254,11 +254,11 @@ AddVariable(Control, "VelocityLength", AnimVariable_Float);
 
 INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitPlayerControl)
 {
-    anim_controller* Control = CreateAnimControl(Anim, Name);
+    anim_controller* Control = CreateAnimControl(Anim);
     
     // NOTE(Dima): Adding animation nodes
-    AddAnimState(Control, AnimState_Animation, "Idle");
-    AddAnimState(Control, AnimState_Animation, "Run");
+    AddAnimState(Control, "Idle", AnimExitAction_Looping);
+    AddAnimState(Control, "Run", AnimExitAction_Looping);
     
     // NOTE(Dima): Idle -> Run
     BeginTransition(Control, "Idle", "Run");
@@ -274,15 +274,19 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitPlayerControl)
 }
 
 INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFriendControl){
-    anim_controller* Control = CreateAnimControl(Anim, Name);
+    anim_controller* Control = CreateAnimControl(Anim);
     
     // NOTE(Dima): Adding animation nodes
-    AddAnimState(Control, AnimState_Animation, "Idle");
-    AddAnimState(Control, AnimState_Animation, "Run");
-    AddAnimState(Control, AnimState_Animation, "Falling");
-    AddAnimState(Control, AnimState_Animation, "JumpUp");
-    AddAnimState(Control, AnimState_Animation, "Land");
-    AddAnimState(Control, AnimState_Animation, "Roll");
+    AddAnimState(Control, "Run", AnimExitAction_Looping);
+    AddAnimState(Control, "Falling", AnimExitAction_Looping);
+    AddAnimState(Control, "JumpUp", AnimExitAction_Looping);
+    AddAnimState(Control, "Land", AnimExitAction_ExitState);
+    AddAnimState(Control, "Roll", AnimExitAction_ExitState);
+    
+    BeginAnimStateQueue(Control, "Idle");
+    AddQueueAnimation(Control, "Idle0", AnimExitAction_Next);
+    AddQueueAnimation(Control, "Idle1", AnimExitAction_Next);
+    EndAnimStateQueue(Control);
     
     f32 SpeedShiftPoint = 0.05f;
     f32 VeryHighFallSpeed = -6.0f;
@@ -329,16 +333,18 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFriendControl){
     BeginTransition(Control, "Land", "Idle", 0.2f, true);
     EndTransition(Control);
     
+    anim_state* LandState = FindState(Control, "Land");
+    
     BeginTransition(Control, "Land", "Run", 0.3f, true, 0.55f);
     AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, SpeedShiftPoint);
     EndTransition(Control);
     
-    BeginTransition(Control, "Roll", "Idle", 0.25f, true, 0.8f);
+    BeginTransition(Control, "Roll", "Idle", 0.25f, true, 0.9f);
     AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_LessThan, SpeedShiftPoint);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
     EndTransition(Control);
     
-    BeginTransition(Control, "Roll", "Run", 0.15f, true, 0.85f);
+    BeginTransition(Control, "Roll", "Run", 0.15f, true, 0.5f);
     AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, SpeedShiftPoint);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
     EndTransition(Control);
@@ -352,16 +358,21 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFriendControl){
 
 
 INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitCaterpillarControl){
-    anim_controller* Control = CreateAnimControl(Anim, Name);
+    anim_controller* Control = CreateAnimControl(Anim);
     
     // NOTE(Dima): Adding animation nodes
-    AddAnimState(Control, AnimState_Animation, "Idle");
-    AddAnimState(Control, AnimState_Animation, "Run");
-    AddAnimState(Control, AnimState_Animation, "Falling");
-    AddAnimState(Control, AnimState_Animation, "JumpUp");
-    AddAnimState(Control, AnimState_Animation, "Land");
-    AddAnimState(Control, AnimState_Animation, "Roll");
-    AddAnimState(Control, AnimState_Animation, "Die");
+    AddAnimState(Control, "Run", AnimExitAction_Looping);
+    AddAnimState(Control, "Falling", AnimExitAction_Looping);
+    AddAnimState(Control, "JumpUp", AnimExitAction_Looping);
+    AddAnimState(Control, "Land", AnimExitAction_ExitState);
+    AddAnimState(Control, "Roll", AnimExitAction_ExitState);
+    AddAnimState(Control, "Die", AnimExitAction_Clamp);
+    
+    BeginAnimStateQueue(Control, "Idle");
+    AddQueueAnimation(Control, "Idle0", AnimExitAction_Random);
+    AddQueueAnimation(Control, "Idle1", AnimExitAction_Random);
+    AddQueueAnimation(Control, "Idle2", AnimExitAction_Random);
+    EndAnimStateQueue(Control);
     
     f32 SpeedShiftPoint = 0.05f;
     
@@ -537,15 +548,17 @@ has the same count of IDs as GameAssetID table for model and animations
     AddVariable(&Character->AnimComponent, "VelocityVertValue", AnimVariable_Float);
     AddVariable(&Character->AnimComponent, "IsFalling", AnimVariable_Bool);
     
-    SetStateAnimation(&Character->AnimComponent, "Idle", Character->CharacterIDs[CharacterID_Idle]);
-    SetStateAnimation(&Character->AnimComponent, "Run", Character->CharacterIDs[CharacterID_Run]);
-    SetStateAnimation(&Character->AnimComponent, "JumpUp", Character->CharacterIDs[CharacterID_JumpUp]);
-    SetStateAnimation(&Character->AnimComponent, "Falling", Character->CharacterIDs[CharacterID_Fall]);
-    SetStateAnimation(&Character->AnimComponent, "Land", Character->CharacterIDs[CharacterID_Land]);
-    SetStateAnimation(&Character->AnimComponent, "Roll", Character->CharacterIDs[CharacterID_Roll]);
+    SetAnimationID(&Character->AnimComponent, "Idle.Idle0", Character->CharacterIDs[CharacterID_Idle]);
+    SetAnimationID(&Character->AnimComponent, "Idle.Idle1", Character->CharacterIDs[CharacterID_Idle]);
+    SetAnimationID(&Character->AnimComponent, "Run", Character->CharacterIDs[CharacterID_Run]);
+    SetAnimationID(&Character->AnimComponent, "JumpUp", Character->CharacterIDs[CharacterID_JumpUp]);
+    SetAnimationID(&Character->AnimComponent, "Falling", Character->CharacterIDs[CharacterID_Fall]);
+    SetAnimationID(&Character->AnimComponent, "Land", Character->CharacterIDs[CharacterID_Land]);
+    SetAnimationID(&Character->AnimComponent, "Roll", Character->CharacterIDs[CharacterID_Roll]);
     
     if(IsInsect){
-        SetStateAnimation(&Character->AnimComponent, "Die", Character->CharacterIDs[CharacterID_Die]);
+        SetAnimationID(&Character->AnimComponent, "Idle.Idle2", Character->CharacterIDs[CharacterID_Idle]);
+        SetAnimationID(&Character->AnimComponent, "Die", Character->CharacterIDs[CharacterID_Die]);
     }
 }
 

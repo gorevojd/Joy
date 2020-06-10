@@ -60,7 +60,8 @@ INTERNAL_FUNCTION inline find_anim_deltas_ctx
 FindAnimDeltas(animation_clip* Animation,
                float* Times,
                int KeysCount,
-               f32 CurTickTime)
+               f32 CurTickTime,
+               b32 IsLooping)
 {
     find_anim_deltas_ctx Result = {};
     
@@ -93,7 +94,7 @@ FindAnimDeltas(animation_clip* Animation,
         {
             FoundPrevIndex = LastFrameIndex;
             PrevKeyTime = Times[LastFrameIndex];
-            if(Animation->IsLooping){
+            if(IsLooping){
                 NextKeyIndex = 0;
                 
                 TickDistance = Animation->DurationTicks - PrevKeyTime + 1.0f;
@@ -267,14 +268,25 @@ inline update_node_anim_data* GetNodeAnimData(update_node_anim_data* Datas,
     return(Result);
 }
 
-INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
-                                              model_info* Model,
-                                              playing_anim* Playing,
-                                              animation_clip* Animation,
-                                              f64 CurrentTime,
-                                              f32 PlaybackRate)
+enum update_pa_result_type{
+    UpdatePA_Unknown,
+    
+    UpdatePA_ExitState,
+    UpdatePA_StopPlayingAnimation,
+    UpdatePA_PickNext,
+    UpdatePA_PickRandom,
+};
+
+INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
+                                             model_info* Model,
+                                             playing_anim* Playing,
+                                             animation_clip* Animation,
+                                             f64 CurrentTime,
+                                             f32 PlaybackRate)
 {
     FUNCTION_TIMING();
+    
+    u32 Result = UpdatePA_Unknown;
     
     // NOTE(Dima): Updating animation
     if(Animation){
@@ -285,14 +297,36 @@ INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
             Playing->TransformsCalculated[NodeIndex] = false;
         }
         
+        b32 IsLooping = (Playing->ExitAction == AnimExitAction_Looping);
+        
         // NOTE(Dima): Animating
         f64 AnimTime = (CurrentTime - Playing->GlobalStart) * PlaybackRate;
         f64 CurrentTick = AnimTime * Animation->TicksPerSecond;
         
         Playing->Phase01 = 0.0f;
         
+        if(CurrentTick >= Animation->DurationTicks){
+            switch(Playing->ExitAction){
+                case AnimExitAction_ExitState:{
+                    Result = UpdatePA_ExitState;
+                }break;
+                
+                case AnimExitAction_Stop:{
+                    Result = UpdatePA_StopPlayingAnimation;
+                }break;
+                
+                case AnimExitAction_Next:{
+                    Result = UpdatePA_PickNext;
+                }break;
+                
+                case AnimExitAction_Random:{
+                    Result = UpdatePA_PickRandom;
+                }break;
+            }
+        }
+        
         if(Animation->DurationTicks > 0.0f){
-            if(Animation->IsLooping){
+            if(IsLooping){
                 CurrentTick = fmod(CurrentTick, Animation->DurationTicks);
             }
             
@@ -328,15 +362,18 @@ INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
                 NodeAnimationDatas[NodeAnimIndex].PosDeltas = FindAnimDeltas(Animation,
                                                                              NodeAnim->PositionKeysTimes,
                                                                              NodeAnim->PositionKeysCount,
-                                                                             CurrentTick);
+                                                                             CurrentTick,
+                                                                             IsLooping);
                 NodeAnimationDatas[NodeAnimIndex].RotDeltas = FindAnimDeltas(Animation,
                                                                              NodeAnim->RotationKeysTimes,
                                                                              NodeAnim->RotationKeysCount,
-                                                                             CurrentTick);
+                                                                             CurrentTick,
+                                                                             IsLooping);
                 NodeAnimationDatas[NodeAnimIndex].ScaDeltas = FindAnimDeltas(Animation,
                                                                              NodeAnim->ScalingKeysTimes,
                                                                              NodeAnim->ScalingKeysCount,
-                                                                             CurrentTick);
+                                                                             CurrentTick,
+                                                                             IsLooping);
             }
         }
         
@@ -559,6 +596,8 @@ INTERNAL_FUNCTION void UpdatePlayingAnimation(assets* Assets,
         }
         
     }
+    
+    return(Result);
 }
 
 // NOTE(Dima): Calculating initial node to parent transforms
@@ -714,12 +753,31 @@ INTERNAL_FUNCTION void CalculateToModelTransforms(model_info* Model){
 #endif
 }
 
+INTERNAL_FUNCTION inline void PlayAnimationInternal(playing_state_slot* Slot,
+                                                    int AnimaitonIndex,
+                                                    f64 GlobalStart,
+                                                    f32 Phase)
+{
+    Slot->PlayingAnimations[AnimaitonIndex]->GlobalStart = GlobalStart;
+    Slot->PlayingAnimations[AnimaitonIndex]->Phase01 = Phase;
+}
+
 void PlayStateAnimations(playing_state_slot* Slot, 
                          f64 GlobalStart, 
                          f32 Phase)
 {
-    Slot->PlayingAnimation.GlobalStart = GlobalStart;
-    Slot->PlayingAnimation.Phase01 = Phase;
+    anim_state* State = Slot->State;
+    
+    for(int Index = State->FirstAnimIndex, Temp = 0;
+        Index < State->OnePastLastAnim;
+        Index++, Temp++)
+    {
+        Slot->PlayingAnimations[Temp] = &Slot->AC->Anims[Index];
+        
+        PlayAnimationInternal(Slot, Temp, GlobalStart, Phase);
+    }
+    
+    Slot->PlayingAnimationsCount = State->OnePastLastAnim - State->FirstAnimIndex;
 }
 
 b32 StateIsPlaying(animated_component* AC,
@@ -745,10 +803,7 @@ f32 GetPlayingStatePhase(animated_component* AC)
 {
     playing_state_slot* Slot = &AC->PlayingStates[AC->PlayingIndex];
     
-    f32 Result = 0.0f;
-    if(Slot->State){
-        Result = Slot->PlayingAnimation.Phase01;
-    }
+    f32 Result = Slot->PlayingAnimations[Slot->PlayingAnimIndex]->Phase01;
     
     return(Result);
 }
@@ -764,12 +819,23 @@ INTERNAL_FUNCTION void TransitionToStateInternal(animated_component* AC,
     AC->PlayingIndex = NextPlayIndex;
     AC->PlayingStatesCount++;
     
-    PlayStateAnimations(&AC->PlayingStates[NextPlayIndex], 
-                        GlobalTime,
-                        0.0f);
+    playing_state_slot* NextSlot = &AC->PlayingStates[NextPlayIndex];
     
-    AC->PlayingStates[NextPlayIndex].TimeToTransit = TimeToTransit;
-    AC->PlayingStates[NextPlayIndex].TransitionTimeLeft = TimeToTransit;
+    NextSlot->TimeToTransit = TimeToTransit;
+    NextSlot->TransitionTimeLeft = TimeToTransit;
+    
+    // NOTE(Dima): Init playing animations
+    NextSlot->PlayingAnimationsCount = 0;
+    NextSlot->PlayingAnimIndex = 0;
+    for(int AnimIndex = 0;
+        AnimIndex < ANIM_MAX_ANIMATIONS_PER_STATE;
+        AnimIndex++)
+    {
+        NextSlot->PlayingAnimations[AnimIndex] = 0;
+    }
+    
+    // NOTE(Dima): Play animations
+    PlayStateAnimations(NextSlot, GlobalTime, 0.0f);
 }
 
 void ForceTransitionRequest(animated_component* AC,
@@ -804,17 +870,40 @@ INTERNAL_FUNCTION void ProcessInitTransitioning(animated_component* AC,
         Request->Requested = false;
     }
     else{
-        b32 Transitioning = (AC->PlayingStatesCount == 2);
-        
         playing_state_slot* Slot = &AC->PlayingStates[AC->PlayingIndex];
-        anim_state* State = Slot->State;
+        
+#if 0        
+        // NOTE(Dima): Updating all queue transitions if needed
+        for(int Index = 0;
+            Index < AC->PlayingStatesCount;
+            Index++)
+        {
+            int CurrPlayIndex = GetModulatedPlayintIndex(AC->PlayingIndex - Index);
+            
+            playing_state_slot* PlaySlot = &AC->PlayingStates[CurrPlayIndex];
+            
+            anim_state* State = PlaySlot->State;
+            if(State && (State->PlayingAnimationsCount > 0)){
+                if(State->Type == AnimState_Queue){
+                    playing_anim* PlayAnim = State->PlayingAnimations[State->PlayingAnimIndex];
+                    
+                    //b32 CanTransit = PlayAnim->Phase01 > (TransitionAt->TransitStartPhase - 0.00001f);
+                }
+                else if(State->Type == AnimState_BlendTree){
+                    
+                }
+            }
+        }
+#endif
+        
+        anim_state* MainState = Slot->State;
         
         // NOTE(Dima): Iterating through all transitions
-        anim_transition* TransitionAt = State->FirstTransition;
+        anim_transition* TransitionAt = MainState->FirstTransition;
         while(TransitionAt != 0){
             
             // NOTE(Dima): From state of transition should be equal to current state
-            Assert(TransitionAt->FromState == State);
+            Assert(TransitionAt->FromState == MainState);
             
             b32 AllConditionsTrue = true;
             
@@ -872,7 +961,10 @@ INTERNAL_FUNCTION void ProcessInitTransitioning(animated_component* AC,
             
             b32 StateCanTransition = false;
             if(TransitionAt->AnimationShouldFinish){
-                StateCanTransition = Slot->PlayingAnimation.Phase01 > (TransitionAt->TransitStartPhase - 0.00001f);
+                playing_anim* PlayAnim = Slot->PlayingAnimations[Slot->PlayingAnimIndex];
+                StateCanTransition = ((Slot->StateShouldBeExited) || 
+                                      (PlayAnim->Phase01 > (TransitionAt->TransitStartPhase - 0.00001f)));
+                
                 if(TransitionAt->ConditionsCount){
                     StateCanTransition &= AllConditionsTrue;
                 }
@@ -894,6 +986,47 @@ INTERNAL_FUNCTION void ProcessInitTransitioning(animated_component* AC,
         } // end loop through all transitions
         
     }
+}
+
+
+/*
+// NOTE(Dima): This funciton chooses which animations of playing state slot 
+we should update.
+*/
+INTERNAL_FUNCTION playing_anim_indices 
+GetUpdateIndices(playing_state_slot* Slot)
+{
+    anim_state* State = Slot->State;
+    
+    int* Indices = Slot->PlayingAnimIndices;
+    int Count = 0;
+    
+    switch(State->Type){
+        case AnimState_Animation:
+        case AnimState_Queue:{
+            Indices[0] = Slot->PlayingAnimIndex;
+            Count = 1;
+        }break;
+        
+        case AnimState_BlendTree:{
+            // TODO(Dima): More smart if contribution is 0 for nodes of blend tree
+            for(int AnimIndex = 0; 
+                AnimIndex < Slot->PlayingAnimationsCount;
+                AnimIndex++)
+            {
+                Indices[AnimIndex] = AnimIndex;
+            }
+            Count = Slot->PlayingAnimationsCount;
+        }break;
+        
+    }
+    
+    playing_anim_indices Result = {};
+    
+    Result.Indices = Indices;
+    Result.Count = Count;
+    
+    return(Result);
 }
 
 INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
@@ -986,17 +1119,186 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                 PlayingSlotIndex < ANIM_MAX_PLAYING_STATES;
                 PlayingSlotIndex++)
             {
-                anim_state* State = AC->PlayingStates[PlayingSlotIndex].State;
-                if(State){
-                    anim_animid* AnimID = FindAnimID(AC, State->Name);
+                playing_state_slot* Slot = &AC->PlayingStates[PlayingSlotIndex];
+                anim_state* State = Slot->State;
+                for(int AnimIndex = 0; 
+                    AnimIndex < Slot->PlayingAnimationsCount;
+                    AnimIndex++)
+                {
+                    playing_anim* PlayAnim = Slot->PlayingAnimations[AnimIndex];
                     
-                    if(AnimID){
-                        AC->PlayingStates[PlayingSlotIndex].PlayingAnimation.AnimationID = AnimID->AnimID;
-                    }
-                    else{
-                        // TODO(Dima): Do something
+                    anim_animid* AnimID = FindAnimID(AC, PlayAnim->Name);
+                    
+                    Assert(AnimID);
+                    
+                    PlayAnim->AnimationID = AnimID->AnimID;
+                }
+            }
+            
+            
+            // NOTE(Dima): Update animations and blend trees of all playing graph nodes
+            {
+                BLOCK_TIMING("UpdateAC::UpdateAllAnims");
+                
+                int PlayingStateIndex = AC->PlayingIndex;
+                for(int Index  = 0;
+                    Index < AC->PlayingStatesCount;
+                    Index++)
+                {
+                    playing_state_slot* Slot = &AC->PlayingStates[PlayingStateIndex];
+                    
+                    playing_anim_indices IndicesToUpdate = GetUpdateIndices(Slot);
+                    
+                    anim_state* AnimState = Slot->State;
+                    
+                    b32 IsQueueOrSingle = ((AnimState->Type == AnimState_Queue) ||
+                                           (AnimState->Type == AnimState_Animation));
+                    
+                    b32 StateShouldBeExited = true;
+                    StateShouldBeExited &= (IndicesToUpdate.Count > 0);
+                    
+                    for(int AnimIndexIndex = 0; 
+                        AnimIndexIndex < IndicesToUpdate.Count;
+                        AnimIndexIndex++)
+                    {
+                        int AnimIndex = IndicesToUpdate.Indices[AnimIndexIndex];
+                        playing_anim* Playing = Slot->PlayingAnimations[AnimIndex];
+                        
+                        Assert(Playing->AnimationID != 0);
+                        animation_clip* Animation = LoadAnimationClip(Assets, 
+                                                                      Playing->AnimationID,
+                                                                      ASSET_IMPORT_IMMEDIATE);
+                        
+                        Assert(Animation->NodesCheckSum == AC->NodesCheckSum);
+                        
+                        // NOTE(Dima): Clearing transforms in anim state to safely contribute
+                        // NOTE(Dima): all in-state animations
+                        ClearNodeTransforms(&Slot->ResultedTransforms, Model->NodeCount);
+                        
+                        // NOTE(Dima): Updating animation and node transforms
+                        u32 UpdateResult = UpdatePlayingAnimation(Assets, Model, 
+                                                                  Playing, Animation, 
+                                                                  GlobalTime, PlaybackRate);
+                        
+                        b32 ThisAnimShouldExit = false;
+                        
+                        switch(UpdateResult){
+                            case UpdatePA_ExitState:{
+                                ThisAnimShouldExit = true;
+                            }break;
+                            
+                            case UpdatePA_StopPlayingAnimation:{
+                                
+                            }break;
+                            
+                            case UpdatePA_PickNext:{
+                                if(IsQueueOrSingle){
+                                    Slot->PlayingAnimIndex =(Slot->PlayingAnimIndex + 1) % Slot->PlayingAnimationsCount;
+                                    
+                                    PlayAnimationInternal(Slot, Slot->PlayingAnimIndex,
+                                                          GlobalTime, 0.0f);
+                                    IndicesToUpdate.Indices[0] = Slot->PlayingAnimIndex;
+                                }
+                            }break;
+                            
+                            case UpdatePA_PickRandom:{
+                                if(IsQueueOrSingle && IndicesToUpdate.Count > 0){
+                                    // NOTE(Dima): Swapping currently playing with the last
+                                    playing_anim* Temp = Slot->PlayingAnimations[Slot->PlayingAnimationsCount - 1];
+                                    Slot->PlayingAnimations[Slot->PlayingAnimationsCount - 1] = 
+                                        Slot->PlayingAnimations[Slot->PlayingAnimIndex];
+                                    Slot->PlayingAnimations[Slot->PlayingAnimIndex] = Temp;
+                                    
+                                    anim_system* System = AC->Control->AnimSystem;
+                                    
+                                    // NOTE(Dima): Now pick any except the last
+                                    Slot->PlayingAnimIndex = GetRandomBetween(&System->Random, 0, 
+                                                                              Slot->PlayingAnimationsCount - 1);
+                                    
+                                    PlayAnimationInternal(Slot, 
+                                                          Slot->PlayingAnimIndex,
+                                                          GlobalTime, 0.0f);
+                                    
+                                    IndicesToUpdate.Indices[0] = Slot->PlayingAnimIndex;
+                                }
+                            }break;
+                        }
+                        
+                        StateShouldBeExited &= ThisAnimShouldExit;
+                        
+                        // NOTE(Dima): Updated resulted graph node transforms
+                        node_transforms_block* Dst = &Slot->ResultedTransforms;
+                        node_transforms_block* Src = &Playing->NodeTransforms;
+                        
+#if 0                    
+                        for(int NodeIndex = 0; 
+                            NodeIndex < Model->NodeCount;
+                            NodeIndex++)
+                        {
+                            Dst->Ts[NodeIndex] += Src->Ts[NodeIndex];
+                            Dst->Rs[NodeIndex] += Src->Rs[NodeIndex];
+                            Dst->Ss[NodeIndex] += Src->Ss[NodeIndex];
+                        }
+#else
+                        for(int NodeIndex = 0; 
+                            NodeIndex < Model->NodeCount;
+                            NodeIndex+=4)
+                        {
+                            v3_4x SrcT = V3_4X(Src->Ts[NodeIndex + 0],
+                                               Src->Ts[NodeIndex + 1],
+                                               Src->Ts[NodeIndex + 2],
+                                               Src->Ts[NodeIndex + 3]);
+                            
+                            v4_4x SrcR = V4_4X(Src->Rs[NodeIndex + 0],
+                                               Src->Rs[NodeIndex + 1],
+                                               Src->Rs[NodeIndex + 2],
+                                               Src->Rs[NodeIndex + 3]);
+                            
+                            v3_4x SrcS = V3_4X(Src->Ss[NodeIndex + 0],
+                                               Src->Ss[NodeIndex + 1],
+                                               Src->Ss[NodeIndex + 2],
+                                               Src->Ss[NodeIndex + 3]);
+                            
+                            v3_4x DstT = V3_4X(Dst->Ts[NodeIndex + 0],
+                                               Dst->Ts[NodeIndex + 1],
+                                               Dst->Ts[NodeIndex + 2],
+                                               Dst->Ts[NodeIndex + 3]);
+                            
+                            v4_4x DstR = V4_4X(Dst->Rs[NodeIndex + 0],
+                                               Dst->Rs[NodeIndex + 1],
+                                               Dst->Rs[NodeIndex + 2],
+                                               Dst->Rs[NodeIndex + 3]);
+                            
+                            v3_4x DstS = V3_4X(Dst->Ss[NodeIndex + 0],
+                                               Dst->Ss[NodeIndex + 1],
+                                               Dst->Ss[NodeIndex + 2],
+                                               Dst->Ss[NodeIndex + 3]);
+                            
+                            DstT += SrcT;
+                            DstS += SrcS;
+                            DstR += SrcR;
+                            
+                            V3_4X_Store(DstT, 
+                                        &Dst->Ts[NodeIndex + 0],
+                                        &Dst->Ts[NodeIndex + 1],
+                                        &Dst->Ts[NodeIndex + 2],
+                                        &Dst->Ts[NodeIndex + 3]);
+                            V3_4X_Store(DstS, 
+                                        &Dst->Ss[NodeIndex + 0],
+                                        &Dst->Ss[NodeIndex + 1],
+                                        &Dst->Ss[NodeIndex + 2],
+                                        &Dst->Ss[NodeIndex + 3]);
+                            V4_4X_Store(DstR,
+                                        &Dst->Rs[NodeIndex + 0],
+                                        &Dst->Rs[NodeIndex + 1],
+                                        &Dst->Rs[NodeIndex + 2],
+                                        &Dst->Rs[NodeIndex + 3]);
+                        }
+#endif
                     }
                 }
+                
+                PlayingStateIndex = GetPrevPlayingIndex(PlayingStateIndex);
             }
             
             {
@@ -1016,21 +1318,10 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                     playing_state_slot* Slot = &AC->PlayingStates[PlayingStateIndex];
                     anim_state* AnimState = Slot->State;
                     
-                    animation_clip* Animation = LoadAnimationClip(Assets, 
-                                                                  Slot->PlayingAnimation.AnimationID,
-                                                                  ASSET_IMPORT_IMMEDIATE);
-                    
-                    Assert(Animation->NodesCheckSum == AC->NodesCheckSum);
-                    
-                    // NOTE(Dima): Updating animation and node transforms
-                    UpdatePlayingAnimation(Assets, Model, 
-                                           &Slot->PlayingAnimation, Animation, 
-                                           GlobalTime, PlaybackRate);
-                    
                     
                     node_transforms_block* Dst = &AC->ResultedTransforms;
-                    //node_transforms_block* Src = &Slot->ResultedTransforms;
-                    node_transforms_block* Src = &Slot->PlayingAnimation.NodeTransforms;
+                    node_transforms_block* Src = &Slot->ResultedTransforms;
+                    //node_transforms_block* Src = &Slot->PlayingAnimation.NodeTransforms;
                     
 #if 0                    
                     float Contribution = AnimState->Contribution;
@@ -1049,7 +1340,7 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                         float RotDot = Dot(Dst->Rs[NodeIndex], 
                                            Src->Rs[NodeIndex]);
                         float SignDot = SignNotZero(RotDot);
-                        Dst->Rs[NodeIndex] += Src->Rs[NodeIndex] * SignDot * Contribution;
+                        Dst->Rs[NodeIndex] += Src->Rs[NodeIndex] * SignDot * Contribution;-
                     }
 #else
                     f32_4x Contribution = F32_4X(Slot->Contribution);
@@ -1291,7 +1582,7 @@ INTERNAL_FUNCTION anim_controller* AllocateAnimController(anim_system* Anim){
                                  16,
                                  Result);
     
-    Result->AnimState = Anim;
+    Result->AnimSystem = Anim;
     
     return(Result);
 }
@@ -1305,15 +1596,13 @@ INTERNAL_FUNCTION anim_controller* DeallocateAnimController(anim_system* Anim,
     return(Control);
 }
 
-anim_controller* CreateAnimControl(anim_system* Anim, 
-                                   char* Name)
+anim_controller* CreateAnimControl(anim_system* Anim)
 {
     anim_controller* Result = AllocateAnimController(Anim);
     
-    CopyStringsSafe(Result->Name, sizeof(Result->Name), Name);
-    
     // NOTE(Dima): Initialize beginned transition to 0
     Result->BeginnedTransitionsCount = 0;
+    Result->AnimSourcesCount = 0;
     
     // NOTE(Dima): Init anim state table
     for(int Index = 0;
@@ -1326,6 +1615,8 @@ anim_controller* CreateAnimControl(anim_system* Anim,
     // NOTE(Dima): Initializing state list
     Result->FirstState = 0;
     Result->LastState = 0;
+    
+    Result->BeginnedState = 0;
     
     return(Result);
 }
@@ -1360,18 +1651,58 @@ void InitAnimComponent(animated_component* AC,
     AC->FirstAnimID = 0;
     AC->LastAnimID = 0;
     
-    
     // NOTE(Dima): Initialize skeleton check sum
     AC->NodesCheckSum = NodesCheckSum;
     
-    // NOTE(Dima): Init animations to play
+    // NOTE(Dima): Init animations states to play
     for(int SlotIndex = 0;
         SlotIndex < ANIM_MAX_PLAYING_STATES;
         SlotIndex++)
     {
         AC->PlayingStates[SlotIndex].State = 0;
+        AC->PlayingStates[SlotIndex].AC = AC;
     }
     
+    // NOTE(Dima): Init animations based on animations sources in anim controller
+    AC->AnimsCount = Control->AnimSourcesCount;
+    AC->Anims = PushArray(Control->AnimSystem->Region,
+                          playing_anim,
+                          Control->AnimSourcesCount);
+    
+    
+    for(int AnimationIndex = 0;
+        AnimationIndex < Control->AnimSourcesCount;
+        AnimationIndex++)
+    {
+        playing_anim* Anim = &AC->Anims[AnimationIndex];
+        playing_anim_source* Source = Control->AnimSources[AnimationIndex];
+        
+        Anim->Name = Source->Name;
+        Anim->ExitAction = Source->ExitAction;
+    }
+    
+#if 0    
+    while(SourceAt){
+        
+        playing_anim* NewAnimation = AllocatePlayingAnim(Control);
+        
+        NewAnimation->Name = SourceAt->Name;
+        NewAnimation->ExitAction = SourceAt->ExitAction;
+        
+        // NOTE(Dima): Inserting to state animations list
+        NewAnimation->NextInList = 0;
+        if((AC->FirstAnimation == 0) && (AC->LastAnimation == 0)){
+            AC->FirstAnimation = AC->LastAnimation = NewAnimation;
+        }
+        else{
+            AC->LastAnimation->NextInList = NewAnimation;
+            AC->LastAnimation = NewAnimation;
+        }
+        AC->AnimationsCount++;
+        
+        SourceAt = SourceAt->NextInList;
+    }
+#endif
     
     AC->PlayingIndex = 0;
     AC->PlayingStates[AC->PlayingIndex].State = Control->FirstState;
@@ -1439,13 +1770,12 @@ FindState(anim_controller* Control, char* Name)
     return(Result);
 }
 
-void AddAnimState(anim_controller* Control,
-                  u32 AnimStateType,
-                  char* Name,
-                  f32 EarlyTerminatePhase)
+INTERNAL_FUNCTION anim_state* AddAnimStateInternal(anim_controller* Control,
+                                                   u32 AnimStateType,
+                                                   char* Name)
 {
     // NOTE(Dima): Initializing new state
-    anim_state* New = AllocateAnimState(Control->AnimState);
+    anim_state* New = AllocateAnimState(Control->AnimSystem);
     
     New->Type = AnimStateType;
     CopyStringsSafe(New->Name, ArrayCount(New->Name), Name);
@@ -1488,6 +1818,127 @@ void AddAnimState(anim_controller* Control,
     // NOTE(Dima): Init transition list
     New->FirstTransition = 0;
     New->LastTransition = 0;
+    
+    // NOTE(Dima): Init animations list
+    New->FirstAnimIndex = -1;
+    New->OnePastLastAnim = -1;
+    
+    return(New);
+}
+
+INTERNAL_FUNCTION void ClearBeginnedStateInControl(anim_controller* Control){
+    Assert(Control->BeginnedState);
+    Control->BeginnedState = 0;
+}
+
+
+INTERNAL_FUNCTION playing_anim_source* AllocatePlayingAnimSource(anim_controller* Control,
+                                                                 char* Name,
+                                                                 u32 AnimExitAction)
+{
+    anim_system* Anim = Control->AnimSystem;
+    
+    DLIST_ALLOCATE_FUNCTION_BODY(playing_anim_source, 
+                                 Anim->Region,
+                                 NextAlloc, PrevAlloc,
+                                 Anim->PlayingAnimSourceFree,
+                                 Anim->PlayingAnimSourceUse,
+                                 256,
+                                 Result);
+    
+    CopyStringsSafe(Result->Name, 
+                    sizeof(Result->Name),
+                    Name);
+    
+    Result->ExitAction = AnimExitAction;
+    
+    return(Result);
+}
+
+
+INTERNAL_FUNCTION void AddAnimationInternal(anim_controller* Control,
+                                            anim_state* State,
+                                            char* Name,
+                                            u32 AnimExitAction)
+{
+    
+    playing_anim_source* NewAnimSource = AllocatePlayingAnimSource(Control,
+                                                                   Name,
+                                                                   AnimExitAction);
+    
+    // NOTE(Dima): Inserting to state animations sources list
+    
+    NewAnimSource->NextInList = 0;
+    NewAnimSource->IndexInArray = Control->AnimSourcesCount++;
+    Assert(NewAnimSource->IndexInArray < ArrayCount(Control->AnimSources));
+    if((State->FirstAnimSource == 0) && (State->LastAnimSource == 0)){
+        State->FirstAnimSource = State->LastAnimSource = NewAnimSource;
+    }
+    else{
+        State->LastAnimSource->NextInList = NewAnimSource;
+        State->LastAnimSource = NewAnimSource;
+    }
+    
+    if(State->FirstAnimIndex == -1){
+        // NOTE(Dima): If this is the first anim in this state - init first index
+        State->FirstAnimIndex = NewAnimSource->IndexInArray;
+        State->OnePastLastAnim = NewAnimSource->IndexInArray;
+    }
+    State->OnePastLastAnim++;
+    
+    Control->AnimSources[NewAnimSource->IndexInArray] = NewAnimSource;
+}
+
+void AddAnimState(anim_controller* Control,
+                  char* Name,
+                  u32 AnimExitAction)
+{
+    anim_state* State = AddAnimStateInternal(Control, 
+                                             AnimState_Animation, 
+                                             Name);
+    
+    AddAnimationInternal(Control, State,
+                         Name, AnimExitAction);
+}
+
+void AddQueueAnimation(anim_controller* Control,
+                       char* Name,
+                       u32 AnimExitAction)
+{
+    anim_state* BeginnedState = Control->BeginnedState;
+    
+    if(BeginnedState){
+        char AnimationNameTemp[ANIM_DEFAULT_NAME_SIZE];
+        
+        CopyStringsSafe(AnimationNameTemp, 
+                        sizeof(AnimationNameTemp), 
+                        BeginnedState->Name);
+        AppendCharacterSafe(AnimationNameTemp,
+                            sizeof(AnimationNameTemp),
+                            ANIM_ANIMATION_NAME_SEPARATOR);
+        CopyStringsToEndSafe(AnimationNameTemp,
+                             sizeof(AnimationNameTemp),
+                             Name);
+        
+        AddAnimationInternal(Control, BeginnedState,
+                             AnimationNameTemp, AnimExitAction);
+    }
+}
+
+void BeginAnimStateQueue(anim_controller* Control,
+                         char* Name)
+{
+    anim_state* State = AddAnimStateInternal(Control,
+                                             AnimState_Queue,
+                                             Name);
+    
+    Assert(!Control->BeginnedState);
+    Control->BeginnedState = State;
+}
+
+void EndAnimStateQueue(anim_controller* Control)
+{
+    ClearBeginnedStateInControl(Control);
 }
 
 
@@ -1526,7 +1977,7 @@ void AddVariable(animated_component* AC,
                  u32 VarType)
 {
     // NOTE(Dima): Init new variable
-    anim_variable* New = AllocateVariable(AC->Control->AnimState);
+    anim_variable* New = AllocateVariable(AC->Control->AnimSystem);
     
     New->ValueType = VarType;
     CopyStringsSafe(New->Name, ArrayCount(New->Name), Name);
@@ -1645,7 +2096,7 @@ anim_animid* ModifyOrAddAnimID(animated_component* AC,
     
     if(New == 0){
         // NOTE(Dima): Allocating
-        New = AllocateAnimID(AC->Control->AnimState);
+        New = AllocateAnimID(AC->Control->AnimSystem);
         
         CopyStringsSafe(New->Name, ArrayCount(New->Name), Name);
         
@@ -1729,7 +2180,7 @@ INTERNAL_FUNCTION anim_transition* AddTransitionToStates(anim_controller* Contro
                                                          f32 TimeToTransit,
                                                          f32 TransitPhaseStart)
 {
-    anim_transition* Result = AllocateTransition(Control->AnimState);
+    anim_transition* Result = AllocateTransition(Control->AnimSystem);
     
     Result->ConditionsCount = 0;
     Result->AnimControl = Control;
@@ -1925,18 +2376,39 @@ void SetBool(animated_component* AC,
     FoundVariable->Value.Bool = Value;
 }
 
-void SetStateAnimation(animated_component* AC,
-                       char* StateName,
-                       u32 AnimationID)
+void SetAnimationID(animated_component* AC,
+                    char* AnimName,
+                    u32 AnimationID)
 {
-    anim_state* State = FindState(AC->Control, StateName);
-    if(State){
-        ModifyOrAddAnimID(AC, StateName, AnimationID);
+    char StateNameTemp[ANIM_DEFAULT_NAME_SIZE];
+    
+    int DstCounter = 0;
+    char* AtDst = StateNameTemp;
+    char* AtSrc = AnimName;
+    
+    if(AnimName){
+        while(*AtSrc && (DstCounter < ANIM_DEFAULT_NAME_SIZE - 1)){
+            if(*AtSrc == ANIM_ANIMATION_NAME_SEPARATOR){
+                break;
+            }
+            
+            *AtDst++ = *AtSrc++;
+            
+            DstCounter++;
+        }
+        *AtDst = 0;
+        
+        anim_state* State = FindState(AC->Control, StateNameTemp);
+        if(State){
+            ModifyOrAddAnimID(AC, AnimName, AnimationID);
+        }
     }
 }
 
 void InitAnimSystem(anim_system* Anim)
 {
+    InitRandomGeneration(&Anim->Random, 123);
+    
     // NOTE(Dima): Initializing states sentinels
     DLIST_REFLECT_PTRS(Anim->StateUse, NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(Anim->StateFree, NextAlloc, PrevAlloc);
@@ -1956,6 +2428,10 @@ void InitAnimSystem(anim_system* Anim)
     // NOTE(Dima): Initializing animids sentinels
     DLIST_REFLECT_PTRS(Anim->AnimIDUse, NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(Anim->AnimIDFree, NextAlloc, PrevAlloc);
+    
+    // NOTE(Dima): Initializing playing anim sentinels
+    DLIST_REFLECT_PTRS(Anim->PlayingAnimSourceUse, NextAlloc, PrevAlloc);
+    DLIST_REFLECT_PTRS(Anim->PlayingAnimSourceFree, NextAlloc, PrevAlloc);
     
     
     DEBUGSetMenuDataSource(DebugMenu_Animation, Anim);
