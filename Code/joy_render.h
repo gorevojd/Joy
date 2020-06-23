@@ -1,7 +1,7 @@
 #ifndef JOY_RENDER_H
 #define JOY_RENDER_H
 
-#define RENDER_DEFAULT_STACK_SIZE Megabytes(1)
+#define RENDER_DEFAULT_STACK_SIZE Megabytes(5)
 #define RENDER_DEFAULT_FAR 500.0f
 #define RENDER_DEFAULT_NEAR 0.2f
 #define RENDER_FOG_DENSITY 0.035f
@@ -11,6 +11,25 @@
 #define SSAO_KERNEL_SIZE 256
 #define SSAO_NOISE_TEXTURE_SIZE 16
 
+#define RENDER_MAX_CAMERA_SETUPS 256
+#define RENDER_MAX_QUEUES 256
+#define RENDER_DEFAULT_QUEUE_INDEX -1
+
+enum render_entry_type{
+    RenderEntry_ClearColor,
+    RenderEntry_Bitmap,
+    RenderEntry_Rect,
+    RenderEntry_Mesh,
+    RenderEntry_Glyph,
+    RenderEntry_Gradient,
+    RenderEntry_GuiGeometryChunk,
+    
+    RenderEntry_RenderPass,
+    
+    RenderEntry_BeginQueue,
+    RenderEntry_EndQueue,
+};
+
 enum render_show_buffer_type{
     RenderShowBuffer_Color,
     RenderShowBuffer_Depth,
@@ -18,8 +37,17 @@ enum render_show_buffer_type{
     RenderShowBuffer_Count,
 };
 
+enum render_pass_type{
+    RenderPass_Main,
+    RenderPass_RenderPassEntry,
+};
+
+struct render_framebuffer{
+    int Width;
+    int Height;
+};
+
 struct render_camera_setup{
-    
     m44 Projection;
     m44 View;
     m44 ViewProjection;
@@ -33,12 +61,101 @@ struct render_camera_setup{
     v4 FrustumPlanes[6];
 };
 
-struct render_pass{
-    render_stack* Stacks[16];
-    int StacksCount;
+struct render_queue{
+    void* FirstEntry;
+    void* OnePastLastEntry;
     
-    render_camera_setup CameraSetup;
+    b32 Beginned;
+    int QueuesCountAtBeginCall;
 };
+
+struct render_entry_header{
+    u32 Type;
+    u32 DataSize;
+};
+
+#define RENDER_GET_ENTRY(type) type* Entry = (type*)At
+
+#define RENDER_ENTRY_MEMORY_ALIGN 4
+#pragma pack(push, RENDER_ENTRY_MEMORY_ALIGN)
+struct render_entry_clear_color{
+    v3 clearColor01;
+};
+
+struct render_entry_bitmap{
+    bmp_info* Bitmap;
+    v2 P;
+    float PixelHeight;
+    v4 ModulationColor01;
+};
+
+enum RenderEntryGradientType{
+    RenderEntryGradient_Horizontal,
+    RenderEntryGradient_Vertical,
+};
+
+struct render_entry_gradient{
+    rc2 rc;
+    v3 color1;
+    v3 color2;
+    u32 gradType;
+};
+
+struct render_entry_rect{
+    v4 modulationColor01;
+    v2 p;
+    v2 dim;
+};
+
+struct render_entry_glyph{
+    v2 P;
+    v2 Dim;
+    
+    v2 MinUV;
+    v2 MaxUV;
+    
+    bmp_info* Bitmap;
+    
+    v4 ModColor;
+};
+
+struct render_entry_in_atlas_bmp{
+    v2 P;
+    v2 Dim;
+    
+    v2 MinUV;
+    v2 MaxUV;
+    
+    v4 ModulationColor;
+};
+
+struct render_entry_mesh{
+    mesh_info* Mesh;
+    material_info* Material;
+    
+    m44 Transform;
+    
+    m44* BoneTransforms;
+    int BoneCount;
+    
+    v3 AlbedoColor;
+};
+
+struct render_entry_gui_chunk{
+    int ChunkIndex;
+};
+
+struct render_entry_renderqueue{
+    int QueueIndex;
+    int QueuesBeginnedAtBeginCall;
+};
+
+struct render_entry_renderpass{
+    int CameraSetupIndex;
+    int QueueIndex;
+};
+
+#pragma pack(pop)
 
 struct render_gui_geom_vertex{
     float Data[8];
@@ -134,13 +251,20 @@ struct render_frame_info{
 
 struct render_state{
     mem_region* MemRegion;
-    random_generation Random;
-    render_platform_api API;
     
-    render_stack Stacks[16];
-    int StacksCount;
-    render_pass Passes[256];
-    int PassCount;
+    render_camera_setup CameraSetups[RENDER_MAX_CAMERA_SETUPS];
+    int CameraSetupsCount;
+    
+    render_queue Queues[RENDER_MAX_QUEUES];
+    int QueuesCount;
+    
+    random_generation Random;
+    render_platform_api PlatformRenderAPI;
+    
+    Asset_Atlas* CurAtlas;
+    b32 IsSoftwareRenderer;
+    mem_region StackRegion;
+    int EntryCount;
     
     int InitWindowWidth;
     int InitWindowHeight;
@@ -162,8 +286,32 @@ struct render_state{
     render_lines_geom LinesGeom;
 };
 
-inline render_gui_geom* GetGuiGeom(render_stack* Stack){
-    render_gui_geom* Result = &Stack->Render->GuiGeom;
+
+inline void* RenderPushMem(render_state* State, mi Size, mi Align = 8){
+    void* Result = PushSomeMem(&State->StackRegion, Size, Align);
+    
+    return(Result);
+}
+
+inline void* RenderPushEntry(render_state* State, u32 sizeOfType, u32 typeEnum) {
+    render_entry_header* header =
+		(render_entry_header*)RenderPushMem(State, sizeof(render_entry_header) + sizeOfType, RENDER_ENTRY_MEMORY_ALIGN);
+    
+	State->EntryCount++;
+    
+	header->Type = typeEnum;
+	header->DataSize = sizeOfType;
+    
+    void* entryData = (void*)(header + 1);
+    
+	return(entryData);
+}
+
+#define PUSH_RENDER_ENTRY(stack, type_enum, type) (type*)RenderPushEntry(stack, sizeof(type), type_enum)
+
+
+inline render_gui_geom* GetGuiGeom(render_state* State){
+    render_gui_geom* Result = &State->GuiGeom;
     
     return(Result);
 }
@@ -495,14 +643,14 @@ inline void PushGuiGeom_InnerOutline(render_gui_geom* Geom, rc2 rect, int pixelW
 }
 
 
-inline void PushClearColor(render_stack* Stack, v3 color){
-    render_entry_clear_color* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_ClearColor, render_entry_clear_color);;
+inline void PushClearColor(render_state* State, v3 color){
+    render_entry_clear_color* entry = PUSH_RENDER_ENTRY(State, RenderEntry_ClearColor, render_entry_clear_color);;
     
     entry->clearColor01 = color;
 }
 
-inline void PushBitmap(render_stack* Stack, bmp_info* bitmap, v2 p, float height, v4 multColor){
-    render_entry_bitmap* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Bitmap, render_entry_bitmap);
+inline void PushBitmap(render_state* State, bmp_info* bitmap, v2 p, float height, v4 multColor){
+    render_entry_bitmap* entry = PUSH_RENDER_ENTRY(State, RenderEntry_Bitmap, render_entry_bitmap);
     
     entry->Bitmap = bitmap;
     entry->P = p;
@@ -510,14 +658,14 @@ inline void PushBitmap(render_stack* Stack, bmp_info* bitmap, v2 p, float height
     entry->ModulationColor01 = multColor;
 }
 
-inline void PushGradient(render_stack* Stack, 
+inline void PushGradient(render_state* State, 
                          rc2 rc, 
                          v3 color1, 
                          v3 color2, 
                          u32 gradType)
 {
-    if(Stack->IsSoftwareRenderer){
-        render_entry_gradient* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Gradient, render_entry_gradient);
+    if(State->IsSoftwareRenderer){
+        render_entry_gradient* entry = PUSH_RENDER_ENTRY(State, RenderEntry_Gradient, render_entry_gradient);
         
         entry->rc = rc;
         entry->color1 = color1;
@@ -525,26 +673,26 @@ inline void PushGradient(render_stack* Stack,
         entry->gradType = gradType;
     }
     else{
-        PushGuiGeom_Gradient(GetGuiGeom(Stack), rc, color1, color2, gradType);
+        PushGuiGeom_Gradient(GetGuiGeom(State), rc, color1, color2, gradType);
     }
 }
 
-inline void PushGradient(render_stack* Stack, 
+inline void PushGradient(render_state* State, 
                          rc2 rc, 
                          v4 color1, 
                          v4 color2, 
                          u32 gradType)
 {
-    PushGradient(Stack, rc, color1.rgb, color2.rgb, gradType);
+    PushGradient(State, rc, color1.rgb, color2.rgb, gradType);
 }
 
 inline void PushRect(
-                     render_stack* Stack, 
+                     render_state* State, 
                      rc2 rect, 
                      v4 multColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
-    if(Stack->IsSoftwareRenderer){
-        render_entry_rect* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Rect, render_entry_rect);
+    if(State->IsSoftwareRenderer){
+        render_entry_rect* entry = PUSH_RENDER_ENTRY(State, RenderEntry_Rect, render_entry_rect);
         
         rect = RectNormalizeSubpixel(rect);
         
@@ -553,54 +701,54 @@ inline void PushRect(
         entry->modulationColor01 = multColor;
     }
     else{
-        PushGuiGeom_Rect(GetGuiGeom(Stack), rect, multColor);
+        PushGuiGeom_Rect(&State->GuiGeom, rect, multColor);
     }
 }
 
-inline void PushRect(render_stack* Stack, 
+inline void PushRect(render_state* State, 
                      v2 p, v2 dim,
                      v4 multColor = V4(1.0f, 1.0f, 1.0f, 1.0f)) 
 {
     rc2 rect = RcMinDim(p, dim);
     
-    PushRect(Stack, rect, multColor);
+    PushRect(State, rect, multColor);
 }
 
-inline void PushRectOutline(render_stack* Stack, v2 p, v2 dim, int pixelWidth, v4 multColor = V4(1.0f, 1.0f, 1.0f, 1.0f)) {
-    if(Stack->IsSoftwareRenderer){
+inline void PushRectOutline(render_state* State, v2 p, v2 dim, int pixelWidth, v4 multColor = V4(1.0f, 1.0f, 1.0f, 1.0f)) {
+    if(State->IsSoftwareRenderer){
         v2 widthQuad = V2(pixelWidth, pixelWidth);
-        PushRect(Stack, V2(p.x - pixelWidth, p.y - pixelWidth), V2(dim.x + 2.0f * pixelWidth, pixelWidth), multColor);
-        PushRect(Stack, V2(p.x - pixelWidth, p.y), V2(pixelWidth, dim.y + pixelWidth), multColor);
-        PushRect(Stack, V2(p.x, p.y + dim.y), V2(dim.x + pixelWidth, pixelWidth), multColor);
-        PushRect(Stack, V2(p.x + dim.x, p.y), V2(pixelWidth, dim.y), multColor);
+        PushRect(State, V2(p.x - pixelWidth, p.y - pixelWidth), V2(dim.x + 2.0f * pixelWidth, pixelWidth), multColor);
+        PushRect(State, V2(p.x - pixelWidth, p.y), V2(pixelWidth, dim.y + pixelWidth), multColor);
+        PushRect(State, V2(p.x, p.y + dim.y), V2(dim.x + pixelWidth, pixelWidth), multColor);
+        PushRect(State, V2(p.x + dim.x, p.y), V2(pixelWidth, dim.y), multColor);
     }
     else{
-        PushGuiGeom_RectOutline(GetGuiGeom(Stack), p, dim, pixelWidth, multColor);
+        PushGuiGeom_RectOutline(&State->GuiGeom, p, dim, pixelWidth, multColor);
     }
 }
 
-inline void PushRectOutline(render_stack* Stack, rc2 rect, int pixelWidth, v4 multColor = V4(1.0f, 1.0f, 1.0f, 1.0f)) {
+inline void PushRectOutline(render_state* State, rc2 rect, int pixelWidth, v4 multColor = V4(1.0f, 1.0f, 1.0f, 1.0f)) {
     v2 p = rect.Min;
     v2 dim = GetRectDim(rect);
     
-    PushRectOutline(Stack, p, dim, pixelWidth, multColor);
+    PushRectOutline(State, p, dim, pixelWidth, multColor);
 }
 
-inline void PushRectInnerOutline(render_stack* Stack, rc2 rect, int pixelWidth, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f)) {
+inline void PushRectInnerOutline(render_state* State, rc2 rect, int pixelWidth, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f)) {
     v2 p = rect.Min + V2(pixelWidth, pixelWidth);;
     v2 dim = GetRectDim(rect) - 2.0f * V2(pixelWidth, pixelWidth);
     
-    PushRectOutline(Stack, p, dim, pixelWidth, color);
+    PushRectOutline(State, p, dim, pixelWidth, color);
 }
 
-inline void PushGlyph(render_stack* Stack, 
+inline void PushGlyph(render_state* State, 
                       v2 P, v2 Dim, 
                       bmp_info* Bitmap, 
                       v2 MinUV, v2 MaxUV,
                       v4 ModColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
-    if(Stack->IsSoftwareRenderer){
-        render_entry_bitmap* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Bitmap, render_entry_bitmap);
+    if(State->IsSoftwareRenderer){
+        render_entry_bitmap* entry = PUSH_RENDER_ENTRY(State, RenderEntry_Bitmap, render_entry_bitmap);
         
         entry->P = P;
         entry->PixelHeight = Dim.y;
@@ -608,11 +756,11 @@ inline void PushGlyph(render_stack* Stack,
         entry->Bitmap = Bitmap;
     }
     else{
-        PushGuiGeom_InAtlasBmp(GetGuiGeom(Stack), P, Dim, MinUV, MaxUV, ModColor);
+        PushGuiGeom_InAtlasBmp(&State->GuiGeom, P, Dim, MinUV, MaxUV, ModColor);
     }
 }
 
-inline void PushMesh(render_stack* Stack,
+inline void PushMesh(render_state* State,
                      mesh_info* Mesh,
                      m44 Transform,
                      material_info* Material = 0,
@@ -620,7 +768,7 @@ inline void PushMesh(render_stack* Stack,
                      int BoneCount = 0)
 {
     
-    render_entry_mesh* entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_Mesh, render_entry_mesh);
+    render_entry_mesh* entry = PUSH_RENDER_ENTRY(State, RenderEntry_Mesh, render_entry_mesh);
     
     entry->Mesh = Mesh;
     entry->BoneCount = BoneCount;
@@ -630,23 +778,120 @@ inline void PushMesh(render_stack* Stack,
     entry->Transform = Transform;
 }
 
-inline void PushMesh(render_stack* Stack,
+inline void PushMesh(render_state* State,
                      mesh_info* Mesh,
                      v3 P,
                      quat R,
                      v3 S)
 {
     m44 Matrix = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
-    PushMesh(Stack, Mesh, Matrix);
+    PushMesh(State, Mesh, Matrix);
 }
 
-inline void PushGuiChunk(render_stack* Stack, int ChunkIndex){
-    render_entry_gui_chunk* Entry = PUSH_RENDER_ENTRY(Stack, RenderEntry_GuiGeometryChunk, render_entry_gui_chunk);
+inline b32 CameraSetupIsValid(render_state* Render, int SetupIndex){
+    b32 Result = (SetupIndex < Render->CameraSetupsCount) && (SetupIndex >= 0);
+    
+    return(Result);
+}
+
+inline b32 RenderQueueIsValid(render_state* Render, int QueueIndex){
+    b32 Result = (QueueIndex < Render->QueuesCount) && (QueueIndex >= 0) && (QueueIndex < RENDER_MAX_QUEUES);
+    
+    return(Result);
+}
+
+inline b32 RenderQueueIsEmpty(render_state* Render, int QueueIndex){
+    b32 Result = false;
+    
+    if(RenderQueueIsValid(Render, QueueIndex)){
+        render_queue* Q = &Render->Queues[QueueIndex];
+        
+        Result = (Q->FirstEntry >= Q->OnePastLastEntry) && ((Q->FirstEntry == 0) || (Q->OnePastLastEntry == 0));
+    }
+    
+    return(Result);
+}
+
+// NOTE(Dima): Returns true if we need to render
+inline b32 ProcessQueueEntry(render_state* Render, 
+                             int BeginnedQueueIndex,
+                             u32 PassType,
+                             void* AtBeforeInc)
+{
+    b32 Result = false;
+    
+    b32 QueueValid = RenderQueueIsValid(Render, BeginnedQueueIndex);
+    
+    if(QueueValid && (PassType == RenderPass_Main)){
+        render_queue* Queue = &Render->Queues[BeginnedQueueIndex];
+        
+        if(Queue->FirstEntry == 0){
+            Queue->FirstEntry = AtBeforeInc;
+        }
+    }
+    else{
+        Result = true;
+    }
+    
+    return(Result);
+}
+
+inline void PushBeginQueue(render_state* Render,
+                           int QueueIndex)
+{
+    b32 IsValid = RenderQueueIsValid(Render, QueueIndex);
+    Assert(IsValid);
+    
+    if(IsValid){
+        render_entry_renderqueue* Entry = PUSH_RENDER_ENTRY(Render, 
+                                                            RenderEntry_BeginQueue, 
+                                                            render_entry_renderqueue);
+        
+        Entry->QueueIndex = QueueIndex;
+    }
+}
+
+inline void PushEndQueue(render_state* Render,
+                         int QueueIndex)
+{
+    b32 IsValid = RenderQueueIsValid(Render, QueueIndex);
+    Assert(IsValid);
+    
+    if(IsValid){
+        render_entry_renderqueue* Entry = PUSH_RENDER_ENTRY(Render, 
+                                                            RenderEntry_EndQueue, 
+                                                            render_entry_renderqueue);
+        
+        Entry->QueueIndex = QueueIndex;
+    }
+}
+
+inline void PushRenderPass(render_state* Render,
+                           int CameraSetupIndex,
+                           int QueueIndex)
+{
+    b32 SetupValid = CameraSetupIsValid(Render, CameraSetupIndex);
+    b32 QueueIsValid = QueueIndex < Render->QueuesCount && RenderQueueIsValid(Render, QueueIndex);
+    
+    Assert(QueueIsValid && SetupValid);
+    
+    if(QueueIsValid && SetupValid){
+        render_entry_renderpass* Entry = PUSH_RENDER_ENTRY(Render,
+                                                           RenderEntry_RenderPass,
+                                                           render_entry_renderpass);
+        
+        Entry->CameraSetupIndex = CameraSetupIndex;
+        Entry->QueueIndex = QueueIndex;
+    }
+}
+
+inline void PushGuiChunk(render_state* State, int ChunkIndex){
+    render_entry_gui_chunk* Entry = PUSH_RENDER_ENTRY(State, RenderEntry_GuiGeometryChunk, render_entry_gui_chunk);
     
     Entry->ChunkIndex = ChunkIndex;
 }
 
-inline void BeginSetupChunk(render_stack* Stack, render_gui_geom* Geom){
+inline void BeginSetupChunk(render_state* State, render_gui_geom* Geom){
     
     render_gui_chunk* CurChunk = &Geom->Chunks[Geom->CurChunkIndex];
     
@@ -656,7 +901,7 @@ inline void BeginSetupChunk(render_stack* Stack, render_gui_geom* Geom){
     if((CurChunk->IndicesCount > 0) ||
        (CurChunk->LinePointsCount > 0))
     {
-        PushGuiChunk(Stack, Geom->CurChunkIndex);
+        PushGuiChunk(State, Geom->CurChunkIndex);
     }
     
     // NOTE(Dima): Advancing current chunk index
@@ -676,10 +921,10 @@ inline void SetupNewChunk(render_gui_geom* Geom,
     Chunk->StartIndicesCount = Geom->IndicesCount;
 }
 
-inline void BeginGuiChunk(render_stack* Stack, rc2 ClipRect){
-    render_gui_geom* Geom = &Stack->Render->GuiGeom;
+inline void BeginGuiChunk(render_state* State, rc2 ClipRect){
+    render_gui_geom* Geom = &State->GuiGeom;
     
-    BeginSetupChunk(Stack, Geom);
+    BeginSetupChunk(State, Geom);
     
     // NOTE(Dima): Setting new chunk
     SetupNewChunk(Geom, ClipRect, &Geom->Chunks[Geom->CurChunkIndex]);
@@ -690,10 +935,10 @@ inline void BeginGuiChunk(render_stack* Stack, rc2 ClipRect){
     Geom->ClipRectStack[Geom->ClipRectStackIndex] = ClipRect;
 }
 
-inline void EndGuiChunk(render_stack* Stack){
-    render_gui_geom* Geom = &Stack->Render->GuiGeom;
+inline void EndGuiChunk(render_state* State){
+    render_gui_geom* Geom = &State->GuiGeom;
     
-    BeginSetupChunk(Stack, Geom);
+    BeginSetupChunk(State, Geom);
     
     // NOTE(Dima): Popping last value from ClipRect's stack
     ASSERT(Geom->ClipRectStackIndex > 0);
@@ -710,26 +955,7 @@ inline void RenderSetFrameInfo(render_state* Render, render_frame_info FrameInfo
     Render->FrameInfo = FrameInfo;
     Render->FrameInfoIsSet = 1;
     
-    Render->API.RendererType = FrameInfo.RendererType;
-}
-
-inline render_pass* BeginRenderPass(render_state* Render, 
-                                    render_camera_setup CameraSetup)
-{
-    ASSERT(Render->PassCount < ARRAY_COUNT(Render->Passes));
-    
-    render_pass* Result = &Render->Passes[Render->PassCount++];
-    
-    Result->CameraSetup = CameraSetup;
-    Result->StacksCount = 0;
-    
-    return(Result);
-}
-
-inline void AddStackToRenderPass(render_pass* Pass, render_stack* Stack){
-    ASSERT(Pass->StacksCount < ARRAY_COUNT(Pass->Stacks));
-    
-    Pass->Stacks[Pass->StacksCount++] = Stack;
+    Render->PlatformRenderAPI.RendererType = FrameInfo.RendererType;
 }
 
 #endif

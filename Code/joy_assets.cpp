@@ -681,7 +681,7 @@ void ImportAsset(assets* Assets, asset* Asset, b32 Immediate){
                 CallbackData->LoadDestSize = DataSize;
                 CallbackData->Task = Task;
                 
-                Platform.AddEntry(&Platform.AsyncQueue,
+                Platform.AddEntry(Platform.AsyncQueue,
                                   ImportAssetCallback, CallbackData);
             }
             else{

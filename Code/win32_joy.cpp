@@ -1413,13 +1413,13 @@ PLATFORM_MEMALLOC(Win32MemAlloc){
     VirtualProtect(EndGuardPage, PageSize, PAGE_NOACCESS, &OldProtectEnd);
     
     // NOTE(Dima): Inserting region to list
-    Region->Prev = &GlobalWin32.memorySentinel;
-    BeginTicketMutex(&GlobalWin32.memoryMutex);
-    Region->Next = GlobalWin32.memorySentinel.Next;
+    Region->Prev = &GlobalWin32.MemorySentinel;
+    BeginTicketMutex(&GlobalWin32.MemoryMutex);
+    Region->Next = GlobalWin32.MemorySentinel.Next;
     
     Region->Prev->Next = Region;
     Region->Next->Prev = Region;
-    EndTicketMutex(&GlobalWin32.memoryMutex);
+    EndTicketMutex(&GlobalWin32.MemoryMutex);
     
     // NOTE(Dima): Initializing region
     Region->TotalCommittedSize = (ToAllocSize + PageSizeMask) & (~PageSizeMask);
@@ -1439,10 +1439,10 @@ PLATFORM_MEMFREE(Win32MemFree){
         Win_Memory_Region* Region = (Win_Memory_Region*)ToFree;
         
         // NOTE(Dima): Removing from list
-        BeginTicketMutex(&GlobalWin32.memoryMutex);
+        BeginTicketMutex(&GlobalWin32.MemoryMutex);
         Region->Next->Prev = Region->Prev;
         Region->Prev->Next = Region->Next;
-        EndTicketMutex(&GlobalWin32.memoryMutex);
+        EndTicketMutex(&GlobalWin32.MemoryMutex);
         
         VirtualFree(ToFree, 0, MEM_RELEASE);
     }
@@ -1600,41 +1600,76 @@ PLATFORM_FILE_OFFSET_READ(Win32FileOffsetRead){
     return(Result);
 }
 
-RENDER_PLATFORM_SWAPBUFFERS(Win32OpenGLSwapBuffers){
+RENDER_PLATFORM_CALLBACK(Win32SoftwareSwapBuffers){
+    
+}
+
+RENDER_PLATFORM_CALLBACK(Win32SoftwareRenderInit){
+    
+}
+
+RENDER_PLATFORM_CALLBACK(Win32SoftwareRender){
+    win_state* Win = &GlobalWin32;
+    
+    HDC WindowDC = GetDC(Win->Window);
+    
+    int WindowWidth = Win->WindowWidth;
+    int WindowHeight = Win->WindowHeight;
+    
+    RenderMultithreaded(&GlobalWin32.ImmediateQueue, GlobalGame->Render, &GlobalWin32.Bitmap);
+    RenderMultithreadedRGBA2BGRA(&GlobalWin32.ImmediateQueue, &GlobalWin32.Bitmap);
+    
+    DWORD Style = GetWindowLong(Win->Window, GWL_STYLE);
+    if (Style & WS_OVERLAPPEDWINDOW)
+    {
+        StretchDIBits(WindowDC,
+                      0, 0, WindowWidth, WindowHeight,
+                      0, 0, Win->Bitmap.Width, Win->Bitmap.Height,
+                      Win->Bitmap.Pixels, &Win->bmi,
+                      DIB_RGB_COLORS, SRCCOPY);
+    }
+    else
+    {
+        MONITORINFO MonitorInfo = { sizeof(MonitorInfo) };
+        GetMonitorInfo(MonitorFromWindow(Win->Window, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo);;
+        StretchDIBits(
+                      WindowDC,
+                      MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
+                      MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
+                      MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
+                      0, 0, Win->Bitmap.Width, Win->Bitmap.Height,
+                      Win->Bitmap.Pixels, &Win->bmi,
+                      DIB_RGB_COLORS, SRCCOPY);
+    }
+    
+    ReleaseDC(Win->Window, WindowDC);
+}
+
+RENDER_PLATFORM_CALLBACK(Win32SoftwareRenderFree){
+    
+}
+
+RENDER_PLATFORM_CALLBACK(Win32OpenGLSwapBuffers){
     SwapBuffers(GlobalWin32.glDC);
 }
 
-RENDER_PLATFORM_INIT(Win32OpenGLRenderInit){
-    GlobalWin32.glDC = GetDC(GlobalWin32.window);
+RENDER_PLATFORM_CALLBACK(Win32OpenGLRenderInit){
+    GlobalWin32.glDC = GetDC(GlobalWin32.Window);
     GlobalWin32.renderCtx = Win32InitOpenGL(GlobalWin32.glDC);
     
-#if JOY_USE_OPENGL
     GlInit(&GlobalGL, GlobalGame->Render, GlobalGame->Assets);
-#endif
-    
-#if JOY_USE_DIRECTX
-    DirXInit(&GlobalDirX, 
-             win32.window, 
-             win32.windowWidth,
-             win32.windowHeight);
-#endif
 }
 
-RENDER_PLATFORM_FREE(Win32OpenGLRenderFree){
+RENDER_PLATFORM_CALLBACK(Win32OpenGLRenderFree){
     //NOTE(dima): Cleanup
     GlFree(&GlobalGL);
     
-#if JOY_USE_DIRECTX
-    DirXFree(&GlobalDirX);
-#endif
-#if JOY_USE_OPENGL
     Win32FreeOpenGL(GlobalWin32.renderCtx);
-#endif
     
-    ReleaseDC(GlobalWin32.window, GlobalWin32.glDC);
+    ReleaseDC(GlobalWin32.Window, GlobalWin32.glDC);
 }
 
-RENDER_PLATFORM_RENDER(Win32OpenGLRender){
+RENDER_PLATFORM_CALLBACK(Win32OpenGLRender){
     GlOutputRender(&GlobalGL, GlobalGame->Render);
 }
 
@@ -1643,12 +1678,12 @@ Win32ToggleFullscreen(win_state* Win32, b32 IsFullscreen)
 {
     Win32->ToggledFullscreen = IsFullscreen;
     
-    DWORD Style = GetWindowLong(Win32->window, GWL_STYLE);
+    DWORD Style = GetWindowLong(Win32->Window, GWL_STYLE);
     if (IsFullscreen && (Style & WS_OVERLAPPEDWINDOW))
     {
         MONITORINFO Monitor = { sizeof(Monitor) };
-        if (GetWindowPlacement(Win32->window, &Win32->windowPlacement) &&
-            GetMonitorInfo(MonitorFromWindow(Win32->window, MONITOR_DEFAULTTOPRIMARY), &Monitor))
+        if (GetWindowPlacement(Win32->Window, &Win32->WindowPlacement) &&
+            GetMonitorInfo(MonitorFromWindow(Win32->Window, MONITOR_DEFAULTTOPRIMARY), &Monitor))
         {
             RECT MonRect = Monitor.rcMonitor;
             
@@ -1658,8 +1693,8 @@ Win32ToggleFullscreen(win_state* Win32, b32 IsFullscreen)
             Win32->WindowWidth = MonitorWidth;
             Win32->WindowHeight = MonitorHeight;
             
-            SetWindowLong(Win32->window, GWL_STYLE, Style & ~WS_OVERLAPPEDWINDOW);
-            SetWindowPos(Win32->window, HWND_TOP,
+            SetWindowLong(Win32->Window, GWL_STYLE, Style & ~WS_OVERLAPPEDWINDOW);
+            SetWindowPos(Win32->Window, HWND_TOP,
                          Monitor.rcMonitor.left, Monitor.rcMonitor.top,
                          MonitorWidth,
                          MonitorHeight,
@@ -1671,9 +1706,9 @@ Win32ToggleFullscreen(win_state* Win32, b32 IsFullscreen)
         Win32->WindowWidth = Win32->InitWindowWidth;
         Win32->WindowHeight = Win32->InitWindowHeight;
         
-        SetWindowLong(Win32->window, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
-        SetWindowPlacement(Win32->window, &Win32->windowPlacement);
-        SetWindowPos(Win32->window, 0, 0, 0, 0, 0,
+        SetWindowLong(Win32->Window, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
+        SetWindowPlacement(Win32->Window, &Win32->WindowPlacement);
+        SetWindowPos(Win32->Window, 0, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
                      SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
     }
@@ -1912,7 +1947,7 @@ Win32ProcessInput(input_state* Input)
     v2 MouseInScreenP = V2(point.x, point.y);
     
     // NOTE(Dima): Getting current mouse P in-window
-    ScreenToClient(GlobalWin32.window, &point);
+    ScreenToClient(GlobalWin32.Window, &point);
     
     float MouseUVx = (float)point.x / (float)GlobalWin32.WindowWidth;
     float MouseUVy = (float)point.y / (float)GlobalWin32.WindowHeight;
@@ -1931,7 +1966,7 @@ Win32ProcessInput(input_state* Input)
     
     // NOTE(Dima): Processing capturing mouse
     if(Input->CapturingMouse){
-        HMONITOR MonitorHandle = MonitorFromWindow(GlobalWin32.window, 
+        HMONITOR MonitorHandle = MonitorFromWindow(GlobalWin32.Window, 
                                                    MONITOR_DEFAULTTOPRIMARY);
         MONITORINFO MonitorInfo;
         MonitorInfo.cbSize = sizeof(MONITORINFO);
@@ -1969,7 +2004,7 @@ Win32ProcessInput(input_state* Input)
         SetCursorPos(point.x, point.y);
     }
     
-    ScreenToClient(GlobalWin32.window, &point);
+    ScreenToClient(GlobalWin32.Window, &point);
     
     MouseUVx = (float)point.x / (float)GlobalWin32.WindowWidth;
     MouseUVy = (float)point.y / (float)GlobalWin32.WindowHeight;
@@ -2333,7 +2368,7 @@ INTERNAL_FUNCTION void Win32InitWindow(HINSTANCE Instance,
         WindowCreateH = WindowHeight;
     }
     
-    GlobalWin32.window = CreateWindowA(
+    GlobalWin32.Window = CreateWindowA(
                                        wndClass.lpszClassName,
                                        "Joy",
                                        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
@@ -2350,7 +2385,7 @@ INTERNAL_FUNCTION void Win32InitWindow(HINSTANCE Instance,
     GlobalWin32.InitWindowHeight = WindowHeight;
     
     void* winBmpMemory = PushSomeMem(&GlobalMem, WindowWidth * WindowHeight * 4, 64);
-    GlobalWin32.bitmap = AllocateBitmapInternal(WindowWidth, WindowHeight, winBmpMemory);
+    GlobalWin32.Bitmap = AllocateBitmapInternal(WindowWidth, WindowHeight, winBmpMemory);
     GlobalWin32.bmi = {};
     BITMAPINFO* bmi = &GlobalWin32.bmi;
     BITMAPINFOHEADER* bmiHeader = &bmi->bmiHeader;
@@ -2380,19 +2415,30 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     Win32InitInternalCriticalSections();
     
     // NOTE(Dima): Initializing platform API
-    InitJobQueue(&Platform.ImmediateQueue, 2048, 8);
-    InitJobQueue(&Platform.AsyncQueue, 2048, 4);
+    InitJobQueue(&GlobalWin32.ImmediateQueue, 2048, 8);
+    InitJobQueue(&GlobalWin32.AsyncQueue, 2048, 4);
     
     // TODO(Dima): Add array of count Renderer_Count and init all renderers
     // TODO(Dima): Or leave if not supported
     // NOTE(Dima): Init render API
     render_platform_api* RenderAPI = &Platform.RenderAPI;
+    
+#if 1
     RenderAPI->RendererType = Renderer_OpenGL;
     RenderAPI->SwapBuffers = Win32OpenGLSwapBuffers;
     RenderAPI->Init = Win32OpenGLRenderInit;
     RenderAPI->Free = Win32OpenGLRenderFree;
     RenderAPI->Render = Win32OpenGLRender;
+#else
+    RenderAPI->RendererType = Renderer_Software;
+    RenderAPI->SwapBuffers = Win32SoftwareSwapBuffers;
+    RenderAPI->Init = Win32SoftwareRenderInit;
+    RenderAPI->Free = Win32SoftwareRenderFree;
+    RenderAPI->Render = Win32SoftwareRender;
+#endif
     
+    Platform.ImmediateQueue = &GlobalWin32.ImmediateQueue;
+    Platform.AsyncQueue = &GlobalWin32.AsyncQueue;
     Platform.AddEntry = PlatformAddEntry;
     Platform.WaitForCompletion = PlatformWaitForCompletion;
     Platform.ReadFile = Win32ReadFile;
@@ -2415,9 +2461,9 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     Platform.ProcessInput = Win32PlatformInputProcess;
     
     // NOTE(Dima): Initializing memory sentinel
-    GlobalWin32.memorySentinel = {};
-    GlobalWin32.memorySentinel.Prev = &GlobalWin32.memorySentinel;
-    GlobalWin32.memorySentinel.Next = &GlobalWin32.memorySentinel;
+    GlobalWin32.MemorySentinel = {};
+    GlobalWin32.MemorySentinel.Prev = &GlobalWin32.MemorySentinel;
+    GlobalWin32.MemorySentinel.Next = &GlobalWin32.MemorySentinel;
     
 #if defined(JOY_DEBUG_BUILD)
     // NOTE(Dima): Initializing DEBUG global table
@@ -2449,7 +2495,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     }
     
     // NOTE(Dima): DSound init
-    DSoundInit(&GlobalDirectSound, GlobalWin32.window);
+    DSoundInit(&GlobalDirectSound, GlobalWin32.Window);
     Win32ClearSoundBuffer(&GlobalDirectSound);
     //Win32FillSoundBufferWithSound(&GlobalDirectSound, &gAssets.SineTest1);
     Win32PlayDirectSoundBuffer(&GlobalDirectSound);
@@ -2479,7 +2525,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         FrameInfo.Height = GlobalWin32.WindowHeight;
         FrameInfo.InitWidth = GlobalWin32.InitWindowWidth;
         FrameInfo.InitHeight = GlobalWin32.InitWindowHeight;
-        FrameInfo.SoftwareBuffer = &GlobalWin32.bitmap;
+        FrameInfo.SoftwareBuffer = &GlobalWin32.Bitmap;
         FrameInfo.dt = DeltaTime;
         FrameInfo.RendererType = Renderer_OpenGL;
         
@@ -2492,10 +2538,10 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     
     DSoundFree(&GlobalDirectSound);
     
-    DestroyWindow(GlobalWin32.window);
+    DestroyWindow(GlobalWin32.Window);
     
-    FreeJobQueue(&Platform.ImmediateQueue);
-    FreeJobQueue(&Platform.AsyncQueue);
+    FreeJobQueue(&GlobalWin32.ImmediateQueue);
+    FreeJobQueue(&GlobalWin32.AsyncQueue);
     
     return (0);
 }

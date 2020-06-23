@@ -58,11 +58,6 @@ struct playing_anim_source{
     
     u32 ExitAction;
     int IndexInArray;
-    
-    playing_anim_source* NextInList;
-    
-    playing_anim_source* NextAlloc;
-    playing_anim_source* PrevAlloc;
 };
 
 
@@ -103,9 +98,6 @@ struct anim_state{
     // NOTE(Dima): Transitions list
     struct anim_transition* FirstTransition;
     struct anim_transition* LastTransition;
-    
-    playing_anim_source* FirstAnimSource;
-    playing_anim_source* LastAnimSource;
     
     // NOTE(Dima): These are indices to anim sources array
     int FirstAnimIndex;
@@ -241,7 +233,7 @@ struct anim_controller{
     anim_transition_condition* BeginnedTransitionsConditions[ANIM_MAX_STATE_COUNT];
     int BeginnedTransitionsCount;
     
-    playing_anim_source* AnimSources[2048];
+    playing_anim_source AnimSources[2048];
     int AnimSourcesCount;
     
     anim_state* BeginnedState;

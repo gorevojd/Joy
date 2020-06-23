@@ -788,41 +788,90 @@ INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, bmp_info* bmp){
     glDeleteTextures(1, &BlitTex);
 }
 
-void GlOutputStack(gl_state* GL, render_stack* Stack, render_camera_setup* CameraSetup){
-    u8* at = (u8*)Stack->MemRegion.CreationBlock.Base;
-    u8* StackEnd = (u8*)Stack->MemRegion.CreationBlock.Base + Stack->MemRegion.CreationBlock.Used;
+void GlOutputPass(gl_state* GL, render_state* Render, 
+                  void* Begin, void* EndExcl,
+                  u32 PassType,
+                  render_camera_setup* CameraSetup)
+{
+    //u8* at = (u8*)Render->StackRegion.CreationBlock.Base;
+    //u8* StackEnd = (u8*)Render->StackRegion.CreationBlock.Base + Render->StackRegion.CreationBlock.Used;
     
-    while (at < StackEnd) {
-        render_entry_header* Header = (render_entry_header*)at;
+    b32 QueueBeginned = false;
+    int BeginnedQueueIndex = RENDER_DEFAULT_QUEUE_INDEX;
+    
+    u8* At = (u8*)Begin;
+    
+    while (At < (u8*)EndExcl) {
+        render_entry_header* Header = (render_entry_header*)At;
         
-        at += sizeof(render_entry_header);
+        void* AtBeforeInc = At;
+        At += sizeof(render_entry_header);
         
-        switch(Header->type){
+        switch(Header->Type){
             case RenderEntry_ClearColor:{
                 RENDER_GET_ENTRY(render_entry_clear_color);
                 
-                glClearColor(entry->clearColor01.r,
-                             entry->clearColor01.g,
-                             entry->clearColor01.b,
+                glClearColor(Entry->clearColor01.r,
+                             Entry->clearColor01.g,
+                             Entry->clearColor01.b,
                              1.0f);
                 glClear(GL_COLOR_BUFFER_BIT);
+            }break;
+            
+            case RenderEntry_BeginQueue:{
+                RENDER_GET_ENTRY(render_entry_renderqueue);
+                
+                QueueBeginned = true;
+                BeginnedQueueIndex = Entry->QueueIndex;
+                
+                render_queue* Queue = &Render->Queues[Entry->QueueIndex];
+                
+                Queue->FirstEntry = 0;
+                Queue->OnePastLastEntry = 0;
+            }break;
+            
+            case RenderEntry_EndQueue:{
+                RENDER_GET_ENTRY(render_entry_renderqueue);
+                
+                Assert(Entry->QueueIndex == BeginnedQueueIndex);
+                QueueBeginned = false;
+                BeginnedQueueIndex = RENDER_DEFAULT_QUEUE_INDEX;
+                
+                render_queue* Queue = &Render->Queues[Entry->QueueIndex];
+                Queue->OnePastLastEntry = AtBeforeInc;
+            }break;
+            
+            case RenderEntry_RenderPass:{
+                RENDER_GET_ENTRY(render_entry_renderpass);
+                
+                if(!RenderQueueIsEmpty(Render, Entry->QueueIndex)){
+                    
+                    render_queue* Queue = &Render->Queues[Entry->QueueIndex];
+                    render_camera_setup* PassCamSetup = &Render->CameraSetups[Entry->CameraSetupIndex];
+                    
+                    GlOutputPass(GL, Render, 
+                                 Queue->FirstEntry, 
+                                 Queue->OnePastLastEntry,
+                                 RenderPass_RenderPassEntry,
+                                 PassCamSetup);
+                }
             }break;
             
             case RenderEntry_Bitmap:{
                 RENDER_GET_ENTRY(render_entry_bitmap);
                 
-                if(!entry->Bitmap->Handle){
-                    GlAllocateTexture(entry->Bitmap);
+                if(!Entry->Bitmap->Handle){
+                    GlAllocateTexture(Entry->Bitmap);
                 }
                 
-                v2 Min = entry->P;
-                v2 Max = V2(Min.x + entry->Bitmap->WidthOverHeight * entry->PixelHeight,
-                            Min.y + entry->PixelHeight);
+                v2 Min = Entry->P;
+                v2 Max = V2(Min.x + Entry->Bitmap->WidthOverHeight * Entry->PixelHeight,
+                            Min.y + Entry->PixelHeight);
                 
-                float r = entry->ModulationColor01.r;
-                float g = entry->ModulationColor01.g;
-                float b = entry->ModulationColor01.b;
-                float a = entry->ModulationColor01.a;
+                float r = Entry->ModulationColor01.r;
+                float g = Entry->ModulationColor01.g;
+                float b = Entry->ModulationColor01.b;
+                float a = Entry->ModulationColor01.a;
                 
                 float RectArr[] = {
                     Min.x, Max.y, 0.0f, 1.0f, r, g, b, a,
@@ -835,117 +884,116 @@ void GlOutputStack(gl_state* GL, render_stack* Stack, render_camera_setup* Camer
                 };
                 
                 GlRenderGuiRect(GL, GL->GuiOrtho.e, true, 
-                                entry->Bitmap->Handle,
+                                Entry->Bitmap->Handle,
                                 RectArr, sizeof(RectArr));
                 
             }break;
             
             case RenderEntry_Mesh:{
-                RENDER_GET_ENTRY(render_entry_mesh);
-                mesh_info* Mesh = entry->Mesh;
-                
-                GlAllocateMesh(GL, Mesh);
-                
-                glEnable(GL_DEPTH_TEST);
-                
-                
-                
-                UseShader(&GL->SimpleShader.Shader);
-                
-                // NOTE(Dima): Setting VS uniforms
-                UniformMatrix4x4(GL->SimpleShader.ModelLoc,
-                                 entry->Transform.e);
-                UniformMatrix4x4(GL->SimpleShader.ViewLoc,
-                                 CameraSetup->View.e);
-                UniformMatrix4x4(GL->SimpleShader.ProjectionLoc,
-                                 CameraSetup->Projection.e);
-                UniformBool(GL->SimpleShader.HasSkinningLoc,
-                            Mesh->TypeCtx.MeshType == Mesh_Skinned);
-                UniformInt(GL->SimpleShader.BonesCountLoc, 
-                           entry->BoneCount);
-                
-                if(entry->BoneCount){
-                    glUniformMatrix4fv(GL->SimpleShader.BoneTransformsLoc,
-                                       entry->BoneCount,
-                                       GL_TRUE,
-                                       (const GLfloat*)entry->BoneTransforms[0].e);
-                }
-                
-                
-                UniformBool(GL->SimpleShader.FogEnabledLoc, Stack->Render->FogEnabled);
-                UniformFloat(GL->SimpleShader.FogGradientLoc, Stack->Render->FogGradient);
-                UniformFloat(GL->SimpleShader.FogDensityLoc, Stack->Render->FogDensity);
-                UniformVec3(GL->SimpleShader.FogColorLoc, Stack->Render->FogColor);
-                
-                
-                // NOTE(Dima): Setting FS uniforms
-                b32 AlbedoIsSet = 0;
-                b32 NormalsIsSet = 0;
-                b32 SpecularIsSet = 0;
-                b32 EmissiveIsSet = 0;
-                
-                if(entry->Material){
-                    material_info* Mat = entry->Material;
+                if(ProcessQueueEntry(Render, 
+                                     BeginnedQueueIndex,
+                                     PassType, 
+                                     AtBeforeInc))
+                {
+                    RENDER_GET_ENTRY(render_entry_mesh);
                     
-                    bmp_info* Albedo = Mat->Textures[MaterialTexture_Diffuse];
-                    bmp_info* Normals = Mat->Textures[MaterialTexture_Normals];
-                    bmp_info* Specular = Mat->Textures[MaterialTexture_Specular];
-                    bmp_info* Emissive = Mat->Textures[MaterialTexture_Emissive];
+                    mesh_info* Mesh = Entry->Mesh;
+                    
+                    GlAllocateMesh(GL, Mesh);
+                    
+                    glEnable(GL_DEPTH_TEST);
                     
                     
-                    if(Albedo){
-                        AlbedoIsSet = 1;
-                        GlAllocateTexture(Albedo);
+                    
+                    UseShader(&GL->SimpleShader.Shader);
+                    
+                    // NOTE(Dima): Setting VS uniforms
+                    UniformMatrix4x4(GL->SimpleShader.ModelLoc,
+                                     Entry->Transform.e);
+                    UniformMatrix4x4(GL->SimpleShader.ViewLoc,
+                                     CameraSetup->View.e);
+                    UniformMatrix4x4(GL->SimpleShader.ProjectionLoc,
+                                     CameraSetup->Projection.e);
+                    UniformBool(GL->SimpleShader.HasSkinningLoc,
+                                Mesh->TypeCtx.MeshType == Mesh_Skinned);
+                    UniformInt(GL->SimpleShader.BonesCountLoc, 
+                               Entry->BoneCount);
+                    
+                    if(Entry->BoneCount){
+                        glUniformMatrix4fv(GL->SimpleShader.BoneTransformsLoc,
+                                           Entry->BoneCount,
+                                           GL_TRUE,
+                                           (const GLfloat*)Entry->BoneTransforms[0].e);
+                    }
+                    
+                    
+                    UniformBool(GL->SimpleShader.FogEnabledLoc, Render->FogEnabled);
+                    UniformFloat(GL->SimpleShader.FogGradientLoc, Render->FogGradient);
+                    UniformFloat(GL->SimpleShader.FogDensityLoc, Render->FogDensity);
+                    UniformVec3(GL->SimpleShader.FogColorLoc, Render->FogColor);
+                    
+                    // NOTE(Dima): Setting FS uniforms
+                    b32 AlbedoIsSet = 0;
+                    b32 NormalsIsSet = 0;
+                    b32 SpecularIsSet = 0;
+                    b32 EmissiveIsSet = 0;
+                    
+                    if(Entry->Material){
+                        material_info* Mat = Entry->Material;
                         
-                        glUniform1i(GL->SimpleShader.AlbedoLoc, 0);
-                        glActiveTexture(GL_TEXTURE0);
-                        glBindTexture(GL_TEXTURE_2D, Albedo->Handle);
-                    }
-                    
-                    if(Specular){
-                        SpecularIsSet = 1;
-                        GlAllocateTexture(Specular);
-                    }
-                    
-                    if(Normals){
-                        NormalsIsSet = 1;
-                        GlAllocateTexture(Normals);
+                        bmp_info* Albedo = Mat->Textures[MaterialTexture_Diffuse];
+                        bmp_info* Normals = Mat->Textures[MaterialTexture_Normals];
+                        bmp_info* Specular = Mat->Textures[MaterialTexture_Specular];
+                        bmp_info* Emissive = Mat->Textures[MaterialTexture_Emissive];
                         
-                        glUniform1i(GL->SimpleShader.NormalsLoc, 1);
-                        glActiveTexture(GL_TEXTURE1);
-                        glBindTexture(GL_TEXTURE_2D, Normals->Handle);
+                        
+                        if(Albedo){
+                            AlbedoIsSet = 1;
+                            GlAllocateTexture(Albedo);
+                            
+                            glUniform1i(GL->SimpleShader.AlbedoLoc, 0);
+                            glActiveTexture(GL_TEXTURE0);
+                            glBindTexture(GL_TEXTURE_2D, Albedo->Handle);
+                        }
+                        
+                        if(Specular){
+                            SpecularIsSet = 1;
+                            GlAllocateTexture(Specular);
+                        }
+                        
+                        if(Normals){
+                            NormalsIsSet = 1;
+                            GlAllocateTexture(Normals);
+                            
+                            glUniform1i(GL->SimpleShader.NormalsLoc, 1);
+                            glActiveTexture(GL_TEXTURE1);
+                            glBindTexture(GL_TEXTURE_2D, Normals->Handle);
+                        }
+                        
+                        if(Emissive){
+                            EmissiveIsSet = 1;
+                            GlAllocateTexture(Emissive);
+                        }
                     }
                     
-                    if(Emissive){
-                        EmissiveIsSet = 1;
-                        GlAllocateTexture(Emissive);
-                    }
+                    u32 TexturesSetFlags = (AlbedoIsSet |
+                                            (NormalsIsSet << 1) |
+                                            (SpecularIsSet << 2) |
+                                            (EmissiveIsSet << 3));
+                    
+                    UniformVec3(GL->SimpleShader.AlbedoColorLoc, Entry->AlbedoColor);
+                    UniformInt(GL->SimpleShader.TexturesSetFlagsLoc, TexturesSetFlags);
+                    
+                    glBindVertexArray(Mesh->Handles.Handles[0]);
+                    glDrawElements(GL_TRIANGLES, Mesh->IndicesCount, GL_UNSIGNED_INT, 0);
+                    
+                    glDisable(GL_DEPTH_TEST);
+                    //GlFreeMeshHandles(&Mesh->Handles);
                 }
-                
-                u32 TexturesSetFlags = 
-                    (AlbedoIsSet) |
-                    (NormalsIsSet << 1) |
-                    (SpecularIsSet << 2) |
-                    (EmissiveIsSet << 3);
-                
-                UniformVec3(GL->SimpleShader.AlbedoColorLoc, entry->AlbedoColor);
-                UniformInt(GL->SimpleShader.TexturesSetFlagsLoc, TexturesSetFlags);
-                
-                glBindVertexArray(Mesh->Handles.Handles[0]);
-                glDrawElements(GL_TRIANGLES, Mesh->IndicesCount, GL_UNSIGNED_INT, 0);
-                
-                glDisable(GL_DEPTH_TEST);
-                //GlFreeMeshHandles(&Mesh->Handles);
             }break;
         }
         
-        at += Header->dataSize;
-    }
-}
-
-INTERNAL_FUNCTION void GlOutputPass(gl_state* GL, render_pass* Pass){
-    for(int i = 0; i < Pass->StacksCount; i++){
-        GlOutputStack(GL, Pass->Stacks[i], &Pass->CameraSetup);
+        At += Header->DataSize;
     }
 }
 
@@ -1139,39 +1187,72 @@ INTERNAL_FUNCTION void OutputGuiGeometryLines(gl_state* GL, render_state* Render
         }
     }
     
-    
     glDeleteTextures(1, &ColorsTex);
 }
 
 INTERNAL_FUNCTION void GlFinalOutput(gl_state* GL, render_state* Render){
+    render_frame_info FrameInfo = Render->FrameInfo;
+    
     // NOTE(Dima): outputing lines
-    OutputRenderLines(GL, Render, Render->Passes[0].CameraSetup.ViewProjection);
+    OutputRenderLines(GL, Render, 
+                      Render->CameraSetups[0].ViewProjection);
     
     // NOTE(Dima): Outputing gui geometry
     glEnable(GL_SCISSOR_TEST);
     OutputGuiGeometry(GL, Render);
     OutputGuiGeometryLines(GL, Render);
     glDisable(GL_SCISSOR_TEST);
+    
+    // NOTE(Dima): Output desired buffer to screen
+    GLint TexLoc;
+    GLuint Tex;
+    GLuint ProgramID;
+    GLint UVInvertYLoc;
+    if(Render->ToShowBufferType == RenderShowBuffer_Color){
+        TexLoc = GL->ScreenShader.ScreenTextureLoc;
+        UVInvertYLoc = GL->ScreenShader.UVInvertYLoc;
+        ProgramID = GL->ScreenShader.Shader.ID;
+        Tex = GL->RenderColorTex0;
+    }
+    else if(Render->ToShowBufferType == RenderShowBuffer_Depth){
+        TexLoc = GL->ResolveDepth.DepthTextureLoc;
+        UVInvertYLoc = GL->ResolveDepth.UVInvertYLoc;
+        ProgramID = GL->ResolveDepth.Shader.ID;
+        Tex = GL->RenderDepthTex;
+    }
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0.0f, 0.0f, 
+               FrameInfo.Width, 
+               FrameInfo.Height);
+    
+    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    // NOTE(Dima): Drawing screen rect
+    glBindVertexArray(GL->ScreenVAO);
+    glUseProgram(ProgramID);
+    
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, Tex);
+    glUniform1i(TexLoc, 0);
+    glUniform1i(UVInvertYLoc, true);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    
+    glUseProgram(0);
+    glBindVertexArray(0);
 }
 
 INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
     FUNCTION_TIMING();
     
     // NOTE(Dima): Calculating gui orthographic projection matrix
-    int WindowWidth = 1366;
-    int WindowHeight = 768;
-    int InitWindowWidth = WindowWidth;
-    int InitWindowHeight = WindowHeight;
+    Assert(Render->FrameInfoIsSet);
+    render_frame_info FrameInfo = Render->FrameInfo;
     
-    if(Render->FrameInfoIsSet){
-        WindowWidth = Render->FrameInfo.Width;
-        WindowHeight = Render->FrameInfo.Height;
-        InitWindowWidth = Render->FrameInfo.InitWidth;
-        InitWindowHeight = Render->FrameInfo.InitHeight;
-    }
-    
-    float a = 2.0f / (float)InitWindowWidth;
-    float b = 2.0f / (float)InitWindowHeight;
+    float a = 2.0f / (float)FrameInfo.InitWidth;
+    float b = 2.0f / (float)FrameInfo.InitHeight;
     
     GLfloat GuiOrtho[16] = {
         a, 0.0f, 0.0f, 0.0f,
@@ -1183,7 +1264,9 @@ INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
     GL->GuiOrtho = Floats2Matrix(GuiOrtho);
     
     glBindFramebuffer(GL_FRAMEBUFFER, GL->RenderFBO);
-    glViewport(0.0f, 0.0f, InitWindowWidth, InitWindowHeight);
+    glViewport(0.0f, 0.0f, 
+               FrameInfo.InitWidth, 
+               FrameInfo.InitHeight);
     
     
     glEnable(GL_BLEND);
@@ -1194,6 +1277,7 @@ INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
     glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
+#if 0    
     // NOTE(Dima): Actual rendering
     if(Render->API.RendererType == Renderer_Software){
         if(Render->FrameInfoIsSet){
@@ -1209,47 +1293,14 @@ INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
         }
     }
     else if (Render->API.RendererType == Renderer_OpenGL){
-        for(int i = 0; i < Render->PassCount; i++){
-            GlOutputPass(GL, &Render->Passes[i]);
-        }
-        
-        GlFinalOutput(GL, Render);
-        
-        GLint TexLoc;
-        GLuint Tex;
-        GLuint ProgramID;
-        GLint UVInvertYLoc;
-        if(Render->ToShowBufferType == RenderShowBuffer_Color){
-            TexLoc = GL->ScreenShader.ScreenTextureLoc;
-            UVInvertYLoc = GL->ScreenShader.UVInvertYLoc;
-            ProgramID = GL->ScreenShader.Shader.ID;
-            Tex = GL->RenderColorTex0;
-        }
-        else if(Render->ToShowBufferType == RenderShowBuffer_Depth){
-            TexLoc = GL->ResolveDepth.DepthTextureLoc;
-            UVInvertYLoc = GL->ResolveDepth.UVInvertYLoc;
-            ProgramID = GL->ResolveDepth.Shader.ID;
-            Tex = GL->RenderDepthTex;
-        }
-        
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glViewport(0.0f, 0.0f, WindowWidth, WindowHeight);
-        
-        glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        
-        // NOTE(Dima): Drawing screen rect
-        glBindVertexArray(GL->ScreenVAO);
-        glUseProgram(ProgramID);
-        
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, Tex);
-        glUniform1i(TexLoc, 0);
-        glUniform1i(UVInvertYLoc, true);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        
-        glUseProgram(0);
-        glBindVertexArray(0);
     }
+#endif
+    
+    GlOutputPass(GL, Render,
+                 Render->StackRegion.CreationBlock.Base,
+                 (void*)((u8*)Render->StackRegion.CreationBlock.Base + Render->StackRegion.CreationBlock.Used),
+                 RenderPass_Main,
+                 &Render->CameraSetups[0]);
+    
+    GlFinalOutput(GL, Render);
 }

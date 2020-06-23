@@ -46,6 +46,7 @@ struct game_init_params{
 #include "joy_assets_render.h"
 #include "joy_gui.h"
 #include "joy_animation.h"
+#include "joy_software_renderer.h"
 #include "joy_debug.h"
 
 #define GAME_GET_MODE_STATE(state_type, state_var_name) \

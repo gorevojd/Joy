@@ -303,6 +303,7 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags,
     
     double factor(0.0);
     scene->mMetaData->Get("UnitScaleFactor", factor);
+    //scene->mMetaData->Set("UnitScaleFactor", 100);
     
     if (scene) {
         printf("Loaded by ASSIMP: %s\n", FileName);

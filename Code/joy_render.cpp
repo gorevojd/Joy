@@ -70,25 +70,16 @@ INTERNAL_FUNCTION render_camera_setup SetupCamera(const m44& Projection,
     return(Result);
 }
 
-INTERNAL_FUNCTION render_camera_setup DefaultPerspSetup(int Width, int Height, 
-                                                        float Far, float Near, 
+INTERNAL_FUNCTION render_camera_setup DefaultPerspSetup(render_state* Render, 
                                                         const m44& CameraTransform)
 {
-    render_camera_setup CamSetup = SetupCamera(PerspectiveProjection(Width, Height, 
+    render_camera_setup CamSetup = SetupCamera(PerspectiveProjection(Render->InitWindowWidth, 
+                                                                     Render->InitWindowHeight, 
                                                                      RENDER_DEFAULT_FAR, 
                                                                      RENDER_DEFAULT_NEAR),
                                                CameraTransform,
-                                               Width, Height, 
-                                               Far, Near, true);
-    
-    return(CamSetup);
-}
-
-INTERNAL_FUNCTION render_camera_setup DefaultOrthoSetup(int Width, int Height,
-                                                        const m44& CameraTransform){
-    render_camera_setup CamSetup = SetupCamera(OrthographicProjection(Width, Height),
-                                               CameraTransform,
-                                               Width, Height, 
+                                               Render->InitWindowWidth, 
+                                               Render->InitWindowHeight, 
                                                RENDER_DEFAULT_FAR, 
                                                RENDER_DEFAULT_NEAR, 
                                                true);
@@ -96,33 +87,37 @@ INTERNAL_FUNCTION render_camera_setup DefaultOrthoSetup(int Width, int Height,
     return(CamSetup);
 }
 
-
-INTERNAL_FUNCTION void InitRenderStack(render_stack* Stack, 
-                                       render_state* render,
-                                       char* Name, 
-                                       void* MemoryForStack, 
-                                       mi Size)
+INTERNAL_FUNCTION render_camera_setup DefaultOrthoSetup(render_state* Render, 
+                                                        const m44& CameraTransform)
 {
-    *Stack = {};
+    render_camera_setup CamSetup = SetupCamera(OrthographicProjection(Render->InitWindowWidth, 
+                                                                      Render->InitWindowHeight),
+                                               CameraTransform,
+                                               Render->InitWindowWidth, 
+                                               Render->InitWindowHeight, 
+                                               RENDER_DEFAULT_FAR, 
+                                               RENDER_DEFAULT_NEAR, 
+                                               true);
     
-    Stack->Render = render;
-    Stack->MemRegion = CreateInsideBlock(MemoryForStack, Size);
-    CopyStrings(Stack->Name, Name);
-    
-    Stack->EntryCount = 0;
+    return(CamSetup);
 }
 
-INTERNAL_FUNCTION inline void RenderStackBeginFrame(render_stack* Stack){
-    Stack->MemRegion.CreationBlock.Used = 0;
-    Stack->EntryCount = 0;
+INTERNAL_FUNCTION int AddCameraSetup(render_state* Render,
+                                     render_camera_setup CameraSetup)
+{
+    Assert(Render->CameraSetupsCount < RENDER_MAX_CAMERA_SETUPS);
+    int Result = Render->CameraSetupsCount++;
     
-    Stack->CurAtlas = 0;
+    Render->CameraSetups[Result] = CameraSetup;
     
-    Stack->IsSoftwareRenderer = (Stack->Render->API.RendererType == Renderer_Software);
+    return(Result);
 }
 
-INTERNAL_FUNCTION inline void RenderStackEndFrame(render_stack* Stack){
+INTERNAL_FUNCTION int AddRenderQueue(render_state* Render){
+    Assert(Render->QueuesCount < RENDER_MAX_QUEUES);
+    int Result = Render->QueuesCount++;
     
+    return(Result);
 }
 
 INTERNAL_FUNCTION void RenderInitGuiGeom(render_state* Render){
@@ -169,8 +164,6 @@ INTERNAL_FUNCTION void RenderInit(render_state* Render,
                                   int InitWindowWidth,
                                   int InitWindowHeight,
                                   render_platform_api API){
-    Render->StacksCount = 0;
-    
     InitRandomGeneration(&Render->Random, 12);
     
     Render->FrameInfoIsSet = 0;
@@ -183,7 +176,9 @@ INTERNAL_FUNCTION void RenderInit(render_state* Render,
     Render->FogColor = V3(0.8f, 0.8f, 0.8f);
     
     // NOTE(Dima): Init render API
-    Render->API = API;
+    Render->PlatformRenderAPI = API;
+    
+    Render->StackRegion = PushSplit(Render->MemRegion, Megabytes(4));
     
     // NOTE(Dima): Init SSAO kernel
     for(int KernelSampleIndex = 0;
@@ -220,124 +215,63 @@ INTERNAL_FUNCTION void RenderInit(render_state* Render,
     RenderInitGuiGeom(Render);
     RenderInitLinesGeom(Render);
     
-    Render->API.Init(Render);
+    Render->PlatformRenderAPI.Init(Render);
 }
 
-INTERNAL_FUNCTION render_stack* RenderFindStack(render_state* Render, char* Name){
-    render_stack* Result = 0;
+INTERNAL_FUNCTION void RenderBeginFrame(render_state* Render){
+    Render->FrameInfoIsSet = 0;
+    Render->FrameInfo = {};
     
-    char NameUpperBuf[256];
-    StringToUpper(NameUpperBuf, Name);
-    
-    for(int i = 0; i < Render->StacksCount; i++){
-        if(StringsAreEqual(Render->Stacks[i].Name, NameUpperBuf)){
-            Result = &Render->Stacks[i];
-            break;
-        }
-    }
-    
-    return(Result);
-}
-
-INTERNAL_FUNCTION render_stack* RenderAddStack(render_state* render, char* Name, mi Size)
-{
-    render_stack* Result = RenderFindStack(render, Name);
-    
-    if(!Result){
-        char NameUpperBuf[256];
-        StringToUpper(NameUpperBuf, Name);
-        
-        ASSERT(render->StacksCount < ARRAY_COUNT(render->Stacks));
-        render_stack* Result = render->Stacks + render->StacksCount++;
-        
-        void* StackMemory = PushSomeMem(render->MemRegion, Size);
-        InitRenderStack(Result, render, NameUpperBuf, StackMemory, Size);
-    }
-    
-    return(Result);
-}
-
-/*
- NOTE(Dima): This function tries to find the stack
- in render. If it can not find the stack with the 
- specified name then it creates one.
-*/
-INTERNAL_FUNCTION render_stack* RenderFindAddStack(render_state* Render, char* Name){
-    render_stack* Result = 0;
-    
-    render_stack* Found = RenderFindStack(Render, Name);
-    if(!Found){
-        Result = RenderAddStack(Render, Name, RENDER_DEFAULT_STACK_SIZE);
-    }
-    else{
-        Result = Found;
-    }
-    
-    return(Result);
-}
-
-INTERNAL_FUNCTION void RenderBeginFrame(render_state* render){
-    render->FrameInfoIsSet = 0;
-    render->FrameInfo = {};
+    Render->CameraSetupsCount = 0;
+    Render->QueuesCount = 0;
     
     // NOTE(Dima): Reset gui
-    render->GuiGeom.VerticesCount = 0;
-    render->GuiGeom.IndicesCount = 0;
-    render->GuiGeom.TriangleGeomTypesCount = 0;
+    Render->GuiGeom.VerticesCount = 0;
+    Render->GuiGeom.IndicesCount = 0;
+    Render->GuiGeom.TriangleGeomTypesCount = 0;
     
     // NOTE(Dima): Reset gui lines
-    render->GuiGeom.LinePointsCount = 0;
-    render->GuiGeom.LineColorsCount = 0;
+    Render->GuiGeom.LinePointsCount = 0;
+    Render->GuiGeom.LineColorsCount = 0;
     
     // NOTE(Dima): Reset lines
-    render_lines_chunk* AtChunk = render->LinesGeom.FirstDepth;
+    render_lines_chunk* AtChunk = Render->LinesGeom.FirstDepth;
     while(AtChunk){
         AtChunk->Count = 0;
         
         AtChunk = AtChunk->Next;
     }
     
-    AtChunk = render->LinesGeom.FirstNoDepth;
+    AtChunk = Render->LinesGeom.FirstNoDepth;
     while(AtChunk){
         AtChunk->Count = 0;
         
         AtChunk = AtChunk->Next;
     }
     
-    // NOTE(Dima): Init render stacks
-    for(int StackIndex = 0; 
-        StackIndex < render->StacksCount;
-        StackIndex++)
-    {
-        render_stack* ToInitStack = &render->Stacks[StackIndex];
-        
-        RenderStackBeginFrame(ToInitStack);
-    }
+    // NOTE(Dima): Render stack begin frame
+    Render->StackRegion.CreationBlock.Used = 0;
+    Render->EntryCount = 0;
+    
+    Render->CurAtlas = 0;
+    
+    Render->IsSoftwareRenderer = (Render->PlatformRenderAPI.RendererType == Renderer_Software);
 }
 
-INTERNAL_FUNCTION void RenderEndFrame(render_state* render){
-    
-    // NOTE(Dima): Deinit render stacks
-    for(int StackIndex = 0; 
-        StackIndex < render->StacksCount;
-        StackIndex++)
-    {
-        render_stack* ToInitStack = &render->Stacks[StackIndex];
-        
-        RenderStackEndFrame(ToInitStack);
-    }
-    
-    for(int PassIndex = 0;
-        PassIndex < render->PassCount;
-        PassIndex++)
-    {
-        render_pass* Pass = &render->Passes[PassIndex];
-        
-        *Pass = {};
-    }
+INTERNAL_FUNCTION void RenderEverything(render_state* Render){
+    Render->PlatformRenderAPI.Render(Render);
+}
+
+INTERNAL_FUNCTION void RenderEndFrame(render_state* Render){
     
     // NOTE(Dima): Clearing all GUI chunks
-    render->GuiGeom.CurChunkIndex = 0;
-    
-    render->PassCount = 0;
+    Render->GuiGeom.CurChunkIndex = 0;
+}
+
+INTERNAL_FUNCTION void RenderSwapBuffers(render_state* Render){
+    Render->PlatformRenderAPI.SwapBuffers(Render);
+}
+
+INTERNAL_FUNCTION void RenderFree(render_state* Render){
+    Render->PlatformRenderAPI.Free(Render);
 }

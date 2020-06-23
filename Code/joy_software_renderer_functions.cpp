@@ -1,12 +1,10 @@
-#include "joy_software_renderer_functions.h"
 #include "joy_simd.h"
 
-void RenderOneBitmapIntoAnother(
-bmp_info* to, 
-bmp_info* what,
-int startX,
-int startY,
-v4 modulationColor) 
+void RenderOneBitmapIntoAnother(bmp_info* to, 
+                                bmp_info* what,
+                                int startX,
+                                int startY,
+                                v4 modulationColor) 
 {
 	float OneOver255 = 1.0f / 255.0f;
     
@@ -71,10 +69,10 @@ void RenderRGBA2BGRA(bmp_info* buf, rc2 clipRect){
             
             v4 LoadColor = UnpackRGBA(*OutDest);
             v4 StoreColor = V4(
-                LoadColor.b,
-                LoadColor.g,
-                LoadColor.r,
-                LoadColor.a);
+                               LoadColor.b,
+                               LoadColor.g,
+                               LoadColor.r,
+                               LoadColor.a);
             
             u32 OutColor = PackRGBA(StoreColor);
             
@@ -127,8 +125,8 @@ void RenderRGBA2BGRASSE(bmp_info* buf, rc2 clipRect) {
             __m128i mmOutColorSh_a = _mm_slli_epi32(_mm_cvtps_epi32(_mm_mul_ps(mmPreDestColor_a, mm255)), 24);
             
             __m128i mmOutColor = _mm_or_si128(
-                _mm_or_si128(mmOutColorSh_r, mmOutColorSh_g),
-                _mm_or_si128(mmOutColorSh_b, mmOutColorSh_a));
+                                              _mm_or_si128(mmOutColorSh_r, mmOutColorSh_g),
+                                              _mm_or_si128(mmOutColorSh_b, mmOutColorSh_a));
             
             __m128i mmResultColor = mmOutColor;
             
@@ -138,8 +136,8 @@ void RenderRGBA2BGRASSE(bmp_info* buf, rc2 clipRect) {
             __m128 mmEndScreenMask = _mm_cmplt_ps(_mm_cvtepi32_ps(mmHorzIndex), mmMaxXF);
             
 			__m128i mmResultColor = _mm_castps_si128(_mm_or_ps(
-				_mm_and_ps(_mm_castsi128_ps(mmOutColor), mmEndScreenMask),
-				_mm_andnot_ps(mmEndScreenMask, _mm_castsi128_ps(mmPreDestColor))));
+                                                               _mm_and_ps(_mm_castsi128_ps(mmOutColor), mmEndScreenMask),
+                                                               _mm_andnot_ps(mmEndScreenMask, _mm_castsi128_ps(mmPreDestColor))));
 #endif
             _mm_storeu_si128((__m128i*)OutDest, mmResultColor);
 		}
@@ -205,8 +203,8 @@ void RenderClearSSE(bmp_info* buf, v3 Color, rc2 clipRect) {
 	__m128i mmOutColorSh_a = _mm_slli_epi32(_mm_cvtps_epi32(_mm_mul_ps(mmOutColor_a, mm255)), 24);
 	
 	mmOutColor = _mm_or_si128(
-		_mm_or_si128(mmOutColorSh_r, mmOutColorSh_g),
-		_mm_or_si128(mmOutColorSh_b, mmOutColorSh_a));
+                              _mm_or_si128(mmOutColorSh_r, mmOutColorSh_g),
+                              _mm_or_si128(mmOutColorSh_b, mmOutColorSh_a));
     
 	for (u32 DestY = MinY; DestY < MaxY; DestY++) {
 		for (u32 DestX = MinX; DestX < MaxX; DestX += 4) {
@@ -224,8 +222,8 @@ void RenderClearSSE(bmp_info* buf, v3 Color, rc2 clipRect) {
             __m128 mmEndScreenMask = _mm_cmplt_ps(_mm_cvtepi32_ps(mmHorzIndex), mmMaxXF);
             
 			__m128i mmResultColor = _mm_castps_si128(_mm_or_ps(
-				_mm_and_ps(_mm_castsi128_ps(mmOutColor), mmEndScreenMask),
-				_mm_andnot_ps(mmEndScreenMask, _mm_castsi128_ps(mmPreDestColor))));
+                                                               _mm_and_ps(_mm_castsi128_ps(mmOutColor), mmEndScreenMask),
+                                                               _mm_andnot_ps(mmEndScreenMask, _mm_castsi128_ps(mmPreDestColor))));
 #endif
             
             
@@ -368,12 +366,12 @@ void RenderGradientHorzSSE(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 cl
 			__m128i mmOutColorShifted_a = _mm_slli_epi32(_mm_cvtps_epi32(_mm_mul_ps(mmOutColor_a, mm255)), 24);
             
 			__m128i mmOutColor = _mm_or_si128(
-				_mm_or_si128(
-                mmOutColorShifted_a, 
-                mmOutColorShifted_b),
-				_mm_or_si128(
-                mmOutColorShifted_g, 
-                mmOutColorShifted_r));
+                                              _mm_or_si128(
+                                                           mmOutColorShifted_a, 
+                                                           mmOutColorShifted_b),
+                                              _mm_or_si128(
+                                                           mmOutColorShifted_g, 
+                                                           mmOutColorShifted_r));
             
 			_mm_storeu_si128((__m128i*)Pixel, mmOutColor);
 		}
@@ -507,12 +505,12 @@ void RenderGradientVertSSE(bmp_info* buf, rc2 rect, v3 color1, v3 color2, rc2 cl
         __m128i mmOutColorShifted_a = _mm_slli_epi32(_mm_cvtps_epi32(_mm_mul_ps(mmOutColor_a, mm255)), 24);
         
         __m128i mmOutColor = _mm_or_si128(
-            _mm_or_si128(
-            mmOutColorShifted_a, 
-            mmOutColorShifted_b),
-            _mm_or_si128(
-            mmOutColorShifted_g, 
-            mmOutColorShifted_r));
+                                          _mm_or_si128(
+                                                       mmOutColorShifted_a, 
+                                                       mmOutColorShifted_b),
+                                          _mm_or_si128(
+                                                       mmOutColorShifted_g, 
+                                                       mmOutColorShifted_r));
         
         
 		for (int HorzIndex = MinX; HorzIndex < MaxX; HorzIndex += 4) {
@@ -527,12 +525,12 @@ void RenderGradientVertSSE(bmp_info* buf, rc2 rect, v3 color1, v3 color2, rc2 cl
 
 
 void RenderBitmapSSE(
-bmp_info* buf,
-bmp_info* bitmap,
-v2 P,
-float TargetBitmapPixelHeight,
-v4 modulationColor01,
-rc2 clipRect)
+                     bmp_info* buf,
+                     bmp_info* bitmap,
+                     v2 P,
+                     float TargetBitmapPixelHeight,
+                     v4 modulationColor01,
+                     rc2 clipRect)
 {
 	float TargetScaling = (float)TargetBitmapPixelHeight / (float)bitmap->Height;
 	u32 TargetWidth = (float)bitmap->Width * TargetScaling;
@@ -648,28 +646,28 @@ rc2 clipRect)
 			__m128i mmBotRTexelSrcOffset = _mm_add_epi32(mmPitchByMaxSrcY, mmMaxSrcXx4);
             
 			__m128i mmTopLTexel = _mm_setr_epi32(
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 0)),
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 1)),
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 2)),
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 3)));
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 0)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 1)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 2)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 3)));
             
 			__m128i mmTopRTexel = _mm_setr_epi32(
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 0)),
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 1)),
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 2)),
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 3)));
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 0)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 1)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 2)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 3)));
             
 			__m128i mmBotLTexel = _mm_setr_epi32(
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 0)),
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 1)),
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 2)),
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 3)));
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 0)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 1)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 2)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 3)));
             
 			__m128i mmBotRTexel = _mm_setr_epi32(
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 0)),
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 1)),
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 2)),
-				*(u32*)((u8*)bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 3)));
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 0)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 1)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 2)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 3)));
             
 			__m128 mmTopLeft_r = MM_UNPACK_COLOR_CHANNEL0(mmTopLTexel);
 			__m128 mmTopLeft_g = MM_UNPACK_COLOR_CHANNEL(mmTopLTexel, 8);
@@ -740,16 +738,16 @@ rc2 clipRect)
 			__m128i mmColorShifted_r = _mm_cvtps_epi32(_mm_mul_ps(mmColor_r, mm255));
             
 			__m128i mmResult = _mm_or_si128(
-				_mm_or_si128(mmColorShifted_r, mmColorShifted_g),
-				_mm_or_si128(mmColorShifted_b, mmColorShifted_a));
+                                            _mm_or_si128(mmColorShifted_r, mmColorShifted_g),
+                                            _mm_or_si128(mmColorShifted_b, mmColorShifted_a));
             
 			/*Mask with end of screen mask*/
 			//__m128 mmEndScreenMask = _mm_cmplt_ps(_mm_cvtepi32_ps(mmDestX), mmDestWidth);
 			__m128 mmEndScreenMask = _mm_cmplt_ps(_mm_cvtepi32_ps(mmDestX), mmMaxXF);
             
 			mmResult = _mm_castps_si128(_mm_or_ps(
-				_mm_and_ps(_mm_castsi128_ps(mmResult), mmEndScreenMask),
-				_mm_andnot_ps(mmEndScreenMask, _mm_castsi128_ps(mmPreDestColor))));
+                                                  _mm_and_ps(_mm_castsi128_ps(mmResult), mmEndScreenMask),
+                                                  _mm_andnot_ps(mmEndScreenMask, _mm_castsi128_ps(mmPreDestColor))));
             
 			//TODO(DIma): make this aligned
 			_mm_storeu_si128((__m128i*)OutDest, mmResult);
@@ -760,12 +758,12 @@ rc2 clipRect)
 }
 
 void RenderBitmap(
-bmp_info* buf,
-bmp_info* bitmap,
-v2 P,
-float TargetBitmapPixelHeight,
-v4 modulationColor01, 
-rc2 clipRect)
+                  bmp_info* buf,
+                  bmp_info* bitmap,
+                  v2 P,
+                  float TargetBitmapPixelHeight,
+                  v4 modulationColor01, 
+                  rc2 clipRect)
 {
 	float TargetScaling = (float)TargetBitmapPixelHeight / (float)bitmap->Height;
     
@@ -891,11 +889,11 @@ rc2 clipRect)
 }
 
 void RenderRect(
-bmp_info* buf,
-v2 P,
-v2 Dim,
-v4 modulationColor01, 
-rc2 clipRect)
+                bmp_info* buf,
+                v2 P,
+                v2 Dim,
+                v4 modulationColor01, 
+                rc2 clipRect)
 {
 	int InitX = floorf(P.x);
 	int InitY = floorf(P.y);
@@ -950,11 +948,11 @@ rc2 clipRect)
 }
 
 void RenderRectSSE(
-bmp_info* buf,
-v2 P,
-v2 Dim,
-v4 modulationColor01,
-rc2 clipRect)
+                   bmp_info* buf,
+                   v2 P,
+                   v2 Dim,
+                   v4 modulationColor01,
+                   rc2 clipRect)
 {
 	int InitX = floorf(P.x);
 	int InitY = floorf(P.y);
@@ -1061,8 +1059,8 @@ rc2 clipRect)
 			__m128 mmMask = _mm_and_ps(mmWidthMask, mmEndScreenMask);
             
 			mmResult = _mm_castps_si128(_mm_or_ps(
-				_mm_and_ps(_mm_castsi128_ps(mmResult), mmMask),
-				_mm_andnot_ps(mmMask, _mm_castsi128_ps(mmDstPixels))));
+                                                  _mm_and_ps(_mm_castsi128_ps(mmResult), mmMask),
+                                                  _mm_andnot_ps(mmMask, _mm_castsi128_ps(mmDstPixels))));
             
 			_mm_storeu_si128((__m128i*)OutDest, mmResult);
 		}

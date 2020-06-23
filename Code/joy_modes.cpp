@@ -76,7 +76,7 @@ struct test_game_mode_state{
     anim_controller* FriendControl;
     anim_controller* CaterpillarControl;
     
-#define TEMP_CHARACTERS_COUNT 100
+#define TEMP_CHARACTERS_COUNT 200
     entity_character Characters[TEMP_CHARACTERS_COUNT];
     entity_character Caterpillar;
     
@@ -215,13 +215,13 @@ GenerateSphereDistribution(
 }
 
 INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
-                                               render_stack* Stack,
+                                               render_state* Render,
                                                sphere_distribution* Distr,
                                                u32 SphereID,
                                                v3 SphereCenter, 
                                                float SphereRad)
 {
-    PushOrLoadMesh(Game->Assets, Stack, 
+    PushOrLoadMesh(Game->Assets, Render, 
                    SphereID, 
                    SphereCenter, 
                    QuatI(), 
@@ -234,7 +234,7 @@ INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
     {
         v3 TargetP = SphereCenter + Distr->Samples[SampleIndex] * SphereRad;
         
-        PushOrLoadMesh(Game->Assets, Stack, 
+        PushOrLoadMesh(Game->Assets, Render, 
                        GetFirst(Game->Assets, GameAsset_Cube),
                        TargetP, 
                        QuatI(), 
@@ -339,17 +339,17 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitFriendControl){
     AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, SpeedShiftPoint);
     EndTransition(Control);
     
-    BeginTransition(Control, "Roll", "Idle", 0.25f, true, 0.9f);
+    BeginTransition(Control, "Roll", "Idle", 0.25f, true, 0.8f);
     AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_LessThan, SpeedShiftPoint);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
     EndTransition(Control);
     
-    BeginTransition(Control, "Roll", "Run", 0.15f, true, 0.5f);
+    BeginTransition(Control, "Roll", "Run", 0.25f, true, 0.8f);
     AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, SpeedShiftPoint);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
     EndTransition(Control);
     
-    BeginTransition(Control, "Roll", "Falling", 0.1f, true);
+    BeginTransition(Control, "Roll", "Falling", 0.1f, true, 0.8f);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, true);
     EndTransition(Control);
     
@@ -422,27 +422,25 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitCaterpillarControl){
     AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, SpeedShiftPoint);
     EndTransition(Control);
     
-    
     BeginTransition(Control, "Roll", "Idle", 0.25f, true, 0.8f);
     AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_LessThan, SpeedShiftPoint);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
     EndTransition(Control);
     
-    BeginTransition(Control, "Roll", "Run", 0.15f, true, 0.85f);
+    BeginTransition(Control, "Roll", "Run", 0.25f, true, 0.8f);
     AddConditionFloat(Control, "VelocityHorzLen", TransitionCondition_MoreEqThan, SpeedShiftPoint);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, false);
     EndTransition(Control);
     
-    BeginTransition(Control, "Roll", "Falling", 0.1f, true);
+    BeginTransition(Control, "Roll", "Falling", 0.1f, true, 0.8f);
     AddConditionBool(Control, "IsFalling", TransitionCondition_Equal, true);
     EndTransition(Control);
-    
     
     return(Control);
 }
 
 INTERNAL_FUNCTION void UpdateModel(assets* Assets, 
-                                   render_stack* Stack,
+                                   render_state* Render,
                                    model_info* Model, 
                                    v3 Pos, quat Rot, v3 Scale, 
                                    f64 GlobalTime,
@@ -480,7 +478,7 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
                                                        Model->MaterialIDs[Mesh->MaterialIndex],
                                                        ASSET_IMPORT_DEFERRED);
                 
-                PushMesh(Stack, Mesh, 
+                PushMesh(Render, Mesh, 
                          NodeTran, Material,
                          CalcPose.BoneTransforms, 
                          CalcPose.BoneTransformsCount);
@@ -563,7 +561,7 @@ has the same count of IDs as GameAssetID table for model and animations
 }
 
 INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
-                                       render_stack* Stack,
+                                       render_state* Render,
                                        input_state* Input,
                                        entity_character* Character,
                                        f64 GlobalTime,
@@ -575,9 +573,11 @@ INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
     
     model_info* Model = Character->Model;
     
-    b32 IsLandedPlaying = StateIsPlaying(&Character->AnimComponent, "Land") && 
-        (GetPlayingStatePhase(&Character->AnimComponent) < 0.55f);
-    b32 IsRollingPlaying = StateIsPlaying(&Character->AnimComponent, "Roll");
+    f32 PlayingPhase = GetPlayingStatePhase(&Character->AnimComponent);
+    b32 IsLandedPlaying = (StateIsPlaying(&Character->AnimComponent, "Land") && 
+                           (PlayingPhase < 0.55f));
+    b32 IsRollingPlaying = (StateIsPlaying(&Character->AnimComponent, "Roll") && 
+                            (PlayingPhase < 0.75f));
     
     b32 CanMove = !IsLandedPlaying && !IsRollingPlaying;
     
@@ -640,7 +640,7 @@ INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
     
     
     if(Model){
-        UpdateModel(Assets, Stack,
+        UpdateModel(Assets, Render,
                     Model, Character->P,
                     Character->R, Character->S,
                     GlobalTime, dt,
@@ -653,6 +653,9 @@ GAME_MODE_UPDATE(TestUpdate){
     FUNCTION_TIMING();
     
     GAME_GET_MODE_STATE(test_game_mode_state, State);
+    
+    render_state* Render = Game->Render;
+    assets* Assets = Game->Assets;
     
     if(!State->Initialized){
         
@@ -772,16 +775,11 @@ GAME_MODE_UPDATE(TestUpdate){
     int Width = Game->Render->FrameInfo.InitWidth;
     int Height = Game->Render->FrameInfo.InitHeight;
     
-    render_camera_setup CamSetup = DefaultPerspSetup(Width, Height,
-                                                     RENDER_DEFAULT_FAR,
-                                                     RENDER_DEFAULT_NEAR,
-                                                     CameraTransform);
+    render_camera_setup CamSetup = DefaultPerspSetup(Render, CameraTransform);
     
-    render_pass* Pass = BeginRenderPass(Game->Render, CamSetup);
-    render_stack* Stack = RenderFindStack(Game->Render, "Main");
-    AddStackToRenderPass(Pass, Stack);
+    int MainCamSetupIndex = AddCameraSetup(Render, CamSetup);
     
-    PushClearColor(Stack, V3(0.1f, 0.3f, 0.9f));
+    PushClearColor(Render, V3(0.1f, 0.3f, 0.9f));
     
     char CameraInfo[256];
     stbsp_sprintf(CameraInfo, "P(x%.3f; y%.3f; z%.3f)", 
@@ -926,8 +924,6 @@ GAME_MODE_UPDATE(TestUpdate){
         VelocityLen = 1.0f;
     }
     
-    assets* Assets = Game->Assets;
-    
 #if 0    
     State->PlayerModel = LoadModel(Game->Assets,
                                    GetFirst(Game->Assets, GameAsset_Man),
@@ -954,12 +950,16 @@ GAME_MODE_UPDATE(TestUpdate){
 #endif
     
 #if 1
+    int MainQueueIndex = AddRenderQueue(Render);
+    
+    PushBeginQueue(Render, MainQueueIndex);
+    
     for(int CharIndex = 0;
         CharIndex < TEMP_CHARACTERS_COUNT;
         CharIndex++)
     {
         UpdateCharacter(Game->Assets,
-                        Stack,
+                        Render,
                         Game->Input,
                         &State->Characters[CharIndex],
                         State->GameTime,
@@ -967,11 +967,15 @@ GAME_MODE_UPDATE(TestUpdate){
     }
     
     UpdateCharacter(Game->Assets,
-                    Stack,
+                    Render,
                     Game->Input,
                     &State->Caterpillar,
                     State->GameTime,
                     State->GameDeltaTime);
+    
+    PushEndQueue(Render, MainQueueIndex);
+    
+    PushRenderPass(Render, MainCamSetupIndex, MainQueueIndex);
 #endif
     
 #if 0
@@ -989,38 +993,38 @@ GAME_MODE_UPDATE(TestUpdate){
 #endif
     
 #if 1
-    PushOrLoadMesh(Game->Assets, Stack, 
+    PushOrLoadMesh(Game->Assets, Render, 
                    GetFirst(Game->Assets, GameAsset_Cube),
                    V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
                    QuatI(), V3(1.0f), 
                    ASSET_IMPORT_DEFERRED);
     
-    PushOrLoadMesh(Game->Assets, Stack, 
+    PushOrLoadMesh(Game->Assets, Render, 
                    GetFirst(Game->Assets, GameAsset_Cube),
                    V3(0.0f, 1.0f + Sin(Game->Input->Time * 3.0f) * 0.5f, 0.0f), 
                    QuatI(), V3(1.0f), 
                    ASSET_IMPORT_DEFERRED);
     
-    PushOrLoadMesh(Game->Assets, Stack, 
+    PushOrLoadMesh(Game->Assets, Render, 
                    CylID,
                    V3(-10.0f, 1.0f, 0.0f), 
                    Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), V3(2.0f),
                    ASSET_IMPORT_DEFERRED);
     
     
-    PushOrLoadMesh(Game->Assets, Stack, 
+    PushOrLoadMesh(Game->Assets, Render, 
                    GetFirst(Game->Assets, GameAsset_Cylynder),
                    V3(-13.0f, 1.0f, 0.0f),
                    Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), 
                    V3(1.0f), 
                    ASSET_IMPORT_DEFERRED);
     
-    PushOrLoadMesh(Game->Assets, Stack, 
+    PushOrLoadMesh(Game->Assets, Render, 
                    SphereID,V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
                    QuatI(), V3(1.0f),
                    ASSET_IMPORT_DEFERRED);
     
-    PushOrLoadMesh(Game->Assets, Stack, 
+    PushOrLoadMesh(Game->Assets, Render, 
                    GetFirst(Game->Assets, GameAsset_Plane),
                    V3(0.0f, 0.0f, 0.0f), 
                    QuatI(), V3(100.0f),
@@ -1038,6 +1042,9 @@ GAME_MODE_UPDATE(MainMenuUpdate){
 GAME_MODE_UPDATE(ChangingPicturesUpdate){
     GAME_GET_MODE_STATE(image_swapper_state, State);
     
+    render_state* Render = Game->Render;
+    assets* Assets = Game->Assets;
+    
     asset_id ArrID = GetFirst(Game->Assets, GameAsset_FadeoutBmps);
     asset* Asset = GetAssetByID(Game->Assets, ArrID);
     ASSERT(Asset->Type == AssetType_Array);
@@ -1045,15 +1052,11 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     array_info* Arr = GET_ASSET_PTR_MEMBER(Asset, array_info);
     
     
-    render_camera_setup CamSetup = DefaultOrthoSetup(Game->Render->FrameInfo.InitWidth,
-                                                     Game->Render->FrameInfo.InitHeight,
-                                                     Identity());
+    render_camera_setup CamSetup = DefaultOrthoSetup(Game->Render, Identity());
     
-    render_pass* Pass = BeginRenderPass(Game->Render, CamSetup);
-    render_stack* Stack = RenderFindStack(Game->Render, "Main");
-    AddStackToRenderPass(Pass, Stack);
+    //BeginRenderPass(Render, CamSetup);
     
-    PushClearColor(Stack, V3(1.0f, 0.5f, 0.0f));
+    PushClearColor(Render, V3(1.0f, 0.5f, 0.0f));
     
     int ToShowCount = Arr->Count;
     
@@ -1085,8 +1088,7 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
                                             ToShow->Height,
                                             Width, Height);
         
-        PushBitmap(
-                   Stack, 
+        PushBitmap(Render, 
                    ToShow, 
                    V2(0.0f, 0.0f), 
                    ToShowH, 
@@ -1098,8 +1100,7 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
                                                 ToShowNext->Width, ToShowNext->Height,
                                                 Width, Height);
         
-        PushBitmap(
-                   Stack, 
+        PushBitmap(Render, 
                    ToShowNext, 
                    V2(0.0f, 0.0f), 
                    ToShowNextH, 

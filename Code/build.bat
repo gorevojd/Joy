@@ -56,7 +56,7 @@ ECHO *   AssimpBuilder  *
 ECHO ********************
 
 set ASSIMP_INCLUDE="../../ExternalPrograms/3dParty/assimp-master/Include"
-set ASSIMP_LIBPATH="../../ExternalPrograms/3dParty/assimp-master/AssimpBuild/code/Release"
+set ASSIMP_LIBPATH="../../ExternalPrograms/3dParty/assimp-master/AssimpBuild/code/Release/"
 set ASSBUILD_COMPFILES=..\Code\assimp_assets.cpp
 
 SET THIS_PROJECT_NAME=AssimpBuilder

@@ -363,7 +363,7 @@ inline gui_interaction CreateInteraction(gui_element* Owner,
 }
 
 struct gui_frame_info{
-    render_stack* Stack;
+    render_state* RenderState;
     input_state* Input;
     int Width;
     int Height;
@@ -387,7 +387,7 @@ struct gui_state{
     
     gui_frame_info FrameInfo;
     
-    render_stack* Stack;
+    render_state* RenderState;
     input_state* Input;
     int Width;
     int Height;
@@ -489,8 +489,8 @@ inline gui_layout* GetParentLayout(gui_state* Gui){
     gui_layout* res = 0;
     
     gui_element* layoutElem = GuiFindElementOfTypeUpInTree(
-        Gui->CurElement, 
-        GuiElement_Layout);
+                                                           Gui->CurElement, 
+                                                           GuiElement_Layout);
     
     if(!layoutElem){
         res = &Gui->rootLayout;
@@ -640,8 +640,8 @@ inline float GuiGetLineAdvance(gui_state* Gui, float Scale = 1.0f){
 
 inline v2 ScaledAscDim(gui_state* Gui, v2 Dim){
     v2 Result = V2(
-        GetScaledAscender(Gui->MainFont, Gui->FontScale * Dim.x),
-        GetScaledAscender(Gui->MainFont, Gui->FontScale * Dim.y));
+                   GetScaledAscender(Gui->MainFont, Gui->FontScale * Dim.x),
+                   GetScaledAscender(Gui->MainFont, Gui->FontScale * Dim.y));
     
     return(Result);
 }
@@ -657,8 +657,8 @@ rc2 PrintText(gui_state* Gui, char* text, v2 P, v4 color = V4(1.0f, 1.0f, 1.0f, 
 rc2 PrintTextCenteredInRect(gui_state* Gui, char* text, rc2 tect, float Scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
 
 void InitGui(
-gui_state* Gui,
-assets* Assets);
+             gui_state* Gui,
+             assets* Assets);
 
 void GuiFrameBegin(gui_state* Gui, gui_frame_info GuiFrameInfo);
 void GuiFrameEnd(gui_state* Gui);
@@ -689,10 +689,10 @@ void BeginTree(gui_state* Gui, char* name);
 void EndTree(gui_state* Gui);
 
 void BeginRadioGroup(
-gui_state* Gui, 
-char* name, 
-u32* ref, 
-u32 defaultId);
+                     gui_state* Gui, 
+                     char* name, 
+                     u32* ref, 
+                     u32 defaultId);
 void RadioButton(gui_state* Gui, char* name, u32 uniqueId);
 void EndRadioGroup(gui_state* Gui);
 

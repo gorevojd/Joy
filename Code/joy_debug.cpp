@@ -1153,7 +1153,7 @@ PLATFORM_CALLBACK(DEBUGDummyThreadsWorkCallback){
 INTERNAL_FUNCTION void DEBUGDummyThreadsWork(){
     int WorksCount = 100;
     
-    platform_job_queue* JobQueue = &Platform.ImmediateQueue;
+    platform_job_queue* JobQueue = Platform.ImmediateQueue;
     
     for(int i = 0; i < WorksCount; i++){
         Platform.AddEntry(JobQueue, DEBUGDummyThreadsWorkCallback, 0);

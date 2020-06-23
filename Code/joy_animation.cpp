@@ -1675,7 +1675,7 @@ void InitAnimComponent(animated_component* AC,
         AnimationIndex++)
     {
         playing_anim* Anim = &AC->Anims[AnimationIndex];
-        playing_anim_source* Source = Control->AnimSources[AnimationIndex];
+        playing_anim_source* Source = &Control->AnimSources[AnimationIndex];
         
         Anim->Name = Source->Name;
         Anim->ExitAction = Source->ExitAction;
@@ -1831,53 +1831,21 @@ INTERNAL_FUNCTION void ClearBeginnedStateInControl(anim_controller* Control){
     Control->BeginnedState = 0;
 }
 
-
-INTERNAL_FUNCTION playing_anim_source* AllocatePlayingAnimSource(anim_controller* Control,
-                                                                 char* Name,
-                                                                 u32 AnimExitAction)
-{
-    anim_system* Anim = Control->AnimSystem;
-    
-    DLIST_ALLOCATE_FUNCTION_BODY(playing_anim_source, 
-                                 Anim->Region,
-                                 NextAlloc, PrevAlloc,
-                                 Anim->PlayingAnimSourceFree,
-                                 Anim->PlayingAnimSourceUse,
-                                 256,
-                                 Result);
-    
-    CopyStringsSafe(Result->Name, 
-                    sizeof(Result->Name),
-                    Name);
-    
-    Result->ExitAction = AnimExitAction;
-    
-    return(Result);
-}
-
-
 INTERNAL_FUNCTION void AddAnimationInternal(anim_controller* Control,
                                             anim_state* State,
                                             char* Name,
                                             u32 AnimExitAction)
 {
-    
-    playing_anim_source* NewAnimSource = AllocatePlayingAnimSource(Control,
-                                                                   Name,
-                                                                   AnimExitAction);
-    
-    // NOTE(Dima): Inserting to state animations sources list
-    
-    NewAnimSource->NextInList = 0;
-    NewAnimSource->IndexInArray = Control->AnimSourcesCount++;
+    playing_anim_source* NewAnimSource = &Control->AnimSources[Control->AnimSourcesCount];
     Assert(NewAnimSource->IndexInArray < ArrayCount(Control->AnimSources));
-    if((State->FirstAnimSource == 0) && (State->LastAnimSource == 0)){
-        State->FirstAnimSource = State->LastAnimSource = NewAnimSource;
-    }
-    else{
-        State->LastAnimSource->NextInList = NewAnimSource;
-        State->LastAnimSource = NewAnimSource;
-    }
+    
+    CopyStringsSafe(NewAnimSource->Name, 
+                    sizeof(NewAnimSource->Name),
+                    Name);
+    
+    NewAnimSource->ExitAction = AnimExitAction;
+    
+    NewAnimSource->IndexInArray = Control->AnimSourcesCount++;
     
     if(State->FirstAnimIndex == -1){
         // NOTE(Dima): If this is the first anim in this state - init first index
@@ -1885,8 +1853,6 @@ INTERNAL_FUNCTION void AddAnimationInternal(anim_controller* Control,
         State->OnePastLastAnim = NewAnimSource->IndexInArray;
     }
     State->OnePastLastAnim++;
-    
-    Control->AnimSources[NewAnimSource->IndexInArray] = NewAnimSource;
 }
 
 void AddAnimState(anim_controller* Control,
@@ -2428,10 +2394,6 @@ void InitAnimSystem(anim_system* Anim)
     // NOTE(Dima): Initializing animids sentinels
     DLIST_REFLECT_PTRS(Anim->AnimIDUse, NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(Anim->AnimIDFree, NextAlloc, PrevAlloc);
-    
-    // NOTE(Dima): Initializing playing anim sentinels
-    DLIST_REFLECT_PTRS(Anim->PlayingAnimSourceUse, NextAlloc, PrevAlloc);
-    DLIST_REFLECT_PTRS(Anim->PlayingAnimSourceFree, NextAlloc, PrevAlloc);
     
     
     DEBUGSetMenuDataSource(DebugMenu_Animation, Anim);

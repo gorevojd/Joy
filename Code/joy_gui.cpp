@@ -64,7 +64,7 @@ INTERNAL_FUNCTION inline void GuiDeallocateElement(gui_state* Gui, gui_element* 
 }
 
 INTERNAL_FUNCTION gui_element* GuiAllocateElement(
-gui_state* Gui)
+                                                  gui_state* Gui)
 {
     gui_element* result = 0;
     
@@ -419,8 +419,8 @@ INTERNAL_FUNCTION void GuiInitRoot(gui_state* Gui, gui_element** root){
 }
 
 void InitGui(
-gui_state* Gui, 
-assets* Assets)
+             gui_state* Gui, 
+             assets* Assets)
 {
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // NOTE(Dima): memory region is already initialized
@@ -543,7 +543,7 @@ assets* Assets)
 }
 
 rc2 PrintTextInternal(font_info* Font, 
-                      render_stack* stack, 
+                      render_state* Render, 
                       assets* Assets, 
                       char* text, 
                       v2 p, 
@@ -583,7 +583,7 @@ rc2 PrintTextInternal(font_info* Font,
                     float bitmapMinX = CurP.x + Glyph->XOffset * Scale;
                     
                     PushOrLoadGlyph(Assets,
-                                    stack, 
+                                    Render, 
                                     V2(bitmapMinX, bitmapMinY), 
                                     bitmapDim, 
                                     Glyph->BitmapID,
@@ -625,17 +625,17 @@ void PrintCaret(gui_state* Gui, v2 PrintP, v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f)
     
     v2 CaretMin = V2(CaretMinX, CaretMinY);
     v2 CaretDim = V2(bmpScale * 0.6f, bmpScale);
-    PushRect(Gui->Stack, RcMinDim(CaretMin, CaretDim), Color);
+    PushRect(Gui->RenderState, RcMinDim(CaretMin, CaretDim), Color);
 }
 
 v2 GetTextSizeInternal(font_info* Font, assets* Assets, char* Text, float Scale){
     rc2 TextRc = PrintTextInternal(
-        Font, 
-        0,
-        Assets,
-        Text, V2(0.0f, 0.0f), 
-        PrintTextOp_GetSize, 
-        Scale);
+                                   Font, 
+                                   0,
+                                   Assets,
+                                   Text, V2(0.0f, 0.0f), 
+                                   PrintTextOp_GetSize, 
+                                   Scale);
     
     v2 result = GetRectDim(TextRc);
     
@@ -672,16 +672,16 @@ inline v2 GetCenteredTextOffset(font_info* Font,
 }
 
 rc2 PrintTextCenteredInRectInternal(
-font_info* Font, 
-render_stack* stack,
-assets* Assets,
-char* text, 
-rc2 rect, 
-float Scale = 1.0f, 
-v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f))
+                                    font_info* Font, 
+                                    render_state* Render,
+                                    assets* Assets,
+                                    char* text, 
+                                    rc2 rect, 
+                                    float Scale = 1.0f, 
+                                    v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
     v2 targetP = GetCenteredTextOffset(Font, Assets, text, rect, Scale);
-    rc2 result = PrintTextInternal(Font, stack, Assets, text, targetP, PrintTextOp_Print, Scale, color);
+    rc2 result = PrintTextInternal(Font, Render, Assets, text, targetP, PrintTextOp_Print, Scale, color);
     
     return(result);
 }
@@ -697,12 +697,12 @@ v2 GetTextSize(gui_state* Gui, char* text, float Scale){
 
 rc2 GetTextRect(gui_state* Gui, char* text, v2 p, float Scale){
     rc2 TextRc = PrintTextInternal(
-        Gui->MainFont, 
-        Gui->Stack, 
-        Gui->Assets,
-        text, p, 
-        PrintTextOp_GetSize, 
-        Gui->FontScale * Scale);
+                                   Gui->MainFont, 
+                                   Gui->RenderState, 
+                                   Gui->Assets,
+                                   text, p, 
+                                   PrintTextOp_GetSize, 
+                                   Gui->FontScale * Scale);
     
     return(TextRc);
 }
@@ -714,13 +714,13 @@ rc2 PrintText(gui_state* Gui,
               float Scale)
 {
     rc2 TextRc = PrintTextInternal(
-        Gui->MainFont, 
-        Gui->Stack, 
-        Gui->Assets,
-        text, p, 
-        PrintTextOp_Print, 
-        Gui->FontScale * Scale,
-        Color);
+                                   Gui->MainFont, 
+                                   Gui->RenderState, 
+                                   Gui->Assets,
+                                   text, p, 
+                                   PrintTextOp_Print, 
+                                   Gui->FontScale * Scale,
+                                   Color);
     
     return(TextRc);
 }
@@ -730,14 +730,14 @@ v2 GetCaretPrintP(gui_state* Gui, char* text, v2 p, int CaretP){
     v2 Result;
     
     rc2 TextRc = PrintTextInternal(
-        Gui->MainFont, 
-        Gui->Stack, 
-        Gui->Assets,
-        text, p, 
-        PrintTextOp_Print, 
-        Gui->FontScale * Gui->FontScale,
-        V4(0.0f, 0.0f, 0.0f, 0.0f), 
-        CaretP, &Result);
+                                   Gui->MainFont, 
+                                   Gui->RenderState, 
+                                   Gui->Assets,
+                                   text, p, 
+                                   PrintTextOp_Print, 
+                                   Gui->FontScale * Gui->FontScale,
+                                   V4(0.0f, 0.0f, 0.0f, 0.0f), 
+                                   CaretP, &Result);
     
     return(Result);
 }
@@ -745,7 +745,7 @@ v2 GetCaretPrintP(gui_state* Gui, char* text, v2 p, int CaretP){
 
 rc2 PrintTextCenteredInRect(gui_state* Gui, char* text, rc2 rect, float Scale, v4 Color){
     rc2 result = PrintTextCenteredInRectInternal(Gui->MainFont,
-                                                 Gui->Stack,
+                                                 Gui->RenderState,
                                                  Gui->Assets,
                                                  text, 
                                                  rect,
@@ -909,7 +909,7 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui,
         
         rc2 windowRc = layout->Rect;
         
-        PushRect(Gui->Stack, windowRc, V4(GUI_GETCOLOR(GuiColor_BackgroundPreview).rgb, 0.95f));
+        PushRect(Gui->RenderState, windowRc, V4(GUI_GETCOLOR(GuiColor_BackgroundPreview).rgb, 0.95f));
         
         v4 outlineColor = GUI_GETCOLOR_COLSYS(Color_White);
         if(MouseInInteractiveArea(Gui, windowRc)){
@@ -967,10 +967,10 @@ INTERNAL_FUNCTION void GuiInitLayout(gui_state* Gui,
         }
         
         // NOTE(Dima): Pushing inner outline
-        //PushRectOutline(Gui->Stack, windowRc, 2, outlineColor);
+        //PushRectOutline(Gui->RenderState, windowRc, 2, outlineColor);
         
         // NOTE(Dima): Beginning GUI chunk
-        BeginGuiChunk(Gui->Stack, windowRc);
+        BeginGuiChunk(Gui->RenderState, windowRc);
     }
 }
 
@@ -1013,7 +1013,7 @@ void EndLayout(gui_state* Gui){
     lay->At = lay->Start;
     
     if(lay->Flags & GuiLayout_Window){
-        EndGuiChunk(Gui->Stack);
+        EndGuiChunk(Gui->RenderState);
     }
     
     GuiEndElement(Gui, GuiElement_Layout);
@@ -1063,7 +1063,7 @@ INTERNAL_FUNCTION void GuiUpdateWindow(gui_state* Gui, Gui_Window* window){
     if(window->visible){
         
         rc2 windowRc = window->rect;
-        PushRect(Gui->Stack, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
+        PushRect(Gui->RenderState, windowRc, GUI_GETCOLOR(GuiColor_WindowBackground));
         
         v4 outlineColor = GUI_GETCOLOR(GuiColor_WindowBorder);
         if(MouseInRect(Gui->Input, windowRc)){
@@ -1119,7 +1119,7 @@ INTERNAL_FUNCTION void GuiUpdateWindow(gui_state* Gui, Gui_Window* window){
                 if(snapType != GuiWindowSnap_Whole){
                     GuiSnapInWindowResult snapRes = GuiSnapInWindowRect(windowRc, snapType);
                     v4 snapColor = V4(1.0f, 0.0f, 1.0f, 0.4f);
-                    PushRect(Gui->Stack, snapRes.result, snapColor);
+                    PushRect(Gui->RenderState, snapRes.result, snapColor);
                     
                     if(KeyWentDown(Gui->Input, MouseKey_Left)){
                         GuiSplitWindow(Gui, window, 2, snapRes.rects);
@@ -1129,7 +1129,7 @@ INTERNAL_FUNCTION void GuiUpdateWindow(gui_state* Gui, Gui_Window* window){
         }
         
         // NOTE(Dima): Pushing inner outline
-        PushRectInnerOutline(Gui->Stack, windowRc, 1, outlineColor);
+        PushRectInnerOutline(Gui->RenderState, windowRc, 1, outlineColor);
     }
 }
 
@@ -1159,12 +1159,12 @@ void GuiFrameBegin(gui_state* Gui, gui_frame_info GuiFrameInfo){
     DEBUGSetMenuDataSource(DebugMenu_GUI, Gui);
     
     Gui->Input = Gui->FrameInfo.Input;
-    Gui->Stack = Gui->FrameInfo.Stack;
+    Gui->RenderState = Gui->FrameInfo.RenderState;
     Gui->Width = Gui->FrameInfo.Width;
     Gui->Height = Gui->FrameInfo.Height;
     
     // NOTE(Dima): Beginning GUI chunk
-    BeginGuiChunk(GuiFrameInfo.Stack, 
+    BeginGuiChunk(GuiFrameInfo.RenderState, 
                   RcMinDim(V2(0.0f, 0.0f), 
                            V2(GuiFrameInfo.Width, GuiFrameInfo.Height)));
     
@@ -1192,7 +1192,7 @@ void GuiFramePrepare4Render(gui_state* Gui){
     Gui->TooltipIndex = 0;
     
     // NOTE(Dima): End GUI chunk
-    EndGuiChunk(Gui->Stack);
+    EndGuiChunk(Gui->RenderState);
 }
 
 
@@ -1513,59 +1513,59 @@ INTERNAL_FUNCTION void GuiPushBut(gui_state* Gui,
     switch(Type){
         // NOTE(Dima): These are with user colors
         case PushBut_Color:{
-            PushRect(Gui->Stack, rect, Color1);
+            PushRect(Gui->RenderState, rect, Color1);
         }break;
         
         case PushBut_Color1Outline2:{
-            PushRect(Gui->Stack, rect, Color1);
-            PushRectOutline(Gui->Stack, rect, OutlineWidth, Color2);
+            PushRect(Gui->RenderState, rect, Color1);
+            PushRectOutline(Gui->RenderState, rect, OutlineWidth, Color2);
         }break;
         
         case PushBut_Grad:{
-            PushGradient(Gui->Stack, rect, 
+            PushGradient(Gui->RenderState, rect, 
                          Color1, Color2, 
                          RenderEntryGradient_Vertical);
         }break;
         
         case PushBut_Outline:{
-            PushRectOutline(Gui->Stack, rect, DEFAULT_OUTLINE_WIDTH, Color1);
+            PushRectOutline(Gui->RenderState, rect, DEFAULT_OUTLINE_WIDTH, Color1);
         }break;
         
         // NOTE(Dima): These take colors from GUI tables
         
         case PushBut_ActiveGrad:{
             PushGradient(
-                Gui->Stack, rect, 
-                GUI_GETCOLOR(GuiColor_ActiveGrad2),
-                GUI_GETCOLOR(GuiColor_ActiveGrad1),
-                RenderEntryGradient_Vertical);
+                         Gui->RenderState, rect, 
+                         GUI_GETCOLOR(GuiColor_ActiveGrad2),
+                         GUI_GETCOLOR(GuiColor_ActiveGrad1),
+                         RenderEntryGradient_Vertical);
         }break;
         
         case PushBut_InactiveGrad:{
             PushGradient(
-                Gui->Stack, rect, 
-                GUI_GETCOLOR(GuiColor_InactiveGrad2),
-                GUI_GETCOLOR(GuiColor_InactiveGrad1),
-                RenderEntryGradient_Vertical);
+                         Gui->RenderState, rect, 
+                         GUI_GETCOLOR(GuiColor_InactiveGrad2),
+                         GUI_GETCOLOR(GuiColor_InactiveGrad1),
+                         RenderEntryGradient_Vertical);
         }break;
         
         case PushBut_BackgroundActive:{
-            PushRect(Gui->Stack, rect, 
+            PushRect(Gui->RenderState, rect, 
                      GUI_GETCOLOR(GuiColor_BackgroundActive));
         }break;
         
         case PushBut_BackgroundInactive:{
-            PushRect(Gui->Stack, rect, 
+            PushRect(Gui->RenderState, rect, 
                      GUI_GETCOLOR(GuiColor_BackgroundInactive));
         }break;
         
         case PushBut_BackgroundPreview:{
-            PushRect(Gui->Stack, rect, 
+            PushRect(Gui->RenderState, rect, 
                      GUI_GETCOLOR(GuiColor_BackgroundPreview));
         }break;
         
         case PushBut_HotOutline:{
-            PushRectOutline(Gui->Stack, rect, DEFAULT_OUTLINE_WIDTH, 
+            PushRectOutline(Gui->RenderState, rect, DEFAULT_OUTLINE_WIDTH, 
                             GUI_GETCOLOR(GuiColor_Hot));
         }break;
     }
@@ -1663,7 +1663,7 @@ void ShowAnchor(gui_state* Gui,
             AnchorColor = GUI_GETCOLOR_COLSYS(Color_Blue);
         }
         
-        PushRect(Gui->Stack, WorkRect, AnchorColor);
+        PushRect(Gui->RenderState, WorkRect, AnchorColor);
     }
     
     GuiEndElement(Gui, GuiElement_Item);
@@ -2230,7 +2230,7 @@ b32 Checkbox(gui_state* Gui, char* Name, b32* Value){
             GuiPushBut(Gui, chkRect, PushBut_BackgroundActive);
             
             PushOrLoadGlyph(Gui->Assets, 
-                            Gui->Stack,
+                            Gui->RenderState,
                             chkRect.Min, 
                             GetRectDim(chkRect),
                             Gui->CheckboxMarkID,
@@ -2259,10 +2259,10 @@ b32 Checkbox(gui_state* Gui, char* Name, b32* Value){
 }
 
 void BeginRadioGroup(
-gui_state* Gui, 
-char* name, 
-u32* ref, 
-u32 defaultId) 
+                     gui_state* Gui, 
+                     char* name, 
+                     u32* ref, 
+                     u32 defaultId) 
 {
     gui_element* Element = GuiBeginElement(Gui, 
                                            name, 
@@ -2433,7 +2433,7 @@ void SliderInt(gui_state* Gui, int* Value, int Min, int Max, char* Name, u32 Sty
                                        V2(HotRectDimX, HotRectDimX));
                 
                 PushOrLoadGlyph(Gui->Assets,
-                                Gui->Stack,
+                                Gui->RenderState,
                                 HotRect.Min,
                                 GetRectDim(HotRect),
                                 Gui->ChamomileID,
@@ -2524,7 +2524,7 @@ void SliderFloat(gui_state* Gui, float* Value, float Min, float Max, char* Name,
                                        V2(HotRectDimX, HotRectDimX));
                 
                 PushOrLoadGlyph(Gui->Assets,
-                                Gui->Stack,
+                                Gui->RenderState,
                                 HotRect.Min,
                                 GetRectDim(HotRect),
                                 Gui->ChamomileID,
@@ -2698,13 +2698,13 @@ void InputText(gui_state* Gui, char* Name, char* Buf, int BufSize){
         v2 PrintP = V2(PrintPX, PrintPY);
         v2 CaretPrintP = GetCaretPrintP(Gui, Buf, PrintP, *CaretP);
         
-        BeginGuiChunk(Gui->Stack, TextRc);
+        BeginGuiChunk(Gui->RenderState, TextRc);
         v4 CaretColor = V4(0.0f, 1.0f, 0.0f, 1.0f);
         PrintCaret(Gui, 
                    CaretPrintP,
                    CaretColor); 
         PrintText(Gui, Buf, PrintP, GUI_GETCOLOR(GuiColor_HeaderInactive));
-        EndGuiChunk(Gui->Stack);
+        EndGuiChunk(Gui->RenderState);
         
         float NameStartY = GetCenteredTextOffsetY(Gui->MainFont, TextRc, Gui->FontScale);
         v2 NameStart = V2(TextRc.Max.x + GetScaledAscender(Gui->MainFont, Gui->FontScale) * 0.5f, NameStartY);
@@ -2985,7 +2985,7 @@ b32 GridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
         GuiPushBut(Gui, WorkRect, PushBut_Grad, Color1, Color2);
         GuiPushBut(Gui, WorkRect, PushBut_Outline, OutlineColor); 
         PrintTextCenteredInRectInternal(Gui->MainFont, 
-                                        Gui->Stack, 
+                                        Gui->RenderState, 
                                         Gui->Assets,
                                         Elem->NameToShow, 
                                         WorkRect, 
@@ -2999,7 +2999,7 @@ b32 GridTile(gui_state* Gui, char* Name, float Weight = 1.0f){
 
 void GuiTest(gui_state* Gui, float deltaTime){
     
-    render_stack* renderStack = Gui->Stack;
+    render_state* RenderState = Gui->RenderState;
     input_state* input = Gui->Input;
     
     char FPSBuf[64];
@@ -3107,7 +3107,7 @@ void GuiTest(gui_state* Gui, float deltaTime){
     }
     EndRow(Gui);
     for(int i = 0; i < RectCount; i++){
-        PushRect(renderStack, RcMinDim(V2(100 + i * 50, 100), V2(40, 40)));
+        PushRect(RenderState, RcMinDim(V2(100 + i * 50, 100), V2(40, 40)));
     }
     EndTree(Gui);
     

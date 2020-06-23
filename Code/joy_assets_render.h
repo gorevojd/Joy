@@ -2,7 +2,7 @@
 #define JOY_ASSETS_RENDER_H
 
 inline bmp_info* PushOrLoadBitmap(assets* Assets, 
-                                  render_stack* Stack,
+                                  render_state* State,
                                   v2 P, v2 Dim,
                                   asset_id BmpID,
                                   v4 ModColor = V4(1.0f, 1.0f, 1.0f, 1.0f),
@@ -11,14 +11,14 @@ inline bmp_info* PushOrLoadBitmap(assets* Assets,
     bmp_info* Bmp = LoadBmp(Assets, BmpID, Immediate);
     
     if(Bmp){
-        PushBitmap(Stack, Bmp, P, Dim.y, ModColor);
+        PushBitmap(State, Bmp, P, Dim.y, ModColor);
     }
     
     return(Bmp);
 }
 
 inline bmp_info* PushOrLoadGlyph(assets* Assets, 
-                                 render_stack* Stack,
+                                 render_state* State,
                                  v2 P, v2 Dim,
                                  asset_id BmpID, 
                                  v4 ModColor = V4(1.0f, 1.0f, 1.0f, 1.0f),
@@ -30,7 +30,7 @@ inline bmp_info* PushOrLoadGlyph(assets* Assets,
         v2 MinUV = Bmp->MinUV;
         v2 MaxUV = Bmp->MaxUV;
         
-        PushGlyph(Stack, P, Dim, Bmp, 
+        PushGlyph(State, P, Dim, Bmp, 
                   Bmp->MinUV, Bmp->MaxUV,
                   ModColor);
     }
@@ -39,7 +39,7 @@ inline bmp_info* PushOrLoadGlyph(assets* Assets,
 }
 
 inline mesh_info* PushOrLoadMesh(assets* Assets, 
-                                 render_stack* Stack,
+                                 render_state* State,
                                  asset_id MeshID,
                                  v3 P, quat R, v3 S,
                                  b32 Immediate = false)
@@ -47,14 +47,14 @@ inline mesh_info* PushOrLoadMesh(assets* Assets,
     mesh_info* Mesh = LoadMesh(Assets, MeshID, Immediate);
     
     if(Mesh){
-        PushMesh(Stack, Mesh, P, R, S);
+        PushMesh(State, Mesh, P, R, S);
     }
     
     return(Mesh);
 }
 
 inline mesh_info* PushOrLoadMesh(assets* Assets, 
-                                 render_stack* Stack,
+                                 render_state* State,
                                  asset_id MeshID,
                                  m44 Transformation,
                                  b32 Immediate = false)
@@ -62,14 +62,14 @@ inline mesh_info* PushOrLoadMesh(assets* Assets,
     mesh_info* Mesh = LoadMesh(Assets, MeshID, Immediate);
     
     if(Mesh){
-        PushMesh(Stack, Mesh, Transformation);
+        PushMesh(State, Mesh, Transformation);
     }
     
     return(Mesh);
 }
 
 inline model_info* PushModel(assets* Assets,
-                             render_stack* Stack,
+                             render_state* State,
                              model_info* Model,
                              v3 P, quat R, v3 S)
 {
@@ -96,7 +96,7 @@ inline model_info* PushModel(assets* Assets,
                     InverseTransformMatrix(Bone->InvBindPose) * 
                     ModelToWorld;
                 
-                PushOrLoadMesh(Assets, Stack, 
+                PushOrLoadMesh(Assets, State, 
                                CubeMeshID, BoneP.xyz, 
                                QuatI(), V3(0.1f), 
                                ASSET_IMPORT_DEFERRED);
@@ -127,7 +127,7 @@ inline model_info* PushModel(assets* Assets,
         for(int MeshIndex = 0; MeshIndex < Node->MeshCount; MeshIndex++){
             asset_id MeshID = Node->MeshIDs[MeshIndex];
             
-            PushOrLoadMesh(Assets, Stack, MeshID, NodeTran);
+            PushOrLoadMesh(Assets, State, MeshID, NodeTran);
         }
         
     }

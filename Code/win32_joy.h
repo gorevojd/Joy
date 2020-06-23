@@ -171,7 +171,7 @@ struct win_critical_section_slot{
 };
 
 struct win_state{
-	HWND window;
+	HWND Window;
     int InitWindowWidth;
     int InitWindowHeight;
     int WindowWidth;
@@ -187,7 +187,7 @@ struct win_state{
     HANDLE OpenFilesFindHandle;
     char OpenFilesDirectory[MAX_PATH];
     
-    WINDOWPLACEMENT windowPlacement;
+    WINDOWPLACEMENT WindowPlacement;
     XINPUT_STATE ControllerStates[XUSER_MAX_COUNT];
     
 #define MAX_CRITICAL_SECTIONS_COUNT 1024
@@ -195,14 +195,17 @@ struct win_state{
     u16 NotUsedCriticalSectionIndices[MAX_CRITICAL_SECTIONS_COUNT];
     int NotUsedCriticalSectionIndicesCount;
     
+    platform_job_queue ImmediateQueue;
+    platform_job_queue AsyncQueue;
+    
     HDC glDC;
     HGLRC renderCtx;
     
-    bmp_info bitmap;
+    bmp_info Bitmap;
     BITMAPINFO bmi;
     
-    ticket_mutex memoryMutex;
-    Win_Memory_Region memorySentinel;
+    ticket_mutex MemoryMutex;
+    Win_Memory_Region MemorySentinel;
     
     LARGE_INTEGER PerformanceFreqLI;
     double OneOverPerformanceFreq;

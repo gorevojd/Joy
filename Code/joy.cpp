@@ -11,6 +11,7 @@
 #include "joy_assets.cpp"
 #include "joy_animation.cpp"
 #include "joy_gui.cpp"
+#include "joy_software_renderer.cpp"
 #include "joy_render.cpp"
 #include "joy_debug.cpp"
 
@@ -161,9 +162,6 @@ void GameInit(game_state* Game, game_init_params Params){
                Params.InitWindowWidth,
                Params.InitWindowHeight,
                Platform.RenderAPI);
-    RenderAddStack(Game->Render, "Main", Megabytes(5));
-    RenderAddStack(Game->Render, "GUI", Megabytes(1));
-    RenderAddStack(Game->Render, "DEBUG", Megabytes(1));
     
     // NOTE(Dima): Init platform render stuff
     
@@ -224,7 +222,7 @@ void GameUpdate(game_state* Game, render_frame_info FrameInfo){
     RenderSetFrameInfo(Game->Render, FrameInfo);
     
     gui_frame_info GuiFrameInfo = {};
-    GuiFrameInfo.Stack = RenderFindStack(Game->Render, "GUI");
+    GuiFrameInfo.RenderState = Game->Render;
     GuiFrameInfo.Input = Game->Input;
     GuiFrameInfo.Width = FrameInfo.InitWidth;
     GuiFrameInfo.Height = FrameInfo.InitHeight;
@@ -258,7 +256,7 @@ void GameUpdate(game_state* Game, render_frame_info FrameInfo){
         BLOCK_TIMING("Frame: Render");
         
         GuiFramePrepare4Render(Game->Gui);
-        Game->Render->API.Render();
+        RenderEverything(Game->Render);
     }
     
     GuiFrameEnd(Game->Gui);
@@ -267,12 +265,12 @@ void GameUpdate(game_state* Game, render_frame_info FrameInfo){
     {
         BLOCK_TIMING("Frame: SwapBuffers");
         
-        Game->Render->API.SwapBuffers();
+        RenderSwapBuffers(Game->Render);
     }
 }
 
 void GameFree(game_state* Game){
-    Game->Render->API.Free();
+    
     
     // NOTE(Dima): Freing all the memories :)
     Free(&Game->GuiMemory);

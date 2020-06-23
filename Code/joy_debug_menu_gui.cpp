@@ -168,7 +168,6 @@ INTERNAL_FUNCTION void ShowTopClocks(gui_state* Gui,
                                      b32 IncludingChildren)
 {
     render_state* Render = State->Render;
-    render_stack* Stack = Gui->Stack;
     
 #if 0    
     gui_element* Elem = GuiBeginElement(Gui, "TopClocks", GuiElement_Item, true);
@@ -266,7 +265,6 @@ INTERNAL_FUNCTION void PrintWebForBaredGraph(gui_state* Gui,
 INTERNAL_FUNCTION void ShowFramesSlider(gui_state* Gui, debug_state* State){
     
     render_state* Render = State->Render;
-    render_stack* Stack = Gui->Stack;
     
     gui_element* Elem = GuiBeginElement(Gui, "FramesSlider", GuiElement_Item, true);
     gui_layout* Layout = GetParentLayout(Gui);
@@ -319,19 +317,19 @@ INTERNAL_FUNCTION void ShowFramesSlider(gui_state* Gui, debug_state* State){
         }
         
         // NOTE(Dima): Printing collation frame bar
-        PushRect(Stack, 
+        PushRect(Render, 
                  GetBarRectHorz(SliderRect, DEBUG_PROFILED_FRAMES_COUNT, 
                                 State->CollationFrameIndex),
                  V4(0.0f, 1.0f, 0.0f, 1.0f));
         
         // NOTE(Dima): Printing newest frame bar
-        PushRect(Stack, 
+        PushRect(Render, 
                  GetBarRectHorz(SliderRect, DEBUG_PROFILED_FRAMES_COUNT, 
                                 State->NewestFrameIndex),
                  V4(1.0f, 0.0f, 0.0f, 1.0f));
         
         // NOTE(Dima): Printing oldest frame bar
-        PushRect(Stack, 
+        PushRect(Render, 
                  GetBarRectHorz(SliderRect, DEBUG_PROFILED_FRAMES_COUNT, 
                                 State->OldestFrameIndex),
                  V4(0.2f, 0.3f, 0.9f, 1.0f));
@@ -339,7 +337,7 @@ INTERNAL_FUNCTION void ShowFramesSlider(gui_state* Gui, debug_state* State){
         
         
         // NOTE(Dima): Printing viewing frame bar
-        PushRect(Stack, 
+        PushRect(Render, 
                  GetBarRectHorz(SliderRect, DEBUG_PROFILED_FRAMES_COUNT, 
                                 State->ViewFrameIndex),
                  V4(1.0f, 1.0f, 0.0f, 1.0f));
@@ -358,7 +356,6 @@ INTERNAL_FUNCTION void ShowFramesSlider(gui_state* Gui, debug_state* State){
 INTERNAL_FUNCTION void ShowRootViewer(gui_state* Gui, debug_state* State){
     
     render_state* Render = State->Render;
-    render_stack* Stack = Gui->Stack;
     
     gui_element* Elem = GuiBeginElement(Gui, "RootViewer", GuiElement_Item, true);
     gui_layout* Layout = GetParentLayout(Gui);
@@ -416,7 +413,7 @@ INTERNAL_FUNCTION void ShowRootViewer(gui_state* Gui, debug_state* State){
                     
                     // NOTE(Dima): Printing rect
                     int ThisColorIndex = GuiColor_Graph0 + TempIndex % (GuiColor_GraphCount - GuiColor_Graph0);
-                    PushRect(Stack, ThisRc, GUI_GETCOLOR(ThisColorIndex));
+                    PushRect(Render, ThisRc, GUI_GETCOLOR(ThisColorIndex));
                     
                     
                     TempIndex++;
@@ -425,16 +422,16 @@ INTERNAL_FUNCTION void ShowRootViewer(gui_state* Gui, debug_state* State){
             }
             
             if(FrameIndex == State->ViewFrameIndex){
-                PushRect(Stack, GetBarRectHorz(WorkRect, 
-                                               DEBUG_PROFILED_FRAMES_COUNT, 
-                                               FrameIndex), 
+                PushRect(Render, GetBarRectHorz(WorkRect, 
+                                                DEBUG_PROFILED_FRAMES_COUNT, 
+                                                FrameIndex), 
                          V4(0.0f, 0.0f, 0.0f, 0.5f));
             }
             
             if(FrameIndex == State->CollationFrameIndex){
-                PushRect(Stack, GetBarRectHorz(WorkRect, 
-                                               DEBUG_PROFILED_FRAMES_COUNT, 
-                                               FrameIndex), 
+                PushRect(Render, GetBarRectHorz(WorkRect, 
+                                                DEBUG_PROFILED_FRAMES_COUNT, 
+                                                FrameIndex), 
                          V4(0.0f, 1.0f, 0.0f, 1.0f));
             }
         }
@@ -510,7 +507,6 @@ GetLaneRect(rc2 TotalRect, int LaneIndex, int LaneCount){
 INTERNAL_FUNCTION void ShowThreadsViewer(gui_state* Gui, debug_state* State){
     
     render_state* Render = State->Render;
-    render_stack* Stack = Gui->Stack;
     
     gui_element* Elem = GuiBeginElement(Gui, "ThreadsViewer", GuiElement_Item, true);
     gui_layout* Layout = GetParentLayout(Gui);
@@ -548,7 +544,7 @@ INTERNAL_FUNCTION void ShowThreadsViewer(gui_state* Gui, debug_state* State){
             GuiSetHot(Gui, &Interaction, false);
         }
         
-        PushRect(Stack, SliderRect, V4(0.0f, 0.0f, 0.0f, 0.7f));
+        PushRect(Render, SliderRect, V4(0.0f, 0.0f, 0.0f, 0.7f));
         
         int ViewFrame = State->ViewFrameIndex;
         
@@ -606,8 +602,8 @@ INTERNAL_FUNCTION void ShowThreadsViewer(gui_state* Gui, debug_state* State){
                                 
                                 u32 GuiColorID = GetGraphColorIndexFromHash(At->NameID);
                                 v4 RectColor = GUI_GETCOLOR(GuiColorID);
-                                PushRect(Stack, ThisRect, RectColor);
-                                PushRectInnerOutline(Stack, ThisRect, 1, GUI_GETCOLOR(GuiColor_Borders));
+                                PushRect(Render, ThisRect, RectColor);
+                                PushRectInnerOutline(Render, ThisRect, 1, GUI_GETCOLOR(GuiColor_Borders));
                                 
                                 if(MouseInRect(Gui->Input, ThisRect)){
                                     b32 HasChildren = At->ChildSentinel->Next != At->ChildSentinel;
@@ -624,7 +620,7 @@ INTERNAL_FUNCTION void ShowThreadsViewer(gui_state* Gui, debug_state* State){
                         }
                     }
                     else{
-                        PushRectInnerOutline(Stack, LaneRect, 3, GUI_GETCOLOR(GuiColor_Error));
+                        PushRectInnerOutline(Render, LaneRect, 3, GUI_GETCOLOR(GuiColor_Error));
                     }
                     
                     
@@ -648,20 +644,20 @@ INTERNAL_FUNCTION void ShowThreadsViewer(gui_state* Gui, debug_state* State){
             }
         }
         else{
-            PushRectInnerOutline(Stack, SliderRect, 3, GUI_GETCOLOR(GuiColor_Error));
+            PushRectInnerOutline(Render, SliderRect, 3, GUI_GETCOLOR(GuiColor_Error));
             
             PrintTextCenteredInRect(Gui, "Can't find frame update node in frame",
                                     SliderRect, 0.7f, GUI_GETCOLOR(GuiColor_Error));
         }
         
-        PushRectOutline(Stack, SliderRect, 2, GUI_GETCOLOR(GuiColor_Borders));
+        PushRectOutline(Render, SliderRect, 2, GUI_GETCOLOR(GuiColor_Borders));
         
         if(ShowWatchingOutline){
             // NOTE(Dima): Pushing outline for watching thread
             rc2 WatchLaneRect = GetLaneRect(SliderRect, WatchThreadLaneAt,
                                             State->ProfiledThreadsCount);
             
-            PushRectOutline(Stack, WatchLaneRect, 2, GUI_GETCOLOR(GuiColor_Active));
+            PushRectOutline(Render, WatchLaneRect, 2, GUI_GETCOLOR(GuiColor_Active));
         }
         
         GuiPostAdvance(Gui, Layout, SliderRectInit);

@@ -1,40 +1,36 @@
-#include "joy_software_renderer.h"
-#include "joy_render_stack.h"
-#include "joy_platform.h"
+#include "joy_software_renderer_functions.cpp"
 
-#include <intrin.h>
-
-void SoftwareRenderStackToOutput(render_stack* stack, bmp_info* buf, rc2 clipRect){
-    u8* at = (u8*)stack->MemRegion.CreationBlock.Base;
-	u8* stackEnd = (u8*)stack->MemRegion.CreationBlock.Base + stack->MemRegion.CreationBlock.Used;
+void SoftwareRenderStackToOutput(render_state* Render, bmp_info* buf, rc2 clipRect){
+    u8* At = (u8*)Render->StackRegion.CreationBlock.Base;
+	u8* RenderEnd = (u8*)Render->StackRegion.CreationBlock.Base + Render->StackRegion.CreationBlock.Used;
     
-	while (at < stackEnd) {
-        render_entry_header* header = (render_entry_header*)at;
+	while (At < RenderEnd) {
+        render_entry_header* header = (render_entry_header*)At;
         
-        at += sizeof(render_entry_header);
+        At += sizeof(render_entry_header);
         
-        switch(header->type){
+        switch(header->Type){
             case RenderEntry_ClearColor:{
                 RENDER_GET_ENTRY(render_entry_clear_color);
                 
-                RenderClearSSE(buf, entry->clearColor01, clipRect);
+                RenderClearSSE(buf, Entry->clearColor01, clipRect);
             }break;
             
             case RenderEntry_Gradient:{
                 RENDER_GET_ENTRY(render_entry_gradient);
                 
-                if(entry->gradType == RenderEntryGradient_Horizontal){
+                if(Entry->gradType == RenderEntryGradient_Horizontal){
                     RenderGradientHorzSSE(buf, 
-                                          entry->rc, 
-                                          entry->color1, 
-                                          entry->color2, 
+                                          Entry->rc, 
+                                          Entry->color1, 
+                                          Entry->color2, 
                                           clipRect);
                 }
-                else if(entry->gradType == RenderEntryGradient_Vertical){
+                else if(Entry->gradType == RenderEntryGradient_Vertical){
                     RenderGradientVertSSE(buf, 
-                                          entry->rc, 
-                                          entry->color1, 
-                                          entry->color2, 
+                                          Entry->rc, 
+                                          Entry->color1, 
+                                          Entry->color2, 
                                           clipRect);
                 }
                 else{
@@ -47,15 +43,15 @@ void SoftwareRenderStackToOutput(render_stack* stack, bmp_info* buf, rc2 clipRec
                 
 #if 1
                 RenderRectSSE(buf,
-                              entry->p,
-                              entry->dim,
-                              entry->modulationColor01,
+                              Entry->p,
+                              Entry->dim,
+                              Entry->modulationColor01,
                               clipRect);
 #else
                 RenderRect(buf,
-                           entry->p,
-                           entry->dim,
-                           entry->modulationColor01,
+                           Entry->p,
+                           Entry->dim,
+                           Entry->modulationColor01,
                            clipRect);
 #endif
             }break;
@@ -65,22 +61,22 @@ void SoftwareRenderStackToOutput(render_stack* stack, bmp_info* buf, rc2 clipRec
                 
 #if 1
                 RenderBitmapSSE(buf, 
-                                entry->Bitmap,
-                                entry->P,
-                                entry->PixelHeight,
-                                entry->ModulationColor01,
+                                Entry->Bitmap,
+                                Entry->P,
+                                Entry->PixelHeight,
+                                Entry->ModulationColor01,
                                 clipRect);
 #else
                 RenderBitmap(buf, 
-                             entry->Bitmap,
-                             entry->P,
-                             entry->PixelHeight,
-                             entry->ModulationColor01,
+                             Entry->Bitmap,
+                             Entry->P,
+                             Entry->PixelHeight,
+                             Entry->ModulationColor01,
                              clipRect);
 #endif
             }break;
             
-            at += header->dataSize;
+            At += header->DataSize;
         }
     }
 }
@@ -88,16 +84,16 @@ void SoftwareRenderStackToOutput(render_stack* stack, bmp_info* buf, rc2 clipRec
 struct Render_Queue_Work_Data{
     bmp_info* buf;
     rc2 clipRect;
-    render_stack* stack;
+    render_state* Render;
 };
 
 PLATFORM_CALLBACK(RenderQueueWork){
     Render_Queue_Work_Data* work = (Render_Queue_Work_Data*)Data;
     
     SoftwareRenderStackToOutput(
-        work->stack,
-        work->buf,
-        work->clipRect);
+                                work->Render,
+                                work->buf,
+                                work->clipRect);
 }
 
 struct Render_Queue_rgba2bgra_Work{
@@ -112,14 +108,14 @@ PLATFORM_CALLBACK(RenderQueueRGBA2BGRAWork){
 }
 
 #define TILES_COUNT 32
-void RenderMultithreaded(platform_job_queue* queue, render_stack* stack, bmp_info* buf) {
+void RenderMultithreaded(platform_job_queue* queue, render_state* Render, bmp_info* buf) {
     
 #if 0
     rc2 clipRect;
     clipRect.min = V2(0, 0);
     clipRect.max = V2(buf->Width, buf->Height);
     
-    SoftwareRenderStackToOutput(stack, buf, clipRect);
+    SoftwareRenderStackToOutput(Render, buf, clipRect);
 #else
     
 #if 0
@@ -148,7 +144,7 @@ void RenderMultithreaded(platform_job_queue* queue, render_stack* stack, bmp_inf
             
             RenderQueueWork* workData = &works[j * SIDE_TILES_COUNT + i];
             workData->buf = buf;
-            workData->stack = stack;
+            workData->Render = Render;
             workData->clipRect = rect;
             
             //if ((j & 1) == (i & 1)) {
@@ -180,7 +176,7 @@ void RenderMultithreaded(platform_job_queue* queue, render_stack* stack, bmp_inf
         
         Render_Queue_Work_Data* workData = &works[i];
         workData->buf = buf;
-        workData->stack = stack;
+        workData->Render = Render;
         workData->clipRect = rect;
         
         //if (i & 1) {
