@@ -1,7 +1,7 @@
 #ifndef JOY_DEBUG_API_H
 #define JOY_DEBUG_API_H
 
-#if defined(JOY_DEBUG_BUILD)
+#if defined(JOY_INTERNAL)
 
 
 struct debug_primitive_data_line{
@@ -264,8 +264,8 @@ struct debug_timing{
 #define FUNCTION_TIMING() debug_timing FuncTiming_##__LINE__(DEBUG_UNIQUE_SYMBOL(__FUNCTION__))
 #define BLOCK_TIMING(name) debug_timing BlockTiming_##__LINE__(DEBUG_UNIQUE_SYMBOL(name))
 #define FRAME_BARRIER(dt) {\
-    DEBUGAddRecord("FrameBarrier", DebugRecord_FrameBarrier);\
-    DEBUGAddFloatToLastRecord(dt);}
+DEBUGAddRecord("FrameBarrier", DebugRecord_FrameBarrier);\
+DEBUGAddFloatToLastRecord(dt);}
 
 #else
 
@@ -287,5 +287,5 @@ struct debug_timing{
 #define END_TIMING(...)
 #define FUNCTION_TIMING(...)
 
-#endif // NOTE(Dima): JOY_DEBUG_BUILD
+#endif // NOTE(Dima): JOY_INTERNAL
 #endif // NOTE(Dima): JOY_DEBUG_API_H

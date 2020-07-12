@@ -95,7 +95,7 @@ struct game_state{
     render_state* Render;
     assets* Assets;
     anim_system* Anim;
-#if defined(JOY_DEBUG_BUILD)
+#if defined(JOY_INTERNAL)
     debug_state* DEBUG;
 #endif
 };

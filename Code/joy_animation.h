@@ -210,6 +210,8 @@ struct anim_transition{
 struct anim_calculated_pose{
     m44* BoneTransforms;
     int BoneTransformsCount;
+    
+    
 };
 
 struct anim_transition_request{

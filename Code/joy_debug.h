@@ -1,7 +1,7 @@
 #ifndef JOY_DEBUG_H
 #define JOY_DEBUG_H
 
-#if defined(JOY_DEBUG_BUILD)
+#if defined(JOY_INTERNAL)
 
 struct debug_window{
     v2 P;
@@ -171,6 +171,6 @@ inline u64 GetClocksFromStat(debug_timing_stat* Stat,
     return(Result);
 }
 
-#endif // NOTE(Dima): JOY_DEBUG_BUILD
+#endif // NOTE(Dima): JOY_INTERNAL
 
 #endif

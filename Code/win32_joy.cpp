@@ -40,7 +40,7 @@ GLOBAL_VARIABLE DirX_State GlobalDirX;
 #endif
 
 platform_api Platform;
-#if defined(JOY_DEBUG_BUILD)
+#if defined(JOY_INTERNAL)
 debug_global_table* DEBUGGlobalTable;
 #endif
 
@@ -2465,7 +2465,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     GlobalWin32.MemorySentinel.Prev = &GlobalWin32.MemorySentinel;
     GlobalWin32.MemorySentinel.Next = &GlobalWin32.MemorySentinel;
     
-#if defined(JOY_DEBUG_BUILD)
+#if defined(JOY_INTERNAL)
     // NOTE(Dima): Initializing DEBUG global table
     DEBUGGlobalTable = PushStruct(&GlobalMem, debug_global_table);
     DEBUGInitGlobalTable(&GlobalMem);

@@ -1,9 +1,10 @@
 #ifndef JOY_DEFINES_H
 #define JOY_DEFINES_H
 
-#define JOY_DEBUG_BUILD
+#define JOY_INTERNAL
+#define JOY_AVX
 
-#if defined(JOY_DEBUG_BUILD)
+#if defined(JOY_INTERNAL)
 #define Assert(cond) if(!(cond)){ *((int*)0) = 0;}
 #define ASSERT(cond) if(!(cond)){ *((int*)0) = 0;}
 #else
@@ -50,65 +51,65 @@
 #endif
 
 #define DLIST_REFLECT_PTRS(value, next, prev) {\
-    (value).##next = &(value); \
-    (value).##prev = &(value);}
+(value).##next = &(value); \
+(value).##prev = &(value);}
 
 #define DLIST_REFLECT_POINTER_PTRS(ptr, next, prev) {\
-    (ptr)->##next = (ptr); \
-    (ptr)->##prev = (ptr);}
+(ptr)->##next = (ptr); \
+(ptr)->##prev = (ptr);}
 
 #define DLIST_FREE_IS_EMPTY(free_value, next) ((free_value).##next == &(free_value))
 
 #define DLIST_INSERT_AFTER_SENTINEL(entry_ptr, sent_value, next, prev) \
 {\
-    (entry_ptr)->##next = (sent_value).##next##; \
-    (entry_ptr)->##prev = &(sent_value); \
-    (entry_ptr)->##prev##->##next = (entry_ptr); \
-    (entry_ptr)->##next##->##prev = (entry_ptr);}
+(entry_ptr)->##next = (sent_value).##next##; \
+(entry_ptr)->##prev = &(sent_value); \
+(entry_ptr)->##prev##->##next = (entry_ptr); \
+(entry_ptr)->##next##->##prev = (entry_ptr);}
 
 #define DLIST_INSERT_BEFORE_SENTINEL(entry_ptr, sent_value, next, prev) \
 {\
-    (entry_ptr)->##next = &(sent_value);\
-    (entry_ptr)->##prev = (sent_value).##prev##; \
-    (entry_ptr)->##prev##->##next = (entry_ptr); \
-    (entry_ptr)->##next##->##prev = (entry_ptr);}
+(entry_ptr)->##next = &(sent_value);\
+(entry_ptr)->##prev = (sent_value).##prev##; \
+(entry_ptr)->##prev##->##next = (entry_ptr); \
+(entry_ptr)->##next##->##prev = (entry_ptr);}
 
 #define DLIST_INSERT_AFTER(entry_ptr, after_ptr, next, prev) \
 {\
-    (entry_ptr)->##next = (after_ptr)->##next##; \
-    (entry_ptr)->##prev = (after_ptr); \
-    (entry_ptr)->##prev##->##next = (entry_ptr); \
-    (entry_ptr)->##next##->##prev = (entry_ptr);}
+(entry_ptr)->##next = (after_ptr)->##next##; \
+(entry_ptr)->##prev = (after_ptr); \
+(entry_ptr)->##prev##->##next = (entry_ptr); \
+(entry_ptr)->##next##->##prev = (entry_ptr);}
 
 #define DLIST_INSERT_BEFORE(entry_ptr, before_ptr, next, prev) \
 {\
-    (entry_ptr)->##next = (before_ptr); \
-    (entry_ptr)->##prev = (before_ptr)->##prev##; \
-    (entry_ptr)->##prev##->##next = (entry_ptr); \
-    (entry_ptr)->##next##->##prev = (entry_ptr);}
+(entry_ptr)->##next = (before_ptr); \
+(entry_ptr)->##prev = (before_ptr)->##prev##; \
+(entry_ptr)->##prev##->##next = (entry_ptr); \
+(entry_ptr)->##next##->##prev = (entry_ptr);}
 
 #define DLIST_REMOVE_ENTRY(entry_ptr, next, prev) \
 {\
-    entry_ptr->##next##->##prev = entry_ptr->##prev##;\
-    entry_ptr->##prev##->##next = entry_ptr->##next##;}
+entry_ptr->##next##->##prev = entry_ptr->##prev##;\
+entry_ptr->##prev##->##next = entry_ptr->##next##;}
 
 #define DLIST_REMOVE_ENTIRE_LIST(from_ptr, to_ptr, next, prev) \
 {\
-    if((from_ptr)->##next != (from_ptr)){\
-        (from_ptr)->##next##->##prev = (to_ptr);\
-        (from_ptr)->##prev##->##next = (to_ptr)->##next;\
-        (to_ptr)->##next##->##prev = (from_ptr)->##prev;\
-        (to_ptr)->##next = (from_ptr)->##next;\
-        DLIST_REFLECT_POINTER_PTRS(from_ptr, next, prev);}}
+if((from_ptr)->##next != (from_ptr)){\
+(from_ptr)->##next##->##prev = (to_ptr);\
+(from_ptr)->##prev##->##next = (to_ptr)->##next;\
+(to_ptr)->##next##->##prev = (from_ptr)->##prev;\
+(to_ptr)->##next = (from_ptr)->##next;\
+DLIST_REFLECT_POINTER_PTRS(from_ptr, next, prev);}}
 
 // NOTE(Dima): DLIST allocate function body
 #define DLIST_ALLOCATE_FUNCTION_BODY(type, mem_region_ptr, next, prev, free_sent_value, use_sent_value, grow_count, result_ptr_name) \
 if(DLIST_FREE_IS_EMPTY(free_sent_value, next)){\
-    type* Pool = PushArray(mem_region_ptr, type, (grow_count));\
-    for(int Index = 0; Index < (grow_count); Index++){\
-        type* Prim = &Pool[Index];\
-        DLIST_INSERT_BEFORE_SENTINEL(Prim, free_sent_value, next, prev);\
-    }\
+type* Pool = PushArray(mem_region_ptr, type, (grow_count));\
+for(int Index = 0; Index < (grow_count); Index++){\
+type* Prim = &Pool[Index];\
+DLIST_INSERT_BEFORE_SENTINEL(Prim, free_sent_value, next, prev);\
+}\
 }\
 type* result_ptr_name = (free_sent_value).##next##; \
 DLIST_REMOVE_ENTRY(Result, next, prev); \

@@ -738,6 +738,7 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags,
                 float Time = Key->mTime;
                 quat Value = Assimp2JoyQuat(Key->mValue);
                 
+                // TODO(Dima): Extract rotation nodes animations
                 if(ExtractRootMotionY){
                     
                 }

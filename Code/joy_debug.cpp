@@ -1,4 +1,4 @@
-#if defined(JOY_DEBUG_BUILD)
+#if defined(JOY_INTERNAL)
 
 #include "joy_debug_menu_gui.cpp"
 

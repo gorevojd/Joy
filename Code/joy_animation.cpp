@@ -194,7 +194,7 @@ INTERNAL_FUNCTION void ClearNodeTransforms(node_transforms_block* Transforms, in
     v3 NullVector = V3(0.0f, 0.0f, 0.0f);
     quat NullQuat = Quat(0.0f, 0.0f, 0.0f, 0.0f);
     
-#if 0    
+#if !defined(JOY_AVX)    
     for(int NodeIndex = 0; 
         NodeIndex < Count; 
         NodeIndex++)
@@ -205,30 +205,42 @@ INTERNAL_FUNCTION void ClearNodeTransforms(node_transforms_block* Transforms, in
     }
 #else
     
-    v3_4x NullVector_4x = V3_4X(NullVector, NullVector, NullVector, NullVector);
-    v4_4x NullQuat_4x = V4_4X(NullQuat, NullQuat, NullQuat, NullQuat);
+    v3_8x NullVector_4x = V3_8X(NullVector);
+    v4_8x NullQuat_4x = V4_8X(NullQuat);
     
     for(int NodeIndex = 0; 
         NodeIndex < Count; 
-        NodeIndex+=4)
+        NodeIndex+=8)
     {
-        V3_4X_Store(NullVector_4x, 
+        V3_8X_Store(NullVector_4x, 
                     &Transforms->Ts[NodeIndex + 0],
                     &Transforms->Ts[NodeIndex + 1],
                     &Transforms->Ts[NodeIndex + 2],
-                    &Transforms->Ts[NodeIndex + 3]);
+                    &Transforms->Ts[NodeIndex + 3],
+                    &Transforms->Ts[NodeIndex + 4],
+                    &Transforms->Ts[NodeIndex + 5],
+                    &Transforms->Ts[NodeIndex + 6],
+                    &Transforms->Ts[NodeIndex + 7]);
         
-        V3_4X_Store(NullVector_4x, 
+        V3_8X_Store(NullVector_4x, 
                     &Transforms->Ss[NodeIndex + 0],
                     &Transforms->Ss[NodeIndex + 1],
                     &Transforms->Ss[NodeIndex + 2],
-                    &Transforms->Ss[NodeIndex + 3]);
+                    &Transforms->Ss[NodeIndex + 3],
+                    &Transforms->Ss[NodeIndex + 4],
+                    &Transforms->Ss[NodeIndex + 5],
+                    &Transforms->Ss[NodeIndex + 6],
+                    &Transforms->Ss[NodeIndex + 7]);
         
-        V4_4X_Store(NullQuat_4x, 
+        V4_8X_Store(NullQuat_4x, 
                     &Transforms->Rs[NodeIndex + 0],
                     &Transforms->Rs[NodeIndex + 1],
                     &Transforms->Rs[NodeIndex + 2],
-                    &Transforms->Rs[NodeIndex + 3]);
+                    &Transforms->Rs[NodeIndex + 3],
+                    &Transforms->Rs[NodeIndex + 4],
+                    &Transforms->Rs[NodeIndex + 5],
+                    &Transforms->Rs[NodeIndex + 6],
+                    &Transforms->Rs[NodeIndex + 7]);
     }
 #endif
     
@@ -241,18 +253,19 @@ struct update_pa_nodes_work{
     b32 Calculated[ANIM_TRANSFORMS_ARRAY_SIZE];
 };
 
-struct update_node_anim_data{
-    node_animation* NodeAnim;
-    find_anim_deltas_ctx PosDeltas;
-    find_anim_deltas_ctx RotDeltas;
-    find_anim_deltas_ctx ScaDeltas;
-};
-
 PLATFORM_CALLBACK(UpdatePANodesWork){
     update_pa_nodes_work* Work = (update_pa_nodes_work*)Data;
     
     
 }
+
+struct update_node_anim_data{
+    node_animation* NodeAnim;
+    find_anim_deltas_ctx PosDeltas;
+    find_anim_deltas_ctx RotDeltas;
+    find_anim_deltas_ctx ScaDeltas;
+    b32 IsRootMotionNode;
+};
 
 inline update_node_anim_data* GetNodeAnimData(update_node_anim_data* Datas,
                                               int Index, int Count,
@@ -281,7 +294,8 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
                                              model_info* Model,
                                              playing_anim* Playing,
                                              animation_clip* Animation,
-                                             f64 CurrentTime,
+                                             f64 CurrentGlobalTime,
+                                             //f64 PreviousGlobalTime,
                                              f32 PlaybackRate)
 {
     FUNCTION_TIMING();
@@ -300,7 +314,8 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
         b32 IsLooping = (Playing->ExitAction == AnimExitAction_Looping);
         
         // NOTE(Dima): Animating
-        f64 AnimTime = (CurrentTime - Playing->GlobalStart) * PlaybackRate;
+        //f64 PrevTick = PreviousGlobalTime * Animation->TicksPerSecond;
+        f64 AnimTime = (CurrentGlobalTime - Playing->GlobalStart) * PlaybackRate;
         f64 CurrentTick = AnimTime * Animation->TicksPerSecond;
         
         Playing->Phase01 = 0.0f;
@@ -334,26 +349,43 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
         }
         
         update_node_anim_data NodeAnimationDatas[ANIM_TRANSFORMS_ARRAY_SIZE];
+        int NumNodeAnimsToUpdate = 0;
+        
         for(int NodeAnimIndex = 0;
             NodeAnimIndex < Animation->NodeAnimationsCount;
             NodeAnimIndex++)
         {
             u32 NodeAnimID = Animation->NodeAnimationIDs[NodeAnimIndex];
             
-            node_animation* NodeAnim = LoadNodeAnim(Assets,
-                                                    NodeAnimID,
+            node_animation* NodeAnim = LoadNodeAnim(Assets, NodeAnimID,
                                                     ASSET_IMPORT_IMMEDIATE);
             
             ASSERT(NodeAnim);
             
-            NodeAnimationDatas[NodeAnimIndex].NodeAnim = NodeAnim;
+            NodeAnimationDatas[NumNodeAnimsToUpdate].NodeAnim = NodeAnim;
+            NodeAnimationDatas[NumNodeAnimsToUpdate].IsRootMotionNode = false;
+            NumNodeAnimsToUpdate++;
         }
+        
+#if 1        
+        if(Animation->UsesRootMotion)
+        {
+            node_animation* RootNodeAnim = LoadNodeAnim(Assets, Animation->RootMotionNodeAnimID,
+                                                        ASSET_IMPORT_IMMEDIATE);
+            
+            ASSERT(RootNodeAnim);
+            
+            NodeAnimationDatas[NumNodeAnimsToUpdate].NodeAnim = RootNodeAnim;
+            NodeAnimationDatas[NumNodeAnimsToUpdate].IsRootMotionNode = true;
+            NumNodeAnimsToUpdate++;
+        }
+#endif
         
         {
             BLOCK_TIMING("UpdatePA::Finding deltas");
             
             for(int NodeAnimIndex = 0;
-                NodeAnimIndex < Animation->NodeAnimationsCount;
+                NodeAnimIndex < NumNodeAnimsToUpdate;
                 NodeAnimIndex++)
             {
                 
@@ -379,9 +411,9 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
         
         {
             BLOCK_TIMING("UpdatePA::Lerping");
-#if 0
+#if !defined(JOY_AVX)
             for(int NodeAnimIndex = 0;
-                NodeAnimIndex < Animation->NodeAnimationsCount;
+                NodeAnimIndex < NumNodeAnimsToUpdate;
                 NodeAnimIndex++)
             {
                 
@@ -408,41 +440,41 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
                 Playing->TransformsCalculated[NodeIndex] = true;
             }
 #else
-            v3_4x DefaultT = V3_4X(V3(0.0f));
-            v4_4x DefaultR = V4_4X(QuatI());
-            v3_4x DefaultS = V3_4X(V3(1.0f));
+            v3_8x DefaultT = V3_8X(V3(0.0f));
+            v4_8x DefaultR = V4_8X(QuatI());
+            v3_8x DefaultS = V3_8X(V3(1.0f));
             
             int NodeAnimIndex = 0;
             for(NodeAnimIndex;
-                NodeAnimIndex < Animation->NodeAnimationsCount;
-                NodeAnimIndex += 4)
+                NodeAnimIndex < NumNodeAnimsToUpdate;
+                NodeAnimIndex += 8)
             {
-                __m128i Indices = _mm_setr_epi32(NodeAnimIndex + 0,
-                                                 NodeAnimIndex + 1,
-                                                 NodeAnimIndex + 2,
-                                                 NodeAnimIndex + 3);
-                
-                i32_4x ResultCalculatedI = I32_4X((NodeAnimIndex + 0 < Animation->NodeAnimationsCount),
-                                                  (NodeAnimIndex + 1 < Animation->NodeAnimationsCount),
-                                                  (NodeAnimIndex + 2 < Animation->NodeAnimationsCount),
-                                                  (NodeAnimIndex + 3 < Animation->NodeAnimationsCount));
-                __m128i CompareResMaskI = _mm_cmplt_epi32(Indices, _mm_set1_epi32(Animation->NodeAnimationsCount));
-                
-                int MovedMask = _mm_movemask_ps(_mm_castsi128_ps(CompareResMaskI));
+                i32_8x Indices = IndicesStartFrom(NodeAnimIndex, 1);
+                f32_8x IndicesFitInRange = LessThan(ConvertToFloat(Indices), ConvertToFloat(I32_8X(Animation->NodeAnimationsCount)));
                 
                 // NOTE(Dima): If at least one of node animations exist
+                int MovedMask = AnyTrue(IndicesFitInRange);
                 if(MovedMask){
                     update_node_anim_data* NodeAnimData0 = &NodeAnimationDatas[NodeAnimIndex + 0];
-                    update_node_anim_data* NodeAnimData1 = GetNodeAnimData(NodeAnimationDatas, 
-                                                                           NodeAnimIndex + 1,
+                    update_node_anim_data* NodeAnimData1 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 1,
+                                                                           Animation->NodeAnimationsCount,
+                                                                           NodeAnimData0);
+                    update_node_anim_data* NodeAnimData2 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 2,
                                                                            Animation->NodeAnimationsCount, 
                                                                            NodeAnimData0);
-                    update_node_anim_data* NodeAnimData2 = GetNodeAnimData(NodeAnimationDatas, 
-                                                                           NodeAnimIndex + 2,
+                    update_node_anim_data* NodeAnimData3 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 3,
                                                                            Animation->NodeAnimationsCount, 
                                                                            NodeAnimData0);
-                    update_node_anim_data* NodeAnimData3 = GetNodeAnimData(NodeAnimationDatas, 
-                                                                           NodeAnimIndex + 3,
+                    update_node_anim_data* NodeAnimData4 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 4,
+                                                                           Animation->NodeAnimationsCount, 
+                                                                           NodeAnimData0);
+                    update_node_anim_data* NodeAnimData5 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 5,
+                                                                           Animation->NodeAnimationsCount, 
+                                                                           NodeAnimData0);
+                    update_node_anim_data* NodeAnimData6 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 6,
+                                                                           Animation->NodeAnimationsCount, 
+                                                                           NodeAnimData0);
+                    update_node_anim_data* NodeAnimData7 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 7,
                                                                            Animation->NodeAnimationsCount, 
                                                                            NodeAnimData0);
                     
@@ -450,125 +482,206 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
                     node_animation* NodeAnim1 = NodeAnimData1->NodeAnim;
                     node_animation* NodeAnim2 = NodeAnimData2->NodeAnim;
                     node_animation* NodeAnim3 = NodeAnimData3->NodeAnim;
+                    node_animation* NodeAnim4 = NodeAnimData4->NodeAnim;
+                    node_animation* NodeAnim5 = NodeAnimData5->NodeAnim;
+                    node_animation* NodeAnim6 = NodeAnimData6->NodeAnim;
+                    node_animation* NodeAnim7 = NodeAnimData7->NodeAnim;
                     
                     find_anim_deltas_ctx* PosDeltas0 = &NodeAnimData0->PosDeltas;
                     find_anim_deltas_ctx* PosDeltas1 = &NodeAnimData1->PosDeltas;
                     find_anim_deltas_ctx* PosDeltas2 = &NodeAnimData2->PosDeltas;
                     find_anim_deltas_ctx* PosDeltas3 = &NodeAnimData3->PosDeltas;
+                    find_anim_deltas_ctx* PosDeltas4 = &NodeAnimData4->PosDeltas;
+                    find_anim_deltas_ctx* PosDeltas5 = &NodeAnimData5->PosDeltas;
+                    find_anim_deltas_ctx* PosDeltas6 = &NodeAnimData6->PosDeltas;
+                    find_anim_deltas_ctx* PosDeltas7 = &NodeAnimData7->PosDeltas;
                     
                     find_anim_deltas_ctx* RotDeltas0 = &NodeAnimData0->RotDeltas;
                     find_anim_deltas_ctx* RotDeltas1 = &NodeAnimData1->RotDeltas;
                     find_anim_deltas_ctx* RotDeltas2 = &NodeAnimData2->RotDeltas;
                     find_anim_deltas_ctx* RotDeltas3 = &NodeAnimData3->RotDeltas;
+                    find_anim_deltas_ctx* RotDeltas4 = &NodeAnimData4->RotDeltas;
+                    find_anim_deltas_ctx* RotDeltas5 = &NodeAnimData5->RotDeltas;
+                    find_anim_deltas_ctx* RotDeltas6 = &NodeAnimData6->RotDeltas;
+                    find_anim_deltas_ctx* RotDeltas7 = &NodeAnimData7->RotDeltas;
                     
                     find_anim_deltas_ctx* ScaDeltas0 = &NodeAnimData0->ScaDeltas;
                     find_anim_deltas_ctx* ScaDeltas1 = &NodeAnimData1->ScaDeltas;
                     find_anim_deltas_ctx* ScaDeltas2 = &NodeAnimData2->ScaDeltas;
                     find_anim_deltas_ctx* ScaDeltas3 = &NodeAnimData3->ScaDeltas;
+                    find_anim_deltas_ctx* ScaDeltas4 = &NodeAnimData4->ScaDeltas;
+                    find_anim_deltas_ctx* ScaDeltas5 = &NodeAnimData5->ScaDeltas;
+                    find_anim_deltas_ctx* ScaDeltas6 = &NodeAnimData6->ScaDeltas;
+                    find_anim_deltas_ctx* ScaDeltas7 = &NodeAnimData7->ScaDeltas;
                     
                     // NOTE(Dima): Setting position
-                    v3_4x PrevValueT = V3_4X(NodeAnim0->PositionKeysValues[PosDeltas0->PrevKeyIndex],
+                    v3_8x PrevValueT = V3_8X(NodeAnim0->PositionKeysValues[PosDeltas0->PrevKeyIndex],
                                              NodeAnim1->PositionKeysValues[PosDeltas1->PrevKeyIndex],
                                              NodeAnim2->PositionKeysValues[PosDeltas2->PrevKeyIndex],
-                                             NodeAnim3->PositionKeysValues[PosDeltas3->PrevKeyIndex]);
+                                             NodeAnim3->PositionKeysValues[PosDeltas3->PrevKeyIndex],
+                                             NodeAnim4->PositionKeysValues[PosDeltas4->PrevKeyIndex],
+                                             NodeAnim5->PositionKeysValues[PosDeltas5->PrevKeyIndex],
+                                             NodeAnim6->PositionKeysValues[PosDeltas6->PrevKeyIndex],
+                                             NodeAnim7->PositionKeysValues[PosDeltas7->PrevKeyIndex]);
                     
-                    v3_4x NextValueT = V3_4X(NodeAnim0->PositionKeysValues[PosDeltas0->NextKeyIndex],
+                    v3_8x NextValueT = V3_8X(NodeAnim0->PositionKeysValues[PosDeltas0->NextKeyIndex],
                                              NodeAnim1->PositionKeysValues[PosDeltas1->NextKeyIndex],
                                              NodeAnim2->PositionKeysValues[PosDeltas2->NextKeyIndex],
-                                             NodeAnim3->PositionKeysValues[PosDeltas3->NextKeyIndex]);
+                                             NodeAnim3->PositionKeysValues[PosDeltas3->NextKeyIndex],
+                                             NodeAnim4->PositionKeysValues[PosDeltas4->NextKeyIndex],
+                                             NodeAnim5->PositionKeysValues[PosDeltas5->NextKeyIndex],
+                                             NodeAnim6->PositionKeysValues[PosDeltas6->NextKeyIndex],
+                                             NodeAnim7->PositionKeysValues[PosDeltas7->NextKeyIndex]);
                     
-                    f32_4x TimeDeltaT = F32_4X(PosDeltas0->t,
+                    f32_8x TimeDeltaT = F32_8X(PosDeltas0->t,
                                                PosDeltas1->t,
                                                PosDeltas2->t,
-                                               PosDeltas3->t);
+                                               PosDeltas3->t,
+                                               PosDeltas4->t,
+                                               PosDeltas5->t,
+                                               PosDeltas6->t,
+                                               PosDeltas7->t);
                     
                     // NOTE(Dima): Setting rotation
-                    v4_4x PrevValueR = V4_4X(NodeAnim0->RotationKeysValues[RotDeltas0->PrevKeyIndex],
+                    v4_8x PrevValueR = V4_8X(NodeAnim0->RotationKeysValues[RotDeltas0->PrevKeyIndex],
                                              NodeAnim1->RotationKeysValues[RotDeltas1->PrevKeyIndex],
                                              NodeAnim2->RotationKeysValues[RotDeltas2->PrevKeyIndex],
-                                             NodeAnim3->RotationKeysValues[RotDeltas3->PrevKeyIndex]);
+                                             NodeAnim3->RotationKeysValues[RotDeltas3->PrevKeyIndex],
+                                             NodeAnim4->RotationKeysValues[RotDeltas4->PrevKeyIndex],
+                                             NodeAnim5->RotationKeysValues[RotDeltas5->PrevKeyIndex],
+                                             NodeAnim6->RotationKeysValues[RotDeltas6->PrevKeyIndex],
+                                             NodeAnim7->RotationKeysValues[RotDeltas7->PrevKeyIndex]);
                     
-                    v4_4x NextValueR = V4_4X(NodeAnim0->RotationKeysValues[RotDeltas0->NextKeyIndex],
+                    v4_8x NextValueR = V4_8X(NodeAnim0->RotationKeysValues[RotDeltas0->NextKeyIndex],
                                              NodeAnim1->RotationKeysValues[RotDeltas1->NextKeyIndex],
                                              NodeAnim2->RotationKeysValues[RotDeltas2->NextKeyIndex],
-                                             NodeAnim3->RotationKeysValues[RotDeltas3->NextKeyIndex]);
+                                             NodeAnim3->RotationKeysValues[RotDeltas3->NextKeyIndex],
+                                             NodeAnim4->RotationKeysValues[RotDeltas4->NextKeyIndex],
+                                             NodeAnim5->RotationKeysValues[RotDeltas5->NextKeyIndex],
+                                             NodeAnim6->RotationKeysValues[RotDeltas6->NextKeyIndex],
+                                             NodeAnim7->RotationKeysValues[RotDeltas7->NextKeyIndex]);
                     
-                    f32_4x TimeDeltaR = F32_4X(RotDeltas0->t,
+                    f32_8x TimeDeltaR = F32_8X(RotDeltas0->t,
                                                RotDeltas1->t,
                                                RotDeltas2->t,
-                                               RotDeltas3->t);
+                                               RotDeltas3->t,
+                                               RotDeltas4->t,
+                                               RotDeltas5->t,
+                                               RotDeltas6->t,
+                                               RotDeltas7->t);
                     
                     // NOTE(Dima): Setting scale
-                    v3_4x PrevValueS = V3_4X(NodeAnim0->ScalingKeysValues[ScaDeltas0->PrevKeyIndex],
+                    v3_8x PrevValueS = V3_8X(NodeAnim0->ScalingKeysValues[ScaDeltas0->PrevKeyIndex],
                                              NodeAnim1->ScalingKeysValues[ScaDeltas1->PrevKeyIndex],
                                              NodeAnim2->ScalingKeysValues[ScaDeltas2->PrevKeyIndex],
-                                             NodeAnim3->ScalingKeysValues[ScaDeltas3->PrevKeyIndex]);
+                                             NodeAnim3->ScalingKeysValues[ScaDeltas3->PrevKeyIndex],
+                                             NodeAnim4->ScalingKeysValues[ScaDeltas4->PrevKeyIndex],
+                                             NodeAnim5->ScalingKeysValues[ScaDeltas5->PrevKeyIndex],
+                                             NodeAnim6->ScalingKeysValues[ScaDeltas6->PrevKeyIndex],
+                                             NodeAnim7->ScalingKeysValues[ScaDeltas7->PrevKeyIndex]);
                     
-                    v3_4x NextValueS = V3_4X(NodeAnim0->ScalingKeysValues[ScaDeltas0->NextKeyIndex],
+                    v3_8x NextValueS = V3_8X(NodeAnim0->ScalingKeysValues[ScaDeltas0->NextKeyIndex],
                                              NodeAnim1->ScalingKeysValues[ScaDeltas1->NextKeyIndex],
                                              NodeAnim2->ScalingKeysValues[ScaDeltas2->NextKeyIndex],
-                                             NodeAnim3->ScalingKeysValues[ScaDeltas3->NextKeyIndex]);
+                                             NodeAnim3->ScalingKeysValues[ScaDeltas3->NextKeyIndex],
+                                             NodeAnim4->ScalingKeysValues[ScaDeltas4->NextKeyIndex],
+                                             NodeAnim5->ScalingKeysValues[ScaDeltas5->NextKeyIndex],
+                                             NodeAnim6->ScalingKeysValues[ScaDeltas6->NextKeyIndex],
+                                             NodeAnim7->ScalingKeysValues[ScaDeltas7->NextKeyIndex]);
                     
-                    f32_4x TimeDeltaS = F32_4X(ScaDeltas0->t,
+                    f32_8x TimeDeltaS = F32_8X(ScaDeltas0->t,
                                                ScaDeltas1->t,
                                                ScaDeltas2->t,
-                                               ScaDeltas3->t);
+                                               ScaDeltas3->t,
+                                               ScaDeltas4->t,
+                                               ScaDeltas5->t,
+                                               ScaDeltas6->t,
+                                               ScaDeltas7->t);
                     
                     // NOTE(Dima): Lerping
-                    v3_4x LerpedT = Lerp_4X(PrevValueT, NextValueT, TimeDeltaT);
+                    v3_8x LerpedT = Lerp(PrevValueT, NextValueT, TimeDeltaT);
                     
-                    v4_4x LerpedR = LerpQuat_4X(PrevValueR, NextValueR, TimeDeltaR);
+                    v4_8x LerpedR = LerpQuat(PrevValueR, NextValueR, TimeDeltaR);
                     
-                    v3_4x LerpedS = Lerp_4X(PrevValueS, NextValueS, TimeDeltaS);
+                    v3_8x LerpedS = Lerp(PrevValueS, NextValueS, TimeDeltaS);
                     
-                    f32_4x SucceededT = IsTrue_4X(I32_4X(PosDeltas0->Success,
-                                                         PosDeltas1->Success,
-                                                         PosDeltas2->Success,
-                                                         PosDeltas3->Success));
-                    f32_4x SucceededR = IsTrue_4X(I32_4X(RotDeltas0->Success,
-                                                         RotDeltas1->Success,
-                                                         RotDeltas2->Success,
-                                                         RotDeltas3->Success));
-                    f32_4x SucceededS = IsTrue_4X(I32_4X(ScaDeltas0->Success,
-                                                         ScaDeltas1->Success,
-                                                         ScaDeltas2->Success,
-                                                         ScaDeltas3->Success));
+                    f32_8x SucceededT = IsTrue(I32_8X(PosDeltas0->Success,
+                                                      PosDeltas1->Success,
+                                                      PosDeltas2->Success,
+                                                      PosDeltas3->Success,
+                                                      PosDeltas4->Success,
+                                                      PosDeltas5->Success,
+                                                      PosDeltas6->Success,
+                                                      PosDeltas7->Success));
+                    
+                    f32_8x SucceededR = IsTrue(I32_8X(RotDeltas0->Success,
+                                                      RotDeltas1->Success,
+                                                      RotDeltas2->Success,
+                                                      RotDeltas3->Success,
+                                                      RotDeltas4->Success,
+                                                      RotDeltas5->Success,
+                                                      RotDeltas6->Success,
+                                                      RotDeltas7->Success));
+                    
+                    f32_8x SucceededS = IsTrue(I32_8X(ScaDeltas0->Success,
+                                                      ScaDeltas1->Success,
+                                                      ScaDeltas2->Success,
+                                                      ScaDeltas3->Success,
+                                                      ScaDeltas4->Success,
+                                                      ScaDeltas5->Success,
+                                                      ScaDeltas6->Success,
+                                                      ScaDeltas7->Success));
                     
                     LerpedT = ConditionalCombine(SucceededT, LerpedT, DefaultT);
                     LerpedR = ConditionalCombine(SucceededR, LerpedR, DefaultR);
                     LerpedS = ConditionalCombine(SucceededS, LerpedS, DefaultS);
                     
                     // NOTE(Dima): Storing values
-                    v3* StoreToT[4] = {
+                    v3* StoreToT[8] = {
                         &Playing->NodeTransforms.Ts[NodeAnim0->NodeIndex],
                         &Playing->NodeTransforms.Ts[NodeAnim1->NodeIndex],
                         &Playing->NodeTransforms.Ts[NodeAnim2->NodeIndex],
-                        &Playing->NodeTransforms.Ts[NodeAnim3->NodeIndex]};
-                    V3_4X_StoreConditional(LerpedT, MovedMask, StoreToT);
+                        &Playing->NodeTransforms.Ts[NodeAnim3->NodeIndex],
+                        &Playing->NodeTransforms.Ts[NodeAnim4->NodeIndex],
+                        &Playing->NodeTransforms.Ts[NodeAnim5->NodeIndex],
+                        &Playing->NodeTransforms.Ts[NodeAnim6->NodeIndex],
+                        &Playing->NodeTransforms.Ts[NodeAnim7->NodeIndex]};
+                    V3_8X_StoreConditional(LerpedT, MovedMask, StoreToT);
                     
-                    quat* StoreToR[4] = {
+                    quat* StoreToR[8] = {
                         &Playing->NodeTransforms.Rs[NodeAnim0->NodeIndex],
                         &Playing->NodeTransforms.Rs[NodeAnim1->NodeIndex],
                         &Playing->NodeTransforms.Rs[NodeAnim2->NodeIndex],
-                        &Playing->NodeTransforms.Rs[NodeAnim3->NodeIndex]};
-                    V4_4X_StoreConditional(LerpedR, MovedMask, StoreToR);
+                        &Playing->NodeTransforms.Rs[NodeAnim3->NodeIndex],
+                        &Playing->NodeTransforms.Rs[NodeAnim4->NodeIndex],
+                        &Playing->NodeTransforms.Rs[NodeAnim5->NodeIndex],
+                        &Playing->NodeTransforms.Rs[NodeAnim6->NodeIndex],
+                        &Playing->NodeTransforms.Rs[NodeAnim7->NodeIndex]};
+                    V4_8X_StoreConditional(LerpedR, MovedMask, StoreToR);
                     
-                    v3* StoreToS[4] = {
+                    v3* StoreToS[8] = {
                         &Playing->NodeTransforms.Ss[NodeAnim0->NodeIndex],
                         &Playing->NodeTransforms.Ss[NodeAnim1->NodeIndex],
                         &Playing->NodeTransforms.Ss[NodeAnim2->NodeIndex],
-                        &Playing->NodeTransforms.Ss[NodeAnim3->NodeIndex]
-                    };
-                    V3_4X_StoreConditional(LerpedS, MovedMask, StoreToS);
+                        &Playing->NodeTransforms.Ss[NodeAnim3->NodeIndex],
+                        &Playing->NodeTransforms.Ss[NodeAnim4->NodeIndex],
+                        &Playing->NodeTransforms.Ss[NodeAnim5->NodeIndex],
+                        &Playing->NodeTransforms.Ss[NodeAnim6->NodeIndex],
+                        &Playing->NodeTransforms.Ss[NodeAnim7->NodeIndex]};
+                    V3_8X_StoreConditional(LerpedS, MovedMask, StoreToS);
                     
-                    b32* StoreToCalc[4] = {
+                    b32* StoreToCalc[8] = {
                         &Playing->TransformsCalculated[NodeAnim0->NodeIndex],
                         &Playing->TransformsCalculated[NodeAnim1->NodeIndex],
                         &Playing->TransformsCalculated[NodeAnim2->NodeIndex],
-                        &Playing->TransformsCalculated[NodeAnim3->NodeIndex]
+                        &Playing->TransformsCalculated[NodeAnim3->NodeIndex],
+                        &Playing->TransformsCalculated[NodeAnim4->NodeIndex],
+                        &Playing->TransformsCalculated[NodeAnim5->NodeIndex],
+                        &Playing->TransformsCalculated[NodeAnim6->NodeIndex],
+                        &Playing->TransformsCalculated[NodeAnim7->NodeIndex]
                     };
                     
-                    I32_4X_StoreConditional(ResultCalculatedI, MovedMask, StoreToCalc);
+                    I32_8X_StoreConditional(CastToInt(IndicesFitInRange), MovedMask, StoreToCalc);
                 }
                 else{
                     break;
@@ -618,7 +731,7 @@ INTERNAL_FUNCTION void CalculateToParentTransforms(model_info* Model,
 {
     FUNCTION_TIMING();
     
-#if 0
+#if !defined(JOY_AVX)
     for(int NodeIndex = 0; 
         NodeIndex < Model->NodeCount;
         NodeIndex++)
@@ -635,38 +748,50 @@ INTERNAL_FUNCTION void CalculateToParentTransforms(model_info* Model,
     int NodeIndex;
     for(NodeIndex = 0; 
         NodeIndex < Model->NodeCount;
-        NodeIndex+=4)
+        NodeIndex+=8)
     {
-        __m128i Indices = _mm_setr_epi32(NodeIndex + 0, NodeIndex + 1,
-                                         NodeIndex + 2, NodeIndex + 3);
+        i32_8x Indices = IndicesStartFrom(NodeIndex);
+        f32_8x IndicesFit = LessThan(ConvertToFloat(Indices), ConvertToFloat(I32_8X(Model->NodeCount)));
+        i32_8x StepIndices = Blend(IndicesFit, Indices, I32_8X(Model->NodeCount - 1));
         
-        __m128i IndicesFit = _mm_cmplt_epi32(Indices, _mm_set1_epi32(Model->NodeCount));
+        m44_8x Tra = TranslationMatrix(Transforms->Ts[MMI8(StepIndices.e, 0)],
+                                       Transforms->Ts[MMI8(StepIndices.e, 1)],
+                                       Transforms->Ts[MMI8(StepIndices.e, 2)],
+                                       Transforms->Ts[MMI8(StepIndices.e, 3)],
+                                       Transforms->Ts[MMI8(StepIndices.e, 4)],
+                                       Transforms->Ts[MMI8(StepIndices.e, 5)],
+                                       Transforms->Ts[MMI8(StepIndices.e, 6)],
+                                       Transforms->Ts[MMI8(StepIndices.e, 7)]);
         
-        __m128i StepIndices = _mm_or_si128(_mm_and_si128(IndicesFit, Indices),
-                                           _mm_andnot_si128(IndicesFit, _mm_set1_epi32(Model->NodeCount - 1)));
+        m44_8x Rot = RotationMatrix(Transforms->Rs[MMI8(StepIndices.e, 0)],
+                                    Transforms->Rs[MMI8(StepIndices.e, 1)],
+                                    Transforms->Rs[MMI8(StepIndices.e, 2)],
+                                    Transforms->Rs[MMI8(StepIndices.e, 3)],
+                                    Transforms->Rs[MMI8(StepIndices.e, 4)],
+                                    Transforms->Rs[MMI8(StepIndices.e, 5)],
+                                    Transforms->Rs[MMI8(StepIndices.e, 6)],
+                                    Transforms->Rs[MMI8(StepIndices.e, 7)]);
         
-        m44_4x Tra = TranslationMatrix_4X(Transforms->Ts[MMI(StepIndices, 0)],
-                                          Transforms->Ts[MMI(StepIndices, 1)],
-                                          Transforms->Ts[MMI(StepIndices, 2)],
-                                          Transforms->Ts[MMI(StepIndices, 3)]);
+        m44_8x Sca = ScalingMatrix(Transforms->Ss[MMI8(StepIndices.e, 0)],
+                                   Transforms->Ss[MMI8(StepIndices.e, 1)],
+                                   Transforms->Ss[MMI8(StepIndices.e, 2)],
+                                   Transforms->Ss[MMI8(StepIndices.e, 3)],
+                                   Transforms->Ss[MMI8(StepIndices.e, 4)],
+                                   Transforms->Ss[MMI8(StepIndices.e, 5)],
+                                   Transforms->Ss[MMI8(StepIndices.e, 6)],
+                                   Transforms->Ss[MMI8(StepIndices.e, 7)]);
         
-        m44_4x Rot = RotationMatrix_4X(Transforms->Rs[MMI(StepIndices, 0)],
-                                       Transforms->Rs[MMI(StepIndices, 1)],
-                                       Transforms->Rs[MMI(StepIndices, 2)],
-                                       Transforms->Rs[MMI(StepIndices, 3)]);
+        m44_8x Res = Sca * Rot * Tra;
         
-        m44_4x Sca = ScalingMatrix_4X(Transforms->Ss[MMI(StepIndices, 0)],
-                                      Transforms->Ss[MMI(StepIndices, 1)],
-                                      Transforms->Ss[MMI(StepIndices, 2)],
-                                      Transforms->Ss[MMI(StepIndices, 3)]);
-        
-        m44_4x Res = Sca * Rot * Tra;
-        
-        M44_4X_Store(Res, 
-                     &Model->Nodes[MMI(StepIndices, 0)].CalculatedToParent,
-                     &Model->Nodes[MMI(StepIndices, 1)].CalculatedToParent,
-                     &Model->Nodes[MMI(StepIndices, 2)].CalculatedToParent,
-                     &Model->Nodes[MMI(StepIndices, 3)].CalculatedToParent);
+        M44_8X_Store(Res, 
+                     &Model->Nodes[MMI8(StepIndices.e, 0)].CalculatedToParent,
+                     &Model->Nodes[MMI8(StepIndices.e, 1)].CalculatedToParent,
+                     &Model->Nodes[MMI8(StepIndices.e, 2)].CalculatedToParent,
+                     &Model->Nodes[MMI8(StepIndices.e, 3)].CalculatedToParent,
+                     &Model->Nodes[MMI8(StepIndices.e, 4)].CalculatedToParent,
+                     &Model->Nodes[MMI8(StepIndices.e, 5)].CalculatedToParent,
+                     &Model->Nodes[MMI8(StepIndices.e, 6)].CalculatedToParent,
+                     &Model->Nodes[MMI8(StepIndices.e, 7)].CalculatedToParent);
     }
 #endif
 }
@@ -676,7 +801,7 @@ INTERNAL_FUNCTION void CalculateToModelTransforms(model_info* Model){
     
     // NOTE(Dima): Calculating to to modelspace transforms
     
-#if 0    
+#if !defined(JOY_AVX)
     for(int NodeIndex = 0;
         NodeIndex < Model->NodeCount;
         NodeIndex++)
@@ -696,59 +821,78 @@ INTERNAL_FUNCTION void CalculateToModelTransforms(model_info* Model){
         }
     }
 #else
-    __m128i MinusOne = _mm_set1_epi32(-1);
+    i32_8x MinusOne = I32_8X(-1);
     
     for(int NodeIndex = 0;
         NodeIndex < Model->NodeCount;
-        NodeIndex += 4)
+        NodeIndex += 8)
     {
-        __m128i Indices = _mm_setr_epi32(NodeIndex + 0, NodeIndex + 1,
-                                         NodeIndex + 2, NodeIndex + 3);
+        i32_8x Indices = IndicesStartFrom(NodeIndex, 1);
+        f32_8x IndicesFit = LessThan(ConvertToFloat(Indices), ConvertToFloat(I32_8X(Model->NodeCount)));
+        i32_8x StepIndices = Blend(IndicesFit, Indices, I32_8X(Model->NodeCount - 1));
         
-        __m128i IndicesFit = _mm_cmplt_epi32(Indices, _mm_set1_epi32(Model->NodeCount));
-        
-        __m128i StepIndices = _mm_or_si128(_mm_and_si128(IndicesFit, Indices),
-                                           _mm_andnot_si128(IndicesFit, _mm_set1_epi32(Model->NodeCount - 1)));
-        
-        node_info* Node0 = &Model->Nodes[MMI(StepIndices, 0)];
-        node_info* Node1 = &Model->Nodes[MMI(StepIndices, 1)];
-        node_info* Node2 = &Model->Nodes[MMI(StepIndices, 2)];
-        node_info* Node3 = &Model->Nodes[MMI(StepIndices, 3)];
+        node_info* Node0 = &Model->Nodes[MMI8(StepIndices.e, 0)];
+        node_info* Node1 = &Model->Nodes[MMI8(StepIndices.e, 1)];
+        node_info* Node2 = &Model->Nodes[MMI8(StepIndices.e, 2)];
+        node_info* Node3 = &Model->Nodes[MMI8(StepIndices.e, 3)];
+        node_info* Node4 = &Model->Nodes[MMI8(StepIndices.e, 4)];
+        node_info* Node5 = &Model->Nodes[MMI8(StepIndices.e, 5)];
+        node_info* Node6 = &Model->Nodes[MMI8(StepIndices.e, 6)];
+        node_info* Node7 = &Model->Nodes[MMI8(StepIndices.e, 7)];
         
         node_info* ParentNode0 = &Model->Nodes[Node0->Shared->ParentIndex];
         node_info* ParentNode1 = &Model->Nodes[Node1->Shared->ParentIndex];
         node_info* ParentNode2 = &Model->Nodes[Node2->Shared->ParentIndex];
         node_info* ParentNode3 = &Model->Nodes[Node3->Shared->ParentIndex];
+        node_info* ParentNode4 = &Model->Nodes[Node4->Shared->ParentIndex];
+        node_info* ParentNode5 = &Model->Nodes[Node5->Shared->ParentIndex];
+        node_info* ParentNode6 = &Model->Nodes[Node6->Shared->ParentIndex];
+        node_info* ParentNode7 = &Model->Nodes[Node7->Shared->ParentIndex];
         
-        m44_4x CalcToParent = M44_4X(Node0->CalculatedToParent,
+        m44_8x CalcToParent = M44_8X(Node0->CalculatedToParent,
                                      Node1->CalculatedToParent,
                                      Node2->CalculatedToParent,
-                                     Node3->CalculatedToParent);
+                                     Node3->CalculatedToParent,
+                                     Node4->CalculatedToParent,
+                                     Node5->CalculatedToParent,
+                                     Node6->CalculatedToParent,
+                                     Node7->CalculatedToParent);
         
-        m44_4x ParentToModel = M44_4X(ParentNode0->CalculatedToModel,
+        m44_8x ParentToModel = M44_8X(ParentNode0->CalculatedToModel,
                                       ParentNode1->CalculatedToModel,
                                       ParentNode2->CalculatedToModel,
-                                      ParentNode3->CalculatedToModel);
+                                      ParentNode3->CalculatedToModel,
+                                      ParentNode4->CalculatedToModel,
+                                      ParentNode5->CalculatedToModel,
+                                      ParentNode6->CalculatedToModel,
+                                      ParentNode7->CalculatedToModel);
         
-        m44_4x Result = CalcToParent * ParentToModel;
+        m44_8x Result = CalcToParent * ParentToModel;
         
-        __m128 ParentIndexCheckMask = _mm_castsi128_ps(_mm_cmpeq_epi32(MinusOne,
-                                                                       _mm_setr_epi32(Node0->Shared->ParentIndex,
-                                                                                      Node1->Shared->ParentIndex,
-                                                                                      Node2->Shared->ParentIndex,
-                                                                                      Node3->Shared->ParentIndex)));
         
-        int MovedMask = _mm_movemask_ps(ParentIndexCheckMask);
-        if(MovedMask){
-            Result = ConditionalCombine(F32_4X(ParentIndexCheckMask),
+        f32_8x ParentIndexCheckMask = IsEqual(MinusOne, I32_8X(Node0->Shared->ParentIndex,
+                                                               Node1->Shared->ParentIndex,
+                                                               Node2->Shared->ParentIndex,
+                                                               Node3->Shared->ParentIndex,
+                                                               Node4->Shared->ParentIndex,
+                                                               Node5->Shared->ParentIndex,
+                                                               Node6->Shared->ParentIndex,
+                                                               Node7->Shared->ParentIndex));
+        
+        if(AnyTrue(ParentIndexCheckMask)){
+            Result = ConditionalCombine(ParentIndexCheckMask,
                                         CalcToParent, Result);
         }
         
-        M44_4X_Store(Result,
+        M44_8X_Store(Result,
                      &Node0->CalculatedToModel,
                      &Node1->CalculatedToModel,
                      &Node2->CalculatedToModel,
-                     &Node3->CalculatedToModel);
+                     &Node3->CalculatedToModel,
+                     &Node4->CalculatedToModel,
+                     &Node5->CalculatedToModel,
+                     &Node6->CalculatedToModel,
+                     &Node7->CalculatedToModel);
     }
 #endif
 }
@@ -1230,7 +1374,7 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                         node_transforms_block* Dst = &Slot->ResultedTransforms;
                         node_transforms_block* Src = &Playing->NodeTransforms;
                         
-#if 0                    
+#if !defined(JOY_AVX)            
                         for(int NodeIndex = 0; 
                             NodeIndex < Model->NodeCount;
                             NodeIndex++)
@@ -1242,57 +1386,93 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
 #else
                         for(int NodeIndex = 0; 
                             NodeIndex < Model->NodeCount;
-                            NodeIndex+=4)
+                            NodeIndex+=8)
                         {
-                            v3_4x SrcT = V3_4X(Src->Ts[NodeIndex + 0],
+                            v3_8x SrcT = V3_8X(Src->Ts[NodeIndex + 0],
                                                Src->Ts[NodeIndex + 1],
                                                Src->Ts[NodeIndex + 2],
-                                               Src->Ts[NodeIndex + 3]);
+                                               Src->Ts[NodeIndex + 3],
+                                               Src->Ts[NodeIndex + 4],
+                                               Src->Ts[NodeIndex + 5],
+                                               Src->Ts[NodeIndex + 6],
+                                               Src->Ts[NodeIndex + 7]);
                             
-                            v4_4x SrcR = V4_4X(Src->Rs[NodeIndex + 0],
+                            v4_8x SrcR = V4_8X(Src->Rs[NodeIndex + 0],
                                                Src->Rs[NodeIndex + 1],
                                                Src->Rs[NodeIndex + 2],
-                                               Src->Rs[NodeIndex + 3]);
+                                               Src->Rs[NodeIndex + 3],
+                                               Src->Rs[NodeIndex + 4],
+                                               Src->Rs[NodeIndex + 5],
+                                               Src->Rs[NodeIndex + 6],
+                                               Src->Rs[NodeIndex + 7]);
                             
-                            v3_4x SrcS = V3_4X(Src->Ss[NodeIndex + 0],
+                            v3_8x SrcS = V3_8X(Src->Ss[NodeIndex + 0],
                                                Src->Ss[NodeIndex + 1],
                                                Src->Ss[NodeIndex + 2],
-                                               Src->Ss[NodeIndex + 3]);
+                                               Src->Ss[NodeIndex + 3],
+                                               Src->Ss[NodeIndex + 4],
+                                               Src->Ss[NodeIndex + 5],
+                                               Src->Ss[NodeIndex + 6],
+                                               Src->Ss[NodeIndex + 7]);
                             
-                            v3_4x DstT = V3_4X(Dst->Ts[NodeIndex + 0],
+                            v3_8x DstT = V3_8X(Dst->Ts[NodeIndex + 0],
                                                Dst->Ts[NodeIndex + 1],
                                                Dst->Ts[NodeIndex + 2],
-                                               Dst->Ts[NodeIndex + 3]);
+                                               Dst->Ts[NodeIndex + 3],
+                                               Dst->Ts[NodeIndex + 4],
+                                               Dst->Ts[NodeIndex + 5],
+                                               Dst->Ts[NodeIndex + 6],
+                                               Dst->Ts[NodeIndex + 7]);
                             
-                            v4_4x DstR = V4_4X(Dst->Rs[NodeIndex + 0],
+                            v4_8x DstR = V4_8X(Dst->Rs[NodeIndex + 0],
                                                Dst->Rs[NodeIndex + 1],
                                                Dst->Rs[NodeIndex + 2],
-                                               Dst->Rs[NodeIndex + 3]);
+                                               Dst->Rs[NodeIndex + 3],
+                                               Dst->Rs[NodeIndex + 4],
+                                               Dst->Rs[NodeIndex + 5],
+                                               Dst->Rs[NodeIndex + 6],
+                                               Dst->Rs[NodeIndex + 7]);
                             
-                            v3_4x DstS = V3_4X(Dst->Ss[NodeIndex + 0],
+                            v3_8x DstS = V3_8X(Dst->Ss[NodeIndex + 0],
                                                Dst->Ss[NodeIndex + 1],
                                                Dst->Ss[NodeIndex + 2],
-                                               Dst->Ss[NodeIndex + 3]);
+                                               Dst->Ss[NodeIndex + 3],
+                                               Dst->Ss[NodeIndex + 4],
+                                               Dst->Ss[NodeIndex + 5],
+                                               Dst->Ss[NodeIndex + 6],
+                                               Dst->Ss[NodeIndex + 7]);
                             
                             DstT += SrcT;
                             DstS += SrcS;
                             DstR += SrcR;
                             
-                            V3_4X_Store(DstT, 
+                            V3_8X_Store(DstT, 
                                         &Dst->Ts[NodeIndex + 0],
                                         &Dst->Ts[NodeIndex + 1],
                                         &Dst->Ts[NodeIndex + 2],
-                                        &Dst->Ts[NodeIndex + 3]);
-                            V3_4X_Store(DstS, 
+                                        &Dst->Ts[NodeIndex + 3],
+                                        &Dst->Ts[NodeIndex + 4],
+                                        &Dst->Ts[NodeIndex + 5],
+                                        &Dst->Ts[NodeIndex + 6],
+                                        &Dst->Ts[NodeIndex + 7]);
+                            V3_8X_Store(DstS, 
                                         &Dst->Ss[NodeIndex + 0],
                                         &Dst->Ss[NodeIndex + 1],
                                         &Dst->Ss[NodeIndex + 2],
-                                        &Dst->Ss[NodeIndex + 3]);
-                            V4_4X_Store(DstR,
+                                        &Dst->Ss[NodeIndex + 3],
+                                        &Dst->Ss[NodeIndex + 4],
+                                        &Dst->Ss[NodeIndex + 5],
+                                        &Dst->Ss[NodeIndex + 6],
+                                        &Dst->Ss[NodeIndex + 7]);
+                            V4_8X_Store(DstR,
                                         &Dst->Rs[NodeIndex + 0],
                                         &Dst->Rs[NodeIndex + 1],
                                         &Dst->Rs[NodeIndex + 2],
-                                        &Dst->Rs[NodeIndex + 3]);
+                                        &Dst->Rs[NodeIndex + 3],
+                                        &Dst->Rs[NodeIndex + 4],
+                                        &Dst->Rs[NodeIndex + 5],
+                                        &Dst->Rs[NodeIndex + 6],
+                                        &Dst->Rs[NodeIndex + 7]);
                         }
 #endif
                     }
@@ -1323,8 +1503,8 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                     node_transforms_block* Src = &Slot->ResultedTransforms;
                     //node_transforms_block* Src = &Slot->PlayingAnimation.NodeTransforms;
                     
-#if 0                    
-                    float Contribution = AnimState->Contribution;
+#if !defined(JOY_AVX)
+                    float Contribution = Slot->Contribution;
                     
                     for(int NodeIndex = 0; 
                         NodeIndex < Model->NodeCount;
@@ -1340,67 +1520,103 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                         float RotDot = Dot(Dst->Rs[NodeIndex], 
                                            Src->Rs[NodeIndex]);
                         float SignDot = SignNotZero(RotDot);
-                        Dst->Rs[NodeIndex] += Src->Rs[NodeIndex] * SignDot * Contribution;-
+                        Dst->Rs[NodeIndex] += Src->Rs[NodeIndex] * SignDot * Contribution;
                     }
 #else
-                    f32_4x Contribution = F32_4X(Slot->Contribution);
+                    f32_8x Contribution = F32_8X(Slot->Contribution);
                     
                     for(int NodeIndex = 0; 
                         NodeIndex < Model->NodeCount;
-                        NodeIndex+=4)
+                        NodeIndex+=8)
                     {
-                        v3_4x SrcT = V3_4X(Src->Ts[NodeIndex + 0],
+                        v3_8x SrcT = V3_8X(Src->Ts[NodeIndex + 0],
                                            Src->Ts[NodeIndex + 1],
                                            Src->Ts[NodeIndex + 2],
-                                           Src->Ts[NodeIndex + 3]);
+                                           Src->Ts[NodeIndex + 3],
+                                           Src->Ts[NodeIndex + 4],
+                                           Src->Ts[NodeIndex + 5],
+                                           Src->Ts[NodeIndex + 6],
+                                           Src->Ts[NodeIndex + 7]);
                         
-                        v4_4x SrcR = V4_4X(Src->Rs[NodeIndex + 0],
+                        v4_8x SrcR = V4_8X(Src->Rs[NodeIndex + 0],
                                            Src->Rs[NodeIndex + 1],
                                            Src->Rs[NodeIndex + 2],
-                                           Src->Rs[NodeIndex + 3]);
+                                           Src->Rs[NodeIndex + 3],
+                                           Src->Rs[NodeIndex + 4],
+                                           Src->Rs[NodeIndex + 5],
+                                           Src->Rs[NodeIndex + 6],
+                                           Src->Rs[NodeIndex + 7]);
                         
-                        v3_4x SrcS = V3_4X(Src->Ss[NodeIndex + 0],
+                        v3_8x SrcS = V3_8X(Src->Ss[NodeIndex + 0],
                                            Src->Ss[NodeIndex + 1],
                                            Src->Ss[NodeIndex + 2],
-                                           Src->Ss[NodeIndex + 3]);
+                                           Src->Ss[NodeIndex + 3],
+                                           Src->Ss[NodeIndex + 4],
+                                           Src->Ss[NodeIndex + 5],
+                                           Src->Ss[NodeIndex + 6],
+                                           Src->Ss[NodeIndex + 7]);
                         
-                        v3_4x DstT = V3_4X(Dst->Ts[NodeIndex + 0],
+                        v3_8x DstT = V3_8X(Dst->Ts[NodeIndex + 0],
                                            Dst->Ts[NodeIndex + 1],
                                            Dst->Ts[NodeIndex + 2],
-                                           Dst->Ts[NodeIndex + 3]);
+                                           Dst->Ts[NodeIndex + 3],
+                                           Dst->Ts[NodeIndex + 4],
+                                           Dst->Ts[NodeIndex + 5],
+                                           Dst->Ts[NodeIndex + 6],
+                                           Dst->Ts[NodeIndex + 7]);
                         
-                        v4_4x DstR = V4_4X(Dst->Rs[NodeIndex + 0],
+                        v4_8x DstR = V4_8X(Dst->Rs[NodeIndex + 0],
                                            Dst->Rs[NodeIndex + 1],
                                            Dst->Rs[NodeIndex + 2],
-                                           Dst->Rs[NodeIndex + 3]);
+                                           Dst->Rs[NodeIndex + 3],
+                                           Dst->Rs[NodeIndex + 4],
+                                           Dst->Rs[NodeIndex + 5],
+                                           Dst->Rs[NodeIndex + 6],
+                                           Dst->Rs[NodeIndex + 7]);
                         
-                        v3_4x DstS = V3_4X(Dst->Ss[NodeIndex + 0],
+                        v3_8x DstS = V3_8X(Dst->Ss[NodeIndex + 0],
                                            Dst->Ss[NodeIndex + 1],
                                            Dst->Ss[NodeIndex + 2],
-                                           Dst->Ss[NodeIndex + 3]);
+                                           Dst->Ss[NodeIndex + 3],
+                                           Dst->Ss[NodeIndex + 4],
+                                           Dst->Ss[NodeIndex + 5],
+                                           Dst->Ss[NodeIndex + 6],
+                                           Dst->Ss[NodeIndex + 7]);
                         
                         DstT += SrcT * Contribution;
                         DstS += SrcS * Contribution;
                         
-                        f32_4x DotRot = Dot_4X(DstR, SrcR);
-                        f32_4x SignDot = SignNotZero_4X(DotRot);
+                        f32_8x DotRot = Dot(DstR, SrcR);
+                        f32_8x SignDot = SignNotZero(DotRot);
                         DstR += (SrcR * SignDot * Contribution);
                         
-                        V3_4X_Store(DstT, 
+                        V3_8X_Store(DstT, 
                                     &Dst->Ts[NodeIndex + 0],
                                     &Dst->Ts[NodeIndex + 1],
                                     &Dst->Ts[NodeIndex + 2],
-                                    &Dst->Ts[NodeIndex + 3]);
-                        V3_4X_Store(DstS, 
+                                    &Dst->Ts[NodeIndex + 3],
+                                    &Dst->Ts[NodeIndex + 4],
+                                    &Dst->Ts[NodeIndex + 5],
+                                    &Dst->Ts[NodeIndex + 6],
+                                    &Dst->Ts[NodeIndex + 7]);
+                        V3_8X_Store(DstS, 
                                     &Dst->Ss[NodeIndex + 0],
                                     &Dst->Ss[NodeIndex + 1],
                                     &Dst->Ss[NodeIndex + 2],
-                                    &Dst->Ss[NodeIndex + 3]);
-                        V4_4X_Store(DstR,
+                                    &Dst->Ss[NodeIndex + 3],
+                                    &Dst->Ss[NodeIndex + 4],
+                                    &Dst->Ss[NodeIndex + 5],
+                                    &Dst->Ss[NodeIndex + 6],
+                                    &Dst->Ss[NodeIndex + 7]);
+                        V4_8X_Store(DstR,
                                     &Dst->Rs[NodeIndex + 0],
                                     &Dst->Rs[NodeIndex + 1],
                                     &Dst->Rs[NodeIndex + 2],
-                                    &Dst->Rs[NodeIndex + 3]);
+                                    &Dst->Rs[NodeIndex + 3],
+                                    &Dst->Rs[NodeIndex + 4],
+                                    &Dst->Rs[NodeIndex + 5],
+                                    &Dst->Rs[NodeIndex + 6],
+                                    &Dst->Rs[NodeIndex + 7]);
                     }
 #endif
                     PlayingStateIndex = GetPrevPlayingIndex(PlayingStateIndex);
@@ -1412,7 +1628,7 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                 
                 node_transforms_block* Src = &AC->ResultedTransforms;
                 
-#if 0                
+#if !defined(JOY_AVX)               
                 // TODO(Dima): SIMD this loop too
                 for(int NodeIndex = 0; 
                     NodeIndex < Model->NodeCount;
@@ -1424,20 +1640,28 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
 #else
                 for(int NodeIndex = 0; 
                     NodeIndex < Model->NodeCount;
-                    NodeIndex+=4)
+                    NodeIndex+=8)
                 {
-                    v4_4x SrcR = V4_4X(Src->Rs[NodeIndex + 0],
+                    v4_8x SrcR = V4_8X(Src->Rs[NodeIndex + 0],
                                        Src->Rs[NodeIndex + 1],
                                        Src->Rs[NodeIndex + 2],
-                                       Src->Rs[NodeIndex + 3]);
+                                       Src->Rs[NodeIndex + 3],
+                                       Src->Rs[NodeIndex + 4],
+                                       Src->Rs[NodeIndex + 5],
+                                       Src->Rs[NodeIndex + 6],
+                                       Src->Rs[NodeIndex + 7]);
                     
-                    v4_4x Res = Normalize_4X(SrcR);
+                    v4_8x Res = Normalize(SrcR);
                     
-                    V4_4X_Store(Res,
+                    V4_8X_Store(Res,
                                 &Src->Rs[NodeIndex + 0],
                                 &Src->Rs[NodeIndex + 1],
                                 &Src->Rs[NodeIndex + 2],
-                                &Src->Rs[NodeIndex + 3]);
+                                &Src->Rs[NodeIndex + 3],
+                                &Src->Rs[NodeIndex + 4],
+                                &Src->Rs[NodeIndex + 5],
+                                &Src->Rs[NodeIndex + 6],
+                                &Src->Rs[NodeIndex + 7]);
                 }
 #endif
             }
@@ -1472,7 +1696,7 @@ INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(assets* Assets,
             BoneCount = Skeleton->BoneCount;
             CalculatedBoneTransforms = AC->BoneTransformMatrices;
             
-#if 0     
+#if !defined(JOY_AVX)   
             for(int BoneIndex = 0;
                 BoneIndex < BoneCount;
                 BoneIndex++)
@@ -1488,43 +1712,55 @@ INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(assets* Assets,
             
             for(int BoneIndex = 0;
                 BoneIndex < BoneCount;
-                BoneIndex += 4)
+                BoneIndex += 8)
             {
-                __m128i Indices = _mm_setr_epi32(BoneIndex + 0, BoneIndex + 1,
-                                                 BoneIndex + 2, BoneIndex + 3);
+                i32_8x Indices = IndicesStartFrom(BoneIndex, 1);
+                f32_8x IndicesFit = LessThan(ConvertToFloat(Indices), ConvertToFloat(I32_8X(BoneCount)));
                 
-                __m128i IndicesFit = _mm_cmplt_epi32(Indices, _mm_set1_epi32(BoneCount));
-                int MovedMask = _mm_movemask_ps(_mm_castsi128_ps(IndicesFit));
-                
-                if(MovedMask){
+                if(AnyTrue(IndicesFit)){
                     bone_info* Bone = &Skeleton->Bones[BoneIndex];
                     node_info* CorrespondingNode = &Model->Nodes[Bone->NodeIndex];
                     
-                    __m128i StepIndices = _mm_or_si128(_mm_and_si128(IndicesFit, Indices),
-                                                       _mm_andnot_si128(IndicesFit, _mm_set1_epi32(BoneCount - 1)));
+                    i32_8x StepIndices = Blend(IndicesFit, Indices, I32_8X(BoneCount - 1));
                     
-                    bone_info* Bone0 = &Skeleton->Bones[MMI(StepIndices, 0)];
-                    bone_info* Bone1 = &Skeleton->Bones[MMI(StepIndices, 1)];
-                    bone_info* Bone2 = &Skeleton->Bones[MMI(StepIndices, 2)];
-                    bone_info* Bone3 = &Skeleton->Bones[MMI(StepIndices, 3)];
+                    bone_info* Bone0 = &Skeleton->Bones[MMI8(StepIndices.e, 0)];
+                    bone_info* Bone1 = &Skeleton->Bones[MMI8(StepIndices.e, 1)];
+                    bone_info* Bone2 = &Skeleton->Bones[MMI8(StepIndices.e, 2)];
+                    bone_info* Bone3 = &Skeleton->Bones[MMI8(StepIndices.e, 3)];
+                    bone_info* Bone4 = &Skeleton->Bones[MMI8(StepIndices.e, 4)];
+                    bone_info* Bone5 = &Skeleton->Bones[MMI8(StepIndices.e, 5)];
+                    bone_info* Bone6 = &Skeleton->Bones[MMI8(StepIndices.e, 6)];
+                    bone_info* Bone7 = &Skeleton->Bones[MMI8(StepIndices.e, 7)];
                     
-                    m44_4x InvBindPose = M44_4X(Bone0->InvBindPose,
+                    m44_8x InvBindPose = M44_8X(Bone0->InvBindPose,
                                                 Bone1->InvBindPose,
                                                 Bone2->InvBindPose,
-                                                Bone3->InvBindPose);
+                                                Bone3->InvBindPose,
+                                                Bone4->InvBindPose,
+                                                Bone5->InvBindPose,
+                                                Bone6->InvBindPose,
+                                                Bone7->InvBindPose);
                     
-                    m44_4x NodeCalcToModel = M44_4X(Model->Nodes[Bone0->NodeIndex].CalculatedToModel,
+                    m44_8x NodeCalcToModel = M44_8X(Model->Nodes[Bone0->NodeIndex].CalculatedToModel,
                                                     Model->Nodes[Bone1->NodeIndex].CalculatedToModel,
                                                     Model->Nodes[Bone2->NodeIndex].CalculatedToModel,
-                                                    Model->Nodes[Bone3->NodeIndex].CalculatedToModel);
+                                                    Model->Nodes[Bone3->NodeIndex].CalculatedToModel,
+                                                    Model->Nodes[Bone4->NodeIndex].CalculatedToModel,
+                                                    Model->Nodes[Bone5->NodeIndex].CalculatedToModel,
+                                                    Model->Nodes[Bone6->NodeIndex].CalculatedToModel,
+                                                    Model->Nodes[Bone7->NodeIndex].CalculatedToModel);
                     
-                    m44_4x Result = InvBindPose * NodeCalcToModel;
+                    m44_8x Result = InvBindPose * NodeCalcToModel;
                     
-                    M44_4X_Store(Result,
-                                 &CalculatedBoneTransforms[MMI(StepIndices, 0)],
-                                 &CalculatedBoneTransforms[MMI(StepIndices, 1)],
-                                 &CalculatedBoneTransforms[MMI(StepIndices, 2)],
-                                 &CalculatedBoneTransforms[MMI(StepIndices, 3]));
+                    M44_8X_Store(Result,
+                                 &CalculatedBoneTransforms[MMI8(StepIndices.e, 0)],
+                                 &CalculatedBoneTransforms[MMI8(StepIndices.e, 1)],
+                                 &CalculatedBoneTransforms[MMI8(StepIndices.e, 2)],
+                                 &CalculatedBoneTransforms[MMI8(StepIndices.e, 3)],
+                                 &CalculatedBoneTransforms[MMI8(StepIndices.e, 4)],
+                                 &CalculatedBoneTransforms[MMI8(StepIndices.e, 5)],
+                                 &CalculatedBoneTransforms[MMI8(StepIndices.e, 6)],
+                                 &CalculatedBoneTransforms[MMI8(StepIndices.e, 7)]);
                 }
             }
 #endif

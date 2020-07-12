@@ -82,6 +82,329 @@ void RenderRGBA2BGRA(bmp_info* buf, rc2 clipRect){
 }
 
 
+void RenderClear(bmp_info* buf, v3 Color, rc2 clipRect) {
+	v4 ResColor = V4(Color.x, Color.y, Color.z, 1.0f);
+	u32 OutColor = PackRGBA(ResColor);
+    
+	int MinX = 0;
+	int MaxX = buf->Width;
+	int MinY = 0;
+	int MaxY = buf->Height;
+    
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+    
+	for (u32 DestY = MinY; DestY < MaxY; DestY++) {
+		for (u32 DestX = MinX; DestX < MaxX; DestX++) {
+			u32* OutDest = (u32*)buf->Pixels + DestY * buf->Width + DestX;
+            
+			*OutDest = OutColor;
+		}
+	}
+}
+
+void RenderGradientHorz(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect){
+	
+    v2 P = rect.Min;
+    v2 Dim = GetRectDim(rect);
+    
+    int InitX = floorf(P.x);
+	int InitY = floorf(P.y);
+    
+	int MinX = InitX;
+	int MaxX = MinX + ceilf(Dim.x);
+    
+	int MinY = InitY;
+	int MaxY = MinY + ceilf(Dim.y);
+    
+    int SaveMinX = MinX;
+    int SaveMinY = MinY;
+    
+    int SaveDimX = MaxX - MinX;
+    int SaveDimY = MaxY - MinY;
+    
+	MinX = Clamp(MinX, 0, buf->Width);
+	MaxX = Clamp(MaxX, 0, buf->Width);
+	MinY = Clamp(MinY, 0, buf->Height);
+	MaxY = Clamp(MaxY, 0, buf->Height);
+    
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+    
+	float OneOverWidth = 1.0f / (float)SaveDimX;
+	float OneOverHeight = 1.0f / (float)SaveDimY;
+    
+	for (int VertIndex = MinY; VertIndex < MaxY; VertIndex++) {
+        
+		float DeltaV = (float)(VertIndex - SaveMinY) * OneOverHeight;
+        
+		u32* Pixel = (u32*)((u8*)buf->Pixels + VertIndex * buf->Pitch + MinX * 4);
+		for (int HorzIndex = MinX; HorzIndex < MaxX; HorzIndex++) {
+			float DeltaU = (float)(HorzIndex - SaveMinX) * OneOverWidth;
+            
+			v4 OutColor;
+			OutColor.x = color1.x + (Color2.x - color1.x) * DeltaU;
+			OutColor.y = color1.y + (Color2.y - color1.y) * DeltaU;
+			OutColor.z = color1.z + (Color2.z - color1.z) * DeltaU;
+			OutColor.w = 1.0f;
+            
+			u32 ColorByteRep = PackRGBA(OutColor);
+            
+			*Pixel++ = ColorByteRep;
+		}
+	}
+}
+
+void RenderGradientVert(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect){
+	
+    v2 P = rect.Min;
+    v2 Dim = GetRectDim(rect);
+    
+    int InitX = floorf(P.x);
+	int InitY = floorf(P.y);
+    
+	int MinX = InitX;
+	int MaxX = MinX + ceilf(Dim.x);
+    
+	int MinY = InitY;
+	int MaxY = MinY + ceilf(Dim.y);
+    
+    int SaveMinX = MinX;
+    int SaveMinY = MinY;
+    
+    int SaveDimX = MaxX - MinX;
+    int SaveDimY = MaxY - MinY;
+    
+	MinX = Clamp(MinX, 0, buf->Width);
+	MaxX = Clamp(MaxX, 0, buf->Width);
+	MinY = Clamp(MinY, 0, buf->Height);
+	MaxY = Clamp(MaxY, 0, buf->Height);
+    
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+    
+    
+	float OneOverWidth = 1.0f / (float)SaveDimX;
+	float OneOverHeight = 1.0f / (float)SaveDimY;
+    
+	for (int VertIndex = MinY; VertIndex < MaxY; VertIndex++) {
+        u32* Pixel = (u32*)((u8*)buf->Pixels + VertIndex * buf->Pitch + MinX * 4);
+		
+		float DeltaV = (float)(VertIndex - SaveMinY) * OneOverHeight;
+        
+        v4 OutColor;
+        OutColor.x = color1.x + (Color2.x - color1.x) * DeltaV;
+        OutColor.y = color1.y + (Color2.y - color1.y) * DeltaV;
+        OutColor.z = color1.z + (Color2.z - color1.z) * DeltaV;
+        OutColor.w = 1.0f;
+        
+        u32 ColorByteRep = PackRGBA(OutColor);
+        
+        for (int HorzIndex = MinX; HorzIndex < MaxX; HorzIndex++) {
+			*Pixel++ = ColorByteRep;
+		}
+	}
+}
+
+void RenderBitmap(
+                  bmp_info* buf,
+                  bmp_info* bitmap,
+                  v2 P,
+                  float TargetBitmapPixelHeight,
+                  v4 modulationColor01, 
+                  rc2 clipRect)
+{
+	float TargetScaling = (float)TargetBitmapPixelHeight / (float)bitmap->Height;
+    
+	modulationColor01.r *= modulationColor01.a;
+	modulationColor01.g *= modulationColor01.a;
+	modulationColor01.b *= modulationColor01.a;
+    
+	/*Clamping incoming color*/
+	modulationColor01.r = Clamp01(modulationColor01.r);
+	modulationColor01.g = Clamp01(modulationColor01.g);
+	modulationColor01.b = Clamp01(modulationColor01.b);
+	modulationColor01.a = Clamp01(modulationColor01.a);
+    
+	u32 TargetWidth = (float)bitmap->Width * TargetScaling;
+	u32 TargetHeight = TargetBitmapPixelHeight;
+    
+	int InitX = P.x;
+	int InitY = P.y;
+    
+	int MinX = InitX;
+	int MaxX = MinX + TargetWidth;
+    
+	int MinY = InitY;
+	int MaxY = MinY + TargetHeight;
+    
+	MinX = Clamp(MinX, 0, buf->Width);
+	MaxX = Clamp(MaxX, 0, buf->Width);
+	MinY = Clamp(MinY, 0, buf->Height);
+	MaxY = Clamp(MaxY, 0, buf->Height);
+    
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+    
+	float SourceWidth = bitmap->Width;
+	float SourceHeight = bitmap->Height;
+    
+	float OneOverSrcWidth = 1.0f / SourceWidth;
+	float OneOverSrcHeight = 1.0f / SourceHeight;
+    
+	float OneOverWidth = 1.0f / (float)TargetWidth;
+	float OneOverHeight = 1.0f / (float)TargetHeight;
+    
+    
+	for (int DestY = MinY; DestY < MaxY; DestY++) {
+        
+		float PixelV = ((float)DestY - (float)InitY) * OneOverHeight;
+		PixelV = Clamp01(PixelV);
+		float SourceY = PixelV * SourceHeight;
+        
+		for (int DestX = MinX; DestX < MaxX; DestX++) {
+            
+			float PixelU = ((float)DestX - (float)InitX) * OneOverWidth;
+			PixelU = Clamp01(PixelU);
+			float SourceX = PixelU * SourceWidth;
+            
+			u32 MinSourceX_ = (u32)SourceX;
+			u32 MinSourceY_ = (u32)SourceY;
+            
+			float DeltaX = SourceX - (float)MinSourceX_;
+			float DeltaY = SourceY - (float)MinSourceY_;
+            
+			u32 MaxSourceX_ = Min(MinSourceX_ + 1, bitmap->Width - 1);
+			u32 MaxSourceY_ = Min(MinSourceY_ + 1, bitmap->Height - 1);
+            
+			u32* TopLeft = (u32*)((u8*)bitmap->Pixels + bitmap->Pitch * MinSourceY_ + MinSourceX_ * 4);
+			u32* TopRight = (u32*)((u8*)bitmap->Pixels + bitmap->Pitch * MinSourceY_ + MaxSourceX_ * 4);
+			u32* BotLeft = (u32*)((u8*)bitmap->Pixels + bitmap->Pitch * MaxSourceY_ + MinSourceX_ * 4);
+			u32* BotRight = (u32*)((u8*)bitmap->Pixels + bitmap->Pitch * MaxSourceY_ + MaxSourceX_ * 4);
+            
+			v4 TopLeftColor = UnpackRGBA(*TopLeft);
+			v4 TopRightColor = UnpackRGBA(*TopRight);
+			v4 BotLeftColor = UnpackRGBA(*BotLeft);
+			v4 BotRightColor = UnpackRGBA(*BotRight);
+            
+			/*First row blend*/
+			v4 UpperBlend;
+			UpperBlend.r = TopLeftColor.r + (TopRightColor.r - TopLeftColor.r) * DeltaX;
+			UpperBlend.g = TopLeftColor.g + (TopRightColor.g - TopLeftColor.g) * DeltaX;
+			UpperBlend.b = TopLeftColor.b + (TopRightColor.b - TopLeftColor.b) * DeltaX;
+			UpperBlend.a = TopLeftColor.a + (TopRightColor.a - TopLeftColor.a) * DeltaX;
+            
+			/*Second row blend*/
+			v4 LowerBlend;
+			LowerBlend.r = BotLeftColor.r + (BotRightColor.r - BotLeftColor.r) * DeltaX;
+			LowerBlend.g = BotLeftColor.g + (BotRightColor.g - BotLeftColor.g) * DeltaX;
+			LowerBlend.b = BotLeftColor.b + (BotRightColor.b - BotLeftColor.b) * DeltaX;
+			LowerBlend.a = BotLeftColor.a + (BotRightColor.a - BotLeftColor.a) * DeltaX;
+            
+			/*Vertical blend*/
+			v4 BlendedColor;
+			BlendedColor.r = UpperBlend.r + (LowerBlend.r - UpperBlend.r) * DeltaY;
+			BlendedColor.g = UpperBlend.g + (LowerBlend.g - UpperBlend.g) * DeltaY;
+			BlendedColor.b = UpperBlend.b + (LowerBlend.b - UpperBlend.b) * DeltaY;
+			BlendedColor.a = UpperBlend.a + (LowerBlend.a - UpperBlend.a) * DeltaY;
+			
+			BlendedColor.r = BlendedColor.r * modulationColor01.r;
+			BlendedColor.g = BlendedColor.g * modulationColor01.g;
+			BlendedColor.b = BlendedColor.b * modulationColor01.b;
+			BlendedColor.a = BlendedColor.a * modulationColor01.a;
+            
+			u32* OutDest = (u32*)((u8*)buf->Pixels + DestY * buf->Pitch + DestX * 4);
+			v4 PreDestColor = UnpackRGBA(*OutDest);
+            
+			//float BlendAlpha = PreDestColor.a + BlendedColor.a - PreDestColor.a * BlendedColor.a;
+			float BlendAlpha = BlendedColor.a;
+			//Assert((BlendAlpha >= 0.0f) && (BlendAlpha <= 1.0f));
+            
+			/*Premultiplied alpha in action*/
+			v4 AlphaBlendColor;
+			AlphaBlendColor.r = (1.0f - BlendAlpha) * PreDestColor.r + BlendedColor.r;
+			AlphaBlendColor.g = (1.0f - BlendAlpha) * PreDestColor.g + BlendedColor.g;
+			AlphaBlendColor.b = (1.0f - BlendAlpha) * PreDestColor.b + BlendedColor.b;
+			AlphaBlendColor.a = PreDestColor.a + BlendedColor.a - PreDestColor.a * BlendedColor.a;
+            
+			u32 DestPackedColor = PackRGBA(AlphaBlendColor);
+			*OutDest = DestPackedColor;
+		}
+	}
+    
+	u32 PixelFillCount = (MaxY - MinY) * (MaxX - MinX);
+}
+
+void RenderRect(
+                bmp_info* buf,
+                v2 P,
+                v2 Dim,
+                v4 modulationColor01, 
+                rc2 clipRect)
+{
+	int InitX = floorf(P.x);
+	int InitY = floorf(P.y);
+    
+	int MinX = InitX;
+	int MaxX = MinX + ceilf(Dim.x);
+    
+	int MinY = InitY;
+	int MaxY = MinY + ceilf(Dim.y);
+    
+	MinX = Clamp(MinX, 0, buf->Width);
+	MaxX = Clamp(MaxX, 0, buf->Width);
+	MinY = Clamp(MinY, 0, buf->Height);
+	MaxY = Clamp(MaxY, 0, buf->Height);
+    
+	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
+	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
+    
+	/*Clamping incoming color*/
+	modulationColor01.r = Clamp01(modulationColor01.r);
+	modulationColor01.g = Clamp01(modulationColor01.g);
+	modulationColor01.b = Clamp01(modulationColor01.b);
+	modulationColor01.a = Clamp01(modulationColor01.a);
+    
+	/*Premultiplying incoming color with it alpha*/
+	modulationColor01.r *= modulationColor01.a;
+	modulationColor01.g *= modulationColor01.a;
+	modulationColor01.b *= modulationColor01.a;
+    
+	for (int DestY = MinY; DestY < MaxY; DestY++) {
+		for (int DestX = MinX; DestX < MaxX; DestX++) {
+			u32* OutDest = (u32*)((u8*)buf->Pixels + DestY * buf->Pitch + DestX * 4);
+            
+			v4 ResultColor = modulationColor01;
+			v4 PreDestColor = UnpackRGBA(*OutDest);
+            
+			float BlendAlpha = modulationColor01.a;
+            
+			v4 AlphaBlendColor;
+			AlphaBlendColor.r = (1.0f - BlendAlpha) * PreDestColor.r + ResultColor.r;
+			AlphaBlendColor.g = (1.0f - BlendAlpha) * PreDestColor.g + ResultColor.g;
+			AlphaBlendColor.b = (1.0f - BlendAlpha) * PreDestColor.b + ResultColor.b;
+			AlphaBlendColor.a = PreDestColor.a + ResultColor.a - PreDestColor.a * ResultColor.a;
+            
+			u32 DestPackedColor = PackRGBA(AlphaBlendColor);
+            
+			*OutDest = DestPackedColor;
+		}
+	}
+}
+
+
+#if defined(JOY_AVX)
+
 void RenderRGBA2BGRASSE(bmp_info* buf, rc2 clipRect) {
 	
 	int MinX = 0;
@@ -144,31 +467,6 @@ void RenderRGBA2BGRASSE(bmp_info* buf, rc2 clipRect) {
 	}
 }
 
-
-void RenderClear(bmp_info* buf, v3 Color, rc2 clipRect) {
-	v4 ResColor = V4(Color.x, Color.y, Color.z, 1.0f);
-	u32 OutColor = PackRGBA(ResColor);
-    
-	int MinX = 0;
-	int MaxX = buf->Width;
-	int MinY = 0;
-	int MaxY = buf->Height;
-    
-	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
-	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
-    
-	for (u32 DestY = MinY; DestY < MaxY; DestY++) {
-		for (u32 DestX = MinX; DestX < MaxX; DestX++) {
-			u32* OutDest = (u32*)buf->Pixels + DestY * buf->Width + DestX;
-            
-			*OutDest = OutColor;
-		}
-	}
-}
-
-
 void RenderClearSSE(bmp_info* buf, v3 Color, rc2 clipRect) {
 	v4 ResColor = V4(Color.x, Color.y, Color.z, 1.0f);
 	u32 OutColor = PackRGBA(ResColor);
@@ -228,60 +526,6 @@ void RenderClearSSE(bmp_info* buf, v3 Color, rc2 clipRect) {
             
             
 			_mm_storeu_si128((__m128i*)OutDest, mmResultColor);
-		}
-	}
-}
-
-void RenderGradientHorz(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect){
-	
-    v2 P = rect.Min;
-    v2 Dim = GetRectDim(rect);
-    
-    int InitX = floorf(P.x);
-	int InitY = floorf(P.y);
-    
-	int MinX = InitX;
-	int MaxX = MinX + ceilf(Dim.x);
-    
-	int MinY = InitY;
-	int MaxY = MinY + ceilf(Dim.y);
-    
-    int SaveMinX = MinX;
-    int SaveMinY = MinY;
-    
-    int SaveDimX = MaxX - MinX;
-    int SaveDimY = MaxY - MinY;
-    
-	MinX = Clamp(MinX, 0, buf->Width);
-	MaxX = Clamp(MaxX, 0, buf->Width);
-	MinY = Clamp(MinY, 0, buf->Height);
-	MaxY = Clamp(MaxY, 0, buf->Height);
-    
-	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
-	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
-    
-	float OneOverWidth = 1.0f / (float)SaveDimX;
-	float OneOverHeight = 1.0f / (float)SaveDimY;
-    
-	for (int VertIndex = MinY; VertIndex < MaxY; VertIndex++) {
-        
-		float DeltaV = (float)(VertIndex - SaveMinY) * OneOverHeight;
-        
-		u32* Pixel = (u32*)((u8*)buf->Pixels + VertIndex * buf->Pitch + MinX * 4);
-		for (int HorzIndex = MinX; HorzIndex < MaxX; HorzIndex++) {
-			float DeltaU = (float)(HorzIndex - SaveMinX) * OneOverWidth;
-            
-			v4 OutColor;
-			OutColor.x = color1.x + (Color2.x - color1.x) * DeltaU;
-			OutColor.y = color1.y + (Color2.y - color1.y) * DeltaU;
-			OutColor.z = color1.z + (Color2.z - color1.z) * DeltaU;
-			OutColor.w = 1.0f;
-            
-			u32 ColorByteRep = PackRGBA(OutColor);
-            
-			*Pixel++ = ColorByteRep;
 		}
 	}
 }
@@ -374,59 +618,6 @@ void RenderGradientHorzSSE(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 cl
                                                            mmOutColorShifted_r));
             
 			_mm_storeu_si128((__m128i*)Pixel, mmOutColor);
-		}
-	}
-}
-
-void RenderGradientVert(bmp_info* buf, rc2 rect, v3 color1, v3 Color2, rc2 clipRect){
-	
-    v2 P = rect.Min;
-    v2 Dim = GetRectDim(rect);
-    
-    int InitX = floorf(P.x);
-	int InitY = floorf(P.y);
-    
-	int MinX = InitX;
-	int MaxX = MinX + ceilf(Dim.x);
-    
-	int MinY = InitY;
-	int MaxY = MinY + ceilf(Dim.y);
-    
-    int SaveMinX = MinX;
-    int SaveMinY = MinY;
-    
-    int SaveDimX = MaxX - MinX;
-    int SaveDimY = MaxY - MinY;
-    
-	MinX = Clamp(MinX, 0, buf->Width);
-	MaxX = Clamp(MaxX, 0, buf->Width);
-	MinY = Clamp(MinY, 0, buf->Height);
-	MaxY = Clamp(MaxY, 0, buf->Height);
-    
-	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
-	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
-    
-    
-	float OneOverWidth = 1.0f / (float)SaveDimX;
-	float OneOverHeight = 1.0f / (float)SaveDimY;
-    
-	for (int VertIndex = MinY; VertIndex < MaxY; VertIndex++) {
-        u32* Pixel = (u32*)((u8*)buf->Pixels + VertIndex * buf->Pitch + MinX * 4);
-		
-		float DeltaV = (float)(VertIndex - SaveMinY) * OneOverHeight;
-        
-        v4 OutColor;
-        OutColor.x = color1.x + (Color2.x - color1.x) * DeltaV;
-        OutColor.y = color1.y + (Color2.y - color1.y) * DeltaV;
-        OutColor.z = color1.z + (Color2.z - color1.z) * DeltaV;
-        OutColor.w = 1.0f;
-        
-        u32 ColorByteRep = PackRGBA(OutColor);
-        
-        for (int HorzIndex = MinX; HorzIndex < MaxX; HorzIndex++) {
-			*Pixel++ = ColorByteRep;
 		}
 	}
 }
@@ -646,28 +837,28 @@ void RenderBitmapSSE(
 			__m128i mmBotRTexelSrcOffset = _mm_add_epi32(mmPitchByMaxSrcY, mmMaxSrcXx4);
             
 			__m128i mmTopLTexel = _mm_setr_epi32(
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 0)),
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 1)),
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 2)),
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopLTexelSrcOffset, 3)));
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmTopLTexelSrcOffset, 0)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmTopLTexelSrcOffset, 1)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmTopLTexelSrcOffset, 2)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmTopLTexelSrcOffset, 3)));
             
 			__m128i mmTopRTexel = _mm_setr_epi32(
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 0)),
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 1)),
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 2)),
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmTopRTexelSrcOffset, 3)));
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmTopRTexelSrcOffset, 0)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmTopRTexelSrcOffset, 1)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmTopRTexelSrcOffset, 2)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmTopRTexelSrcOffset, 3)));
             
 			__m128i mmBotLTexel = _mm_setr_epi32(
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 0)),
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 1)),
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 2)),
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotLTexelSrcOffset, 3)));
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmBotLTexelSrcOffset, 0)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmBotLTexelSrcOffset, 1)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmBotLTexelSrcOffset, 2)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmBotLTexelSrcOffset, 3)));
             
 			__m128i mmBotRTexel = _mm_setr_epi32(
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 0)),
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 1)),
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 2)),
-                                                 *(u32*)((u8*)bitmap->Pixels + MMI(mmBotRTexelSrcOffset, 3)));
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmBotRTexelSrcOffset, 0)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmBotRTexelSrcOffset, 1)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmBotRTexelSrcOffset, 2)),
+                                                 *(u32*)((u8*)bitmap->Pixels + MMI4(mmBotRTexelSrcOffset, 3)));
             
 			__m128 mmTopLeft_r = MM_UNPACK_COLOR_CHANNEL0(mmTopLTexel);
 			__m128 mmTopLeft_g = MM_UNPACK_COLOR_CHANNEL(mmTopLTexel, 8);
@@ -757,195 +948,6 @@ void RenderBitmapSSE(
 	u32 PixelFillCount = (MaxY - MinY) * (MaxX - MinX);
 }
 
-void RenderBitmap(
-                  bmp_info* buf,
-                  bmp_info* bitmap,
-                  v2 P,
-                  float TargetBitmapPixelHeight,
-                  v4 modulationColor01, 
-                  rc2 clipRect)
-{
-	float TargetScaling = (float)TargetBitmapPixelHeight / (float)bitmap->Height;
-    
-	modulationColor01.r *= modulationColor01.a;
-	modulationColor01.g *= modulationColor01.a;
-	modulationColor01.b *= modulationColor01.a;
-    
-	/*Clamping incoming color*/
-	modulationColor01.r = Clamp01(modulationColor01.r);
-	modulationColor01.g = Clamp01(modulationColor01.g);
-	modulationColor01.b = Clamp01(modulationColor01.b);
-	modulationColor01.a = Clamp01(modulationColor01.a);
-    
-	u32 TargetWidth = (float)bitmap->Width * TargetScaling;
-	u32 TargetHeight = TargetBitmapPixelHeight;
-    
-	int InitX = P.x;
-	int InitY = P.y;
-    
-	int MinX = InitX;
-	int MaxX = MinX + TargetWidth;
-    
-	int MinY = InitY;
-	int MaxY = MinY + TargetHeight;
-    
-	MinX = Clamp(MinX, 0, buf->Width);
-	MaxX = Clamp(MaxX, 0, buf->Width);
-	MinY = Clamp(MinY, 0, buf->Height);
-	MaxY = Clamp(MaxY, 0, buf->Height);
-    
-	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
-	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
-    
-	float SourceWidth = bitmap->Width;
-	float SourceHeight = bitmap->Height;
-    
-	float OneOverSrcWidth = 1.0f / SourceWidth;
-	float OneOverSrcHeight = 1.0f / SourceHeight;
-    
-	float OneOverWidth = 1.0f / (float)TargetWidth;
-	float OneOverHeight = 1.0f / (float)TargetHeight;
-    
-    
-	for (int DestY = MinY; DestY < MaxY; DestY++) {
-        
-		float PixelV = ((float)DestY - (float)InitY) * OneOverHeight;
-		PixelV = Clamp01(PixelV);
-		float SourceY = PixelV * SourceHeight;
-        
-		for (int DestX = MinX; DestX < MaxX; DestX++) {
-            
-			float PixelU = ((float)DestX - (float)InitX) * OneOverWidth;
-			PixelU = Clamp01(PixelU);
-			float SourceX = PixelU * SourceWidth;
-            
-			u32 MinSourceX_ = (u32)SourceX;
-			u32 MinSourceY_ = (u32)SourceY;
-            
-			float DeltaX = SourceX - (float)MinSourceX_;
-			float DeltaY = SourceY - (float)MinSourceY_;
-            
-			u32 MaxSourceX_ = Min(MinSourceX_ + 1, bitmap->Width - 1);
-			u32 MaxSourceY_ = Min(MinSourceY_ + 1, bitmap->Height - 1);
-            
-			u32* TopLeft = (u32*)((u8*)bitmap->Pixels + bitmap->Pitch * MinSourceY_ + MinSourceX_ * 4);
-			u32* TopRight = (u32*)((u8*)bitmap->Pixels + bitmap->Pitch * MinSourceY_ + MaxSourceX_ * 4);
-			u32* BotLeft = (u32*)((u8*)bitmap->Pixels + bitmap->Pitch * MaxSourceY_ + MinSourceX_ * 4);
-			u32* BotRight = (u32*)((u8*)bitmap->Pixels + bitmap->Pitch * MaxSourceY_ + MaxSourceX_ * 4);
-            
-			v4 TopLeftColor = UnpackRGBA(*TopLeft);
-			v4 TopRightColor = UnpackRGBA(*TopRight);
-			v4 BotLeftColor = UnpackRGBA(*BotLeft);
-			v4 BotRightColor = UnpackRGBA(*BotRight);
-            
-			/*First row blend*/
-			v4 UpperBlend;
-			UpperBlend.r = TopLeftColor.r + (TopRightColor.r - TopLeftColor.r) * DeltaX;
-			UpperBlend.g = TopLeftColor.g + (TopRightColor.g - TopLeftColor.g) * DeltaX;
-			UpperBlend.b = TopLeftColor.b + (TopRightColor.b - TopLeftColor.b) * DeltaX;
-			UpperBlend.a = TopLeftColor.a + (TopRightColor.a - TopLeftColor.a) * DeltaX;
-            
-			/*Second row blend*/
-			v4 LowerBlend;
-			LowerBlend.r = BotLeftColor.r + (BotRightColor.r - BotLeftColor.r) * DeltaX;
-			LowerBlend.g = BotLeftColor.g + (BotRightColor.g - BotLeftColor.g) * DeltaX;
-			LowerBlend.b = BotLeftColor.b + (BotRightColor.b - BotLeftColor.b) * DeltaX;
-			LowerBlend.a = BotLeftColor.a + (BotRightColor.a - BotLeftColor.a) * DeltaX;
-            
-			/*Vertical blend*/
-			v4 BlendedColor;
-			BlendedColor.r = UpperBlend.r + (LowerBlend.r - UpperBlend.r) * DeltaY;
-			BlendedColor.g = UpperBlend.g + (LowerBlend.g - UpperBlend.g) * DeltaY;
-			BlendedColor.b = UpperBlend.b + (LowerBlend.b - UpperBlend.b) * DeltaY;
-			BlendedColor.a = UpperBlend.a + (LowerBlend.a - UpperBlend.a) * DeltaY;
-			
-			BlendedColor.r = BlendedColor.r * modulationColor01.r;
-			BlendedColor.g = BlendedColor.g * modulationColor01.g;
-			BlendedColor.b = BlendedColor.b * modulationColor01.b;
-			BlendedColor.a = BlendedColor.a * modulationColor01.a;
-            
-			u32* OutDest = (u32*)((u8*)buf->Pixels + DestY * buf->Pitch + DestX * 4);
-			v4 PreDestColor = UnpackRGBA(*OutDest);
-            
-			//float BlendAlpha = PreDestColor.a + BlendedColor.a - PreDestColor.a * BlendedColor.a;
-			float BlendAlpha = BlendedColor.a;
-			//Assert((BlendAlpha >= 0.0f) && (BlendAlpha <= 1.0f));
-            
-			/*Premultiplied alpha in action*/
-			v4 AlphaBlendColor;
-			AlphaBlendColor.r = (1.0f - BlendAlpha) * PreDestColor.r + BlendedColor.r;
-			AlphaBlendColor.g = (1.0f - BlendAlpha) * PreDestColor.g + BlendedColor.g;
-			AlphaBlendColor.b = (1.0f - BlendAlpha) * PreDestColor.b + BlendedColor.b;
-			AlphaBlendColor.a = PreDestColor.a + BlendedColor.a - PreDestColor.a * BlendedColor.a;
-            
-			u32 DestPackedColor = PackRGBA(AlphaBlendColor);
-			*OutDest = DestPackedColor;
-		}
-	}
-    
-	u32 PixelFillCount = (MaxY - MinY) * (MaxX - MinX);
-}
-
-void RenderRect(
-                bmp_info* buf,
-                v2 P,
-                v2 Dim,
-                v4 modulationColor01, 
-                rc2 clipRect)
-{
-	int InitX = floorf(P.x);
-	int InitY = floorf(P.y);
-    
-	int MinX = InitX;
-	int MaxX = MinX + ceilf(Dim.x);
-    
-	int MinY = InitY;
-	int MaxY = MinY + ceilf(Dim.y);
-    
-	MinX = Clamp(MinX, 0, buf->Width);
-	MaxX = Clamp(MaxX, 0, buf->Width);
-	MinY = Clamp(MinY, 0, buf->Height);
-	MaxY = Clamp(MaxY, 0, buf->Height);
-    
-	MinX = Clamp(MinX, (int)clipRect.Min.x, (int)clipRect.Max.x);
-	MinY = Clamp(MinY, (int)clipRect.Min.y, (int)clipRect.Max.y);
-	MaxX = Clamp(MaxX, (int)clipRect.Min.x, (int)clipRect.Max.x);
-	MaxY = Clamp(MaxY, (int)clipRect.Min.y, (int)clipRect.Max.y);
-    
-	/*Clamping incoming color*/
-	modulationColor01.r = Clamp01(modulationColor01.r);
-	modulationColor01.g = Clamp01(modulationColor01.g);
-	modulationColor01.b = Clamp01(modulationColor01.b);
-	modulationColor01.a = Clamp01(modulationColor01.a);
-    
-	/*Premultiplying incoming color with it alpha*/
-	modulationColor01.r *= modulationColor01.a;
-	modulationColor01.g *= modulationColor01.a;
-	modulationColor01.b *= modulationColor01.a;
-    
-	for (int DestY = MinY; DestY < MaxY; DestY++) {
-		for (int DestX = MinX; DestX < MaxX; DestX++) {
-			u32* OutDest = (u32*)((u8*)buf->Pixels + DestY * buf->Pitch + DestX * 4);
-            
-			v4 ResultColor = modulationColor01;
-			v4 PreDestColor = UnpackRGBA(*OutDest);
-            
-			float BlendAlpha = modulationColor01.a;
-            
-			v4 AlphaBlendColor;
-			AlphaBlendColor.r = (1.0f - BlendAlpha) * PreDestColor.r + ResultColor.r;
-			AlphaBlendColor.g = (1.0f - BlendAlpha) * PreDestColor.g + ResultColor.g;
-			AlphaBlendColor.b = (1.0f - BlendAlpha) * PreDestColor.b + ResultColor.b;
-			AlphaBlendColor.a = PreDestColor.a + ResultColor.a - PreDestColor.a * ResultColor.a;
-            
-			u32 DestPackedColor = PackRGBA(AlphaBlendColor);
-            
-			*OutDest = DestPackedColor;
-		}
-	}
-}
 
 void RenderRectSSE(
                    bmp_info* buf,
@@ -1068,3 +1070,5 @@ void RenderRectSSE(
     
 	u32 PixelFillCount = (MaxY - MinY) * (MaxX - MinX);
 }
+
+#endif

@@ -13,25 +13,47 @@ void SoftwareRenderStackToOutput(render_state* Render, bmp_info* buf, rc2 clipRe
             case RenderEntry_ClearColor:{
                 RENDER_GET_ENTRY(render_entry_clear_color);
                 
+#if defined(JOY_AVX)
                 RenderClearSSE(buf, Entry->clearColor01, clipRect);
+#else
+                RenderClear(buf, Entry->clearColor01, clipRect);
+#endif
             }break;
             
             case RenderEntry_Gradient:{
                 RENDER_GET_ENTRY(render_entry_gradient);
                 
                 if(Entry->gradType == RenderEntryGradient_Horizontal){
+                    
+#if defined(JOY_AVX)
                     RenderGradientHorzSSE(buf, 
                                           Entry->rc, 
                                           Entry->color1, 
                                           Entry->color2, 
                                           clipRect);
+#else
+                    
+                    RenderGradientHorz(buf, 
+                                       Entry->rc, 
+                                       Entry->color1, 
+                                       Entry->color2, 
+                                       clipRect);
+#endif
                 }
                 else if(Entry->gradType == RenderEntryGradient_Vertical){
+#if defined(JOY_AVX)
                     RenderGradientVertSSE(buf, 
                                           Entry->rc, 
                                           Entry->color1, 
                                           Entry->color2, 
                                           clipRect);
+#else
+                    RenderGradientVert(buf, 
+                                       Entry->rc, 
+                                       Entry->color1, 
+                                       Entry->color2, 
+                                       clipRect);
+#endif
                 }
                 else{
                     INVALID_CODE_PATH;
@@ -41,7 +63,7 @@ void SoftwareRenderStackToOutput(render_state* Render, bmp_info* buf, rc2 clipRe
             case RenderEntry_Rect:{
                 RENDER_GET_ENTRY(render_entry_rect);
                 
-#if 1
+#if defined(JOY_AVX)
                 RenderRectSSE(buf,
                               Entry->p,
                               Entry->dim,
@@ -59,7 +81,7 @@ void SoftwareRenderStackToOutput(render_state* Render, bmp_info* buf, rc2 clipRe
             case RenderEntry_Bitmap:{
                 RENDER_GET_ENTRY(render_entry_bitmap);
                 
-#if 1
+#if defined(JOY_AVX)
                 RenderBitmapSSE(buf, 
                                 Entry->Bitmap,
                                 Entry->P,
@@ -104,7 +126,11 @@ struct Render_Queue_rgba2bgra_Work{
 PLATFORM_CALLBACK(RenderQueueRGBA2BGRAWork){
     Render_Queue_rgba2bgra_Work* work = (Render_Queue_rgba2bgra_Work*)Data;
     
+#if defined(JOY_AVX)
     RenderRGBA2BGRASSE(work->buf, work->clipRect);
+#else
+    RenderRGBA2BGRA(work->buf, work->clipRect);
+#endif
 }
 
 #define TILES_COUNT 32

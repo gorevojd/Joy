@@ -176,7 +176,7 @@ void GameInit(game_state* Game, game_init_params Params){
     InitAnimSystem(Game->Anim);
     
     // NOTE(Dima): DEBUG
-#if defined(JOY_DEBUG_BUILD)
+#if defined(JOY_INTERNAL)
     Game->DEBUGMemory = {};
     PushMemoryStruct(&Game->DEBUGMemory, debug_state, Game->DEBUG, Region);
     DEBUGInit(Game->DEBUG, 
@@ -236,7 +236,7 @@ void GameUpdate(game_state* Game, render_frame_info FrameInfo){
         CurMode->Update(Game, CurMode);
     }
     
-#if defined(JOY_DEBUG_BUILD)
+#if defined(JOY_INTERNAL)
     if(KeyWentDown(Game->Input, Key_F2)){
         Game->Render->ToShowBufferType = (Game->Render->ToShowBufferType + 1) % RenderShowBuffer_Count;
     }
