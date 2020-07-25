@@ -259,12 +259,12 @@ PLATFORM_CALLBACK(UpdatePANodesWork){
     
 }
 
+// TODO(Dima): Unroll deltas from here to make SOA
 struct update_node_anim_data{
     node_animation* NodeAnim;
     find_anim_deltas_ctx PosDeltas;
     find_anim_deltas_ctx RotDeltas;
     find_anim_deltas_ctx ScaDeltas;
-    b32 IsRootMotionNode;
 };
 
 inline update_node_anim_data* GetNodeAnimData(update_node_anim_data* Datas,
@@ -295,7 +295,6 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
                                              playing_anim* Playing,
                                              animation_clip* Animation,
                                              f64 CurrentGlobalTime,
-                                             //f64 PreviousGlobalTime,
                                              f32 PlaybackRate)
 {
     FUNCTION_TIMING();
@@ -315,10 +314,11 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
         
         // NOTE(Dima): Animating
         //f64 PrevTick = PreviousGlobalTime * Animation->TicksPerSecond;
+        f64 PhaseTick = Playing->StartPhase01 * Animation->DurationTicks;
         f64 AnimTime = (CurrentGlobalTime - Playing->GlobalStart) * PlaybackRate;
-        f64 CurrentTick = AnimTime * Animation->TicksPerSecond;
+        f64 CurrentTick = PhaseTick + AnimTime * Animation->TicksPerSecond;
         
-        Playing->Phase01 = 0.0f;
+        //Playing->Phase01 = 0.0f;
         
         if(CurrentTick >= Animation->DurationTicks){
             switch(Playing->ExitAction){
@@ -363,23 +363,56 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
             ASSERT(NodeAnim);
             
             NodeAnimationDatas[NumNodeAnimsToUpdate].NodeAnim = NodeAnim;
-            NodeAnimationDatas[NumNodeAnimsToUpdate].IsRootMotionNode = false;
             NumNodeAnimsToUpdate++;
         }
         
-#if 1        
-        if(Animation->UsesRootMotion)
+        
+        Playing->LastTick = Playing->NextTick;
+        Playing->NextTick = CurrentTick;
+        
+        if(Playing->JustStarted && Animation->UsesRootMotion)
         {
             node_animation* RootNodeAnim = LoadNodeAnim(Assets, Animation->RootMotionNodeAnimID,
                                                         ASSET_IMPORT_IMMEDIATE);
             
             ASSERT(RootNodeAnim);
             
-            NodeAnimationDatas[NumNodeAnimsToUpdate].NodeAnim = RootNodeAnim;
-            NodeAnimationDatas[NumNodeAnimsToUpdate].IsRootMotionNode = true;
-            NumNodeAnimsToUpdate++;
+            
+            find_anim_deltas_ctx PosDeltas = FindAnimDeltas(Animation,
+                                                            RootNodeAnim->PositionKeysTimes,
+                                                            RootNodeAnim->PositionKeysCount,
+                                                            PhaseTick,
+                                                            IsLooping);
+            find_anim_deltas_ctx RotDeltas = FindAnimDeltas(Animation,
+                                                            RootNodeAnim->RotationKeysTimes,
+                                                            RootNodeAnim->RotationKeysCount,
+                                                            PhaseTick,
+                                                            IsLooping);
+            find_anim_deltas_ctx ScaDeltas = FindAnimDeltas(Animation,
+                                                            RootNodeAnim->ScalingKeysTimes,
+                                                            RootNodeAnim->ScalingKeysCount,
+                                                            PhaseTick,
+                                                            IsLooping);
+            
+            v3 AnimatedP = GetAnimatedVector(PosDeltas,
+                                             RootNodeAnim->PositionKeysValues,
+                                             V3(0.0f, 0.0f, 0.0f));
+            
+            quat AnimatedR = GetAnimatedQuat(RotDeltas,
+                                             RootNodeAnim->RotationKeysValues,
+                                             QuatI());
+            
+            v3 AnimatedS = GetAnimatedVector(ScaDeltas,
+                                             RootNodeAnim->ScalingKeysValues,
+                                             V3(1.0f, 1.0f, 1.0f));
+            
+            Playing->RootLastP = AnimatedP;
+            Playing->RootLastR = AnimatedR;
+            Playing->RootLastS = AnimatedS;
+            
+            Playing->LastTick = PhaseTick;
+            Playing->JustStarted = false;
         }
-#endif
         
         {
             BLOCK_TIMING("UpdatePA::Finding deltas");
@@ -450,32 +483,32 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
                 NodeAnimIndex += 8)
             {
                 i32_8x Indices = IndicesStartFrom(NodeAnimIndex, 1);
-                f32_8x IndicesFitInRange = LessThan(ConvertToFloat(Indices), ConvertToFloat(I32_8X(Animation->NodeAnimationsCount)));
+                f32_8x IndicesFitInRange = LessThan(ConvertToFloat(Indices), ConvertToFloat(I32_8X(NumNodeAnimsToUpdate)));
                 
                 // NOTE(Dima): If at least one of node animations exist
                 int MovedMask = AnyTrue(IndicesFitInRange);
                 if(MovedMask){
                     update_node_anim_data* NodeAnimData0 = &NodeAnimationDatas[NodeAnimIndex + 0];
                     update_node_anim_data* NodeAnimData1 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 1,
-                                                                           Animation->NodeAnimationsCount,
+                                                                           NumNodeAnimsToUpdate,
                                                                            NodeAnimData0);
                     update_node_anim_data* NodeAnimData2 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 2,
-                                                                           Animation->NodeAnimationsCount, 
+                                                                           NumNodeAnimsToUpdate, 
                                                                            NodeAnimData0);
                     update_node_anim_data* NodeAnimData3 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 3,
-                                                                           Animation->NodeAnimationsCount, 
+                                                                           NumNodeAnimsToUpdate, 
                                                                            NodeAnimData0);
                     update_node_anim_data* NodeAnimData4 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 4,
-                                                                           Animation->NodeAnimationsCount, 
+                                                                           NumNodeAnimsToUpdate, 
                                                                            NodeAnimData0);
                     update_node_anim_data* NodeAnimData5 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 5,
-                                                                           Animation->NodeAnimationsCount, 
+                                                                           NumNodeAnimsToUpdate, 
                                                                            NodeAnimData0);
                     update_node_anim_data* NodeAnimData6 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 6,
-                                                                           Animation->NodeAnimationsCount, 
+                                                                           NumNodeAnimsToUpdate, 
                                                                            NodeAnimData0);
                     update_node_anim_data* NodeAnimData7 = GetNodeAnimData(NodeAnimationDatas, NodeAnimIndex + 7,
-                                                                           Animation->NodeAnimationsCount, 
+                                                                           NumNodeAnimsToUpdate, 
                                                                            NodeAnimData0);
                     
                     node_animation* NodeAnim0 = NodeAnimData0->NodeAnim;
@@ -514,97 +547,7 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
                     find_anim_deltas_ctx* ScaDeltas6 = &NodeAnimData6->ScaDeltas;
                     find_anim_deltas_ctx* ScaDeltas7 = &NodeAnimData7->ScaDeltas;
                     
-                    // NOTE(Dima): Setting position
-                    v3_8x PrevValueT = V3_8X(NodeAnim0->PositionKeysValues[PosDeltas0->PrevKeyIndex],
-                                             NodeAnim1->PositionKeysValues[PosDeltas1->PrevKeyIndex],
-                                             NodeAnim2->PositionKeysValues[PosDeltas2->PrevKeyIndex],
-                                             NodeAnim3->PositionKeysValues[PosDeltas3->PrevKeyIndex],
-                                             NodeAnim4->PositionKeysValues[PosDeltas4->PrevKeyIndex],
-                                             NodeAnim5->PositionKeysValues[PosDeltas5->PrevKeyIndex],
-                                             NodeAnim6->PositionKeysValues[PosDeltas6->PrevKeyIndex],
-                                             NodeAnim7->PositionKeysValues[PosDeltas7->PrevKeyIndex]);
-                    
-                    v3_8x NextValueT = V3_8X(NodeAnim0->PositionKeysValues[PosDeltas0->NextKeyIndex],
-                                             NodeAnim1->PositionKeysValues[PosDeltas1->NextKeyIndex],
-                                             NodeAnim2->PositionKeysValues[PosDeltas2->NextKeyIndex],
-                                             NodeAnim3->PositionKeysValues[PosDeltas3->NextKeyIndex],
-                                             NodeAnim4->PositionKeysValues[PosDeltas4->NextKeyIndex],
-                                             NodeAnim5->PositionKeysValues[PosDeltas5->NextKeyIndex],
-                                             NodeAnim6->PositionKeysValues[PosDeltas6->NextKeyIndex],
-                                             NodeAnim7->PositionKeysValues[PosDeltas7->NextKeyIndex]);
-                    
-                    f32_8x TimeDeltaT = F32_8X(PosDeltas0->t,
-                                               PosDeltas1->t,
-                                               PosDeltas2->t,
-                                               PosDeltas3->t,
-                                               PosDeltas4->t,
-                                               PosDeltas5->t,
-                                               PosDeltas6->t,
-                                               PosDeltas7->t);
-                    
-                    // NOTE(Dima): Setting rotation
-                    v4_8x PrevValueR = V4_8X(NodeAnim0->RotationKeysValues[RotDeltas0->PrevKeyIndex],
-                                             NodeAnim1->RotationKeysValues[RotDeltas1->PrevKeyIndex],
-                                             NodeAnim2->RotationKeysValues[RotDeltas2->PrevKeyIndex],
-                                             NodeAnim3->RotationKeysValues[RotDeltas3->PrevKeyIndex],
-                                             NodeAnim4->RotationKeysValues[RotDeltas4->PrevKeyIndex],
-                                             NodeAnim5->RotationKeysValues[RotDeltas5->PrevKeyIndex],
-                                             NodeAnim6->RotationKeysValues[RotDeltas6->PrevKeyIndex],
-                                             NodeAnim7->RotationKeysValues[RotDeltas7->PrevKeyIndex]);
-                    
-                    v4_8x NextValueR = V4_8X(NodeAnim0->RotationKeysValues[RotDeltas0->NextKeyIndex],
-                                             NodeAnim1->RotationKeysValues[RotDeltas1->NextKeyIndex],
-                                             NodeAnim2->RotationKeysValues[RotDeltas2->NextKeyIndex],
-                                             NodeAnim3->RotationKeysValues[RotDeltas3->NextKeyIndex],
-                                             NodeAnim4->RotationKeysValues[RotDeltas4->NextKeyIndex],
-                                             NodeAnim5->RotationKeysValues[RotDeltas5->NextKeyIndex],
-                                             NodeAnim6->RotationKeysValues[RotDeltas6->NextKeyIndex],
-                                             NodeAnim7->RotationKeysValues[RotDeltas7->NextKeyIndex]);
-                    
-                    f32_8x TimeDeltaR = F32_8X(RotDeltas0->t,
-                                               RotDeltas1->t,
-                                               RotDeltas2->t,
-                                               RotDeltas3->t,
-                                               RotDeltas4->t,
-                                               RotDeltas5->t,
-                                               RotDeltas6->t,
-                                               RotDeltas7->t);
-                    
-                    // NOTE(Dima): Setting scale
-                    v3_8x PrevValueS = V3_8X(NodeAnim0->ScalingKeysValues[ScaDeltas0->PrevKeyIndex],
-                                             NodeAnim1->ScalingKeysValues[ScaDeltas1->PrevKeyIndex],
-                                             NodeAnim2->ScalingKeysValues[ScaDeltas2->PrevKeyIndex],
-                                             NodeAnim3->ScalingKeysValues[ScaDeltas3->PrevKeyIndex],
-                                             NodeAnim4->ScalingKeysValues[ScaDeltas4->PrevKeyIndex],
-                                             NodeAnim5->ScalingKeysValues[ScaDeltas5->PrevKeyIndex],
-                                             NodeAnim6->ScalingKeysValues[ScaDeltas6->PrevKeyIndex],
-                                             NodeAnim7->ScalingKeysValues[ScaDeltas7->PrevKeyIndex]);
-                    
-                    v3_8x NextValueS = V3_8X(NodeAnim0->ScalingKeysValues[ScaDeltas0->NextKeyIndex],
-                                             NodeAnim1->ScalingKeysValues[ScaDeltas1->NextKeyIndex],
-                                             NodeAnim2->ScalingKeysValues[ScaDeltas2->NextKeyIndex],
-                                             NodeAnim3->ScalingKeysValues[ScaDeltas3->NextKeyIndex],
-                                             NodeAnim4->ScalingKeysValues[ScaDeltas4->NextKeyIndex],
-                                             NodeAnim5->ScalingKeysValues[ScaDeltas5->NextKeyIndex],
-                                             NodeAnim6->ScalingKeysValues[ScaDeltas6->NextKeyIndex],
-                                             NodeAnim7->ScalingKeysValues[ScaDeltas7->NextKeyIndex]);
-                    
-                    f32_8x TimeDeltaS = F32_8X(ScaDeltas0->t,
-                                               ScaDeltas1->t,
-                                               ScaDeltas2->t,
-                                               ScaDeltas3->t,
-                                               ScaDeltas4->t,
-                                               ScaDeltas5->t,
-                                               ScaDeltas6->t,
-                                               ScaDeltas7->t);
-                    
-                    // NOTE(Dima): Lerping
-                    v3_8x LerpedT = Lerp(PrevValueT, NextValueT, TimeDeltaT);
-                    
-                    v4_8x LerpedR = LerpQuat(PrevValueR, NextValueR, TimeDeltaR);
-                    
-                    v3_8x LerpedS = Lerp(PrevValueS, NextValueS, TimeDeltaS);
-                    
+                    // NOTE(Dima): Getting conditions
                     f32_8x SucceededT = IsTrue(I32_8X(PosDeltas0->Success,
                                                       PosDeltas1->Success,
                                                       PosDeltas2->Success,
@@ -632,43 +575,145 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
                                                       ScaDeltas6->Success,
                                                       ScaDeltas7->Success));
                     
-                    LerpedT = ConditionalCombine(SucceededT, LerpedT, DefaultT);
-                    LerpedR = ConditionalCombine(SucceededR, LerpedR, DefaultR);
-                    LerpedS = ConditionalCombine(SucceededS, LerpedS, DefaultS);
+                    if(AnyTrue(SucceededT))
+                    {
+                        // NOTE(Dima): Setting position
+                        v3_8x PrevValueT = V3_8X(NodeAnim0->PositionKeysValues[PosDeltas0->PrevKeyIndex],
+                                                 NodeAnim1->PositionKeysValues[PosDeltas1->PrevKeyIndex],
+                                                 NodeAnim2->PositionKeysValues[PosDeltas2->PrevKeyIndex],
+                                                 NodeAnim3->PositionKeysValues[PosDeltas3->PrevKeyIndex],
+                                                 NodeAnim4->PositionKeysValues[PosDeltas4->PrevKeyIndex],
+                                                 NodeAnim5->PositionKeysValues[PosDeltas5->PrevKeyIndex],
+                                                 NodeAnim6->PositionKeysValues[PosDeltas6->PrevKeyIndex],
+                                                 NodeAnim7->PositionKeysValues[PosDeltas7->PrevKeyIndex]);
+                        
+                        v3_8x NextValueT = V3_8X(NodeAnim0->PositionKeysValues[PosDeltas0->NextKeyIndex],
+                                                 NodeAnim1->PositionKeysValues[PosDeltas1->NextKeyIndex],
+                                                 NodeAnim2->PositionKeysValues[PosDeltas2->NextKeyIndex],
+                                                 NodeAnim3->PositionKeysValues[PosDeltas3->NextKeyIndex],
+                                                 NodeAnim4->PositionKeysValues[PosDeltas4->NextKeyIndex],
+                                                 NodeAnim5->PositionKeysValues[PosDeltas5->NextKeyIndex],
+                                                 NodeAnim6->PositionKeysValues[PosDeltas6->NextKeyIndex],
+                                                 NodeAnim7->PositionKeysValues[PosDeltas7->NextKeyIndex]);
+                        
+                        f32_8x TimeDeltaT = F32_8X(PosDeltas0->t,
+                                                   PosDeltas1->t,
+                                                   PosDeltas2->t,
+                                                   PosDeltas3->t,
+                                                   PosDeltas4->t,
+                                                   PosDeltas5->t,
+                                                   PosDeltas6->t,
+                                                   PosDeltas7->t);
+                        
+                        // NOTE(Dima): Lerping
+                        v3_8x LerpedT = Lerp(PrevValueT, NextValueT, TimeDeltaT);
+                        LerpedT = ConditionalCombine(SucceededT, LerpedT, DefaultT);
+                        
+                        // NOTE(Dima): Storing values
+                        v3* StoreToT[8] = {
+                            &Playing->NodeTransforms.Ts[NodeAnim0->NodeIndex],
+                            &Playing->NodeTransforms.Ts[NodeAnim1->NodeIndex],
+                            &Playing->NodeTransforms.Ts[NodeAnim2->NodeIndex],
+                            &Playing->NodeTransforms.Ts[NodeAnim3->NodeIndex],
+                            &Playing->NodeTransforms.Ts[NodeAnim4->NodeIndex],
+                            &Playing->NodeTransforms.Ts[NodeAnim5->NodeIndex],
+                            &Playing->NodeTransforms.Ts[NodeAnim6->NodeIndex],
+                            &Playing->NodeTransforms.Ts[NodeAnim7->NodeIndex]};
+                        V3_8X_StoreConditional(LerpedT, MovedMask, StoreToT);
+                    }
                     
-                    // NOTE(Dima): Storing values
-                    v3* StoreToT[8] = {
-                        &Playing->NodeTransforms.Ts[NodeAnim0->NodeIndex],
-                        &Playing->NodeTransforms.Ts[NodeAnim1->NodeIndex],
-                        &Playing->NodeTransforms.Ts[NodeAnim2->NodeIndex],
-                        &Playing->NodeTransforms.Ts[NodeAnim3->NodeIndex],
-                        &Playing->NodeTransforms.Ts[NodeAnim4->NodeIndex],
-                        &Playing->NodeTransforms.Ts[NodeAnim5->NodeIndex],
-                        &Playing->NodeTransforms.Ts[NodeAnim6->NodeIndex],
-                        &Playing->NodeTransforms.Ts[NodeAnim7->NodeIndex]};
-                    V3_8X_StoreConditional(LerpedT, MovedMask, StoreToT);
+                    // NOTE(Dima): Setting rotation
+                    if(AnyTrue(SucceededR))
+                    {
+                        v4_8x PrevValueR = V4_8X(NodeAnim0->RotationKeysValues[RotDeltas0->PrevKeyIndex],
+                                                 NodeAnim1->RotationKeysValues[RotDeltas1->PrevKeyIndex],
+                                                 NodeAnim2->RotationKeysValues[RotDeltas2->PrevKeyIndex],
+                                                 NodeAnim3->RotationKeysValues[RotDeltas3->PrevKeyIndex],
+                                                 NodeAnim4->RotationKeysValues[RotDeltas4->PrevKeyIndex],
+                                                 NodeAnim5->RotationKeysValues[RotDeltas5->PrevKeyIndex],
+                                                 NodeAnim6->RotationKeysValues[RotDeltas6->PrevKeyIndex],
+                                                 NodeAnim7->RotationKeysValues[RotDeltas7->PrevKeyIndex]);
+                        
+                        v4_8x NextValueR = V4_8X(NodeAnim0->RotationKeysValues[RotDeltas0->NextKeyIndex],
+                                                 NodeAnim1->RotationKeysValues[RotDeltas1->NextKeyIndex],
+                                                 NodeAnim2->RotationKeysValues[RotDeltas2->NextKeyIndex],
+                                                 NodeAnim3->RotationKeysValues[RotDeltas3->NextKeyIndex],
+                                                 NodeAnim4->RotationKeysValues[RotDeltas4->NextKeyIndex],
+                                                 NodeAnim5->RotationKeysValues[RotDeltas5->NextKeyIndex],
+                                                 NodeAnim6->RotationKeysValues[RotDeltas6->NextKeyIndex],
+                                                 NodeAnim7->RotationKeysValues[RotDeltas7->NextKeyIndex]);
+                        
+                        f32_8x TimeDeltaR = F32_8X(RotDeltas0->t,
+                                                   RotDeltas1->t,
+                                                   RotDeltas2->t,
+                                                   RotDeltas3->t,
+                                                   RotDeltas4->t,
+                                                   RotDeltas5->t,
+                                                   RotDeltas6->t,
+                                                   RotDeltas7->t);
+                        
+                        // NOTE(Dima): Lerping
+                        v4_8x LerpedR = LerpQuat(PrevValueR, NextValueR, TimeDeltaR);
+                        LerpedR = ConditionalCombine(SucceededR, LerpedR, DefaultR);
+                        
+                        // NOTE(Dima): Storing values
+                        quat* StoreToR[8] = {
+                            &Playing->NodeTransforms.Rs[NodeAnim0->NodeIndex],
+                            &Playing->NodeTransforms.Rs[NodeAnim1->NodeIndex],
+                            &Playing->NodeTransforms.Rs[NodeAnim2->NodeIndex],
+                            &Playing->NodeTransforms.Rs[NodeAnim3->NodeIndex],
+                            &Playing->NodeTransforms.Rs[NodeAnim4->NodeIndex],
+                            &Playing->NodeTransforms.Rs[NodeAnim5->NodeIndex],
+                            &Playing->NodeTransforms.Rs[NodeAnim6->NodeIndex],
+                            &Playing->NodeTransforms.Rs[NodeAnim7->NodeIndex]};
+                        V4_8X_StoreConditional(LerpedR, MovedMask, StoreToR);
+                    }
                     
-                    quat* StoreToR[8] = {
-                        &Playing->NodeTransforms.Rs[NodeAnim0->NodeIndex],
-                        &Playing->NodeTransforms.Rs[NodeAnim1->NodeIndex],
-                        &Playing->NodeTransforms.Rs[NodeAnim2->NodeIndex],
-                        &Playing->NodeTransforms.Rs[NodeAnim3->NodeIndex],
-                        &Playing->NodeTransforms.Rs[NodeAnim4->NodeIndex],
-                        &Playing->NodeTransforms.Rs[NodeAnim5->NodeIndex],
-                        &Playing->NodeTransforms.Rs[NodeAnim6->NodeIndex],
-                        &Playing->NodeTransforms.Rs[NodeAnim7->NodeIndex]};
-                    V4_8X_StoreConditional(LerpedR, MovedMask, StoreToR);
-                    
-                    v3* StoreToS[8] = {
-                        &Playing->NodeTransforms.Ss[NodeAnim0->NodeIndex],
-                        &Playing->NodeTransforms.Ss[NodeAnim1->NodeIndex],
-                        &Playing->NodeTransforms.Ss[NodeAnim2->NodeIndex],
-                        &Playing->NodeTransforms.Ss[NodeAnim3->NodeIndex],
-                        &Playing->NodeTransforms.Ss[NodeAnim4->NodeIndex],
-                        &Playing->NodeTransforms.Ss[NodeAnim5->NodeIndex],
-                        &Playing->NodeTransforms.Ss[NodeAnim6->NodeIndex],
-                        &Playing->NodeTransforms.Ss[NodeAnim7->NodeIndex]};
-                    V3_8X_StoreConditional(LerpedS, MovedMask, StoreToS);
+                    if(AnyTrue(SucceededS))
+                    {
+                        // NOTE(Dima): Setting scale
+                        v3_8x PrevValueS = V3_8X(NodeAnim0->ScalingKeysValues[ScaDeltas0->PrevKeyIndex],
+                                                 NodeAnim1->ScalingKeysValues[ScaDeltas1->PrevKeyIndex],
+                                                 NodeAnim2->ScalingKeysValues[ScaDeltas2->PrevKeyIndex],
+                                                 NodeAnim3->ScalingKeysValues[ScaDeltas3->PrevKeyIndex],
+                                                 NodeAnim4->ScalingKeysValues[ScaDeltas4->PrevKeyIndex],
+                                                 NodeAnim5->ScalingKeysValues[ScaDeltas5->PrevKeyIndex],
+                                                 NodeAnim6->ScalingKeysValues[ScaDeltas6->PrevKeyIndex],
+                                                 NodeAnim7->ScalingKeysValues[ScaDeltas7->PrevKeyIndex]);
+                        
+                        v3_8x NextValueS = V3_8X(NodeAnim0->ScalingKeysValues[ScaDeltas0->NextKeyIndex],
+                                                 NodeAnim1->ScalingKeysValues[ScaDeltas1->NextKeyIndex],
+                                                 NodeAnim2->ScalingKeysValues[ScaDeltas2->NextKeyIndex],
+                                                 NodeAnim3->ScalingKeysValues[ScaDeltas3->NextKeyIndex],
+                                                 NodeAnim4->ScalingKeysValues[ScaDeltas4->NextKeyIndex],
+                                                 NodeAnim5->ScalingKeysValues[ScaDeltas5->NextKeyIndex],
+                                                 NodeAnim6->ScalingKeysValues[ScaDeltas6->NextKeyIndex],
+                                                 NodeAnim7->ScalingKeysValues[ScaDeltas7->NextKeyIndex]);
+                        
+                        f32_8x TimeDeltaS = F32_8X(ScaDeltas0->t,
+                                                   ScaDeltas1->t,
+                                                   ScaDeltas2->t,
+                                                   ScaDeltas3->t,
+                                                   ScaDeltas4->t,
+                                                   ScaDeltas5->t,
+                                                   ScaDeltas6->t,
+                                                   ScaDeltas7->t);
+                        
+                        // NOTE(Dima): Lerping
+                        v3_8x LerpedS = Lerp(PrevValueS, NextValueS, TimeDeltaS);
+                        LerpedS = ConditionalCombine(SucceededS, LerpedS, DefaultS);
+                        
+                        v3* StoreToS[8] = {
+                            &Playing->NodeTransforms.Ss[NodeAnim0->NodeIndex],
+                            &Playing->NodeTransforms.Ss[NodeAnim1->NodeIndex],
+                            &Playing->NodeTransforms.Ss[NodeAnim2->NodeIndex],
+                            &Playing->NodeTransforms.Ss[NodeAnim3->NodeIndex],
+                            &Playing->NodeTransforms.Ss[NodeAnim4->NodeIndex],
+                            &Playing->NodeTransforms.Ss[NodeAnim5->NodeIndex],
+                            &Playing->NodeTransforms.Ss[NodeAnim6->NodeIndex],
+                            &Playing->NodeTransforms.Ss[NodeAnim7->NodeIndex]};
+                        V3_8X_StoreConditional(LerpedS, MovedMask, StoreToS);
+                    }
                     
                     b32* StoreToCalc[8] = {
                         &Playing->TransformsCalculated[NodeAnim0->NodeIndex],
@@ -678,8 +723,7 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
                         &Playing->TransformsCalculated[NodeAnim4->NodeIndex],
                         &Playing->TransformsCalculated[NodeAnim5->NodeIndex],
                         &Playing->TransformsCalculated[NodeAnim6->NodeIndex],
-                        &Playing->TransformsCalculated[NodeAnim7->NodeIndex]
-                    };
+                        &Playing->TransformsCalculated[NodeAnim7->NodeIndex]};
                     
                     I32_8X_StoreConditional(CastToInt(IndicesFitInRange), MovedMask, StoreToCalc);
                 }
@@ -689,6 +733,7 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
             }
 #endif
         }
+        
         {
             BLOCK_TIMING("UpdatePA::Decomposing");
             // NOTE(Dima): Extract transforms that were not calculated
@@ -708,6 +753,67 @@ INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
             }
         }
         
+        
+        Playing->AdvancedP = V3_Zero();
+        Playing->AdvancedS = V3_Zero();
+        Playing->AdvancedR = IdentityQuaternion();
+        
+        if(Animation->UsesRootMotion){
+            
+            node_animation* RootNodeAnim = LoadNodeAnim(Assets, Animation->RootMotionNodeAnimID,
+                                                        ASSET_IMPORT_IMMEDIATE);
+            
+            ASSERT(RootNodeAnim);
+            
+            
+            find_anim_deltas_ctx PosDeltas = FindAnimDeltas(Animation,
+                                                            RootNodeAnim->PositionKeysTimes,
+                                                            RootNodeAnim->PositionKeysCount,
+                                                            CurrentTick,
+                                                            IsLooping);
+            find_anim_deltas_ctx RotDeltas = FindAnimDeltas(Animation,
+                                                            RootNodeAnim->RotationKeysTimes,
+                                                            RootNodeAnim->RotationKeysCount,
+                                                            CurrentTick,
+                                                            IsLooping);
+            find_anim_deltas_ctx ScaDeltas = FindAnimDeltas(Animation,
+                                                            RootNodeAnim->ScalingKeysTimes,
+                                                            RootNodeAnim->ScalingKeysCount,
+                                                            CurrentTick,
+                                                            IsLooping);
+            
+            v3 RootCurP = GetAnimatedVector(PosDeltas,
+                                            RootNodeAnim->PositionKeysValues,
+                                            V3(0.0f, 0.0f, 0.0f));
+            
+            quat RootCurR = GetAnimatedQuat(RotDeltas,
+                                            RootNodeAnim->RotationKeysValues,
+                                            QuatI());
+            
+            v3 RootCurS = GetAnimatedVector(ScaDeltas,
+                                            RootNodeAnim->ScalingKeysValues,
+                                            V3(1.0f, 1.0f, 1.0f));
+            
+            if(Playing->NextTick >= Playing->LastTick)
+            {
+                Playing->AdvancedP = RootCurP - Playing->RootLastP;
+                Playing->AdvancedS = RootCurS - Playing->RootLastS;
+                Playing->AdvancedR = RotationDifference(Playing->RootLastR, RootCurR);
+            }
+            else
+            {
+                Playing->AdvancedP = (RootNodeAnim->EndP - Playing->RootLastP) + (RootCurP - RootNodeAnim->BeginP);
+                Playing->AdvancedS = (RootNodeAnim->EndS - Playing->RootLastS) + (RootCurS - RootNodeAnim->BeginS);
+                
+                quat EndDiff = RotationDifference(Playing->RootLastR, RootNodeAnim->EndR);
+                quat BeginDiff = RotationDifference(RootNodeAnim->BeginR, RootCurR);
+                Playing->AdvancedR = BeginDiff * EndDiff;
+            }
+            
+            Playing->RootLastP = RootCurP;
+            Playing->RootLastR = RootCurR;
+            Playing->RootLastS = RootCurS;
+        }
     }
     
     return(Result);
@@ -898,12 +1004,16 @@ INTERNAL_FUNCTION void CalculateToModelTransforms(model_info* Model){
 }
 
 INTERNAL_FUNCTION inline void PlayAnimationInternal(playing_state_slot* Slot,
-                                                    int AnimaitonIndex,
+                                                    int AnimationIndex,
                                                     f64 GlobalStart,
                                                     f32 Phase)
 {
-    Slot->PlayingAnimations[AnimaitonIndex]->GlobalStart = GlobalStart;
-    Slot->PlayingAnimations[AnimaitonIndex]->Phase01 = Phase;
+    playing_anim* PlayAnim = Slot->PlayingAnimations[AnimationIndex];
+    
+    PlayAnim->GlobalStart = GlobalStart;
+    PlayAnim->Phase01 = Phase;
+    PlayAnim->StartPhase01 = Phase;
+    PlayAnim->JustStarted = true;
 }
 
 void PlayStateAnimations(playing_state_slot* Slot, 
@@ -1000,6 +1110,101 @@ void ForceTransitionRequest(animated_component* AC,
 INTERNAL_FUNCTION void ProcessInitTransitioning(animated_component* AC,
                                                 f64 GlobalTime)
 {
+    
+    playing_state_slot* Slot = &AC->PlayingStates[AC->PlayingIndex];
+    
+    anim_state* MainState = Slot->State;
+    
+    // NOTE(Dima): Iterating through all transitions
+    b32 TransitionHappened = false;
+    anim_transition* TransitionAt = MainState->FirstTransition;
+    while(TransitionAt != 0){
+        
+        // NOTE(Dima): From state of transition should be equal to current state
+        Assert(TransitionAt->FromState == MainState);
+        
+        b32 AllConditionsTrue = true;
+        
+        // NOTE(Dima): Checking conditions loop
+        for(int ConditionIndex = 0;
+            ConditionIndex < TransitionAt->ConditionsCount;
+            ConditionIndex++)
+        {
+            anim_transition_condition* Cond = &TransitionAt->Conditions[ConditionIndex];
+            
+            anim_variable* Variable = FindVariable(AC, Cond->Name);
+            Assert(Cond->VariableValueType == Variable->ValueType);
+            
+            b32 ConditionTrue = 0;
+            if(Cond->VariableValueType == AnimVariable_Bool){
+                b32 VariableBool = Variable->Value.Bool;
+                b32 CondBool = Cond->Value.Bool;
+                
+                if(Cond->ConditionType == TransitionCondition_Equal){
+                    ConditionTrue = (VariableBool == CondBool);
+                }
+            }
+            else if(Cond->VariableValueType  == AnimVariable_Float){
+                float VariableFloat = Variable->Value.Float;
+                float CondFloat = Cond->Value.Float;
+                
+                switch(Cond->ConditionType){
+                    case TransitionCondition_MoreEqThan:{
+                        ConditionTrue = VariableFloat >= CondFloat;
+                    }break;
+                    
+                    case TransitionCondition_MoreThan:{
+                        ConditionTrue = VariableFloat > CondFloat;
+                    }break;
+                    
+                    case TransitionCondition_LessEqThan:{
+                        ConditionTrue = VariableFloat <= CondFloat;
+                    }break;
+                    
+                    case TransitionCondition_LessThan:{
+                        ConditionTrue = VariableFloat < CondFloat;
+                    }break;
+                    
+                    case TransitionCondition_Equal:{
+                        ConditionTrue = Abs(VariableFloat - CondFloat) < 0.00000001f;
+                    }break;
+                }
+            }
+            
+            if(!ConditionTrue){
+                AllConditionsTrue = false;
+                break;
+            }
+        }
+        
+        b32 StateCanTransition = false;
+        if(TransitionAt->AnimationShouldFinish){
+            playing_anim* PlayAnim = Slot->PlayingAnimations[Slot->PlayingAnimIndex];
+            StateCanTransition = ((Slot->StateShouldBeExited) || 
+                                  (PlayAnim->Phase01 > (TransitionAt->TransitStartPhase - 0.00001f)));
+            
+            if(TransitionAt->ConditionsCount){
+                StateCanTransition &= AllConditionsTrue;
+            }
+        }
+        else{
+            StateCanTransition = TransitionAt->ConditionsCount && AllConditionsTrue;
+        }
+        
+        if(StateCanTransition){
+            TransitionToStateInternal(AC, TransitionAt->ToState,
+                                      TransitionAt->TimeToTransit,
+                                      GlobalTime, 0.0f);
+            
+            TransitionHappened = true;
+            
+            break;
+        }
+        
+        // NOTE(Dima): Advancing iterator
+        TransitionAt = TransitionAt->NextInList;
+    } // end loop through all transitions
+    
     if(AC->ForceTransitionRequest.Requested && 
        AC->ForceTransitionRequest.ToState)
     {
@@ -1013,123 +1218,23 @@ INTERNAL_FUNCTION void ProcessInitTransitioning(animated_component* AC,
         
         Request->Requested = false;
     }
-    else{
-        playing_state_slot* Slot = &AC->PlayingStates[AC->PlayingIndex];
+    
+#if 0
+    if(AC->TryTransitionRequest.Requested &&
+       AC->TryTransitionRequest.ToState &&
+       !TransitionHappened)
+    {
+        anim_transition_request* Request = &AC->TryTransitionRequest;
         
-#if 0        
-        // NOTE(Dima): Updating all queue transitions if needed
-        for(int Index = 0;
-            Index < AC->PlayingStatesCount;
-            Index++)
-        {
-            int CurrPlayIndex = GetModulatedPlayintIndex(AC->PlayingIndex - Index);
-            
-            playing_state_slot* PlaySlot = &AC->PlayingStates[CurrPlayIndex];
-            
-            anim_state* State = PlaySlot->State;
-            if(State && (State->PlayingAnimationsCount > 0)){
-                if(State->Type == AnimState_Queue){
-                    playing_anim* PlayAnim = State->PlayingAnimations[State->PlayingAnimIndex];
-                    
-                    //b32 CanTransit = PlayAnim->Phase01 > (TransitionAt->TransitStartPhase - 0.00001f);
-                }
-                else if(State->Type == AnimState_BlendTree){
-                    
-                }
-            }
-        }
-#endif
+        TransitionToStateInternal(AC, 
+                                  Request->ToState,
+                                  Request->TimeToTransit,
+                                  GlobalTime, 
+                                  Request->Phase);
         
-        anim_state* MainState = Slot->State;
-        
-        // NOTE(Dima): Iterating through all transitions
-        anim_transition* TransitionAt = MainState->FirstTransition;
-        while(TransitionAt != 0){
-            
-            // NOTE(Dima): From state of transition should be equal to current state
-            Assert(TransitionAt->FromState == MainState);
-            
-            b32 AllConditionsTrue = true;
-            
-            // NOTE(Dima): Checking conditions loop
-            for(int ConditionIndex = 0;
-                ConditionIndex < TransitionAt->ConditionsCount;
-                ConditionIndex++)
-            {
-                anim_transition_condition* Cond = &TransitionAt->Conditions[ConditionIndex];
-                
-                anim_variable* Variable = FindVariable(AC, Cond->Name);
-                Assert(Cond->VariableValueType == Variable->ValueType);
-                
-                b32 ConditionTrue = 0;
-                if(Cond->VariableValueType == AnimVariable_Bool){
-                    b32 VariableBool = Variable->Value.Bool;
-                    b32 CondBool = Cond->Value.Bool;
-                    
-                    if(Cond->ConditionType == TransitionCondition_Equal){
-                        ConditionTrue = (VariableBool == CondBool);
-                    }
-                }
-                else if(Cond->VariableValueType  == AnimVariable_Float){
-                    float VariableFloat = Variable->Value.Float;
-                    float CondFloat = Cond->Value.Float;
-                    
-                    switch(Cond->ConditionType){
-                        case TransitionCondition_MoreEqThan:{
-                            ConditionTrue = VariableFloat >= CondFloat;
-                        }break;
-                        
-                        case TransitionCondition_MoreThan:{
-                            ConditionTrue = VariableFloat > CondFloat;
-                        }break;
-                        
-                        case TransitionCondition_LessEqThan:{
-                            ConditionTrue = VariableFloat <= CondFloat;
-                        }break;
-                        
-                        case TransitionCondition_LessThan:{
-                            ConditionTrue = VariableFloat < CondFloat;
-                        }break;
-                        
-                        case TransitionCondition_Equal:{
-                            ConditionTrue = Abs(VariableFloat - CondFloat) < 0.00000001f;
-                        }break;
-                    }
-                }
-                
-                if(!ConditionTrue){
-                    AllConditionsTrue = false;
-                    break;
-                }
-            }
-            
-            b32 StateCanTransition = false;
-            if(TransitionAt->AnimationShouldFinish){
-                playing_anim* PlayAnim = Slot->PlayingAnimations[Slot->PlayingAnimIndex];
-                StateCanTransition = ((Slot->StateShouldBeExited) || 
-                                      (PlayAnim->Phase01 > (TransitionAt->TransitStartPhase - 0.00001f)));
-                
-                if(TransitionAt->ConditionsCount){
-                    StateCanTransition &= AllConditionsTrue;
-                }
-            }
-            else{
-                StateCanTransition = TransitionAt->ConditionsCount && AllConditionsTrue;
-            }
-            
-            if(StateCanTransition){
-                TransitionToStateInternal(AC, TransitionAt->ToState,
-                                          TransitionAt->TimeToTransit,
-                                          GlobalTime, 0.0f);
-                
-                break;
-            }
-            
-            // NOTE(Dima): Advancing iterator
-            TransitionAt = TransitionAt->NextInList;
-        } // end loop through all transitions
-        
+        Request->Requested = false;
     }
+#endif
 }
 
 
@@ -1279,7 +1384,6 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                 }
             }
             
-            
             // NOTE(Dima): Update animations and blend trees of all playing graph nodes
             {
                 BLOCK_TIMING("UpdateAC::UpdateAllAnims");
@@ -1301,6 +1405,14 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                     b32 StateShouldBeExited = true;
                     StateShouldBeExited &= (IndicesToUpdate.Count > 0);
                     
+                    // NOTE(Dima): Clearing transforms in anim state to safely contribute
+                    // NOTE(Dima): all in-state animations
+                    ClearNodeTransforms(&Slot->ResultedTransforms, Model->NodeCount);
+                    
+                    Slot->AdvancedP = {};
+                    Slot->AdvancedR = {};
+                    Slot->AdvancedS = {};
+                    
                     for(int AnimIndexIndex = 0; 
                         AnimIndexIndex < IndicesToUpdate.Count;
                         AnimIndexIndex++)
@@ -1309,20 +1421,22 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                         playing_anim* Playing = Slot->PlayingAnimations[AnimIndex];
                         
                         Assert(Playing->AnimationID != 0);
+                        
                         animation_clip* Animation = LoadAnimationClip(Assets, 
                                                                       Playing->AnimationID,
                                                                       ASSET_IMPORT_IMMEDIATE);
-                        
                         Assert(Animation->NodesCheckSum == AC->NodesCheckSum);
-                        
-                        // NOTE(Dima): Clearing transforms in anim state to safely contribute
-                        // NOTE(Dima): all in-state animations
-                        ClearNodeTransforms(&Slot->ResultedTransforms, Model->NodeCount);
                         
                         // NOTE(Dima): Updating animation and node transforms
                         u32 UpdateResult = UpdatePlayingAnimation(Assets, Model, 
                                                                   Playing, Animation, 
                                                                   GlobalTime, PlaybackRate);
+                        
+                        if(Animation->UsesRootMotion){
+                            Slot->AdvancedP = Playing->AdvancedP;
+                            Slot->AdvancedR = Playing->AdvancedR;
+                            Slot->AdvancedS = Playing->AdvancedS;
+                        }
                         
                         b32 ThisAnimShouldExit = false;
                         
@@ -1476,6 +1590,21 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                         }
 #endif
                     }
+                    
+                    b32 IsAlreadyTransitioning = PlayingStateIndex != AC->PlayingIndex;
+                    if(StateShouldBeExited && !IsAlreadyTransitioning){
+                        anim_transition_request* TryRequest = &AC->TryTransitionRequest;
+                        
+                        TryRequest->ToState = 0;
+                        if(AnimState->FirstTransition && AnimState->FirstTransition->ToState)
+                        {
+                            TryRequest->ToState = AnimState->FirstTransition->ToState;
+                        }
+                        
+                        TryRequest->Requested = true;
+                        TryRequest->TimeToTransit = 0.15f;
+                        TryRequest->Phase = 0.0f;
+                    }
                 }
                 
                 PlayingStateIndex = GetPrevPlayingIndex(PlayingStateIndex);
@@ -1489,8 +1618,12 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                 ClearNodeTransforms(&AC->ResultedTransforms, Model->NodeCount);
                 
                 // NOTE(Dima): Sum every state resulted transforms based on contribution factor
-                // TODO(Dima): Potentially we can SIMD this loop
                 int PlayingStateIndex = AC->PlayingIndex;
+                
+                AC->AdvancedByRootP = {};
+                AC->AdvancedByRootR = {};
+                AC->AdvancedByRootS = {};
+                
                 for(int Index = 0;
                     Index < AC->PlayingStatesCount;
                     Index++)
@@ -1498,10 +1631,13 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
                     playing_state_slot* Slot = &AC->PlayingStates[PlayingStateIndex];
                     anim_state* AnimState = Slot->State;
                     
-                    
                     node_transforms_block* Dst = &AC->ResultedTransforms;
                     node_transforms_block* Src = &Slot->ResultedTransforms;
-                    //node_transforms_block* Src = &Slot->PlayingAnimation.NodeTransforms;
+                    
+                    AC->AdvancedByRootP += Slot->AdvancedP * Slot->Contribution;
+                    AC->AdvancedByRootS += Slot->AdvancedS * Slot->Contribution;
+                    float RootAdvanceCheckR = SignNotZero(Dot(AC->AdvancedByRootR, Slot->AdvancedR));
+                    AC->AdvancedByRootR += Slot->AdvancedR * Slot->Contribution * RootAdvanceCheckR;
                     
 #if !defined(JOY_AVX)
                     float Contribution = Slot->Contribution;
@@ -1626,15 +1762,16 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
             {
                 BLOCK_TIMING("UpdateAC::Final");
                 
+                AC->AdvancedByRootR = Normalize(AC->AdvancedByRootR);
+                
                 node_transforms_block* Src = &AC->ResultedTransforms;
                 
+                // NOTE(Dima): Finaling normalization of rotation
 #if !defined(JOY_AVX)               
-                // TODO(Dima): SIMD this loop too
                 for(int NodeIndex = 0; 
                     NodeIndex < Model->NodeCount;
                     NodeIndex++)
                 {
-                    // NOTE(Dima): Finaling normalization of rotation
                     Src->Rs[NodeIndex] = Normalize(Src->Rs[NodeIndex]);
                 }
 #else
@@ -1668,7 +1805,6 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
             
             // NOTE(Dima): Calculating to parent transforms
             CalculateToParentTransforms(Model, &AC->ResultedTransforms);
-            
         } // NOTE(Dima): end if transitions count greater than zero
     }
 }

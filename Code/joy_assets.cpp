@@ -547,33 +547,54 @@ void ImportAssetDirectly(assets* Assets,
             
             NodeAnim->PositionKeysValues = 0;
             NodeAnim->PositionKeysTimes = 0;
+            NodeAnim->BeginP = V3_Zero();
+            NodeAnim->EndP = V3_Zero();
             if(Src->PositionKeysCount){
                 v3* PositionKeysValues = GET_DATA(v3, Src->DataOffsetToPositionKeysValues);
                 float* PositionKeysTimes = GET_DATA(float, Src->DataOffsetToPositionKeysTimes);
                 
                 NodeAnim->PositionKeysValues = PositionKeysValues;
                 NodeAnim->PositionKeysTimes = PositionKeysTimes;
+                
+                NodeAnim->BeginP = PositionKeysValues[0];
+                NodeAnim->EndP = PositionKeysValues[Src->PositionKeysCount - 1];
             }
             
             
             NodeAnim->RotationKeysValues = 0;
             NodeAnim->RotationKeysTimes = 0;
+            NodeAnim->BeginR = IdentityQuaternion();
+            NodeAnim->EndR = IdentityQuaternion();
             if(Src->RotationKeysCount){
                 quat* RotationKeysValues = GET_DATA(quat, Src->DataOffsetToRotationKeysValues);
                 float* RotationKeysTimes = GET_DATA(float, Src->DataOffsetToRotationKeysTimes);
                 
                 NodeAnim->RotationKeysValues = RotationKeysValues;
                 NodeAnim->RotationKeysTimes = RotationKeysTimes;
+                
+                NodeAnim->BeginR = RotationKeysValues[0];
+                NodeAnim->EndR = RotationKeysValues[Src->RotationKeysCount - 1];
             }
             
             NodeAnim->ScalingKeysValues = 0;
             NodeAnim->ScalingKeysTimes = 0;
+            NodeAnim->BeginS = V3_One();
+            NodeAnim->EndS = V3_One();
             if(Src->ScalingKeysCount){
                 v3* ScalingKeysValues = GET_DATA(v3, Src->DataOffsetToScalingKeysValues);
                 float* ScalingKeysTimes = GET_DATA(float, Src->DataOffsetToScalingKeysTimes);
                 
                 NodeAnim->ScalingKeysValues = ScalingKeysValues;
                 NodeAnim->ScalingKeysTimes = ScalingKeysTimes;
+                
+                NodeAnim->BeginS = ScalingKeysValues[0];
+                NodeAnim->EndS = ScalingKeysValues[Src->ScalingKeysCount - 1];
+            }
+            
+            // TODO(Dima): Remove this. It's for test
+            if(Src->IsRootMotion)
+            {
+                int a = 1;
             }
             
         }break;
@@ -1069,7 +1090,6 @@ corresponding asset groups (Main groups, and tag groups for each tag
                     
 #define ALLOC_ASS_PTR_MEMBER(type) (type*)AllocateAssetType(Assets, NewAsset, (void**)&GET_ASSET_PTR_MEMBER(NewAsset, type), sizeof(type))
                     
-                    
                     // NOTE(Dima): Initializing assets
                     // NOTE(Dima): Loading description info from file headers
                     switch(NewAsset->Type){
@@ -1189,6 +1209,7 @@ corresponding asset groups (Main groups, and tag groups for each tag
                             NodeAnim->RotationKeysCount = Src->RotationKeysCount;
                             NodeAnim->ScalingKeysCount = Src->ScalingKeysCount;
                             NodeAnim->NodeIndex = Src->NodeIndex;
+                            NodeAnim->IsRootMotion = Src->IsRootMotion;
                         }break;
                         
                         case AssetType_AnimationClip:{
@@ -1200,8 +1221,11 @@ corresponding asset groups (Main groups, and tag groups for each tag
                             Clip->NodeAnimationsCount = Src->NodeAnimationIDsCount;
                             Clip->NodesCheckSum = Src->NodesCheckSum;
                             Clip->UsesRootMotion = Src->UsesRootMotion;
-                            Clip->RootMotionNodeAnimID = FileToIntegratedID(FileSource, 
-                                                                            Src->RootMotionNodeAnimID);
+                            Clip->RootMotionNodeAnimID = 0;
+                            if(Clip->UsesRootMotion){
+                                Clip->RootMotionNodeAnimID = FileToIntegratedID(FileSource, 
+                                                                                Src->RootMotionNodeAnimID);
+                            }
                         }break;
                         
                         case AssetType_Skeleton:{

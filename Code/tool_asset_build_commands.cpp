@@ -383,6 +383,7 @@ added_asset AddNodeAnimationAsset(asset_system* System, tool_node_animation* Nod
         Head->DataOffsetToRotationKeysTimes + Head->SizeRotationKeysTimes;
     
     Head->NodeIndex = NodeAnim->NodeIndex;
+    Head->IsRootMotion = NodeAnim->IsRootMotion;
     
     return(Added);
 }

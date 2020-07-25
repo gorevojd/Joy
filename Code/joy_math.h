@@ -329,6 +329,29 @@ inline v3 V3(float Value){
     return(Res);
 }
 
+inline v3 V3_One()
+{
+    v3 Res;
+    
+    Res.x = 1.0f;
+    Res.y = 1.0f;
+    Res.z = 1.0f;
+    
+    return(Res);
+}
+
+
+inline v3 V3_Zero()
+{
+    v3 Res;
+    
+    Res.x = 0.0f;
+    Res.y = 0.0f;
+    Res.z = 0.0f;
+    
+    return(Res);
+}
+
 inline v4 V4(float Value) {
 	v4 res;
 	res.x = Value;
@@ -355,6 +378,17 @@ inline v4 V4(v3 InitVector, float w) {
 	res.y = InitVector.y;
 	res.z = InitVector.z;
 	res.w = w;
+	return(res);
+}
+
+inline quat IdentityQuaternion(){
+    quat res;
+    
+	res.x = 0.0f;
+	res.y = 0.0f;
+	res.z = 0.0f;
+	res.w = 1.0f;
+    
 	return(res);
 }
 
@@ -839,6 +873,13 @@ inline quat Inverse(quat Q){
     quat res = Conjugate(Q) / Dot(Q, Q);
     
     return(res);
+}
+
+// NOTE(Dima): Finds the 'diff' such tat diff * A = B
+inline quat RotationDifference(quat A, quat B){
+    quat Result = B * Inverse(A);
+    
+    return(Result);
 }
 
 inline quat Lerp(quat A, quat B, float t) {

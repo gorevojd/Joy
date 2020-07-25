@@ -198,6 +198,17 @@ struct model_info{
 };
 
 struct node_animation{
+    // NOTE(Dima): These are precalculated values for start&end in animation
+    v3 BeginP;
+    v3 EndP;
+    
+    quat BeginR;
+    quat EndR;
+    
+    v3 BeginS;
+    v3 EndS;
+    
+    // NOTE(Dima): Data
     float* PositionKeysTimes;
     v3* PositionKeysValues;
     
@@ -210,7 +221,9 @@ struct node_animation{
     int PositionKeysCount;
     int RotationKeysCount;
     int ScalingKeysCount;
+    b32 IsRootMotion;
     
+    // NOTE(Dima): this is reference index to NodesSharedDatas
     int NodeIndex;
 };
 

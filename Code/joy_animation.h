@@ -67,15 +67,28 @@ struct playing_anim{
     
     f64 GlobalStart;
     f32 Phase01;
+    f32 StartPhase01;
     
     b32 TransformsCalculated[ANIM_TRANSFORMS_ARRAY_SIZE];
     node_transforms_block NodeTransforms;
     
     u32 AnimationID;
+    animation_clip* Animation;
     
     struct playing_state_slot* StateSlot;
     f32 InStateContribution;
     
+    b32 JustStarted;
+    f32 LastTick;
+    f32 NextTick;
+    
+    v3 RootLastP;
+    quat RootLastR;
+    v3 RootLastS;
+    
+    v3 AdvancedP;
+    quat AdvancedR;
+    v3 AdvancedS;
 };
 
 enum anim_state_type{
@@ -117,6 +130,9 @@ struct playing_state_slot{
     
     f32 Contribution;
     node_transforms_block ResultedTransforms;
+    v3 AdvancedP;
+    quat AdvancedR;
+    v3 AdvancedS;
     
     /*
 NOTE(dima): Fot n'th element in playing states
@@ -264,10 +280,15 @@ struct animated_component{
     node_transforms_block ResultedTransforms;
     m44 BoneTransformMatrices[128];
     
+    v3 AdvancedByRootP;
+    quat AdvancedByRootR;
+    v3 AdvancedByRootS;
+    
     playing_anim* Anims;
     int AnimsCount;
     
     anim_transition_request ForceTransitionRequest;
+    anim_transition_request TryTransitionRequest;
 };
 
 inline int GetModulatedPlayintIndex(int Index){

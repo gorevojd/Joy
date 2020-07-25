@@ -36,15 +36,16 @@ enum character_id_type{
     CharacterID_Count,
 };
 
-struct entity_character{
+struct obj_transform
+{
     v3 P;
-    v3 dP;
-    quat R;
     v3 S;
-    
-    v3 InitP;
-    v3 InitS;
-    quat InitR;
+    quat R;
+};
+
+struct entity_character{
+    obj_transform Transform;
+    v3 dP;
     
     u32 CharacterIDs[CharacterID_Count];
     
@@ -439,10 +440,10 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitCaterpillarControl){
     return(Control);
 }
 
-INTERNAL_FUNCTION void UpdateModel(assets* Assets, 
+INTERNAL_FUNCTION void UpdateModel(assets* Assets,
                                    render_state* Render,
                                    model_info* Model, 
-                                   v3 Pos, quat Rot, v3 Scale, 
+                                   obj_transform* Transform, 
                                    f64 GlobalTime,
                                    f32 DeltaTime,
                                    animated_component* AC)
@@ -455,7 +456,18 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
                                                          GlobalTime, DeltaTime, 
                                                          1.0f);
     
-    m44 ModelToWorld = ScalingMatrix(Scale) * RotationMatrix(Rot) * TranslationMatrix(Pos);
+    m44 ModelToWorld = ScalingMatrix(Transform->S) * RotationMatrix(Transform->R) * TranslationMatrix(Transform->P);
+    
+#if 1
+    if(AC)
+    {
+        v4 ToMove = V4(AC->AdvancedByRootP, 1.0f) * ModelToWorld;
+        Transform->P = ToMove.xyz;
+        
+        ModelToWorld = ScalingMatrix(Transform->S) * RotationMatrix(Transform->R) * TranslationMatrix(Transform->P);
+    }
+#endif
+    
     
     // NOTE(Dima): Pushing to render
     for(int NodeIndex = 0;
@@ -527,12 +539,9 @@ has the same count of IDs as GameAssetID table for model and animations
     }
     
     Character->dP = V3(0.0f, 0.0f, 0.0f);
-    Character->P = P;
-    Character->R = R;
-    Character->S = S;
-    Character->InitP = P;
-    Character->InitR = R;
-    Character->InitS = S;
+    Character->Transform.P = P;
+    Character->Transform.R = R;
+    Character->Transform.S = S;
     Character->IsInsect = IsInsect;
     
     model_info* ModelInfo = GET_ASSET_DATA_BY_ID(model_info, AssetType_Model, 
@@ -591,60 +600,39 @@ INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
         Character->dP.y += 5.0f;
     }
     
-#if 0    
-    f32 RadialFrequency = 1.0f;
-    f32 MoveRadius = 5.0f;
-    
-    v2 RadialP1 = V2(Cos(GlobalTime * RadialFrequency) * MoveRadius,
-                     Sin(GlobalTime * RadialFrequency) * MoveRadius);
-    
-    v2 RadialP2 = V2(Cos((GlobalTime + dt) * RadialFrequency) * MoveRadius,
-                     Sin((GlobalTime + dt) * RadialFrequency) * MoveRadius);
-    
-    v2 MoveHorzDirection = Normalize(RadialP2 - RadialP1);
-    v2 MoveHorz = MoveHorzDirection * MoveSpeed;
-    
-    Character->dP.x = MoveHorz.x;
-    Character->dP.z = MoveHorz.y;
-    
-    quat LookRotation = QuatLookAt(V3(MoveHorzDirection.x, 0.0f, MoveHorzDirection.y),
-                                   V3(0.0f, 1.0f, 0.0f));
-    Character->R = Normalize(LookRotation * Character->InitR);
-#endif
+    animated_component* AC = &Character->AnimComponent;
     
     v3 Acc = V3(0.0f, -9.81f, 0.0f);
-    Character->P = Character->P + Character->dP * dt + Acc * dt * dt * 0.5f;
+    
+    Character->Transform.P = Character->Transform.P + Character->dP * dt + Acc * dt * dt * 0.5f;
+    
     Character->dP = Character->dP + Acc * dt;
     
     float PrevVelocityY = Character->dP.y;
-    if(Character->P.y < 0.0f){
-        Character->P.y = 0.0f;
+    
+    if(Character->Transform.P.y < 0.0f){
+        Character->Transform.P.y = 0.0f;
         Character->dP.y = 0.0f;
     }
     
-    b32 IsFalling = Character->P.y > 0.0001f;
+    b32 IsFalling = Character->Transform.P.y > 0.0001f;
     
-    
-    if(KeyWentDown(Input, Key_X) && CanMove && !IsFalling){
+    if(KeyWentDown(Input, Key_X) && CanMove && !IsFalling)
+    {
         ForceTransitionRequest(&Character->AnimComponent,
                                "Roll", 0.1f, 0.0f);
     }
     
-    
-    SetFloat(&Character->AnimComponent, 
-             "VelocityHorzLen", MoveSpeed);
-    SetFloat(&Character->AnimComponent,
-             "VelocityVertValue", PrevVelocityY);
-    SetBool(&Character->AnimComponent,
-            "IsFalling", IsFalling);
-    
+    SetFloat(&Character->AnimComponent, "VelocityHorzLen", MoveSpeed);
+    SetFloat(&Character->AnimComponent, "VelocityVertValue", PrevVelocityY);
+    SetBool(&Character->AnimComponent, "IsFalling", IsFalling);
     
     if(Model){
         UpdateModel(Assets, Render,
-                    Model, Character->P,
-                    Character->R, Character->S,
+                    Model, 
+                    &Character->Transform,
                     GlobalTime, dt,
-                    &Character->AnimComponent);
+                    AC);
     }
 }
 
@@ -709,7 +697,8 @@ GAME_MODE_UPDATE(TestUpdate){
                           Char,
                           CharType,
                           State->FriendControl,
-                          P, 
+                          P,
+                          //IdentityQuaternion(),
                           Quat(V3(1.0f, 0.0f, 0.0f), -JOY_PI_OVER_TWO),
                           V3(0.01f),
                           false);

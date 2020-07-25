@@ -806,7 +806,7 @@ inline b32 RenderQueueIsEmpty(render_state* Render, int QueueIndex){
     if(RenderQueueIsValid(Render, QueueIndex)){
         render_queue* Q = &Render->Queues[QueueIndex];
         
-        Result = (Q->FirstEntry >= Q->OnePastLastEntry) && ((Q->FirstEntry == 0) || (Q->OnePastLastEntry == 0));
+        Result = (Q->FirstEntry >= Q->OnePastLastEntry) || (Q->FirstEntry == 0) || (Q->OnePastLastEntry == 0);
     }
     
     return(Result);

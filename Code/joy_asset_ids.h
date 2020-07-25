@@ -129,6 +129,7 @@ struct asset_node_animation{
     u32 SizeScalingKeysTimes;
     
     u32 NodeIndex;
+    b32 IsRootMotion;
 };
 
 struct asset_bitmap{

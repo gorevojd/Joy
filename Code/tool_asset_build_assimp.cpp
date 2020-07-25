@@ -68,7 +68,6 @@ void ReplaceSlashes(std::string& Path){
     }
 }
 
-
 void ReplaceSpecialPath(std::string& Path,
                         char* SpecialPath,
                         char* NewPath)
@@ -679,18 +678,25 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags,
             
             std::string NodeName = std::string(AssimpNodeAnim->mNodeName.C_Str());
             
-            // NOTE(Dima): Ignoring root node animation
             b32 IsRootMotionNode = (NodeName == RootAnimatedNodeName);
             
             tool_node_animation NewNodeAnim = {};
             
             // NOTE(Dima): Setting name
             NewNodeAnim.NodeName = NodeName;
+            NewNodeAnim.IsRootMotion = false;
             
             // NOTE(Dima): Finding node index in a mapping
             auto FindIterator = Result.NodeNameToNodeIndex.find(NewNodeAnim.NodeName);
             ASSERT(FindIterator != Result.NodeNameToNodeIndex.end());
             NewNodeAnim.NodeIndex = FindIterator->second;
+            
+            if(IsRootMotionNode)
+            {
+                RootMotionNodeAnim->IsRootMotion = true;
+                RootMotionNodeAnim->NodeIndex = NewNodeAnim.NodeIndex;
+                RootMotionNodeAnim->NodeName = NodeName;
+            }
             
             // NOTE(Dima): Loading position keys
             for(int KeyIndex = 0; 
@@ -707,6 +713,7 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags,
                     
                     if(ExtractRootMotionY){
                         Extracted.x = Value.x;
+                        Extracted.y = 0.0f;
                         Extracted.z = Value.z;
                         
                         Value.x = 0.0f;
@@ -715,6 +722,7 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags,
                     else if(ExtractRootMotionZ){
                         Extracted.x = Value.x;
                         Extracted.y = Value.y;
+                        Extracted.z = 0.0f;
                         
                         Value.x = 0.0f;
                         Value.y = 0.0f;
@@ -936,6 +944,7 @@ INTERNAL_FUNCTION void StoreAnimationsToGroupID(asset_system* System,
     Model->ToolModelInfo = LoadedToToolModelInfo(Model);
     tool_model_info* ToolModel = &Model->ToolModelInfo;
     
+    // NOTE(Dima): Storing all node animations except root node anim
     BeginAsset(System, GameAsset_Type_NodeAnim);
     for(int AnimIndex = 0;
         AnimIndex < Model->Animations.size();
@@ -974,6 +983,7 @@ INTERNAL_FUNCTION void StoreAnimationsToGroupID(asset_system* System,
     }
     EndAsset(System);
     
+    // NOTE(Dima): Storing animation assets
     BeginAsset(System, AssetGroupID);
     for(int AnimIndex = 0;
         AnimIndex < Model->Animations.size();
@@ -1190,6 +1200,5 @@ INTERNAL_FUNCTION void StoreLoadingContext(asset_system* System,
         else{
             StoreModelAsset(System, Source, LoadingCtx);
         }
-        
     }
 }

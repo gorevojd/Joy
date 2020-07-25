@@ -1,7 +1,7 @@
 @echo off
 
 set DISABLED_WARNS=/wd4530 /wd4577 /wd4005
-SET COMP_OPTS=/Od /Zi /Oi /FC /MP /EHa- /Gm- /GR- /nologo %DISABLED_WARNS%
+SET COMP_OPTS=/Od /Zi /Oi /arch:AVX2 /FC /MP /EHa- /Gm- /GR- /nologo %DISABLED_WARNS%
 SET INCLUDE_PATH=/I"C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include"
 
 IF NOT EXIST ..\Build MKDIR ..\Build
@@ -14,27 +14,6 @@ ECHO ***********
 
 REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy.cpp
 set COMPILATION_FILES=..\Code\win32_joy.cpp
-
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_debug.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_animation.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_sort.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_memory.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_render.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_assets.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_gui.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_platform.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_render_blur.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_software_renderer.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_software_renderer_functions.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_colors.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_opengl.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_audio.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_camera.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_world.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_game_mode.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_modes.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_input.cpp
-REM set COMPILATION_FILES=%COMPILATION_FILES% ..\Code\joy_engine.cpp
 
 SET THIS_PROJECT_NAME=Joy
 ECHO Compiling Joy

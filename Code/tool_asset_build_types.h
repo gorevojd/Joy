@@ -163,6 +163,7 @@ struct tool_node_animation{
     std::string NodeName;
     
     int NodeIndex;
+    b32 IsRootMotion;
     
     std::vector<v3> PositionValues;
     std::vector<quat> RotationValues;
