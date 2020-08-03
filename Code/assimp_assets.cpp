@@ -105,17 +105,21 @@ INTERNAL_FUNCTION void WriteMeshes1(){
     model_loading_context* Ctx = &LoadCtx;
     
     u32 DefaultFlags = 
-        Load_GenerateNormals |
+        Load_GenerateSmoothNormals |
         Load_GenerateTangents;
     
     AddModelSource(Ctx, "../Data/Models/Animations/Male_Casual.fbx",
-                   GameAsset_Man,
+                   AssetEntry_Man,
+                   DefaultFlags);
+    
+    AddModelSource(Ctx, "../Data/Models/UtahTeapot/teapot.obj",
+                   AssetEntry_UtahTeapot,
                    DefaultFlags);
     
     // NOTE(Dima): Storing loading context
     StoreLoadingContext(System, Ctx);
     
-    WriteAssetFile(System, "../Data/AssimpMeshes1.ja");
+    WriteAssetFile(System, "../Data/AssimpMeshes1.jass");
 }
 
 
@@ -132,47 +136,47 @@ INTERNAL_FUNCTION void AddCharacterToWrite(model_loading_context* Ctx,
     PushDirectory(Ctx, DataFolder);
     
     AddModelSource(Ctx, ModelName,
-                   GameAsset_Model_Character, DefaultFlags);
+                   AssetEntry_Model_Character, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Failure.fbx", 
-                  GameAsset_Anim_Failure, DefaultFlags);
+                  AssetEntry_Anim_Failure, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Fall.fbx",
-                  GameAsset_Anim_Fall, DefaultFlags);
+                  AssetEntry_Anim_Fall, DefaultFlags);
     
     PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
     AddAnimSource(Ctx, "animations/Idle.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags);
+                  AssetEntry_Anim_Idle, DefaultFlags);
     PopTag(Ctx);
     
     PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle1);
     AddAnimSource(Ctx, "animations/Idle_2.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags);
+                  AssetEntry_Anim_Idle, DefaultFlags);
     PopTag(Ctx);
     
     AddAnimSource(Ctx, "animations/Jump_Up.fbx",
-                  GameAsset_Anim_JumpUp, DefaultFlags);
+                  AssetEntry_Anim_JumpUp, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Land.fbx",
-                  GameAsset_Anim_Land, DefaultFlags);
+                  AssetEntry_Anim_Land, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Roll.fbx",
-                  GameAsset_Anim_Roll, DefaultFlags | Load_ExtractRootMotionZ);
+                  AssetEntry_Anim_Roll, DefaultFlags | Load_ExtractRootMotionZ);
     
     AddAnimSource(Ctx, "animations/Run.fbx",
-                  GameAsset_Anim_Run, DefaultFlags | Load_ExtractRootMotionZ);
+                  AssetEntry_Anim_Run, DefaultFlags | Load_ExtractRootMotionZ);
     
     AddAnimSource(Ctx, "animations/Sleep.fbx",
-                  GameAsset_Anim_Sleep, DefaultFlags);
+                  AssetEntry_Anim_Sleep, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Success.fbx",
-                  GameAsset_Anim_Success, DefaultFlags);
+                  AssetEntry_Anim_Success, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Talk.fbx",
-                  GameAsset_Anim_Talk, DefaultFlags);
+                  AssetEntry_Anim_Talk, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Walk.fbx",
-                  GameAsset_Anim_Walk, DefaultFlags | Load_ExtractRootMotionZ);
+                  AssetEntry_Anim_Walk, DefaultFlags | Load_ExtractRootMotionZ);
     PopDirectory(Ctx);
     EndCharacter(Ctx);
 }
@@ -191,32 +195,32 @@ INTERNAL_FUNCTION void AddCaterpillar(model_loading_context* Ctx)
     
     // NOTE(Dima): Common
     AddModelSource(Ctx, NameFBX,
-                   GameAsset_Model_Character, DefaultFlags);
+                   AssetEntry_Model_Character, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Fall.fbx",
-                  GameAsset_Anim_Fall, DefaultFlags);
+                  AssetEntry_Anim_Fall, DefaultFlags);
     
     PushIntTag(Ctx, AssetTag_IdleAnim, TagIdleAnim_Idle0);
     AddAnimSource(Ctx, "animations/Idle.fbx",
-                  GameAsset_Anim_Idle, DefaultFlags);
+                  AssetEntry_Anim_Idle, DefaultFlags);
     PopTag(Ctx);
     
     AddAnimSource(Ctx, "animations/Jump_Up.fbx",
-                  GameAsset_Anim_JumpUp, DefaultFlags);
+                  AssetEntry_Anim_JumpUp, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Land.fbx",
-                  GameAsset_Anim_Land, DefaultFlags);
+                  AssetEntry_Anim_Land, DefaultFlags);
     
     AddAnimSource(Ctx, "animations/Roll.fbx",
-                  GameAsset_Anim_Roll, 
+                  AssetEntry_Anim_Roll, 
                   DefaultFlags | Load_ExtractRootMotionZ);
     
     AddAnimSource(Ctx, "animations/Run.fbx",
-                  GameAsset_Anim_Run, 
+                  AssetEntry_Anim_Run, 
                   DefaultFlags | Load_ExtractRootMotionZ);
     
     AddAnimSource(Ctx, "animations/Die.fbx",
-                  GameAsset_Anim_Die, DefaultFlags);
+                  AssetEntry_Anim_Die, DefaultFlags);
     
     PopDirectory(Ctx);
     EndCharacter(Ctx);
@@ -257,7 +261,7 @@ INTERNAL_FUNCTION void WriteForestAnimals(){
     // NOTE(Dima): Storing loading context
     StoreLoadingContext(System, Ctx);
     
-    WriteAssetFile(System, "../Data/ForestAnimals.ja");
+    WriteAssetFile(System, "../Data/ForestAnimals.jass");
 }
 
 
@@ -298,7 +302,7 @@ INTERNAL_FUNCTION void WriteFarmAnimals(){
     // NOTE(Dima): Storing loading context
     StoreLoadingContext(System, Ctx);
     
-    WriteAssetFile(System, "../Data/FarmAnimals.ja");
+    WriteAssetFile(System, "../Data/FarmAnimals.jass");
 }
 
 INTERNAL_FUNCTION void WriteInsects(){
@@ -311,7 +315,7 @@ INTERNAL_FUNCTION void WriteInsects(){
     
     AddCaterpillar(Ctx);
     
-#if 0    
+#if 0
     AddInsectCharacter(Ctx, "../Data/Models/Insects/Hornet",
                        TagCharacter_Hornet,
                        "Hornet.fbx");
@@ -336,7 +340,7 @@ INTERNAL_FUNCTION void WriteInsects(){
     // NOTE(Dima): Storing loading context
     StoreLoadingContext(System, Ctx);
     
-    WriteAssetFile(System, "../Data/Insects.ja");
+    WriteAssetFile(System, "../Data/Insects.jass");
 }
 
 int main(int ArgsCount, char** Args){

@@ -10,6 +10,7 @@
 
 #define JOY_PI 3.14159265359f
 #define JOY_TWO_PI 6.28318530718f
+#define JOY_TAU 6.28318530718f
 #define JOY_PI_OVER_TWO 1.57079632679f
 
 #define JOY_ONE_OVER_255 0.00392156862f;
@@ -1021,8 +1022,6 @@ inline m33 Transpose(m33 M){
         }
     }
     
-    
-    
     return(Result);
 }
 
@@ -1041,13 +1040,13 @@ inline m44 InverseTransformMatrix(m44 Transformation){
     return(Result);
 }
 
-inline m44 PerspectiveProjection(int Width, int Height, float Far, float Near)
+inline m44 PerspectiveProjection(int Width, int Height, float Far, float Near, float FOVDegrees = 45.0f)
 {
     m44 Result = {};
     
     float AspectRatio = (float)Width / (float)Height;
     
-    float S = 1.0f / (Tan(45.0f * 0.5f * JOY_DEG2RAD));
+    float S = 1.0f / Tan(FOVDegrees * 0.5f * JOY_DEG2RAD);
     float A = S / AspectRatio;
     float B = S;
     float OneOverFarMinusNear = 1.0f / (Far - Near);

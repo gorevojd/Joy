@@ -290,7 +290,7 @@ enum update_pa_result_type{
     UpdatePA_PickRandom,
 };
 
-INTERNAL_FUNCTION u32 UpdatePlayingAnimation(assets* Assets,
+INTERNAL_FUNCTION u32 UpdatePlayingAnimation(asset_system* Assets,
                                              model_info* Model,
                                              playing_anim* Playing,
                                              animation_clip* Animation,
@@ -1278,7 +1278,7 @@ GetUpdateIndices(playing_state_slot* Slot)
     return(Result);
 }
 
-INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
+INTERNAL_FUNCTION void UpdateAnimatedComponent(asset_system* Assets,
                                                model_info* Model, 
                                                animated_component* AC,
                                                f64 GlobalTime,
@@ -1809,7 +1809,7 @@ INTERNAL_FUNCTION void UpdateAnimatedComponent(assets* Assets,
     }
 }
 
-INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(assets* Assets, 
+INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(asset_system* Assets, 
                                                                  model_info* Model, 
                                                                  animated_component* AC)
 {
@@ -1909,7 +1909,7 @@ INTERNAL_FUNCTION anim_calculated_pose UpdateModelBoneTransforms(assets* Assets,
     return(Result);
 }
 
-anim_calculated_pose UpdateModelAnimation(assets* Assets,
+anim_calculated_pose UpdateModelAnimation(asset_system* Assets,
                                           model_info* Model,
                                           animated_component* AnimComp,
                                           f64 GlobalTime,
@@ -2767,6 +2767,6 @@ void InitAnimSystem(anim_system* Anim)
     DLIST_REFLECT_PTRS(Anim->AnimIDUse, NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(Anim->AnimIDFree, NextAlloc, PrevAlloc);
     
-    
     DEBUGSetMenuDataSource(DebugMenu_Animation, Anim);
 }
+

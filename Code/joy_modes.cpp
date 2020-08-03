@@ -236,7 +236,7 @@ INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
         v3 TargetP = SphereCenter + Distr->Samples[SampleIndex] * SphereRad;
         
         PushOrLoadMesh(Game->Assets, Render, 
-                       GetFirst(Game->Assets, GameAsset_Cube),
+                       GetFirst(Game->Assets, AssetEntry_Cube),
                        TargetP, 
                        QuatI(), 
                        V3(0.05f),
@@ -440,17 +440,18 @@ INTERNAL_FUNCTION CREATE_ANIM_CONTROL_FUNC(InitCaterpillarControl){
     return(Control);
 }
 
-INTERNAL_FUNCTION void UpdateModel(assets* Assets,
+INTERNAL_FUNCTION void UpdateModel(asset_system* Assets,
                                    render_state* Render,
                                    model_info* Model, 
                                    obj_transform* Transform, 
+                                   v3 Color,
                                    f64 GlobalTime,
                                    f32 DeltaTime,
                                    animated_component* AC)
 {
     FUNCTION_TIMING();
     
-    asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
+    asset_id CubeMeshID = GetFirst(Assets, AssetEntry_Cube);
     
     anim_calculated_pose CalcPose = UpdateModelAnimation(Assets, Model, AC,
                                                          GlobalTime, DeltaTime, 
@@ -463,11 +464,9 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
     {
         v4 ToMove = V4(AC->AdvancedByRootP, 1.0f) * ModelToWorld;
         Transform->P = ToMove.xyz;
-        
         ModelToWorld = ScalingMatrix(Transform->S) * RotationMatrix(Transform->R) * TranslationMatrix(Transform->P);
     }
 #endif
-    
     
     // NOTE(Dima): Pushing to render
     for(int NodeIndex = 0;
@@ -491,7 +490,9 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
                                                        ASSET_IMPORT_DEFERRED);
                 
                 PushMesh(Render, Mesh, 
-                         NodeTran, Material,
+                         NodeTran, 
+                         Color,
+                         Material,
                          CalcPose.BoneTransforms, 
                          CalcPose.BoneTransformsCount);
             }
@@ -499,7 +500,7 @@ INTERNAL_FUNCTION void UpdateModel(assets* Assets,
     }
 }
 
-INTERNAL_FUNCTION u32 LoadCharacterAssetID(assets* Assets, 
+INTERNAL_FUNCTION u32 LoadCharacterAssetID(asset_system* Assets, 
                                            u32 GroupID, 
                                            u32 TagCharacterValue)
 {
@@ -513,7 +514,7 @@ INTERNAL_FUNCTION u32 LoadCharacterAssetID(assets* Assets,
     return(ResultID);
 }
 
-INTERNAL_FUNCTION void InitCharacter(assets* Assets, 
+INTERNAL_FUNCTION void InitCharacter(asset_system* Assets, 
                                      entity_character* Character,
                                      u32 TagCharacterValue,
                                      anim_controller* Control,
@@ -525,7 +526,7 @@ INTERNAL_FUNCTION void InitCharacter(assets* Assets,
 has the same count of IDs as GameAssetID table for model and animations
 */
     Assert((CharacterID_Count - CharacterID_Model) == 
-           (GameAsset_Model_TempForCounting - GameAsset_Model_Character));
+           (AssetEntry_Model_TempForCounting - AssetEntry_Model_Character));
     
     // NOTE(Dima): Loading IDs
     u32 *CharIDs = Character->CharacterIDs;
@@ -534,7 +535,7 @@ has the same count of IDs as GameAssetID table for model and animations
         Index++)
     {
         CharIDs[Index] = LoadCharacterAssetID(Assets, 
-                                              GameAsset_Model_Character + Index,
+                                              AssetEntry_Model_Character + Index,
                                               TagCharacterValue);
     }
     
@@ -569,7 +570,7 @@ has the same count of IDs as GameAssetID table for model and animations
     }
 }
 
-INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
+INTERNAL_FUNCTION void UpdateCharacter(asset_system* Assets,
                                        render_state* Render,
                                        input_state* Input,
                                        entity_character* Character,
@@ -631,6 +632,7 @@ INTERNAL_FUNCTION void UpdateCharacter(assets* Assets,
         UpdateModel(Assets, Render,
                     Model, 
                     &Character->Transform,
+                    V3_One(),
                     GlobalTime, dt,
                     AC);
     }
@@ -643,7 +645,7 @@ GAME_MODE_UPDATE(TestUpdate){
     GAME_GET_MODE_STATE(test_game_mode_state, State);
     
     render_state* Render = Game->Render;
-    assets* Assets = Game->Assets;
+    asset_system* Assets = Game->Assets;
     
     if(!State->Initialized){
         
@@ -674,7 +676,7 @@ GAME_MODE_UPDATE(TestUpdate){
         
 #if 0        
         model_info* PlayerInfo = GET_ASSET_DATA_BY_ID(model_info, AssetType_Model, 
-                                                      Game->Assets, GameAsset_Man);
+                                                      Game->Assets, AssetEntry_Man);
         InitAnimComponent(&State->PlayerAnimComponent,
                           State->PlayerControl,
                           PlayerInfo->NodesCheckSum);
@@ -827,18 +829,42 @@ GAME_MODE_UPDATE(TestUpdate){
     
     BoolButtonOnOff(Game->Gui, "Fog enabled", &Game->Render->FogEnabled);
     
+    SliderFloat(Game->Gui,
+                &Game->Render->SSAOKernelRadius,
+                0.2f, 1.5f,
+                "SSAO Kernel Radius");
+    
+    SliderInt(Game->Gui,
+              &Game->Render->SSAOKernelSampleCount,
+              1, SSAO_KERNEL_MAX_SIZE,
+              "SSAO Kernel Samples");
+    
+    SliderFloat(Game->Gui,
+                &Game->Render->SSAOContribution,
+                0.01f, 1.0f,
+                "SSAO Contrib");
+    
+    SliderFloat(Game->Gui,
+                &Game->Render->SSAORangeCheck,
+                0.01f, 10.0f,
+                "SSAO Range check");
+    
+    BeginRow(Game->Gui);
+    ShowText(Game->Gui, "SSAO Filter");
+    ShowText(Game->Gui, (char*)Game->Render->FilterNames[Game->Render->SSAOFilterType]);
+    EndRow(Game->Gui);
     
     u32 FindTagTypes[1] = {AssetTag_LOD};
     asset_tag_value FindTagValues[1] = {FindSphereQuality};
     
     u32 SphereID = GetBestByTags(Game->Assets,
-                                 GameAsset_Sphere,
+                                 AssetEntry_Sphere,
                                  FindTagTypes,
                                  FindTagValues,
                                  1);
     
     u32 CylID = GetBestByTags(Game->Assets,
-                              GameAsset_Cylynder,
+                              AssetEntry_Cylynder,
                               FindTagTypes,
                               FindTagValues,
                               1);
@@ -915,7 +941,7 @@ GAME_MODE_UPDATE(TestUpdate){
     
 #if 0    
     State->PlayerModel = LoadModel(Game->Assets,
-                                   GetFirst(Game->Assets, GameAsset_Man),
+                                   GetFirst(Game->Assets, AssetEntry_Man),
                                    ASSET_IMPORT_DEFERRED);
     
     if(State->PlayerModel){
@@ -962,34 +988,85 @@ GAME_MODE_UPDATE(TestUpdate){
                     State->GameTime,
                     State->GameDeltaTime);
     
+    v3 Color00 = V3(1.0f, 0.0f, 0.0f);
+    v3 Color01 = V3(0.0f, 1.0f, 0.0f);
+    v3 Color10 = V3(0.0f, 0.0f, 1.0f);
+    v3 Color11 = V3(1.0f, 0.6f, 0.0f);
+    
+    int TeapotRowColCount = 20;
+    
+    for(int RowIndex = 0;
+        RowIndex < TeapotRowColCount;
+        RowIndex++)
+    {
+        f32 HorzPercentage = (f32)RowIndex / f32(TeapotRowColCount);
+        
+        v3 HorzBlend0 = Lerp(Color00, Color01, HorzPercentage);
+        v3 HorzBlend1 = Lerp(Color10, Color11, HorzPercentage);
+        
+        for(int ColIndex = 0;
+            ColIndex < TeapotRowColCount;
+            ColIndex++)
+        {
+            f32 VertPercentage = (f32)ColIndex / f32(TeapotRowColCount);
+            
+            v3 TeapotColor = Lerp(HorzBlend0, HorzBlend1, VertPercentage);
+            
+            v3 P = V3(-(float)RowIndex, 0.0f, (float)ColIndex);
+            
+            model_info* Model = LoadModel(Assets, 
+                                          GetFirst(Game->Assets, AssetEntry_UtahTeapot), 
+                                          ASSET_IMPORT_DEFERRED);
+            
+            obj_transform Transform;
+            Transform.P = P + V3(-10.0f, 0.0f, 10.0f);
+            Transform.R = Quat(V3(0.0f, 1.0f, 0.0f), JOY_PI * 0.25f);
+            Transform.S = V3(0.01f);
+            
+            if(Model)
+            {
+                UpdateModel(Assets, Render,
+                            Model, 
+                            &Transform,
+                            TeapotColor,
+                            State->GameTime, State->GameDeltaTime, 0);
+            }
+        }
+    }
+    
     PushEndQueue(Render, MainQueueIndex);
     
     PushRenderPass(Render, MainCamSetupIndex, MainQueueIndex);
 #endif
     
-#if 0
-    ShowSphereDistributions(Game, Stack,
-                            &State->SphereDistributionTrig,
-                            SphereID,
-                            V3(0.0f, 10.0f, 0.0f),
-                            2.0f);
+#if 1
+    v3 SphereCenter = V3(0.0f, 7.0f, 0.0f);
+    float SphereRad = 2.0f;
+    for(int SampleIndex = 0;
+        SampleIndex < SSAO_KERNEL_MAX_SIZE;
+        SampleIndex++)
+    {
+        v3 TargetP = SphereCenter + Render->SSAOKernelSamples[SampleIndex] * SphereRad;
+        
+        PushOrLoadMesh(Game->Assets, Render, 
+                       GetFirst(Game->Assets, AssetEntry_Cube),
+                       TargetP, 
+                       QuatI(), 
+                       V3(0.05f),
+                       ASSET_IMPORT_DEFERRED);
+    }
     
-    ShowSphereDistributions(Game, Stack,
-                            &State->SphereDistributionFib,
-                            SphereID,
-                            V3(10.0f, 10.0f, 0.0f),
-                            2.0f);
 #endif
     
 #if 1
     PushOrLoadMesh(Game->Assets, Render, 
-                   GetFirst(Game->Assets, GameAsset_Cube),
+                   GetFirst(Game->Assets, AssetEntry_Cube),
                    V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
                    QuatI(), V3(1.0f), 
                    ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Render, 
-                   GetFirst(Game->Assets, GameAsset_Cube),
+                   GetFirst(Game->Assets, AssetEntry_Cube),
                    V3(0.0f, 1.0f + Sin(Game->Input->Time * 3.0f) * 0.5f, 0.0f), 
                    QuatI(), V3(1.0f), 
                    ASSET_IMPORT_DEFERRED);
@@ -1002,7 +1079,7 @@ GAME_MODE_UPDATE(TestUpdate){
     
     
     PushOrLoadMesh(Game->Assets, Render, 
-                   GetFirst(Game->Assets, GameAsset_Cylynder),
+                   GetFirst(Game->Assets, AssetEntry_Cylynder),
                    V3(-13.0f, 1.0f, 0.0f),
                    Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), 
                    V3(1.0f), 
@@ -1014,16 +1091,11 @@ GAME_MODE_UPDATE(TestUpdate){
                    ASSET_IMPORT_DEFERRED);
     
     PushOrLoadMesh(Game->Assets, Render, 
-                   GetFirst(Game->Assets, GameAsset_Plane),
+                   GetFirst(Game->Assets, AssetEntry_Plane),
                    V3(0.0f, 0.0f, 0.0f), 
                    QuatI(), V3(100.0f),
                    ASSET_IMPORT_DEFERRED);
 #endif
-    
-}
-
-// NOTE(Dima): MAIN MENU GAME MODE
-GAME_MODE_UPDATE(MainMenuUpdate){
     
 }
 
@@ -1032,9 +1104,9 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     GAME_GET_MODE_STATE(image_swapper_state, State);
     
     render_state* Render = Game->Render;
-    assets* Assets = Game->Assets;
+    asset_system* Assets = Game->Assets;
     
-    asset_id ArrID = GetFirst(Game->Assets, GameAsset_FadeoutBmps);
+    asset_id ArrID = GetFirst(Game->Assets, AssetEntry_FadeoutBmps);
     asset* Asset = GetAssetByID(Game->Assets, ArrID);
     ASSERT(Asset->Type == AssetType_Array);
     
@@ -1104,7 +1176,9 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     }
 }
 
-// NOTE(Dima): TITLE GAME MODE
-GAME_MODE_UPDATE(TitleUpdate){
+IMPLEMENT_INIT_MODES(){
+    DescribeGameMode(Game, "Test", TestUpdate);
+    DescribeGameMode(Game, "Changing pictures", ChangingPicturesUpdate);
     
+    SetGameMode(Game, "Test");
 }

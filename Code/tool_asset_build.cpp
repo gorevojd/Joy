@@ -9,7 +9,7 @@ INTERNAL_FUNCTION void StoreFontAsset(asset_system* System,
                                       tag_hub* TagHub)
 {
     // NOTE(Dima): Adding glyphs
-    BeginAsset(System, GameAsset_Type_Glyph);
+    BeginAsset(System, AssetEntry_Type_Glyph);
     for (int GlyphIndex = 0;
          GlyphIndex < Font->GlyphCount;
          GlyphIndex++)
@@ -40,14 +40,14 @@ INTERNAL_FUNCTION void WriteFonts(){
     tag_hub HubRegular = tag_hub::Empty().AddIntTag(AssetTag_FontType, TagFont_Regular);
     tag_hub HubBold = tag_hub::Empty().AddIntTag(AssetTag_FontType, TagFont_Bold);
     
-    StoreFontAsset(System, GameAsset_LiberationMono, &LibMono, &HubRegular);
-    StoreFontAsset(System, GameAsset_LilitaOne, &Lilita, &HubRegular);
-    StoreFontAsset(System, GameAsset_Inconsolata, &Inconsolata, &HubBold);
-    StoreFontAsset(System, GameAsset_PFDIN, &PFDIN, &HubRegular);
-    StoreFontAsset(System, GameAsset_MollyJackFont, &MollyJack, &HubRegular);
+    StoreFontAsset(System, AssetEntry_LiberationMono, &LibMono, &HubRegular);
+    StoreFontAsset(System, AssetEntry_LilitaOne, &Lilita, &HubRegular);
+    StoreFontAsset(System, AssetEntry_Inconsolata, &Inconsolata, &HubBold);
+    StoreFontAsset(System, AssetEntry_PFDIN, &PFDIN, &HubRegular);
+    StoreFontAsset(System, AssetEntry_MollyJackFont, &MollyJack, &HubRegular);
     
     // NOTE(Dima): Writing file
-    WriteAssetFile(System, "../Data/Fonts.ja");
+    WriteAssetFile(System, "../Data/Fonts.jass");
 }
 
 INTERNAL_FUNCTION void WriteIcons(){
@@ -55,15 +55,15 @@ INTERNAL_FUNCTION void WriteIcons(){
     asset_system* System = &System_;
     InitAssetFile(System);
     
-    BeginAsset(System, GameAsset_CheckboxMark);
+    BeginAsset(System, AssetEntry_CheckboxMark);
     AddIconAsset(System, "../Data/Icons/checkmark64.png");
     EndAsset(System);
     
-    BeginAsset(System, GameAsset_ChamomileIcon);
+    BeginAsset(System, AssetEntry_ChamomileIcon);
     AddIconAsset(System, "../Data/Icons/chamomile.png");
     EndAsset(System);
     
-    WriteAssetFile(System, "../Data/Icons.ja");
+    WriteAssetFile(System, "../Data/Icons.jass");
 }
 
 INTERNAL_FUNCTION void WriteBitmapArray(){
@@ -84,8 +84,9 @@ INTERNAL_FUNCTION void WriteBitmapArray(){
     }
     FreeStringList(&BitmapNames);
     
+#if 0    
     // NOTE(Dima): Adding bitmap assets
-    BeginAsset(System, GameAsset_Type_Bitmap);
+    BeginAsset(System, AssetEntry_Type_Bitmap);
     u32 FirstBitmapID = 0;
     for(int i = 0; i < BitmapPaths.size(); i++){
         added_asset Asset = AddBitmapAsset(System, (char*)BitmapPaths[i].c_str());
@@ -97,11 +98,12 @@ INTERNAL_FUNCTION void WriteBitmapArray(){
     EndAsset(System);
     
     // NOTE(Dima): adding bitmap array
-    BeginAsset(System, GameAsset_FadeoutBmps);
+    BeginAsset(System, AssetEntry_FadeoutBmps);
     AddArrayAsset(System, FirstBitmapID, BitmapCount);
     EndAsset(System);
+#endif
     
-    WriteAssetFile(System, "../Data/BitmapsArray.ja");
+    WriteAssetFile(System, "../Data/BitmapsArray.jass");
 }
 
 INTERNAL_FUNCTION void WriteBitmaps(){
@@ -111,7 +113,7 @@ INTERNAL_FUNCTION void WriteBitmaps(){
     
     
     
-    WriteAssetFile(System, "../Data/Bitmaps.ja");
+    WriteAssetFile(System, "../Data/Bitmaps.jass");
 }
 
 INTERNAL_FUNCTION void WriteSounds(){
@@ -121,11 +123,13 @@ INTERNAL_FUNCTION void WriteSounds(){
     
     tool_sound_info Sine = MakeSineSound256(44100 * 2, 44100);
     
-    BeginAsset(System, GameAsset_SineTest);
+#if 0    
+    BeginAsset(System, AssetEntry_SineTest);
     AddSoundAssetManual(System, &Sine);
     EndAsset(System);
+#endif
     
-    WriteAssetFile(System, "../Data/Sounds.ja");
+    WriteAssetFile(System, "../Data/Sounds.jass");
 }
 
 INTERNAL_FUNCTION void WriteMeshPrimitives(){
@@ -148,15 +152,15 @@ INTERNAL_FUNCTION void WriteMeshPrimitives(){
     tool_mesh_info CylMeshHig = MakeCylynder(2.0f, 0.5f, 48);
     tool_mesh_info CylMeshSuperHig = MakeCylynder(2.0f, 0.5f, 96);
     
-    BeginAsset(System, GameAsset_Cube);
+    BeginAsset(System, AssetEntry_Cube);
     AddMeshAsset(System, &Cube);
     EndAsset(System);
     
-    BeginAsset(System, GameAsset_Plane);
+    BeginAsset(System, AssetEntry_Plane);
     AddMeshAsset(System, &Plane);
     EndAsset(System);
     
-    BeginAsset(System, GameAsset_Sphere);
+    BeginAsset(System, AssetEntry_Sphere);
     AddMeshAsset(System, &SphereMeshSuperLow);
     AddFloatTag(System, AssetTag_LOD, 0.0f);
     AddMeshAsset(System, &SphereMeshLow);
@@ -169,7 +173,7 @@ INTERNAL_FUNCTION void WriteMeshPrimitives(){
     AddFloatTag(System, AssetTag_LOD, 1.0f);
     EndAsset(System);
     
-    BeginAsset(System, GameAsset_Cylynder);
+    BeginAsset(System, AssetEntry_Cylynder);
     AddMeshAsset(System, &CylMeshSuperLow);
     AddFloatTag(System, AssetTag_LOD, 0.0f);
     AddMeshAsset(System, &CylMeshLow);
@@ -182,7 +186,7 @@ INTERNAL_FUNCTION void WriteMeshPrimitives(){
     AddFloatTag(System, AssetTag_LOD, 1.0f);
     EndAsset(System);
     
-    WriteAssetFile(System, "../Data/MeshPrimitives.ja");
+    WriteAssetFile(System, "../Data/MeshPrimitives.jass");
 }
 
 int main() {

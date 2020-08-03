@@ -528,7 +528,7 @@ INTERNAL_FUNCTION void DEBUGUpdateMenus(debug_state* State)
         
         // NOTE(Dima): Calling gui callback for DEBUG menu
         debug_menu* ToShowMenu = &State->Menus[State->ToShowMenuType];
-        PushGuiFont(Gui, GetFirst(Gui->Assets, GameAsset_LilitaOne));
+        PushGuiFont(Gui, GetFirst(Gui->Assets, AssetEntry_LilitaOne));
         BeginDimension(Gui, BeginDimension_Height, V2(0.0f, GetScaledAscender(Gui) * 2.0f));
         ShowHeader(Gui, ToShowMenu->Name);
         EndDimension(Gui);

@@ -1,4 +1,4 @@
-INTERNAL_FUNCTION asset_slot* AllocateAssetSlot(assets* Assets)
+INTERNAL_FUNCTION asset_slot* AllocateAssetSlot(asset_system* Assets)
 {
     DLIST_ALLOCATE_FUNCTION_BODY(asset_slot,
                                  Assets->Memory,
@@ -72,40 +72,40 @@ INTERNAL_FUNCTION Asset_Atlas InitAtlas(mem_region* Region, int Dim){
     return(atlas);
 }
 
-u32 GetFirst(assets* Assets, u32 Group){
-    asset_group* Grp = &Assets->Groups[Group];
+u32 GetFirst(asset_system* Assets, u32 EntryIndex){
+    asset_entry* Entry = &Assets->Entries[EntryIndex];
     
     u32 Result = 0;
     
-    if(Grp->InGroupAssetCount){
-        Result = Grp->PointersToAssets[0]->ID;
+    if(Entry->InEntryAssetCount){
+        Result = Entry->PointersToAssets[0]->ID;
     }
     
     return(Result);
 }
 
-u32 GetRandom(assets* Assets, u32 Group){
-    asset_group* Grp = &Assets->Groups[Group];
+u32 GetRandom(asset_system* Assets, u32 EntryIndex){
+    asset_entry* Entry = &Assets->Entries[EntryIndex];
     
     u32 Result = 0;
     
-    if(Grp->InGroupAssetCount){
+    if(Entry->InEntryAssetCount){
         int RandomIndex = GetRandomIndex(&Assets->Random, 
-                                         Grp->InGroupAssetCount);
+                                         Entry->InEntryAssetCount);
         
-        Result = Grp->PointersToAssets[RandomIndex]->ID;
+        Result = Entry->PointersToAssets[RandomIndex]->ID;
     }
     
     return(Result);
 }
 
-u32 GetBestByTags(assets* Assets, 
+u32 GetBestByTags(asset_system* Assets, 
                   u32 Group, 
                   u32* TagTypes, 
                   asset_tag_value* TagValues, 
                   int TagsCount)
 {
-    asset_group* Grp = &Assets->Groups[Group];
+    asset_entry* Entry = &Assets->Entries[Group];
     
     u32 Result = 0;
     
@@ -114,15 +114,15 @@ TODO(Dima): Ideas to make it faster:
 */
     
 #if 1
-    if(Grp->InGroupAssetCount){
+    if(Entry->InEntryAssetCount){
         int BestIndex = 0;
         float BestWeight = 0.0f;
         
-        for(int GrpAssetIndex = 0; 
-            GrpAssetIndex < Grp->InGroupAssetCount;
-            GrpAssetIndex++)
+        for(int EntryAssetIndex = 0; 
+            EntryAssetIndex < Entry->InEntryAssetCount;
+            EntryAssetIndex++)
         {
-            asset* Asset = Grp->PointersToAssets[GrpAssetIndex];
+            asset* Asset = Entry->PointersToAssets[EntryAssetIndex];
             
             b32 ShouldExitAssetLoop = false;
             
@@ -158,7 +158,7 @@ TODO(Dima): Ideas to make it faster:
                             }break;
                             
                             case TagValue_Empty:{
-                                BestIndex = GrpAssetIndex;
+                                BestIndex = EntryAssetIndex;
                                 
                                 ShouldExitMatchLoop = true;
                                 ShouldExitAssetLoop = true;
@@ -175,7 +175,7 @@ TODO(Dima): Ideas to make it faster:
             
             if(Weight > BestWeight){
                 BestWeight = Weight;
-                BestIndex = GrpAssetIndex;
+                BestIndex = EntryAssetIndex;
             }
             
             if(ShouldExitAssetLoop){
@@ -183,7 +183,7 @@ TODO(Dima): Ideas to make it faster:
             }
         }
         
-        Result = Grp->PointersToAssets[BestIndex]->ID;
+        Result = Entry->PointersToAssets[BestIndex]->ID;
     }
 #endif
     
@@ -198,7 +198,7 @@ TODO(Dima): Ideas to make it faster:
         asset_tag_value* Value = &TagValues[MatchTagIndex];
         u32 TagType = TagTypes[MatchTagIndex];
         
-        asset_group* Group = &Assets->TagGroups[TagType][Group];
+        asset_entry* Group = &Assets->TagGroups[TagType][Group];
         
         for(int InGroupIndex = 0;
             InGroupIndex < Group->InGroupAssetCount;
@@ -223,19 +223,19 @@ TODO(Dima): Ideas to make it faster:
             
             if(Weight > BestWeight){
                 BestWeight = Weight;
-                BestIndex = GrpAssetIndex;
+                BestIndex = EntryAssetIndex;
             }
             
         }
     }
     
-    Result = Grp->PointersToAssets[BestIndex]->ID;
+    Result = Entry->PointersToAssets[BestIndex]->ID;
 #endif
     
     return(Result);
 }
 
-inline asset_file_source* AllocateFileSource(assets* Assets){
+inline asset_file_source* AllocateFileSource(asset_system* Assets){
     if(DLIST_FREE_IS_EMPTY(Assets->FileSourceFree, Next)){
         const int Count = 128;
         asset_file_source* Pool = PushArray(Assets->Memory, asset_file_source, Count);
@@ -281,7 +281,7 @@ inline void IntegrateIDs(asset_id* IDsToIntegrate,
     }
 }
 
-void* AllocateAssetType(assets* Assets, asset* Asset, void** Type, u32 AssetTypeSize){
+void* AllocateAssetType(asset_system* Assets, asset* Asset, void** Type, u32 AssetTypeSize){
     Asset->TypeMemEntry = AllocateMemLayerEntry(
                                                 &Assets->LayeredMemory, AssetTypeSize);
     
@@ -296,94 +296,96 @@ void* AllocateAssetType(assets* Assets, asset* Asset, void** Type, u32 AssetType
     return(Result);
 }
 
-INTERNAL_FUNCTION void AddAssetToGroup(assets* Assets, 
-                                       asset_group* Group, 
+INTERNAL_FUNCTION void AddAssetToEntry(asset_system* Assets, 
+                                       asset_entry* Entry, 
                                        asset* ToAdd)
 {
     asset_slot* Slot = AllocateAssetSlot(Assets);
     
     Slot->Asset = ToAdd;
     
-    DLIST_INSERT_BEFORE_SENTINEL(Slot, Group->Sentinel, Next, Prev);
-    Group->InGroupAssetCount++;
+    DLIST_INSERT_BEFORE_SENTINEL(Slot, Entry->Sentinel, Next, Prev);
+    Entry->InEntryAssetCount++;
 }
 
-INTERNAL_FUNCTION void InitAssetGroups(asset_group* Groups, int Count){
-    for(int GroupIndex = 0; 
-        GroupIndex < GameAsset_Count;
-        GroupIndex++)
+INTERNAL_FUNCTION void InitAssetEntries(asset_entry* Entries, int Count){
+    for(int EntryIndex = 0; 
+        EntryIndex < AssetEntry_Count;
+        EntryIndex++)
     {
-        asset_group* Group = &Groups[GroupIndex];
+        asset_entry* Entry = &Entries[EntryIndex];
         
-        Group->PointersToAssets = 0;
-        Group->InGroupAssetCount = 0;
+        Entry->PointersToAssets = 0;
+        Entry->InEntryAssetCount = 0;
         
-        DLIST_REFLECT_PTRS(Group->Sentinel, Next, Prev);
+        DLIST_REFLECT_PTRS(Entry->Sentinel, Next, Prev);
     }
 }
 
-INTERNAL_FUNCTION void GroupsFillAssetArray(assets* Assets, asset_group* Groups, int Count){
-    for(int GroupIndex = 0; 
-        GroupIndex < Count;
-        GroupIndex++)
+INTERNAL_FUNCTION void EntriesFillAssetArray(asset_system* Assets, asset_entry* Entries, int Count){
+    for(int EntryIndex = 0; 
+        EntryIndex < Count;
+        EntryIndex++)
     {
-        asset_group* Group = &Groups[GroupIndex];
+        asset_entry* Entry = &Entries[EntryIndex];
         
-        if(Group->InGroupAssetCount){
+        if(Entry->InEntryAssetCount){
             
-            Group->PointersToAssets = PushArray(Assets->Memory, 
+            Entry->PointersToAssets = PushArray(Assets->Memory, 
                                                 asset*,
-                                                Group->InGroupAssetCount);
+                                                Entry->InEntryAssetCount);
             
-            asset_slot* At = Group->Sentinel.Next;
-            for(int Index = 0; Index < Group->InGroupAssetCount; Index++){
-                Group->PointersToAssets[Index] = At->Asset;
+            asset_slot* At = Entry->Sentinel.Next;
+            for(int Index = 0; Index < Entry->InEntryAssetCount; Index++){
+                Entry->PointersToAssets[Index] = At->Asset;
                 
                 At = At->Next;
             }
         }
         else{
-            Group->PointersToAssets = 0;
+            Entry->PointersToAssets = 0;
         }
     }
 }
 
-INTERNAL_FUNCTION void AddAssetToCorrespondingGroups(assets* Assets, asset* ToAdd)
+INTERNAL_FUNCTION void AddAssetToCorrespondingEntries(asset_system* Assets, asset* ToAdd)
 {
-    AddAssetToGroup(Assets, &Assets->Groups[ToAdd->GroupIndex], ToAdd);
+    AddAssetToEntry(Assets, &Assets->Entries[ToAdd->EntryIndex], ToAdd);
     
     for(int TagTypeIndex = 0; TagTypeIndex < AssetTag_Count; TagTypeIndex++){
         for(int TagIndex = 0; TagIndex < ToAdd->TagCount; TagIndex++){
             asset_tag_header* TagHeader = &ToAdd->Tags[TagIndex];
             
             if(TagHeader->Type == TagTypeIndex){
-                AddAssetToGroup(Assets, 
-                                &Assets->TagGroups[TagTypeIndex][ToAdd->GroupIndex], 
-                                ToAdd);
+                asset_entry* EntryArray = Assets->TaggedEntries[TagTypeIndex];
+                AddAssetToEntry(Assets, &EntryArray[ToAdd->EntryIndex], ToAdd);
             }
         }
     }
 }
 
-INTERNAL_FUNCTION void FillCorrespondingAssetArrays(assets* Assets){
-    GroupsFillAssetArray(Assets, Assets->Groups, GameAsset_Count);
+INTERNAL_FUNCTION void FillCorrespondingAssetArrays(asset_system* Assets){
+    EntriesFillAssetArray(Assets, Assets->Entries, AssetEntry_Count);
     
     for(int TagIndex = 0; TagIndex < AssetTag_Count; TagIndex++){
-        GroupsFillAssetArray(Assets, Assets->TagGroups[TagIndex], GameAsset_Count);
+        EntriesFillAssetArray(Assets, 
+                              Assets->TaggedEntries[TagIndex], 
+                              AssetEntry_Count);
     }
 }
 
-INTERNAL_FUNCTION void InitCorrespondingGroups(assets* Assets){
-    InitAssetGroups(Assets->Groups, GameAsset_Count);
+INTERNAL_FUNCTION void InitCorrespondingEntries(asset_system* Assets){
+    InitAssetEntries(Assets->Entries, AssetEntry_Count);
     
     for(int TagIndex = 0; TagIndex < AssetTag_Count; TagIndex++){
-        InitAssetGroups(Assets->TagGroups[TagIndex], GameAsset_Count);
+        InitAssetEntries(Assets->TaggedEntries[TagIndex], 
+                         AssetEntry_Count);
     }
 }
 
 #define GET_DATA(type, offset) (type*)((u8*)Data + (offset))
 
-void ImportAssetDirectly(assets* Assets, 
+void ImportAssetDirectly(asset_system* Assets, 
                          asset* Asset, 
                          void* Data, 
                          u64 DataSize,
@@ -634,7 +636,7 @@ void ImportAssetDirectly(assets* Assets,
 }
 
 struct import_asset_callback_data{
-    assets* Assets;
+    asset_system* Assets;
     asset* Asset;
     void* LoadDest;
     u64 LoadDestSize;
@@ -647,7 +649,7 @@ PLATFORM_CALLBACK(ImportAssetCallback){
     void* DestData = CallbackData->LoadDest;
     u64 DataSize = CallbackData->LoadDestSize;
     asset* Asset = CallbackData->Asset;
-    assets* Assets = CallbackData->Assets;
+    asset_system* Assets = CallbackData->Assets;
     
     mem_region TempRegion = CreateInRestOfRegion(&CallbackData->Task->Region);
     
@@ -656,7 +658,7 @@ PLATFORM_CALLBACK(ImportAssetCallback){
     EndTaskData(&Assets->ImportTasksPool, CallbackData->Task);
 }
 
-void ImportAsset(assets* Assets, asset* Asset, b32 Immediate){
+void ImportAsset(asset_system* Assets, asset* Asset, b32 Immediate){
     asset_header* Header = &Asset->Header;
     asset_file_source* FileSource = Asset->FileSource;
     
@@ -724,7 +726,7 @@ void ImportAsset(assets* Assets, asset* Asset, b32 Immediate){
 }
 
 
-array_info* LoadArray(assets* Assets,
+array_info* LoadArray(asset_system* Assets,
                       u32 ArrayID)
 {
     array_info* Result = LOAD_ASSET(array_info, AssetType_Array,
@@ -733,7 +735,7 @@ array_info* LoadArray(assets* Assets,
     return(Result);
 }
 
-bmp_info* LoadBmp(assets* Assets,
+bmp_info* LoadBmp(asset_system* Assets,
                   u32 BmpID,
                   b32 Immediate)
 {
@@ -743,7 +745,7 @@ bmp_info* LoadBmp(assets* Assets,
     return(Result);
 }
 
-font_info* LoadFont(assets* Assets,
+font_info* LoadFont(asset_system* Assets,
                     u32 FontID,
                     b32 Immediate)
 {
@@ -754,7 +756,7 @@ font_info* LoadFont(assets* Assets,
 }
 
 
-mesh_info* LoadMesh(assets* Assets,
+mesh_info* LoadMesh(asset_system* Assets,
                     u32 MeshID,
                     b32 Immediate)
 {
@@ -765,7 +767,7 @@ mesh_info* LoadMesh(assets* Assets,
 }
 
 
-material_info* LoadMaterial(assets* Assets,
+material_info* LoadMaterial(asset_system* Assets,
                             u32 MaterialID,
                             b32 Immediate)
 {
@@ -798,7 +800,7 @@ material_info* LoadMaterial(assets* Assets,
     return(Result);
 }
 
-model_info* LoadModel(assets* Assets,
+model_info* LoadModel(asset_system* Assets,
                       u32 ModelID,
                       b32 Immediate)
 {
@@ -808,7 +810,7 @@ model_info* LoadModel(assets* Assets,
     return(Result);
 }
 
-skeleton_info* LoadSkeleton(assets* Assets,
+skeleton_info* LoadSkeleton(asset_system* Assets,
                             u32 SkeletonID,
                             b32 Immediate)
 {
@@ -818,7 +820,7 @@ skeleton_info* LoadSkeleton(assets* Assets,
     return(Result);
 }
 
-animation_clip* LoadAnimationClip(assets* Assets,
+animation_clip* LoadAnimationClip(asset_system* Assets,
                                   u32 AnimID,
                                   b32 Immediate)
 {
@@ -828,7 +830,7 @@ animation_clip* LoadAnimationClip(assets* Assets,
     return(Result);
 }
 
-node_animation* LoadNodeAnim(assets* Assets,
+node_animation* LoadNodeAnim(asset_system* Assets,
                              u32 NodeAnimID,
                              b32 Immediate)
 {
@@ -838,7 +840,7 @@ node_animation* LoadNodeAnim(assets* Assets,
     return(Result);
 }
 
-inline asset* AllocateAsset(assets* Assets, asset_file_source* FileSource, u32 FileID)
+inline asset* AllocateAsset(asset_system* Assets, asset_file_source* FileSource, u32 FileID)
 {
     u32 ResultIntegratedID = FileToIntegratedID(FileSource, FileID);
     asset* Result = GetAssetByID(Assets, ResultIntegratedID);
@@ -853,7 +855,8 @@ inline asset* AllocateAsset(assets* Assets, asset_file_source* FileSource, u32 F
     return(Result);
 }
 
-INTERNAL_FUNCTION void InitAssets(assets* Assets){
+INTERNAL_FUNCTION void InitAssets(asset_system* Assets)
+{
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // NOTE(Dima): Memory region is already initialized
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -893,7 +896,7 @@ INTERNAL_FUNCTION void InitAssets(assets* Assets){
     DLIST_REFLECT_PTRS(Assets->UseSlot, NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(Assets->FreeSlot, NextAlloc, PrevAlloc);
     
-    InitCorrespondingGroups(Assets);
+    InitCorrespondingEntries(Assets);
     
     mem_region AssetInitMem = {};
     
@@ -903,19 +906,18 @@ INTERNAL_FUNCTION void InitAssets(assets* Assets){
     
     // NOTE(Dima): Temp initialization of asset families
     for(int FamIndex = 0;
-        FamIndex < GameAsset_Count;
+        FamIndex < AssetEntry_Count;
         FamIndex++)
     {
-        asset_group* Grp = &Assets->Groups[FamIndex];
+        asset_entry* Entry = &Assets->Entries[FamIndex];
         
-        Grp->InGroupAssetCount = 0;
-        DLIST_REFLECT_PTRS(Grp->Sentinel, Next, Prev);
+        Entry->InEntryAssetCount = 0;
+        DLIST_REFLECT_PTRS(Entry->Sentinel, Next, Prev);
     }
     
     // NOTE(Dima): Loading from asset files
-    Platform.OpenFilesBegin("../Data/", "*ja");
-    
     platform_file_desc FileDesc;
+    Platform.OpenFilesBegin("../Data/", "*jass");
     
     while(Platform.OpenNextFile(&FileDesc)){
         // NOTE(Dima): Allocating and setting file source
@@ -945,30 +947,30 @@ INTERNAL_FUNCTION void InitAssets(assets* Assets){
         // NOTE(Dima): Some checking
         Assert(HeaderIsEqual);
         Assert(FileVersion == EngineFileVersion);
-        Assert(FileHeader.GroupsCount == GameAsset_Count);
+        Assert(FileHeader.EntriesCount == AssetEntry_Count);
         
         // NOTE(Dima): Reading groups
-        asset_file_group *FileGroups = PushArray(&AssetInitMem,
-                                                 asset_file_group,
-                                                 GameAsset_Count);
+        asset_file_group *FileEntries = PushArray(&AssetInitMem,
+                                                  asset_file_group,
+                                                  AssetEntry_Count);
         
-        Assert(FileHeader.GroupsByteOffset == sizeof(asset_file_header));
-        u32 GroupsByteSize = FileHeader.GroupsCount * sizeof(asset_file_group);
-        b32 ReadGroupsResult = Platform.FileOffsetRead(FileFullPath,
-                                                       FileHeader.GroupsByteOffset,
-                                                       GroupsByteSize,
-                                                       FileGroups);
-        Assert(ReadGroupsResult);
+        Assert(FileHeader.EntriesByteOffset == sizeof(asset_file_header));
+        u32 EntriesByteSize = FileHeader.EntriesCount * sizeof(asset_file_group);
+        b32 ReadEntriesResult = Platform.FileOffsetRead(FileFullPath,
+                                                        FileHeader.EntriesByteOffset,
+                                                        EntriesByteSize,
+                                                        FileEntries);
+        Assert(ReadEntriesResult);
         
         // NOTE(Dima): Reading groups regions
         asset_file_group_region* Regions = PushArray(&AssetInitMem,
                                                      asset_file_group_region,
                                                      FileHeader.RegionsCount);
         
-        Assert(FileHeader.GroupsRegionsByteOffset == sizeof(asset_file_header) + GroupsByteSize);
+        Assert(FileHeader.EntriesRegionsByteOffset == sizeof(asset_file_header) + EntriesByteSize);
         u32 RegionsByteSize = FileHeader.RegionsCount * sizeof(asset_file_group_region);
         b32 ReadRegionsResult = Platform.FileOffsetRead(FileFullPath,
-                                                        FileHeader.GroupsRegionsByteOffset,
+                                                        FileHeader.EntriesRegionsByteOffset,
                                                         RegionsByteSize,
                                                         Regions);
         Assert(ReadRegionsResult);
@@ -1017,20 +1019,20 @@ INTERNAL_FUNCTION void InitAssets(assets* Assets){
         CurBlock->InBlockCount += FileAssetCount;
         
         // NOTE(Dima): Reading assets
-        for(int FileGroupIndex = 0; 
-            FileGroupIndex < GameAsset_Count; 
-            FileGroupIndex++)
+        for(int FileEntryIndex = 0; 
+            FileEntryIndex < AssetEntry_Count; 
+            FileEntryIndex++)
         {
-            asset_file_group* FileGrp = FileGroups + FileGroupIndex;
-            asset_group* ToGroup = Assets->Groups + FileGroupIndex;
+            asset_file_group* FileEntry = FileEntries + FileEntryIndex;
+            asset_entry* ToEntry = Assets->Entries + FileEntryIndex;
             
             // NOTE(Dima): Iterating through regions in file
             for(int RegionIndex = 0;
-                RegionIndex < FileGrp->RegionCount;
+                RegionIndex < FileEntry->RegionCount;
                 RegionIndex++)
             {
                 // NOTE(Dima): Getting right region from big file regions array
-                asset_file_group_region* Reg = Regions + FileGrp->FirstRegionIndex + RegionIndex;
+                asset_file_group_region* Reg = Regions + FileEntry->FirstRegionIndex + RegionIndex;
                 
                 u32 FirstFileAssetIndex = Reg->FirstAssetIndex;
                 u32 OnePastLastFileAssetIndex = FirstFileAssetIndex + Reg->AssetCount;
@@ -1062,7 +1064,7 @@ INTERNAL_FUNCTION void InitAssets(assets* Assets){
                     NewAsset->FileSource = FileSource;
                     NewAsset->Type = AssetHeader.AssetType;
                     NewAsset->TagCount = AssetHeader.TagCount;
-                    NewAsset->GroupIndex = FileGroupIndex;
+                    NewAsset->EntryIndex = FileEntryIndex;
                     
                     // NOTE(Dima): Reading tags
                     if(AssetHeader.TagCount){
@@ -1083,7 +1085,7 @@ INTERNAL_FUNCTION void InitAssets(assets* Assets){
 // NOTE(Dima):  After tags being written we can add tag to 
 corresponding asset groups (Main groups, and tag groups for each tag
 */
-                    AddAssetToCorrespondingGroups(Assets, NewAsset);
+                    AddAssetToCorrespondingEntries(Assets, NewAsset);
                     
                     u32 DataOffsetInFile = LineOffset + AssetHeader.LineDataOffset;
                     NewAsset->OffsetToData = DataOffsetInFile;

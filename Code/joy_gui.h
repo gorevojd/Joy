@@ -371,7 +371,7 @@ struct gui_frame_info{
 };
 
 struct gui_state{
-    assets* Assets;
+    asset_system* Assets;
     
     b32 ShowGuiTest;
     
@@ -656,9 +656,8 @@ rc2 GetTextRect(gui_state* Gui, char* Text, v2 p, float Scale = 1.0f);
 rc2 PrintText(gui_state* Gui, char* text, v2 P, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f), float Scale = 1.0f);
 rc2 PrintTextCenteredInRect(gui_state* Gui, char* text, rc2 tect, float Scale = 1.0f, v4 color = V4(1.0f, 1.0f, 1.0f, 1.0f));
 
-void InitGui(
-             gui_state* Gui,
-             assets* Assets);
+void InitGui(gui_state* Gui,
+             asset_system* Assets);
 
 void GuiFrameBegin(gui_state* Gui, gui_frame_info GuiFrameInfo);
 void GuiFrameEnd(gui_state* Gui);

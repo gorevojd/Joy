@@ -168,7 +168,30 @@ struct skeleton_info{
     int BoneCount;
 };
 
+
+#if 0
+enum materal_texture_type
+{
+    MaterialTexture_Albedo,
+    MaterialTexture_Ambient,
+    MaterialTexture_Specular,
+    MaterialTexture_Normal,
+    MaterialTexture_Metal,
+    MaterialTexture_Roughness,
+    MaterialTexture_Height,
+    
+    MaterialTexture_Count,
+};
+#endif
+
 struct material_info{
+    v3 ModColor;
+    
+#if 0    
+    v3 Colors[MaterialTexture_Count];
+    bmp_info* Bitmaps[MaterialTexture_Count];
+#endif
+    
     v3 ColorDiffuse;
     v3 ColorSpecular;
     v3 ColorAmbient;

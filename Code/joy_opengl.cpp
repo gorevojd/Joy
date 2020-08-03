@@ -1,9 +1,61 @@
 #include "joy_opengl.h"
 
-#include <assert.h>
+INTERNAL_FUNCTION GLuint GlLoadFromSourceCompute(char* ComputeCode){
+    
+    char InfoLog[1024];
+	int Success;
+    
+	GLuint ComputeShader = glCreateShader(GL_COMPUTE_SHADER);
+	glShaderSource(ComputeShader, 1, &ComputeCode, 0);
+	glCompileShader(ComputeShader);
+	
+	glGetShaderiv(ComputeShader, GL_COMPILE_STATUS, &Success);
+	if (!Success) {
+		glGetShaderInfoLog(ComputeShader, sizeof(InfoLog), 0, InfoLog);
+		//TODO(dima): Logging
+        Platform.OutputString(InfoLog);
+        Assert(Success);
+    }
+    
+    
+	GLuint Program = glCreateProgram();
+	glAttachShader(Program, ComputeShader);
+    glLinkProgram(Program);
+    
+	glGetProgramiv(Program, GL_LINK_STATUS, &Success);
+	if (!Success) {
+		glGetProgramInfoLog(Program, sizeof(InfoLog), 0, InfoLog);
+		//TODO(dima): Logging
+        Platform.OutputString(InfoLog);
+        Assert(Success);
+	}
+    
+	glDeleteShader(ComputeShader);
+    
+	return(Program);
+}
 
-INTERNAL_FUNCTION GLuint GlLoadFromSource(char* VertexSource, char* FragmentSource, char* GeometrySource = 0) {
-	char InfoLog[1024];
+INTERNAL_FUNCTION gl_shader GlLoadProgram(gl_state* GL, char* VertexPath, char* FragmentPath, char* GeometryPath = 0) {
+    Assert(GL->ProgramsCount < ARRAY_COUNT(GL->Programs));
+	int resultIndex = GL->ProgramsCount;
+    gl_program* result = GL->Programs + GL->ProgramsCount++;
+    
+    gl_shader ResultShader = {};
+    
+	Platform_Read_File_Result vFile = Platform.ReadFile(VertexPath);
+	Platform_Read_File_Result fFile = Platform.ReadFile(FragmentPath);
+    Platform_Read_File_Result gFile = {};
+    char* toPassGeometryData = 0;
+    if(GeometryPath){
+        gFile = Platform.ReadFile(GeometryPath);
+        toPassGeometryData = (char*)gFile.data;
+    }
+    
+    char* VertexSource = (char*)vFile.data;
+    char* FragmentSource = (char*)fFile.data;
+    char* GeometrySource = toPassGeometryData;
+    
+    char InfoLog[1024];
 	int Success;
 	
 	GLuint VertexShader;
@@ -19,9 +71,9 @@ INTERNAL_FUNCTION GLuint GlLoadFromSource(char* VertexSource, char* FragmentSour
 	if (!Success) {
 		glGetShaderInfoLog(VertexShader, sizeof(InfoLog), 0, InfoLog);
 		//TODO(dima): Logging
-        fprintf(stderr, "Error while loading vertex shader(%s)\n%s\n", VertexSource, InfoLog);
+        fprintf(stderr, "Error while loading vertex shader(%s)\n%s\n", VertexPath, InfoLog);
         Platform.OutputString(InfoLog);
-        assert(Success);
+        Assert(Success);
     }
     
 	FragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -32,9 +84,9 @@ INTERNAL_FUNCTION GLuint GlLoadFromSource(char* VertexSource, char* FragmentSour
 	if (!Success) {
 		glGetShaderInfoLog(FragmentShader, sizeof(InfoLog), 0, InfoLog);
 		//TODO(dima): Logging
-        fprintf(stderr, "Error while loading fragment shader(%s)\n%s\n", FragmentSource, InfoLog);
+        fprintf(stderr, "Error while loading fragment shader(%s)\n%s\n", FragmentPath, InfoLog);
         Platform.OutputString(InfoLog);
-        assert(Success);
+        Assert(Success);
     }
     
     if(GeometrySource){
@@ -47,9 +99,9 @@ INTERNAL_FUNCTION GLuint GlLoadFromSource(char* VertexSource, char* FragmentSour
             glGetShaderInfoLog(GeometryShader, sizeof(InfoLog), 0, InfoLog);
             //TODO(dima): Logging
             fprintf(stderr, "Error while loading geometry shader(%s)\n%s\n", 
-                    GeometrySource, InfoLog);
+                    GeometryPath, InfoLog);
             Platform.OutputString(InfoLog);
-            assert(Success);
+            Assert(Success);
         }
     }
     
@@ -67,7 +119,7 @@ INTERNAL_FUNCTION GLuint GlLoadFromSource(char* VertexSource, char* FragmentSour
 		//TODO(dima): Logging
         fprintf(stderr, "Error while linking shader program\n%s\n", InfoLog);
         Platform.OutputString(InfoLog);
-        assert(Success);
+        Assert(Success);
 	}
     
 	glDeleteShader(VertexShader);
@@ -76,72 +128,13 @@ INTERNAL_FUNCTION GLuint GlLoadFromSource(char* VertexSource, char* FragmentSour
         glDeleteShader(GeometryShader);
     }
     
-	return(Program);
-}
-
-INTERNAL_FUNCTION GLuint GlLoadFromSourceCompute(char* ComputeCode){
-    
-    char InfoLog[1024];
-	int Success;
-    
-	GLuint ComputeShader = glCreateShader(GL_COMPUTE_SHADER);
-	glShaderSource(ComputeShader, 1, &ComputeCode, 0);
-	glCompileShader(ComputeShader);
-	
-	glGetShaderiv(ComputeShader, GL_COMPILE_STATUS, &Success);
-	if (!Success) {
-		glGetShaderInfoLog(ComputeShader, sizeof(InfoLog), 0, InfoLog);
-		//TODO(dima): Logging
-        Platform.OutputString(InfoLog);
-        assert(Success);
-    }
-    
-    
-	GLuint Program = glCreateProgram();
-	glAttachShader(Program, ComputeShader);
-    glLinkProgram(Program);
-    
-	glGetProgramiv(Program, GL_LINK_STATUS, &Success);
-	if (!Success) {
-		glGetProgramInfoLog(Program, sizeof(InfoLog), 0, InfoLog);
-		//TODO(dima): Logging
-        Platform.OutputString(InfoLog);
-        assert(Success);
-	}
-    
-	glDeleteShader(ComputeShader);
-    
-	return(Program);
-}
-
-INTERNAL_FUNCTION gl_shader GlLoadProgram(gl_state* GL, char* vertexPath, char* fragmentPath, char* geometryPath = 0) {
-    assert(GL->ProgramsCount < ARRAY_COUNT(GL->Programs));
-	int resultIndex = GL->ProgramsCount;
-    gl_program* result = GL->Programs + GL->ProgramsCount++;
-    
-    gl_shader ResultShader = {};
-    
-	Platform_Read_File_Result vFile = Platform.ReadFile(vertexPath);
-	Platform_Read_File_Result fFile = Platform.ReadFile(fragmentPath);
-    Platform_Read_File_Result gFile = {};
-    char* toPassGeometryData = 0;
-    if(geometryPath){
-        gFile = Platform.ReadFile(geometryPath);
-        toPassGeometryData = (char*)gFile.data;
-    }
-    
-	result->ID = GlLoadFromSource(
-                                  (char*)vFile.data, 
-                                  (char*)fFile.data, 
-                                  toPassGeometryData);
-    
-    ResultShader.ID = result->ID;
+    ResultShader.ID = Program;
     ResultShader.Type = GlShader_Simple;
     ResultShader._InternalProgramIndex = resultIndex;
     
 	Platform.FreeFileMemory(&vFile);
 	Platform.FreeFileMemory(&fFile);
-    if(geometryPath){
+    if(GeometryPath){
         Platform.FreeFileMemory(&gFile);
     }
     
@@ -169,6 +162,15 @@ void UniformFloat(GLint Loc, float Value){
     glUniform1f(Loc, Value);
 }
 
+void UniformVec2(GLint Loc, float x, float y){
+    glUniform2f(Loc, x, y);
+}
+
+
+void UniformVec2(GLint Loc, v2 Vector){
+    glUniform2f(Loc, Vector.x, Vector.y);
+}
+
 void UniformVec3(GLint Loc, float x, float y, float z){
     glUniform3f(Loc, x, y, z);
 }
@@ -185,14 +187,32 @@ void UniformVec4(GLint Loc, v4 A){
     glUniform4f(Loc, A.x, A.y, A.z, A.w);
 }
 
-void UniformMatrix4x4(GLint Loc, float* Data){
+void UniformMatrix4x4(GLint Loc, float* Data)
+{
     glUniformMatrix4fv(Loc, 1, true, Data);
 }
 
-void UniformMatrixArray4x4(GLint Loc, int Count, m44* Array){
+void UniformMatrixArray4x4(GLint Loc, int Count, m44* Array)
+{
     glUniformMatrix4fv(Loc, Count, true, (const GLfloat*)Array);
 }
 
+inline void UniformTextureInternal(GLint Loc, GLuint Texture, GLint Slot, GLint Target)
+{
+    glActiveTexture(GL_TEXTURE0 + Slot);
+    glBindTexture(Target, Texture);
+    glUniform1i(Loc, Slot);
+}
+
+void UniformTexture2D(GLint Loc, GLuint Texture, GLint Slot)
+{
+    UniformTextureInternal(Loc, Texture, Slot, GL_TEXTURE_2D);
+}
+
+void UniformTextureBuffer(GLint Loc, GLuint Texture, GLint Slot)
+{
+    UniformTextureInternal(Loc, Texture, Slot, GL_TEXTURE_BUFFER);
+}
 
 #define LOAD_SHADER_FUNC(name) void name(gl_state* GL, char* PathV, char* PathF)
 
@@ -204,12 +224,73 @@ INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadScreenShader){
     GLGETU(UVInvertY);
 }
 
-INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadResolveDepthShader){
-    gl_resolve_depth_shader& Result = GL->ResolveDepth;
+INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadResolveShader){
+    gl_resolve_shader& Result = GL->ResolveShader;
     Result.Shader = GlLoadProgram(GL, PathV, PathF);
     
-    GLGETU(DepthTexture);
+    GLGETU(TextureToResolve);
+    GLGETU(TextureResolveType);
     GLGETU(UVInvertY);
+    GLGETU(FarNear);
+}
+
+INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadLightingShader)
+{
+    gl_lighting_shader& Result = GL->LightingShader;
+    
+    Result.Shader = GlLoadProgram(GL, PathV, PathF);
+    
+    GLGETU(AspectRatio);
+    GLGETU(UVInvertY);
+    GLGETU(FOVRadians);
+    
+    GLGETU(GNormalMetalRough);
+    GLGETU(GAlbedoSpec);
+    GLGETU(GDepthTex);
+    GLGETU(SSAOInput);
+    
+    GLGETU(FarNear);
+    
+    GLGETU(FogEnabled);
+    GLGETU(FogColor);
+    GLGETU(FogDensity);
+    GLGETU(FogGradient);
+}
+
+
+INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadSSAOShader)
+{
+    gl_ssao_shader& Result = GL->SSAOShader;
+    
+    Result.Shader = GlLoadProgram(GL, PathV, PathF);
+    
+    GLGETU(WidthHeight);
+    GLGETU(UVInvertY);
+    GLGETU(FOVRadians);
+    GLGETU(PerspProjCoefs);
+    
+    GLGETU(FarNear);
+    GLGETU(DepthTex);
+    GLGETU(NormalMetalRoughTex);
+    
+    GLGETU(SSAOKernelSamplesCount);
+    GLGETU(SSAOKernelRadius);
+    GLGETU(SSAOKernelBuf);
+    GLGETU(SSAONoiseTex);
+    GLGETU(SSAOContribution);
+    GLGETU(SSAORangeCheck);
+}
+
+INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadFilterShader)
+{
+    gl_filter_shader& Result = GL->FilterShader;
+    
+    Result.Shader = GlLoadProgram(GL, PathV, PathF);
+    
+    GLGETU(UVInvertY);
+    GLGETU(InputTex);
+    GLGETU(Filter);
+    GLGETU(FilterType);
 }
 
 INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadSimpleShader){
@@ -229,11 +310,6 @@ INTERNAL_FUNCTION LOAD_SHADER_FUNC(LoadSimpleShader){
     GLGETU(Emissive);
     GLGETU(Specular);
     GLGETU(TexturesSetFlags);
-    
-    GLGETU(FogEnabled);
-    GLGETU(FogColor);
-    GLGETU(FogDensity);
-    GLGETU(FogGradient);
     
     GLGETA(P);
     GLGETA(UV);
@@ -392,6 +468,15 @@ INTERNAL_FUNCTION GLuint GlAllocateTexture(bmp_info* bmp){
     return(GenerateTex);
 }
 
+INTERNAL_FUNCTION void CheckFramebufferStatus()
+{
+    GLenum FramebufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    Assert(FramebufferStatus == GL_FRAMEBUFFER_COMPLETE);
+    if(FramebufferStatus != GL_FRAMEBUFFER_COMPLETE){
+        Platform.OutputString("Can not create render framebuffer\n");
+    }
+}
+
 INTERNAL_FUNCTION inline void GlAddMeshHandle(mesh_handles* Handles, u32 HandleType, size_t Handle)
 {
     ASSERT(Handles->Count < ARRAY_COUNT(Handles->Handles));
@@ -499,9 +584,11 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
     return(Result);
 }
 
+
+
 INTERNAL_FUNCTION void GlInit(gl_state* GL, 
                               render_state* Render, 
-                              assets* Assets)
+                              asset_system* Assets)
 {
     GL->ProgramsCount = 0;
     LoadScreenShader(GL, 
@@ -522,9 +609,21 @@ INTERNAL_FUNCTION void GlInit(gl_state* GL,
     LoadGuiLinesShader(GL,
                        "../Data/Shaders/gui_geom_lines.vs",
                        "../Data/Shaders/gui_geom_lines.fs");
-    LoadResolveDepthShader(GL,
-                           "../Data/Shaders/screen.vs",
-                           "../Data/Shaders/screen_resolve_depth.fs");
+    LoadResolveShader(GL,
+                      "../Data/Shaders/screen.vs",
+                      "../Data/Shaders/resolve_gbuf_texture.fs");
+    
+    LoadLightingShader(GL,
+                       "../Data/Shaders/lighting.vs",
+                       "../Data/Shaders/lighting.fs");
+    
+    LoadSSAOShader(GL,
+                   "../Data/Shaders/ssao.vs",
+                   "../Data/Shaders/ssao.fs");
+    
+    LoadFilterShader(GL,
+                     "../Data/Shaders/screen.vs",
+                     "../Data/Shaders/kernel_filter.fs");
     
     size_t FS = sizeof(float);
     
@@ -610,21 +709,102 @@ INTERNAL_FUNCTION void GlInit(gl_state* GL,
     glBindVertexArray(0);
     
     
-    // NOTE(Dima): Init SSAO textures
-    glGenTextures(1, &GL->SSAONoiseTex);
-    glGenTextures(1, &GL->SSAOKernelTex);
+    // NOTE(Dima): Init GBuffer textures & framebuffers
+    glGenFramebuffers(1, &GL->GBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, GL->GBuffer);
     
-    glBindTexture(GL_TEXTURE_2D, GL->SSAOKernelTex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glGenTextures(1, &GL->GAlbedoSpecTex);
+    glBindTexture(GL_TEXTURE_2D, GL->GAlbedoSpecTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 
+                 Render->InitWindowWidth, 
+                 Render->InitWindowHeight, 
+                 0, GL_RGBA, GL_UNSIGNED_INT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, 
-                 GL_RGB32F,
-                 Render->SSAOKernelSampleCount, 1, 0,
-                 GL_RGB, GL_FLOAT,
-                 Render->SSAOKernelSamples);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 
+                           GL_TEXTURE_2D, GL->GAlbedoSpecTex, 0);
     
+    glGenTextures(1, &GL->GNormalMetalRoughTex);
+    glBindTexture(GL_TEXTURE_2D, GL->GNormalMetalRoughTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 
+                 Render->InitWindowWidth, 
+                 Render->InitWindowHeight, 
+                 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, 
+                           GL_TEXTURE_2D, GL->GNormalMetalRoughTex, 0);
+    
+    // NOTE(Dima): Init Gbuffer attachements
+    GLuint GBufferAttachments[2];
+    GBufferAttachments[0] = GL_COLOR_ATTACHMENT0;
+    GBufferAttachments[1] = GL_COLOR_ATTACHMENT1;
+    glDrawBuffers(2, GBufferAttachments);
+    
+    // NOTE(Dima): Init Gbuffer depth
+    glGenTextures(1, &GL->GBufferDepthTex);
+    glBindTexture(GL_TEXTURE_2D, GL->GBufferDepthTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, 
+                 GL_DEPTH_COMPONENT32, 
+                 Render->InitWindowWidth,
+                 Render->InitWindowHeight,
+                 0, GL_DEPTH_COMPONENT, 
+                 GL_FLOAT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    
+    glFramebufferTexture2D(GL_FRAMEBUFFER,
+                           GL_DEPTH_ATTACHMENT, 
+                           GL_TEXTURE_2D, 
+                           GL->GBufferDepthTex, 0);
+    
+    CheckFramebufferStatus();
+    
+    // NOTE(Dima): Init SSAO textures & framebuffers
+    
+#if 1
+    glGenFramebuffers(1, &GL->SSAO_FBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, GL->SSAO_FBO);
+    glGenTextures(1, &GL->SSAO_Tex);
+    glBindTexture(GL_TEXTURE_2D, GL->SSAO_Tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 
+                 Render->InitWindowWidth,
+                 Render->InitWindowHeight,
+                 0, GL_RED, GL_FLOAT, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 
+                           GL_TEXTURE_2D, GL->SSAO_Tex, 0);
+    
+    CheckFramebufferStatus();
+    
+    glGenFramebuffers(1, &GL->SSAOBlur_FBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, GL->SSAOBlur_FBO);
+    glGenTextures(1, &GL->SSAOBlur_Tex);
+    glBindTexture(GL_TEXTURE_2D, GL->SSAOBlur_Tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 
+                 Render->InitWindowWidth,
+                 Render->InitWindowHeight,
+                 0, GL_RED, GL_FLOAT, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 
+                           GL_TEXTURE_2D, GL->SSAOBlur_Tex, 0);
+    
+    CheckFramebufferStatus();
+    
+    glGenBuffers(1, &GL->SSAOKernelBuf);
+    glBindBuffer(GL_TEXTURE_BUFFER, GL->SSAOKernelBuf);
+    glBufferData(GL_TEXTURE_BUFFER, sizeof(Render->SSAOKernelSamples), 
+                 Render->SSAOKernelSamples, GL_STATIC_DRAW);
+    
+    glGenTextures(1, &GL->SSAOKernelTex);
+    glBindTexture(GL_TEXTURE_BUFFER, GL->SSAOKernelTex);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, GL->SSAOKernelBuf);
+    
+    glGenTextures(1, &GL->SSAONoiseTex);
     glBindTexture(GL_TEXTURE_2D, GL->SSAONoiseTex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -635,57 +815,8 @@ INTERNAL_FUNCTION void GlInit(gl_state* GL,
                  4, 4, 0,
                  GL_RGB, GL_FLOAT,
                  Render->SSAONoiseTexture);
+#endif
     
-    // NOTE(Dima): Init render FBO
-    glGenFramebuffers(1, &GL->RenderFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, GL->RenderFBO);
-    
-    // NOTE(Dima): Color component init
-    glGenTextures(1, &GL->RenderColorTex0);
-    glBindTexture(GL_TEXTURE_2D, GL->RenderColorTex0);
-    glTexImage2D(GL_TEXTURE_2D, 0, 
-                 GL_RGB, 
-                 Render->InitWindowWidth,
-                 Render->InitWindowHeight,
-                 0, GL_RGB, 
-                 GL_UNSIGNED_BYTE, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);  
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
-    glFramebufferTexture2D(GL_FRAMEBUFFER, 
-                           GL_COLOR_ATTACHMENT0, 
-                           GL_TEXTURE_2D, 
-                           GL->RenderColorTex0, 0);
-    
-    // NOTE(Dima): Depth component init
-    glGenTextures(1, &GL->RenderDepthTex);
-    glBindTexture(GL_TEXTURE_2D, GL->RenderDepthTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, 
-                 GL_DEPTH_COMPONENT32, 
-                 Render->InitWindowWidth,
-                 Render->InitWindowHeight,
-                 0, GL_DEPTH_COMPONENT, 
-                 GL_UNSIGNED_INT, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
-    glFramebufferTexture2D(GL_FRAMEBUFFER,
-                           GL_DEPTH_ATTACHMENT, 
-                           GL_TEXTURE_2D, 
-                           GL->RenderDepthTex, 0);
-    
-    // TODO(Dima): Maybe add stencil buffer here
-    GLenum FramebufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    Assert(FramebufferStatus == GL_FRAMEBUFFER_COMPLETE);
-    if(FramebufferStatus != GL_FRAMEBUFFER_COMPLETE){
-        Platform.OutputString("Can not create render framebuffer\n");
-    }
 }
 
 INTERNAL_FUNCTION void GlFree(gl_state* GL){
@@ -707,11 +838,21 @@ INTERNAL_FUNCTION void GlFree(gl_state* GL){
     glDeleteVertexArrays(1, &GL->GuiGeomVAO);
     
     // NOTE(Dima): Deleting render framebuffer
-    glDeleteFramebuffers(1, &GL->RenderFBO);
+    glDeleteFramebuffers(1, &GL->GBuffer);
+    glDeleteTextures(1, &GL->GBufferDepthTex);
+    glDeleteTextures(1, &GL->GNormalMetalRoughTex);
+    glDeleteTextures(1, &GL->GAlbedoSpecTex);
     
     // NOTE(Dima): Deleting for SSAO
+    glDeleteFramebuffers(1, &GL->SSAO_FBO);
+    glDeleteTextures(1, &GL->SSAO_Tex);
+    
+    glDeleteFramebuffers(1, &GL->SSAOBlur_FBO);
+    glDeleteTextures(1, &GL->SSAOBlur_Tex);
+    
     glDeleteTextures(1, &GL->SSAONoiseTex);
     glDeleteTextures(1, &GL->SSAOKernelTex);
+    glDeleteBuffers(1, &GL->SSAOKernelBuf);
 }
 
 INTERNAL_FUNCTION void GlRenderGuiRect(gl_state* GL,
@@ -926,11 +1067,7 @@ void GlOutputPass(gl_state* GL, render_state* Render,
                                            (const GLfloat*)Entry->BoneTransforms[0].e);
                     }
                     
-                    
-                    UniformBool(GL->SimpleShader.FogEnabledLoc, Render->FogEnabled);
-                    UniformFloat(GL->SimpleShader.FogGradientLoc, Render->FogGradient);
-                    UniformFloat(GL->SimpleShader.FogDensityLoc, Render->FogDensity);
-                    UniformVec3(GL->SimpleShader.FogColorLoc, Render->FogColor);
+                    //UniformInt(GL->SimpleShader.);
                     
                     // NOTE(Dima): Setting FS uniforms
                     b32 AlbedoIsSet = 0;
@@ -1190,38 +1327,160 @@ INTERNAL_FUNCTION void OutputGuiGeometryLines(gl_state* GL, render_state* Render
     glDeleteTextures(1, &ColorsTex);
 }
 
+INTERNAL_FUNCTION void ApplyFilter(gl_state* GL, render_state* Render,
+                                   GLuint TargetFBO,
+                                   GLuint TextureToFilter,
+                                   u32 FilterType)
+{
+    b32 IsValid = true;
+    float* Target = 0;
+    int TargetCount = 0;
+    switch(FilterType)
+    {
+        case RenderFilter_GaussianBlur5x5:
+        {
+            Target = Render->GaussianBlur5;
+            TargetCount = 25;
+        }break;
+        
+        case RenderFilter_GaussianBlur3x3:
+        {
+            Target = Render->GaussianBlur3;
+            TargetCount = 9;
+        }break;
+        
+        case RenderFilter_BoxBlur5x5:
+        {
+            Target = &Render->BoxBlur5;
+            TargetCount = 1;
+        }break;
+        
+        case RenderFilter_BoxBlur3x3:
+        {
+            Target = &Render->BoxBlur3;
+            TargetCount = 1;
+        }break;
+        
+        default:
+        {
+            IsValid = false;
+        }break;
+    }
+    
+    if(IsValid)
+    {
+        gl_filter_shader* FilterSh = &GL->FilterShader;
+        glBindFramebuffer(GL_FRAMEBUFFER, TargetFBO);
+        
+        glUseProgram(FilterSh->Shader.ID);
+        glUniform1i(FilterSh->UVInvertYLoc, true);
+        UniformTexture2D(FilterSh->InputTexLoc,
+                         TextureToFilter, 0);
+        glUniform1fv(FilterSh->FilterLoc,
+                     TargetCount,
+                     Target);
+        glUniform1i(FilterSh->FilterTypeLoc,
+                    FilterType);
+        
+        glBindVertexArray(GL->ScreenVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+        glUseProgram(0);
+    }
+}
+
 INTERNAL_FUNCTION void GlFinalOutput(gl_state* GL, render_state* Render){
     render_frame_info FrameInfo = Render->FrameInfo;
+    
+    render_camera_setup* CamSet = &Render->CameraSetups[0];
+    
+    // NOTE(Dima): Rendering SSAO
+    {
+        BLOCK_TIMING("SSAO Compute");
+        
+        gl_ssao_shader* ShaderSSAO = &GL->SSAOShader;
+        glBindFramebuffer(GL_FRAMEBUFFER, GL->SSAO_FBO);
+        
+        glUseProgram(ShaderSSAO->Shader.ID);
+        glUniform1i(ShaderSSAO->UVInvertYLoc, true);
+        glUniform2f(ShaderSSAO->WidthHeightLoc, 
+                    CamSet->FramebufferWidth, 
+                    CamSet->FramebufferHeight);
+        glUniform2f(ShaderSSAO->FarNearLoc, CamSet->Far, CamSet->Near);
+        glUniform1f(ShaderSSAO->FOVRadiansLoc, CamSet->FOVRadians);
+        
+        v4 Coefs;
+        Coefs.x = CamSet->Projection.e[0];
+        Coefs.y = CamSet->Projection.e[5];
+        Coefs.z = CamSet->Projection.e[10];
+        Coefs.w = CamSet->Projection.e[14];
+        UniformVec4(ShaderSSAO->PerspProjCoefsLoc, Coefs);
+        
+        UniformTexture2D(ShaderSSAO->DepthTexLoc,
+                         GL->GBufferDepthTex, 0);
+        
+        UniformTexture2D(ShaderSSAO->NormalMetalRoughTexLoc, 
+                         GL->GNormalMetalRoughTex, 1);
+        
+        UniformTexture2D(ShaderSSAO->SSAONoiseTexLoc,
+                         GL->SSAONoiseTex, 2);
+        
+        UniformTextureBuffer(ShaderSSAO->SSAOKernelBufLoc,
+                             GL->SSAOKernelTex, 3);
+        
+        glUniform1i(ShaderSSAO->SSAOKernelSamplesCountLoc, Render->SSAOKernelSampleCount);
+        glUniform1f(ShaderSSAO->SSAOKernelRadiusLoc, Render->SSAOKernelRadius);
+        glUniform1f(ShaderSSAO->SSAOContributionLoc, Render->SSAOContribution);
+        glUniform1f(ShaderSSAO->SSAORangeCheckLoc, Render->SSAORangeCheck);
+        
+        glBindVertexArray(GL->ScreenVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        
+        glUseProgram(0);
+        glBindVertexArray(0);
+    }
+    
+    // NOTE(Dima): Rendering SSAO blur
+    {
+        BLOCK_TIMING("SSAO Blur");
+        
+        ApplyFilter(GL, Render, 
+                    GL->SSAOBlur_FBO,
+                    GL->SSAO_Tex,
+                    Render->SSAOFilterType);
+    }
+    
+    //glBindFramebuffer(GL_FRAMEBUFFER, GL->RenderFBO);
     
     // NOTE(Dima): outputing lines
     OutputRenderLines(GL, Render, 
                       Render->CameraSetups[0].ViewProjection);
     
-    // NOTE(Dima): Outputing gui geometry
-    glEnable(GL_SCISSOR_TEST);
-    OutputGuiGeometry(GL, Render);
-    OutputGuiGeometryLines(GL, Render);
-    glDisable(GL_SCISSOR_TEST);
-    
-    // NOTE(Dima): Output desired buffer to screen
-    GLint TexLoc;
-    GLuint Tex;
-    GLuint ProgramID;
-    GLint UVInvertYLoc;
-    if(Render->ToShowBufferType == RenderShowBuffer_Color){
-        TexLoc = GL->ScreenShader.ScreenTextureLoc;
-        UVInvertYLoc = GL->ScreenShader.UVInvertYLoc;
-        ProgramID = GL->ScreenShader.Shader.ID;
-        Tex = GL->RenderColorTex0;
-    }
-    else if(Render->ToShowBufferType == RenderShowBuffer_Depth){
-        TexLoc = GL->ResolveDepth.DepthTextureLoc;
-        UVInvertYLoc = GL->ResolveDepth.UVInvertYLoc;
-        ProgramID = GL->ResolveDepth.Shader.ID;
-        Tex = GL->RenderDepthTex;
-    }
-    
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    // NOTE(Dima): Common attributes for Resolve and GBuffer shaders
+    b32 IsGReconstruction = false;
+    GLint FarNearLoc;
+    GLint UVInvertYLoc;
+    GLuint ProgramID;
+    
+    gl_lighting_shader* LitSh = &GL->LightingShader;
+    gl_resolve_shader* SolveSh = &GL->ResolveShader;
+    
+    if(Render->ToShowBufferType == RenderShowBuffer_Main)
+    {
+        IsGReconstruction = true;
+        FarNearLoc = LitSh->FarNearLoc;
+        UVInvertYLoc = LitSh->UVInvertYLoc;
+        ProgramID = LitSh->Shader.ID;
+    }
+    else{
+        IsGReconstruction = false;
+        FarNearLoc = SolveSh->FarNearLoc;
+        UVInvertYLoc = SolveSh->UVInvertYLoc;
+        ProgramID = SolveSh->Shader.ID;
+    }
+    
     glViewport(0.0f, 0.0f, 
                FrameInfo.Width, 
                FrameInfo.Height);
@@ -1233,15 +1492,83 @@ INTERNAL_FUNCTION void GlFinalOutput(gl_state* GL, render_state* Render){
     glBindVertexArray(GL->ScreenVAO);
     glUseProgram(ProgramID);
     
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, Tex);
-    glUniform1i(TexLoc, 0);
-    glUniform1i(UVInvertYLoc, true);
+    if(ProgramID == SolveSh->Shader.ID)
+    {
+        glUniform1i(SolveSh->TextureResolveTypeLoc, Render->ToShowBufferType);
+        
+        GLuint TexToResolve = 0;
+        
+        if((Render->ToShowBufferType == RenderShowBuffer_Albedo) ||
+           (Render->ToShowBufferType == RenderShowBuffer_Specular))
+        {
+            TexToResolve = GL->GAlbedoSpecTex;
+        }
+        else if(Render->ToShowBufferType == RenderShowBuffer_Depth)
+        {
+            TexToResolve = GL->GBufferDepthTex;
+        }
+        else if((Render->ToShowBufferType == RenderShowBuffer_Normal) ||
+                (Render->ToShowBufferType == RenderShowBuffer_Metal) ||
+                (Render->ToShowBufferType == RenderShowBuffer_Roughness))
+        {
+            TexToResolve = GL->GNormalMetalRoughTex;
+        }
+        else if(Render->ToShowBufferType == RenderShowBuffer_SSAO)
+        {
+            TexToResolve = GL->SSAO_Tex;
+        }
+        else if(Render->ToShowBufferType == RenderShowBuffer_SSAOBlur)
+        {
+            TexToResolve = GL->SSAOBlur_Tex;
+        }
+        
+        UniformTexture2D(SolveSh->TextureToResolveLoc,
+                         TexToResolve, 0);
+    }
+    else
+    {
+        Assert(IsGReconstruction);
+        
+        UniformFloat(LitSh->AspectRatioLoc, CamSet->AspectRatio);
+        UniformFloat(LitSh->FOVRadiansLoc, CamSet->FOVRadians);
+        
+        UniformTexture2D(LitSh->GNormalMetalRoughLoc, 
+                         GL->GNormalMetalRoughTex, 0);
+        
+        UniformTexture2D(LitSh->GAlbedoSpecLoc,
+                         GL->GAlbedoSpecTex, 1);
+        
+        UniformTexture2D(LitSh->GDepthTexLoc,
+                         GL->GBufferDepthTex, 2);
+        
+        UniformTexture2D(LitSh->SSAOInputLoc,
+                         GL->SSAOBlur_Tex, 3);
+        
+        UniformBool(LitSh->FogEnabledLoc, Render->FogEnabled);
+        UniformFloat(LitSh->FogGradientLoc, Render->FogGradient);
+        UniformFloat(LitSh->FogDensityLoc, Render->FogDensity);
+        UniformVec3(LitSh->FogColorLoc, Render->FogColor);
+    }
+    
+    UniformVec2(FarNearLoc, CamSet->Far, CamSet->Near);
+    UniformBool(UVInvertYLoc, true);
+    
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindTexture(GL_TEXTURE_2D, 0);
     
     glUseProgram(0);
     glBindVertexArray(0);
+    
+    glEnable(GL_BLEND);
+    //glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    //glBlendEquation(GL_FUNC_ADD);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA); 
+    
+    // NOTE(Dima): Outputing gui geometry
+    glEnable(GL_SCISSOR_TEST);
+    OutputGuiGeometry(GL, Render);
+    OutputGuiGeometryLines(GL, Render);
+    glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_BLEND);
 }
 
 INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
@@ -1263,38 +1590,13 @@ INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
     
     GL->GuiOrtho = Floats2Matrix(GuiOrtho);
     
-    glBindFramebuffer(GL_FRAMEBUFFER, GL->RenderFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, GL->GBuffer);
     glViewport(0.0f, 0.0f, 
                FrameInfo.InitWidth, 
                FrameInfo.InitHeight);
     
-    
-    glEnable(GL_BLEND);
-    //glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    //glBlendEquation(GL_FUNC_ADD);
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA); 
-    
     glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
-#if 0    
-    // NOTE(Dima): Actual rendering
-    if(Render->API.RendererType == Renderer_Software){
-        if(Render->FrameInfoIsSet){
-            ASSERT(Render->FrameInfoIsSet);
-            
-            bmp_info* SoftBuf = Render->FrameInfo.SoftwareBuffer;
-            if(SoftBuf){
-                GlShowDynamicBitmap(GL, SoftBuf);
-            }
-            else{
-                // NOTE(Dima): Render through WinAPI
-            }
-        }
-    }
-    else if (Render->API.RendererType == Renderer_OpenGL){
-    }
-#endif
     
     GlOutputPass(GL, Render,
                  Render->StackRegion.CreationBlock.Base,

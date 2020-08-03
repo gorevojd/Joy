@@ -519,7 +519,7 @@ void InitAssetFile(asset_system* Assets) {
     
     //NOTE(dima): Clearing asset groups
     for (int AssetGroupIndex = 0;
-         AssetGroupIndex < GameAsset_Count;
+         AssetGroupIndex < AssetEntry_Count;
          AssetGroupIndex++)
     {
         game_asset_group* Group = Assets->AssetGroups + AssetGroupIndex;
@@ -558,7 +558,7 @@ And forming group regions that are about to be written
         std::vector<asset_file_group_region> WriteRegions;
         
         for (int GroupIndex = 0;
-             GroupIndex < GameAsset_Count;
+             GroupIndex < AssetEntry_Count;
              GroupIndex++)
         {
             game_asset_group* Src = &Assets->AssetGroups[GroupIndex];
@@ -589,10 +589,10 @@ And forming group regions that are about to be written
         }
         
         int TotalGroupsCount = WriteGroups.size();
-        ASSERT(TotalGroupsCount == GameAsset_Count);
+        ASSERT(TotalGroupsCount == AssetEntry_Count);
         int TotalRegionsCount = WriteRegions.size();
         
-        FileHeader.GroupsCount = TotalGroupsCount;
+        FileHeader.EntriesCount = TotalGroupsCount;
         FileHeader.RegionsCount = TotalRegionsCount;
         
         // NOTE(Dima): Writing header
@@ -1002,7 +1002,7 @@ And forming group regions that are about to be written
     if (fp) {
         asset_file_header* Header = (asset_file_header*)FileData;
         
-        u32 GroupsByteSize = Header->GroupsCount * sizeof(asset_file_group);
+        u32 GroupsByteSize = Header->EntriesCount * sizeof(asset_file_group);
         u32 GroupsRegionsSize = Header->RegionsCount * sizeof(asset_file_group_region);
         u32 LinesOffsetsSize = Header->EffectiveAssetsCount * sizeof(u32);
         u32 AssetsLinesByteSize = AssetLinesBytesWritten;
@@ -1012,8 +1012,8 @@ And forming group regions that are about to be written
         u32 LinesOffsetsByteOffset = GroupsRegionsByteOffset + GroupsRegionsSize;
         u32 AssetLinesByteOffset = LinesOffsetsByteOffset + LinesOffsetsSize;
         
-        Header->GroupsByteOffset = GroupsByteOffset;
-        Header->GroupsRegionsByteOffset = GroupsRegionsByteOffset;
+        Header->EntriesByteOffset = GroupsByteOffset;
+        Header->EntriesRegionsByteOffset = GroupsRegionsByteOffset;
         Header->LinesOffsetsByteOffset = LinesOffsetsByteOffset;
         Header->AssetLinesByteOffset = AssetLinesByteOffset;
         

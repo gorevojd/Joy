@@ -418,9 +418,8 @@ INTERNAL_FUNCTION void GuiInitRoot(gui_state* Gui, gui_element** root){
     rcs->Type = GuiElement_ChildrenSentinel;
 }
 
-void InitGui(
-             gui_state* Gui, 
-             assets* Assets)
+void InitGui(gui_state* Gui, 
+             asset_system* Assets)
 {
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // NOTE(Dima): memory region is already initialized
@@ -431,11 +430,11 @@ void InitGui(
     
     Gui->MainFont = 0;
     Gui->CurFontStackIndex = 0;
-    // NOTE(Dima): Getting IDs for needed assets
-    PushGuiFont(Gui, GetFirst(Gui->Assets, GameAsset_LiberationMono));
+    // NOTE(Dima): Getting IDs for needed asset_system
+    PushGuiFont(Gui, GetFirst(Gui->Assets, AssetEntry_LiberationMono));
     
-    Gui->CheckboxMarkID = GetFirst(Assets, GameAsset_CheckboxMark);
-    Gui->ChamomileID = GetFirst(Assets, GameAsset_ChamomileIcon);
+    Gui->CheckboxMarkID = GetFirst(Assets, AssetEntry_CheckboxMark);
+    Gui->ChamomileID = GetFirst(Assets, AssetEntry_ChamomileIcon);
     
     Gui->FontScale = 1.0f;
     
@@ -544,7 +543,7 @@ void InitGui(
 
 rc2 PrintTextInternal(font_info* Font, 
                       render_state* Render, 
-                      assets* Assets, 
+                      asset_system* Assets, 
                       char* text, 
                       v2 p, 
                       u32 textOp, 
@@ -628,7 +627,7 @@ void PrintCaret(gui_state* Gui, v2 PrintP, v4 Color = V4(1.0f, 1.0f, 1.0f, 1.0f)
     PushRect(Gui->RenderState, RcMinDim(CaretMin, CaretDim), Color);
 }
 
-v2 GetTextSizeInternal(font_info* Font, assets* Assets, char* Text, float Scale){
+v2 GetTextSizeInternal(font_info* Font, asset_system* Assets, char* Text, float Scale){
     rc2 TextRc = PrintTextInternal(
                                    Font, 
                                    0,
@@ -659,7 +658,7 @@ inline float GetCenteredTextOffsetY(font_info* font, rc2 rect, float Scale = 1.0
 }
 
 inline v2 GetCenteredTextOffset(font_info* Font, 
-                                assets* Assets, 
+                                asset_system* Assets, 
                                 char* Text, 
                                 rc2 rect, 
                                 float Scale = 1.0f)
@@ -674,7 +673,7 @@ inline v2 GetCenteredTextOffset(font_info* Font,
 rc2 PrintTextCenteredInRectInternal(
                                     font_info* Font, 
                                     render_state* Render,
-                                    assets* Assets,
+                                    asset_system* Assets,
                                     char* text, 
                                     rc2 rect, 
                                     float Scale = 1.0f, 

@@ -1,16 +1,10 @@
 #ifndef JOY_ANIMATION_H
 #define JOY_ANIMATION_H
 
-#include "joy_types.h"
-#include "joy_math.h"
-#include "joy_assets.h"
-#include "joy_strings.h"
-
 #define ANIM_ANY_STATE "#Any"
 #define ANIM_ANIMATION_NAME_SEPARATOR '.'
 #define ANIM_TRANSFORMS_ARRAY_SIZE 256
 #define ANIM_DEFAULT_TRANSITION_TIME 0.15f
-#define ANIM_OPTIMIZE 1
 #define ANIM_DEFAULT_NAME_SIZE 64
 #define ANIM_MAX_ANIMATIONS_PER_STATE 128
 #define ANIM_STATE_TABLE_SIZE 64
@@ -339,14 +333,14 @@ struct anim_system{
     playing_anim_source PlayingAnimSourceFree;
 };
 
-anim_calculated_pose UpdateModelAnimation(assets* Assets,
+anim_calculated_pose UpdateModelAnimation(asset_system* Assets,
                                           model_info* Model,
                                           animated_component* AnimComp,
                                           f64 GlobalTime,
                                           f32 DeltaTime,
                                           f32 PlaybackRate);
 
-#define CREATE_ANIM_CONTROL_FUNC(name) anim_controller* name(anim_system* Anim, struct assets* Assets, char* Name)
+#define CREATE_ANIM_CONTROL_FUNC(name) anim_controller* name(anim_system* Anim, struct asset_system* Assets, char* Name)
 
 anim_controller* CreateAnimControl(anim_system* Anim, char* Name, u32 NodesCheckSum);
 void FinalizeCreation(anim_controller* Control);

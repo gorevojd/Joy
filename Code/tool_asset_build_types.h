@@ -414,7 +414,7 @@ struct game_asset {
 struct asset_system {
     std::vector<game_asset> Assets;
     
-    game_asset_group AssetGroups[GameAsset_Count];
+    game_asset_group AssetGroups[AssetEntry_Count];
     
     u32 AssetCount;
     game_asset_group* CurrentGroup;

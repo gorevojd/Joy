@@ -56,21 +56,24 @@ state_var_name = PushStruct(&Mode->Memory, state_type);\
 Mode->ModeState = state_var_name;\
 }
 
+#define INIT_MODES(name) void name(struct game_state* Game)
+typedef INIT_MODES(init_modes);
+
+#define INIT_MODES_FUNC_NAME GlobalInitModes
+#define IMPLEMENT_INIT_MODES() INIT_MODES(INIT_MODES_FUNC_NAME)
+
+INIT_MODES(INIT_MODES_FUNC_NAME);
+
 #define GAME_MODE_UPDATE(name) void name(struct game_state* Game, struct game_mode* Mode)
 typedef GAME_MODE_UPDATE(game_mode_update_prototype);
 
-#define GAME_MODE_ENDFRAME(name) void name(struct game_state* Game, struct game_mode* Mode)
-typedef GAME_MODE_ENDFRAME(game_mode_endframe_prototype);
-
 struct game_mode{
     char Name[128];
+    game_mode_update_prototype* Update;
     
     mem_region Memory;
     
     void* ModeState;
-    
-    game_mode_update_prototype* Update;
-    game_mode_endframe_prototype* EndFrame;
     
     int NextModeIndex;
 };
@@ -86,14 +89,16 @@ struct game_state{
     mem_region GuiMemory;
     mem_region InputMemory;
     mem_region RenderMemory;
-    mem_region AssetMemory;
+    mem_region AssetsMemory;
     mem_region AnimMemory;
+#if defined(JOY_INTERNAL)
     mem_region DEBUGMemory;
+#endif
     
     gui_state* Gui;
     input_state* Input;
     render_state* Render;
-    assets* Assets;
+    asset_system* Assets;
     anim_system* Anim;
 #if defined(JOY_INTERNAL)
     debug_state* DEBUG;
@@ -104,6 +109,10 @@ struct game_state{
 void GameInit(game_state* Game, game_init_params Params);
 void GameUpdate(game_state* Game, render_frame_info FrameInfo);
 void GameFree(game_state* Game);
+
+// NOTE(Dima): API for modes abstraction
+game_mode* DescribeGameMode(game_state* Game, char* Name, game_mode_update_prototype* Update);
+void SetGameMode(game_state* Game, char* ModeName);
 
 // NOTE(Dima): Functions definitions
 task_data* BeginTaskData(task_data_pool* Pool);

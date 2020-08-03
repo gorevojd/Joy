@@ -59,7 +59,6 @@ inline int ConvertAssimpToOurTextureType(u32 Assimp){
     return(Result);
 }
 
-
 void ReplaceSlashes(std::string& Path){
     for(int i = 0; i < Path.length(); i++){
         if(Path[i] == '\\'){
@@ -300,8 +299,8 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags,
     
     //scene->mMetaData->Get("UnitScaleFactor", factor);
     
-    double factor(0.0);
-    scene->mMetaData->Get("UnitScaleFactor", factor);
+    //double factor(0.0);
+    //scene->mMetaData->Get("UnitScaleFactor", factor);
     //scene->mMetaData->Set("UnitScaleFactor", 100);
     
     if (scene) {
@@ -945,7 +944,7 @@ INTERNAL_FUNCTION void StoreAnimationsToGroupID(asset_system* System,
     tool_model_info* ToolModel = &Model->ToolModelInfo;
     
     // NOTE(Dima): Storing all node animations except root node anim
-    BeginAsset(System, GameAsset_Type_NodeAnim);
+    BeginAsset(System, AssetEntry_Type_NodeAnim);
     for(int AnimIndex = 0;
         AnimIndex < Model->Animations.size();
         AnimIndex++)
@@ -1028,10 +1027,10 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
     
     // NOTE(Dima): Storing in-model embeded animations
     StoreAnimationsToGroupID(System, Source, Model, 
-                             GameAsset_Type_AnimationClip);
+                             AssetEntry_Type_AnimationClip);
     
     // NOTE(Dima): Storing embeded textures
-    BeginAsset(System, GameAsset_Type_Bitmap);
+    BeginAsset(System, AssetEntry_Type_Bitmap);
     for(int EmbedIndex = 0;
         EmbedIndex < Model->EmbededTextures.size();
         EmbedIndex++)
@@ -1044,7 +1043,7 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
     EndAsset(System);
     
     // NOTE(Dima): Storing meshes
-    BeginAsset(System, GameAsset_Type_Mesh);
+    BeginAsset(System, AssetEntry_Type_Mesh);
     for(int MeshIndex = 0; 
         MeshIndex < Model->Meshes.size(); 
         MeshIndex++)
@@ -1058,7 +1057,7 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
     EndAsset(System);
     
     // NOTE(Dima): Storing skeleton
-    BeginAsset(System, GameAsset_Type_Skeleton);
+    BeginAsset(System, AssetEntry_Type_Skeleton);
     if(Model->HasSkeleton)
     {
         added_asset Added = AddSkeletonAsset(System, &Model->Skeleton);
@@ -1087,7 +1086,7 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
             int FirstIDInArray = Material->TextureFirstIndexOfTypeInArray[TextureTypeIndex];
             
             // NOTE(Dima): Adding bitmap arrays if needed
-            BeginAsset(System, GameAsset_Type_BitmapArray);
+            BeginAsset(System, AssetEntry_Type_BitmapArray);
             u32 AddedArrayID = 0;
             
             if(Count && (FirstIDInArray != -1)){
@@ -1116,7 +1115,7 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
             ToolMatInfo->BitmapArrayIDs[OurTextureType] = AddedArrayID;
         }
         
-        BeginAsset(System, GameAsset_Type_Material);
+        BeginAsset(System, AssetEntry_Type_Material);
         added_asset AddedMaterial = AddMaterialAsset(System, ToolMatInfo);
         EndAsset(System);
         
@@ -1180,7 +1179,7 @@ INTERNAL_FUNCTION void StoreLoadingContext(asset_system* System,
     }
     
     // NOTE(Dima): Storing bitmaps
-    BeginAsset(System, GameAsset_Type_Bitmap);
+    BeginAsset(System, AssetEntry_Type_Bitmap);
     for(auto& it: LoadingCtx->PathToTextureMap){
         added_asset AddedBitmap = AddBitmapAssetManual(System, &it.second.Bmp);
         it.second.StoredBitmapID = AddedBitmap.ID;

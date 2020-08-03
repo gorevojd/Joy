@@ -58,11 +58,13 @@ struct gl_screen_shader{
     GLint ScreenTextureLoc;
 };
 
-struct gl_resolve_depth_shader{
+struct gl_resolve_shader{
     gl_shader Shader;
     
     GLint UVInvertYLoc;
-    GLint DepthTextureLoc;
+    GLint TextureToResolveLoc;
+    GLint TextureResolveTypeLoc;
+    GLint FarNearLoc;
 };
 
 struct gl_simple_shader{
@@ -81,11 +83,6 @@ struct gl_simple_shader{
     GLint SpecularLoc;
     GLint EmissiveLoc;
     GLint TexturesSetFlagsLoc;
-    
-    GLint FogEnabledLoc;
-    GLint FogColorLoc;
-    GLint FogDensityLoc;
-    GLint FogGradientLoc;
     
     GLint PAttrLoc;
     GLint UVAttrLoc;
@@ -135,6 +132,56 @@ struct gl_lines_shader{
     GLint PAttrLoc;
 };
 
+struct gl_lighting_shader{
+    gl_shader Shader;
+    
+    GLint AspectRatioLoc;
+    GLint UVInvertYLoc;
+    GLint FarNearLoc;
+    GLint FOVRadiansLoc;
+    
+    GLint GNormalMetalRoughLoc;
+    GLint GAlbedoSpecLoc;
+    GLint GDepthTexLoc;
+    GLint SSAOInputLoc;
+    
+    GLint FogEnabledLoc;
+    GLint FogColorLoc;
+    GLint FogDensityLoc;
+    GLint FogGradientLoc;
+};
+
+struct gl_ssao_shader
+{
+    gl_shader Shader;
+    
+    GLint WidthHeightLoc;
+    GLint UVInvertYLoc;
+    
+    GLint FarNearLoc;
+    GLint DepthTexLoc;
+    GLint NormalMetalRoughTexLoc;
+    GLint FOVRadiansLoc;
+    GLint PerspProjCoefsLoc;
+    
+    GLint SSAOKernelSamplesCountLoc;
+    GLint SSAOKernelRadiusLoc;
+    GLint SSAOKernelBufLoc;
+    GLint SSAONoiseTexLoc;
+    GLint SSAOContributionLoc;
+    GLint SSAORangeCheckLoc;
+};
+
+struct gl_filter_shader
+{
+    gl_shader Shader;
+    
+    GLint UVInvertYLoc;
+    GLint InputTexLoc;
+    GLint FilterLoc;
+    GLint FilterTypeLoc;
+};
+
 struct gl_state{
     gl_program Programs[256];
     int ProgramsCount;
@@ -147,7 +194,10 @@ struct gl_state{
     gl_guigeom_shader GuiGeomShader;
     gl_guigeom_lines_shader GuiLinesShader;
     gl_lines_shader LinesShader;
-    gl_resolve_depth_shader ResolveDepth;
+    gl_resolve_shader ResolveShader;
+    gl_lighting_shader LightingShader;
+    gl_ssao_shader SSAOShader;
+    gl_filter_shader FilterShader;
     
     GLuint ScreenVAO;
     GLuint ScreenVBO;
@@ -175,13 +225,22 @@ struct gl_state{
     GLuint GuiLinesVBO;
     GLuint GuiLinesColorsTBO;
     
+    // NOTE(Dima): GBuffer
+    GLuint GBuffer;
+    GLuint GBufferDepthTex;
+    GLuint GNormalMetalRoughTex;
+    GLuint GAlbedoSpecTex;
+    
     // NOTE(Dima): SSAO
+    GLuint SSAO_FBO;
+    GLuint SSAO_Tex;
+    
+    GLuint SSAOBlur_FBO;
+    GLuint SSAOBlur_Tex;
+    
     GLuint SSAONoiseTex;
     GLuint SSAOKernelTex;
-    
-    GLuint RenderFBO;
-    GLuint RenderColorTex0;
-    GLuint RenderDepthTex;
+    GLuint SSAOKernelBuf;
     
     m44 GuiOrtho;
 };

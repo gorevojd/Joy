@@ -24,7 +24,7 @@ struct asset_file_source{
 struct asset{
     u32 ID;
     u32 Type;
-    int GroupIndex;
+    int EntryIndex;
     
     std::atomic_uint State;
     
@@ -86,17 +86,22 @@ struct asset_id_range{
     int Count;
 };
 
-struct slots_group{
+struct asset_group_context
+{
+    char* GroupName;
+    
+    int Count;
+    u32 NameHash;
 };
 
-struct asset_group{
-    int InGroupAssetCount;
+struct asset_entry{
+    int InEntryAssetCount;
     asset_slot Sentinel;
     asset** PointersToAssets;
 };
 
 #define MAX_ASSETS_IN_ASSET_BLOCK 4096
-#define MAX_ASSET_BLOCKS_COUNT 1024
+#define MAX_ASSET_BLOCKS_COUNT 256
 
 struct asset_block{
     asset* BlockAssets;
@@ -104,14 +109,10 @@ struct asset_block{
 };
 
 // NOTE(dima): Bitmaps are stored in gamma-corrected premultiplied alpha format
-struct assets{
+struct asset_system
+{
     mem_region* Memory;
     layered_mem LayeredMemory;
-    
-    task_data_pool ImportTasksPool;
-    task_data_pool ImportTaskPoolMainThread;
-    
-    random_generation Random;
     
     Asset_Atlas MainLargeAtlas;
     
@@ -119,16 +120,19 @@ struct assets{
     asset_file_source FileSourceUse;
     asset_file_source FileSourceFree;
     
-    // NOTE(Dima): Memory entries
-    mem_box MemBox;
-    
     // NOTE(Dima): Asset groups
-    asset_group Groups[GameAsset_Count];
-    asset_group TagGroups[AssetTag_Count][GameAsset_Count];
+    // TODO(Dima): Allocate memory for those
+    asset_entry Entries[AssetEntry_Count];
+    asset_entry TaggedEntries[AssetTag_Count][AssetEntry_Count];
     
     // NOTE(Dima): Actual asset storage
     asset_block AssetBlocks[MAX_ASSET_BLOCKS_COUNT];
     int CurrentBlockIndex;
+    
+    task_data_pool ImportTasksPool;
+    task_data_pool ImportTaskPoolMainThread;
+    
+    random_generation Random;
     
     asset_slot UseSlot;
     asset_slot FreeSlot;
@@ -162,7 +166,7 @@ inline b32 PotentiallyLoadedAsset(asset* Asset, b32 Immediate){
     return(Result);
 }
 
-inline asset* GetAssetByID(assets* Assets, u32 ID){
+inline asset* GetAssetByID(asset_system* Assets, u32 ID){
     
     parsed_asset_id ParsedID = ParseAssetID(ID);
     
@@ -175,20 +179,20 @@ inline asset* GetAssetByID(assets* Assets, u32 ID){
     return(Result);
 }
 
-void InitAssets(assets* Assets);
-u32 GetFirst(assets* Assets, u32 Family);
-u32 GetRandom(assets* Assets, u32 Group);
-u32 GetBestByTags(assets* Assets, 
+void InitAssets(asset_system* Assets);
+u32 GetFirst(asset_system* Assets, u32 Family);
+u32 GetRandom(asset_system* Assets, u32 Group);
+u32 GetBestByTags(asset_system* Assets, 
                   u32 Group, 
                   u32* TagTypes, 
                   asset_tag_value* TagValues, 
                   int TagsCount);
 
-void ImportAsset(assets* Assets, asset* Asset, b32 Immediate);
+void ImportAsset(asset_system* Assets, asset* Asset, b32 Immediate);
 
 // NOTE(Dima): This functions returns asset only if it was loaded.
 // NOTE(Dima): Otherwise it returns NULL
-inline void* LoadAssetTypeInternal(assets* Assets, 
+inline void* LoadAssetTypeInternal(asset_system* Assets, 
                                    asset_id ID, 
                                    u32 CompareAssetType,
                                    b32 Immediate)
@@ -206,7 +210,7 @@ inline void* LoadAssetTypeInternal(assets* Assets,
     return(Result);
 }
 
-inline void* LoadAssetTypeRawInternal(assets* Assets, 
+inline void* LoadAssetTypeRawInternal(asset_system* Assets, 
                                       asset_id ID, 
                                       u32 CompareAssetType)
 {
@@ -224,38 +228,38 @@ inline void* LoadAssetTypeRawInternal(assets* Assets,
 #define LOAD_ASSET(data_type, type, assets, id, immediate) \
 (data_type*)LoadAssetTypeInternal(assets, id, type, immediate)
 
-array_info* LoadArray(assets* Assets,
+array_info* LoadArray(asset_system* Assets,
                       u32 ArrayID);
 
-bmp_info* LoadBmp(assets* Assets,
+bmp_info* LoadBmp(asset_system* Assets,
                   u32 BmpID,
                   b32 Immediate);
 
-font_info* LoadFont(assets* Assets,
+font_info* LoadFont(asset_system* Assets,
                     u32 FontID,
                     b32 Immediate);
 
-mesh_info* LoadMesh(assets* Assets,
+mesh_info* LoadMesh(asset_system* Assets,
                     u32 MeshID,
                     b32 Immediate);
 
-material_info* LoadMaterial(assets* Assets,
+material_info* LoadMaterial(asset_system* Assets,
                             u32 MaterialID,
                             b32 Immediate);
 
-model_info* LoadModel(assets* Assets,
+model_info* LoadModel(asset_system* Assets,
                       u32 ModelID,
                       b32 Immediate);
 
-skeleton_info* LoadSkeleton(assets* Assets,
+skeleton_info* LoadSkeleton(asset_system* Assets,
                             u32 SkeletonID,
                             b32 Immediate);
 
-animation_clip* LoadAnimationClip(assets* Assets,
+animation_clip* LoadAnimationClip(asset_system* Assets,
                                   u32 AnimID,
                                   b32 Immediate);
 
-node_animation* LoadNodeAnim(assets* Assets,
+node_animation* LoadNodeAnim(asset_system* Assets,
                              u32 NodeAnimID,
                              b32 Immediate);
 

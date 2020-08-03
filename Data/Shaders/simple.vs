@@ -11,19 +11,14 @@ uniform mat4 Model;
 uniform mat4 View;
 uniform mat4 Projection;
 
-uniform bool FogEnabled;
-uniform float FogDensity;
-uniform float FogGradient;
-
 uniform bool HasSkinning;
 uniform int BonesCount;
 uniform mat4 BoneTransforms[128];
 
 out Vertex_Shader_Out{
     vec3 WorldP;
-    vec3 WorldN;
+	vec3 ViewN;
     vec2 UV;
-	float Visibility;
 } VsOut;
 
 void main(){
@@ -48,21 +43,17 @@ void main(){
         
         ModelSpaceP = SumP.xyz;
         ModelSpaceN = SumN.xyz;
-    }
-    
+    }    
+
     // NOTE(Dima): Usual calculations
     vec4 WorldP = vec4(ModelSpaceP, 1.0f) * Model;
     vec4 ViewP = WorldP * View;
     vec4 ProjectedP = ViewP * Projection;
     
-	float CamToVertexLen = length(ViewP.xyz);
-	VsOut.Visibility = 1.0f;
-	if(FogEnabled){
-		VsOut.Visibility = exp(-pow((FogDensity * CamToVertexLen), FogGradient));
-		VsOut.Visibility = clamp(VsOut.Visibility, 0.0f, 1.0f);
-	}
-    VsOut.WorldP = WorldP.xyz;
-    VsOut.WorldN = normalize(ModelSpaceN * transpose(inverse(mat3(Model))));
+	//float CamToVertexLen = length(ViewP.xyz);
+	float CamToVertexLen = ViewP.z;
+	VsOut.WorldP = WorldP.xyz;
+    VsOut.ViewN = (vec4(normalize(ModelSpaceN * transpose(inverse(mat3(Model)))), 0.0f) * View).xyz;
     VsOut.UV = vec2(UV.x, 1.0f - UV.y);
     
     gl_Position = ProjectedP;

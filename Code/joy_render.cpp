@@ -3,6 +3,7 @@ INTERNAL_FUNCTION render_camera_setup SetupCamera(const m44& Projection,
                                                   int FramebufferWidth,
                                                   int FramebufferHeight,
                                                   float Far, float Near,
+                                                  float FOVDegrees,
                                                   b32 CalcFrustumPlanes)
 {
     render_camera_setup Result = {};
@@ -16,8 +17,11 @@ INTERNAL_FUNCTION render_camera_setup SetupCamera(const m44& Projection,
     Result.FramebufferWidth = FramebufferWidth;
     Result.FramebufferHeight = FramebufferHeight;
     
+    Result.AspectRatio = FramebufferWidth / FramebufferHeight;
+    
     Result.Far = Far;
     Result.Near = Near;
+    Result.FOVRadians = JOY_DEG2RAD * FOVDegrees;
     
     if(CalcFrustumPlanes){
         v4 *FrustumPlanes = Result.FrustumPlanes;
@@ -73,15 +77,18 @@ INTERNAL_FUNCTION render_camera_setup SetupCamera(const m44& Projection,
 INTERNAL_FUNCTION render_camera_setup DefaultPerspSetup(render_state* Render, 
                                                         const m44& CameraTransform)
 {
+    float FOVDegrees = 45.0f;
     render_camera_setup CamSetup = SetupCamera(PerspectiveProjection(Render->InitWindowWidth, 
                                                                      Render->InitWindowHeight, 
                                                                      RENDER_DEFAULT_FAR, 
-                                                                     RENDER_DEFAULT_NEAR),
+                                                                     RENDER_DEFAULT_NEAR,
+                                                                     FOVDegrees),
                                                CameraTransform,
                                                Render->InitWindowWidth, 
                                                Render->InitWindowHeight, 
                                                RENDER_DEFAULT_FAR, 
                                                RENDER_DEFAULT_NEAR, 
+                                               FOVDegrees,
                                                true);
     
     return(CamSetup);
@@ -96,7 +103,8 @@ INTERNAL_FUNCTION render_camera_setup DefaultOrthoSetup(render_state* Render,
                                                Render->InitWindowWidth, 
                                                Render->InitWindowHeight, 
                                                RENDER_DEFAULT_FAR, 
-                                               RENDER_DEFAULT_NEAR, 
+                                               RENDER_DEFAULT_NEAR,
+                                               45.0f,
                                                true);
     
     return(CamSetup);
@@ -160,11 +168,66 @@ INTERNAL_FUNCTION void RenderInitLinesGeom(render_state* Render){
     Render->LinesGeom.ChunksAllocated = 0;
 }
 
+INTERNAL_FUNCTION void InitGausBlur5(render_state* Render)
+{
+    float* GausBlurBox = Render->GaussianBlur5;
+	GausBlurBox[0] = 1;
+	GausBlurBox[1] = 4;
+	GausBlurBox[2] = 6;
+	GausBlurBox[3] = 4;
+	GausBlurBox[4] = 1;
+	GausBlurBox[5] = 4;
+	GausBlurBox[6] = 16;
+	GausBlurBox[7] = 24;
+	GausBlurBox[8] = 16;
+	GausBlurBox[9] = 4;
+	GausBlurBox[10] = 6;
+	GausBlurBox[11] = 24;
+	GausBlurBox[12] = 36;
+	GausBlurBox[13] = 24;
+	GausBlurBox[14] = 6;
+	GausBlurBox[15] = 4;
+	GausBlurBox[16] = 16;
+	GausBlurBox[17] = 24;
+	GausBlurBox[18] = 16;
+	GausBlurBox[19] = 4;
+	GausBlurBox[20] = 1;
+	GausBlurBox[21] = 4;
+	GausBlurBox[22] = 6;
+	GausBlurBox[23] = 4;
+	GausBlurBox[24] = 1;
+    
+	for(int i = 0; i < 25; i++)
+	{
+		GausBlurBox[i] /= 256.0f;
+	}
+}
+
+INTERNAL_FUNCTION void InitGausBlur3(render_state* Render)
+{
+    float* GausBlurBox = Render->GaussianBlur3;
+    GausBlurBox[0] = 1;
+	GausBlurBox[1] = 2;
+	GausBlurBox[2] = 1;
+	GausBlurBox[3] = 2;
+	GausBlurBox[4] = 4;
+	GausBlurBox[5] = 2;
+	GausBlurBox[6] = 1;
+	GausBlurBox[7] = 2;
+	GausBlurBox[8] = 1;
+    
+	for(int i = 0; i < 9; i++)
+	{
+		GausBlurBox[i] /= 16.0f;
+	}
+}
+
 INTERNAL_FUNCTION void RenderInit(render_state* Render, 
                                   int InitWindowWidth,
                                   int InitWindowHeight,
-                                  render_platform_api API){
-    InitRandomGeneration(&Render->Random, 12);
+                                  render_platform_api API)
+{
+    InitRandomGeneration(&Render->Random, 1232);
     
     Render->FrameInfoIsSet = 0;
     Render->InitWindowWidth = InitWindowWidth;
@@ -178,11 +241,13 @@ INTERNAL_FUNCTION void RenderInit(render_state* Render,
     // NOTE(Dima): Init render API
     Render->PlatformRenderAPI = API;
     
-    Render->StackRegion = PushSplit(Render->MemRegion, Megabytes(4));
+    Render->StackRegion = PushSplit(Render->MemRegion, Megabytes(5));
     
+    
+#if 0    
     // NOTE(Dima): Init SSAO kernel
     for(int KernelSampleIndex = 0;
-        KernelSampleIndex < SSAO_KERNEL_SIZE;
+        KernelSampleIndex < SSAO_KERNEL_MAX_SIZE;
         KernelSampleIndex++)
     {
         v3 RandomVector = V3(RandomBi(&Render->Random),
@@ -191,26 +256,81 @@ INTERNAL_FUNCTION void RenderInit(render_state* Render,
         
         RandomVector = Normalize(RandomVector);
         
-        float Scale = float(KernelSampleIndex) / float(SSAO_KERNEL_SIZE);
+        float Scale = float(KernelSampleIndex) / float(SSAO_KERNEL_MAX_SIZE);
         float RandomScale = RandomUni(&Render->Random);
-        RandomScale = Lerp(RandomScale, 0.1f, 1.0f);
+        RandomScale = Lerp(0.1f, 1.0f, RandomScale);
         
         RandomVector *= RandomScale;
-        
-        Render->SSAOKernelSamples[KernelSampleIndex] = RandomVector;
     }
+#else
+    for(int YIndex = 0; 
+        YIndex < 16; 
+        YIndex++)
+    {
+        for(int XIndex = 0; 
+            XIndex < 16;
+            XIndex++)
+        {
+            float RandomX = RandomUni();
+            float RandomY = RandomUni();
+            
+            float Theta = 2.0f * ACos(Sqrt(1.0f - RandomX));
+            float Phi = 2.0f * JOY_PI * RandomY;
+            
+            float UnitX = sinf(Theta) * cosf(Phi);
+            float UnitY = sinf(Theta) * sinf(Phi);
+            float UnitZ = cosf(Theta);
+            
+            v3 UnitVector = V3(UnitX, UnitY, UnitZ);
+            UnitVector = NOZ(UnitVector);
+            
+#if 1     
+            float RandomScale = RandomUni(&Render->Random);
+            RandomScale = Lerp(0.1f, 1.0f, RandomScale);
+            
+            UnitVector *= RandomScale;
+#endif
+            
+            if(UnitVector.z < 0)
+            {
+                UnitVector.z = -UnitVector.z;
+            }
+            
+            int NewSampleIndex = YIndex * 16 + XIndex;
+            Render->SSAOKernelSamples[NewSampleIndex] = UnitVector;
+        }
+    }
+#endif
     
     // NOTE(Dima): Init SSAO noise texture
     for(int NoiseIndex = 0;
         NoiseIndex < SSAO_NOISE_TEXTURE_SIZE;
         NoiseIndex++)
     {
-        v3 Noise = V3(RandomBi(&Render->Random),
-                      RandomBi(&Render->Random),
+        v3 Noise = V3(Cos(RandomUni(&Render->Random) * JOY_TAU),
+                      Sin(RandomUni(&Render->Random) * JOY_TAU),
                       0.0f);
         
         Render->SSAONoiseTexture[NoiseIndex] = NOZ(Noise);
     }
+    
+    Render->SSAOKernelSampleCount = SSAO_DEFAULT_SAMPLES;
+    Render->SSAOKernelRadius = SSAO_DEFAULT_RADIUS;
+    Render->SSAOContribution = SSAO_DEFAULT_CONTRIBUTION;
+    Render->SSAORangeCheck = SSAO_DEFAULT_RANGE_CHECK;
+    
+    // NOTE(Dima): Init filters
+    InitGausBlur5(Render);
+    InitGausBlur3(Render);
+    Render->BoxBlur5 = 1.0f / 25.0f;
+    Render->BoxBlur3 = 1.0f / 9.0f;
+    
+    Render->ToShowBufferType = RenderShowBuffer_SSAO;
+    
+    Render->FilterNames[RenderFilter_GaussianBlur5x5] = "Gaussian blur 5x5";
+    Render->FilterNames[RenderFilter_GaussianBlur3x3] = "Gaussian blur 3x3";
+    Render->FilterNames[RenderFilter_BoxBlur5x5] = "Box blur 5x5";
+    Render->FilterNames[RenderFilter_BoxBlur3x3] = "Box blur 3x3";
     
     RenderInitGuiGeom(Render);
     RenderInitLinesGeom(Render);

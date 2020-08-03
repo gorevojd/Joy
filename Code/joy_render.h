@@ -2,13 +2,17 @@
 #define JOY_RENDER_H
 
 #define RENDER_DEFAULT_STACK_SIZE Megabytes(5)
-#define RENDER_DEFAULT_FAR 500.0f
-#define RENDER_DEFAULT_NEAR 0.2f
+#define RENDER_DEFAULT_FAR 250.0f
+#define RENDER_DEFAULT_NEAR 1.0f
 #define RENDER_FOG_DENSITY 0.035f
 #define RENDER_FOG_GRADIENT 3.0f
 #define RENDER_FOG_ENABLED false
 
-#define SSAO_KERNEL_SIZE 256
+#define SSAO_KERNEL_MAX_SIZE 256
+#define SSAO_DEFAULT_SAMPLES 64
+#define SSAO_DEFAULT_CONTRIBUTION 0.6f
+#define SSAO_DEFAULT_RADIUS 0.6f
+#define SSAO_DEFAULT_RANGE_CHECK 1.0f
 #define SSAO_NOISE_TEXTURE_SIZE 16
 
 #define RENDER_MAX_CAMERA_SETUPS 256
@@ -31,10 +35,28 @@ enum render_entry_type{
 };
 
 enum render_show_buffer_type{
-    RenderShowBuffer_Color,
-    RenderShowBuffer_Depth,
+    RenderShowBuffer_Main = 0,
+    
+    RenderShowBuffer_Albedo = 1,
+    RenderShowBuffer_Specular = 2,
+    RenderShowBuffer_Depth = 3,
+    RenderShowBuffer_Normal = 4,
+    RenderShowBuffer_Metal = 5,
+    RenderShowBuffer_Roughness = 6,
+    RenderShowBuffer_SSAO = 7,
+    RenderShowBuffer_SSAOBlur = 8,
     
     RenderShowBuffer_Count,
+};
+
+enum render_filter_type
+{
+    RenderFilter_GaussianBlur5x5 = 0,
+    RenderFilter_GaussianBlur3x3 = 1,
+    RenderFilter_BoxBlur5x5 = 2,
+    RenderFilter_BoxBlur3x3 = 3,
+    
+    RenderFilter_Count,
 };
 
 enum render_pass_type{
@@ -54,9 +76,12 @@ struct render_camera_setup{
     
     float Far;
     float Near;
+    float FOVRadians;
     
     int FramebufferWidth;
     int FramebufferHeight;
+    
+    float AspectRatio;
     
     v4 FrustumPlanes[6];
 };
@@ -271,11 +296,22 @@ struct render_state{
     
     b32 FrameInfoIsSet;
     render_frame_info FrameInfo;
+    
     u32 ToShowBufferType;
+    const char* FilterNames[RenderFilter_Count];
     
     v3 SSAONoiseTexture[SSAO_NOISE_TEXTURE_SIZE];
-    v3 SSAOKernelSamples[SSAO_KERNEL_SIZE];
+    v3 SSAOKernelSamples[SSAO_KERNEL_MAX_SIZE];
     int SSAOKernelSampleCount;
+    float SSAOKernelRadius;
+    float SSAOContribution;
+    float SSAORangeCheck;
+    u32 SSAOFilterType;
+    
+    float GaussianBlur5[25];
+    float GaussianBlur3[9];
+    float BoxBlur3;
+    float BoxBlur5; 
     
     b32 FogEnabled;
     float FogDensity;
@@ -763,6 +799,7 @@ inline void PushGlyph(render_state* State,
 inline void PushMesh(render_state* State,
                      mesh_info* Mesh,
                      m44 Transform,
+                     v3 Color = V3(1.0f, 0.0f, 1.0f),
                      material_info* Material = 0,
                      m44* BoneTransforms = 0,
                      int BoneCount = 0)
@@ -773,7 +810,7 @@ inline void PushMesh(render_state* State,
     entry->Mesh = Mesh;
     entry->BoneCount = BoneCount;
     entry->BoneTransforms = BoneTransforms;
-    entry->AlbedoColor = V3(1.0f, 1.0f, 1.0f);
+    entry->AlbedoColor = Color;
     entry->Material = Material;
     entry->Transform = Transform;
 }
@@ -782,7 +819,8 @@ inline void PushMesh(render_state* State,
                      mesh_info* Mesh,
                      v3 P,
                      quat R,
-                     v3 S)
+                     v3 S,
+                     v3 Color = V3(1.0f, 0.0f, 1.0f))
 {
     m44 Matrix = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
     PushMesh(State, Mesh, Matrix);

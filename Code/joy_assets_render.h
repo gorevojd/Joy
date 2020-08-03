@@ -1,7 +1,7 @@
 #ifndef JOY_ASSETS_RENDER_H
 #define JOY_ASSETS_RENDER_H
 
-inline bmp_info* PushOrLoadBitmap(assets* Assets, 
+inline bmp_info* PushOrLoadBitmap(asset_system* Assets, 
                                   render_state* State,
                                   v2 P, v2 Dim,
                                   asset_id BmpID,
@@ -17,7 +17,7 @@ inline bmp_info* PushOrLoadBitmap(assets* Assets,
     return(Bmp);
 }
 
-inline bmp_info* PushOrLoadGlyph(assets* Assets, 
+inline bmp_info* PushOrLoadGlyph(asset_system* Assets, 
                                  render_state* State,
                                  v2 P, v2 Dim,
                                  asset_id BmpID, 
@@ -38,7 +38,7 @@ inline bmp_info* PushOrLoadGlyph(assets* Assets,
     return(Bmp);
 }
 
-inline mesh_info* PushOrLoadMesh(assets* Assets, 
+inline mesh_info* PushOrLoadMesh(asset_system* Assets, 
                                  render_state* State,
                                  asset_id MeshID,
                                  v3 P, quat R, v3 S,
@@ -53,7 +53,7 @@ inline mesh_info* PushOrLoadMesh(assets* Assets,
     return(Mesh);
 }
 
-inline mesh_info* PushOrLoadMesh(assets* Assets, 
+inline mesh_info* PushOrLoadMesh(asset_system* Assets, 
                                  render_state* State,
                                  asset_id MeshID,
                                  m44 Transformation,
@@ -68,7 +68,7 @@ inline mesh_info* PushOrLoadMesh(assets* Assets,
     return(Mesh);
 }
 
-inline model_info* PushModel(assets* Assets,
+inline model_info* PushModel(asset_system* Assets,
                              render_state* State,
                              model_info* Model,
                              v3 P, quat R, v3 S)
@@ -83,7 +83,7 @@ inline model_info* PushModel(assets* Assets,
                                              ASSET_IMPORT_DEFERRED);
         
         if(Skeleton){
-            asset_id CubeMeshID = GetFirst(Assets, GameAsset_Cube);
+            asset_id CubeMeshID = GetFirst(Assets, AssetEntry_Cube);
             
             for(int BoneIndex = 0;
                 BoneIndex < Skeleton->BoneCount;

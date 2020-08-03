@@ -86,9 +86,8 @@ void InitTaskDataPool(task_data_pool* Pool,
 
 
 // NOTE(Dima): Game stuff
-INTERNAL_FUNCTION game_mode* DescribeGameMode(game_state* Game, char* Name, 
-                                              game_mode_update_prototype* Update,
-                                              game_mode_endframe_prototype* EndFrame)
+game_mode* DescribeGameMode(game_state* Game, char* Name, 
+                            game_mode_update_prototype* Update)
 {
     ASSERT(Game->ModesCount < MAX_GAME_MODE_COUNT);
     
@@ -99,7 +98,6 @@ INTERNAL_FUNCTION game_mode* DescribeGameMode(game_state* Game, char* Name,
     CopyStrings(Result->Name, Name);
     
     Result->Update = Update;
-    Result->EndFrame = EndFrame;
     
     return(Result);
 }
@@ -121,7 +119,7 @@ INTERNAL_FUNCTION int FindGameMode(game_state* Game, char* ModeName){
     return(Result);
 }
 
-INTERNAL_FUNCTION void SetGameMode(game_state* Game, char* ModeName){
+void SetGameMode(game_state* Game, char* ModeName){
     int ModeIndex = FindGameMode(Game, ModeName);
     
     ASSERT(ModeIndex != -1);
@@ -151,8 +149,8 @@ void GameInit(game_state* Game, game_init_params Params){
     InitInput(Game->Input);
     
     // NOTE(Dima): Assets
-    Game->AssetMemory = {};
-    PushMemoryStruct(&Game->AssetMemory, assets, Game->Assets, Memory);
+    Game->AssetsMemory = {};
+    PushMemoryStruct(&Game->AssetsMemory, asset_system, Game->Assets, Memory);
     InitAssets(Game->Assets);
     
     // NOTE(Dima): Render
@@ -185,15 +183,8 @@ void GameInit(game_state* Game, game_init_params Params){
               Game->Input);
 #endif
     
-    // NOTE(Dima): Describing all game modes
-    DescribeGameMode(Game, "Title", TitleUpdate, 0);
-    DescribeGameMode(Game, "Main Menu", MainMenuUpdate, 0);
-    DescribeGameMode(Game, "Changing pictures", ChangingPicturesUpdate, 0);
-    DescribeGameMode(Game, "Test", TestUpdate, 0);
-    
-    SetGameMode(Game, "Test");
+    INIT_MODES_FUNC_NAME(Game);
 }
-
 
 INTERNAL_FUNCTION void UpdateGameInput(input_state* Input){
     DEBUGSetMenuDataSource(DebugMenu_Input, Input);
@@ -205,6 +196,8 @@ INTERNAL_FUNCTION void UpdateGameInput(input_state* Input){
     if(KeyWentDown(Input, Key_Escape)){
         Input->QuitRequested = true;
     }
+    
+    Platform.ProcessInput(Input);
 }
 
 void GameUpdate(game_state* Game, render_frame_info FrameInfo){
@@ -215,7 +208,6 @@ void GameUpdate(game_state* Game, render_frame_info FrameInfo){
         BLOCK_TIMING("Frame: Input");
         
         UpdateGameInput(Game->Input);
-        Platform.ProcessInput(Game->Input);
     }
     
     RenderBeginFrame(Game->Render);
@@ -237,8 +229,34 @@ void GameUpdate(game_state* Game, render_frame_info FrameInfo){
     }
     
 #if defined(JOY_INTERNAL)
+    if(KeyWentDown(Game->Input, Key_F1)){
+        if(KeyIsDown(Game->Input, Key_Shift))
+        {
+            if(Game->Render->SSAOFilterType == 0)
+            {
+                Game->Render->SSAOFilterType = RenderFilter_Count;
+            }
+            Game->Render->SSAOFilterType = (Game->Render->SSAOFilterType - 1) % RenderFilter_Count;
+        }
+        else 
+        {
+            Game->Render->SSAOFilterType = (Game->Render->SSAOFilterType + 1) % RenderFilter_Count;
+        }
+    }
+    
     if(KeyWentDown(Game->Input, Key_F2)){
-        Game->Render->ToShowBufferType = (Game->Render->ToShowBufferType + 1) % RenderShowBuffer_Count;
+        if(KeyIsDown(Game->Input, Key_Shift))
+        {
+            if(Game->Render->ToShowBufferType == 0)
+            {
+                Game->Render->ToShowBufferType = RenderShowBuffer_Count;
+            }
+            Game->Render->ToShowBufferType = (Game->Render->ToShowBufferType - 1) % RenderShowBuffer_Count;
+        }
+        else 
+        {
+            Game->Render->ToShowBufferType = (Game->Render->ToShowBufferType + 1) % RenderShowBuffer_Count;
+        }
     }
     
     {
@@ -269,14 +287,13 @@ void GameUpdate(game_state* Game, render_frame_info FrameInfo){
     }
 }
 
-void GameFree(game_state* Game){
-    
-    
+void GameFree(game_state* Game)
+{
     // NOTE(Dima): Freing all the memories :)
     Free(&Game->GuiMemory);
     Free(&Game->InputMemory);
     Free(&Game->RenderMemory);
-    Free(&Game->AssetMemory);
+    Free(&Game->AssetsMemory);
     Free(&Game->AnimMemory);
     Free(&Game->DEBUGMemory);
 }

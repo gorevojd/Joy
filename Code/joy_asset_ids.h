@@ -303,13 +303,13 @@ struct asset_file_header{
     u32 Version;
     
     /*
-    NOTE(dima): I store asset groups count here
+    NOTE(dima): I store asset entries count here
     because later i will want to make sure that
     the asset file that i load is actual and 
     wont contain new assets group types that we dont't 
     have in our game...
     */
-    u32 GroupsCount;
+    u32 EntriesCount;
     
     /*
     NOTE(Dima): Groups regions are written to file in one 
@@ -321,8 +321,8 @@ struct asset_file_header{
     // NOTE(Dima): Not counting zero asset
     u32 EffectiveAssetsCount;
     
-    u32 GroupsByteOffset;
-    u32 GroupsRegionsByteOffset;
+    u32 EntriesByteOffset;
+    u32 EntriesRegionsByteOffset;
     u32 LinesOffsetsByteOffset;
     u32 AssetLinesByteOffset;
 };
@@ -406,63 +406,64 @@ struct asset_tag{
     };
 };
 
-enum asset_group_type{
-    // NOTE(Dima): Bitmap array
-    GameAsset_FadeoutBmps,
-    
+enum asset_entries
+{
     // NOTE(Dima): Icons for GUI
-    GameAsset_CheckboxMark,
-    GameAsset_ChamomileIcon,
+    AssetEntry_CheckboxMark,
+    AssetEntry_ChamomileIcon,
     
     // NOTE(Dima): Generated sounds
-    GameAsset_SineTest,
+    Asset_SineTest,
     
     // NOTE(Dima): Mesh primitives
-    GameAsset_Cube,
-    GameAsset_Plane,
-    GameAsset_Sphere,
-    GameAsset_Cylynder,
+    AssetEntry_Cube,
+    AssetEntry_Plane,
+    AssetEntry_Sphere,
+    AssetEntry_Cylynder,
+    AssetEntry_UtahTeapot,
     
-    GameAsset_Model_Character,
-    GameAsset_Anim_Failure,
-    GameAsset_Anim_Fall,
-    GameAsset_Anim_Idle,
-    GameAsset_Anim_JumpUp,
-    GameAsset_Anim_Land,
-    GameAsset_Anim_Roll,
-    GameAsset_Anim_Run,
-    GameAsset_Anim_Sleep,
-    GameAsset_Anim_Success,
-    GameAsset_Anim_Talk,
-    GameAsset_Anim_Walk,
-    GameAsset_Anim_Die,
-    GameAsset_Anim_Attack,
-    GameAsset_Anim_TakeDamage,
-    GameAsset_Anim_Throw,
-    GameAsset_Model_TempForCounting,
+    AssetEntry_FadeoutBmps,
+    
+    AssetEntry_Model_Character,
+    AssetEntry_Anim_Failure,
+    AssetEntry_Anim_Fall,
+    AssetEntry_Anim_Idle,
+    AssetEntry_Anim_JumpUp,
+    AssetEntry_Anim_Land,
+    AssetEntry_Anim_Roll,
+    AssetEntry_Anim_Run,
+    AssetEntry_Anim_Sleep,
+    AssetEntry_Anim_Success,
+    AssetEntry_Anim_Talk,
+    AssetEntry_Anim_Walk,
+    AssetEntry_Anim_Die,
+    AssetEntry_Anim_Attack,
+    AssetEntry_Anim_TakeDamage,
+    AssetEntry_Anim_Throw,
+    AssetEntry_Model_TempForCounting,
     
     // NOTE(Dima): Animations
-    GameAsset_Man,
-    
-    // NOTE(Dima): Fonts
-    GameAsset_LiberationMono,
-    GameAsset_LilitaOne,
-    GameAsset_Inconsolata,
-    GameAsset_PFDIN,
-    GameAsset_MollyJackFont,
+    AssetEntry_Man,
     
     // NOTE(Dima): Typed assets
-    GameAsset_Type_Bitmap,
-    GameAsset_Type_Font,
-    GameAsset_Type_Glyph,
-    GameAsset_Type_Mesh,
-    GameAsset_Type_Material,
-    GameAsset_Type_BitmapArray,
-    GameAsset_Type_Skeleton,
-    GameAsset_Type_AnimationClip,
-    GameAsset_Type_NodeAnim,
+    AssetEntry_Type_Bitmap,
+    AssetEntry_Type_Font,
+    AssetEntry_Type_Glyph,
+    AssetEntry_Type_Mesh,
+    AssetEntry_Type_Material,
+    AssetEntry_Type_BitmapArray,
+    AssetEntry_Type_Skeleton,
+    AssetEntry_Type_AnimationClip,
+    AssetEntry_Type_NodeAnim,
     
-    GameAsset_Count,
+    // NOTE(Dima): Fonts
+    AssetEntry_LiberationMono,
+    AssetEntry_LilitaOne,
+    AssetEntry_Inconsolata,
+    AssetEntry_PFDIN,
+    AssetEntry_MollyJackFont,
+    
+    AssetEntry_Count,
 };
 
 #endif

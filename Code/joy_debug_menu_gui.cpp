@@ -754,7 +754,7 @@ DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Profile)){
 }
 
 DEBUG_MENU_GUI_FUNC_CALLBACK(DEBUG_MENU_GUI_FUNC_NAME(DebugMenu_Assets)){
-    assets* Assets = Gui->Assets;
+    asset_system* Assets = Gui->Assets;
     
     if(Assets){
         char CurBlockBuf[256];
