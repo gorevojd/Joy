@@ -19,15 +19,15 @@ INTERNAL_FUNCTION void InitLayerSentinels(mem_layer_entry* Entries,
 }
 
 void InitLayeredMem(layered_mem* Mem, 
-                    mem_region* Region,
+                    mem_arena* Arena,
                     u32* LayersSizes,
                     int LayersSizesCount)
 {
     *Mem = {};
     
-    Mem->Region = Region;;
-    Mem->LayersSentinels = PushArray(Region, mem_layer_entry, LayersSizesCount);
-    Mem->FreeSentinels = PushArray(Region, mem_layer_entry, LayersSizesCount);
+    Mem->Arena = Arena;;
+    Mem->LayersSentinels = PushArray(Arena, mem_layer_entry, LayersSizesCount);
+    Mem->FreeSentinels = PushArray(Arena, mem_layer_entry, LayersSizesCount);
     Mem->LayersCount = LayersSizesCount;
     
     
@@ -79,13 +79,13 @@ AllocateMemLayerEntry(layered_mem* MemLayered, u32 SizeToAllocate)
         
         if(Free->Next == Free){
             const int Count = 128;
-            mem_layer_entry* Pool = PushArray(MemLayered->Region, mem_layer_entry, Count);
+            mem_layer_entry* Pool = PushArray(MemLayered->Arena, mem_layer_entry, Count);
             
             for(int I = 0; I < Count; I++){
                 mem_layer_entry* Elem = &Pool[I];
                 
                 Elem->LayerSize = ResultLayerSize;
-                Elem->Data = PushSomeMem(MemLayered->Region, ResultLayerSize);
+                Elem->Data = PushSomeMem(MemLayered->Arena, ResultLayerSize);
                 Elem->LayerIndex = ResultLayerIndex;
                 
                 DLIST_INSERT_BEFORE(Elem, Free, Next, Prev);
@@ -115,9 +115,9 @@ INTERNAL_FUNCTION inline mem_entry* AllocateMemoryEntry(mem_box* box) {
 		//NOTE(dima): Allocating new entries array
 		int NewEntriesCount = 1200;
 		mem_entry* NewEntriesArray = PushArray(
-			box->Region,
-			mem_entry,
-			NewEntriesCount);
+                                               box->Arena,
+                                               mem_entry,
+                                               NewEntriesCount);
         
 		//NOTE(dima): Inserting new entries to freelist
 		for (int EntryIndex = 0;
@@ -156,8 +156,8 @@ INTERNAL_FUNCTION inline mem_entry* AllocateMemoryEntry(mem_box* box) {
 }
 
 INTERNAL_FUNCTION inline void DeallocateMemoryEntry(
-mem_box* box,
-mem_entry* to)
+                                                    mem_box* box,
+                                                    mem_entry* to)
 {
 	to->NextAlloc->PrevAlloc = to->PrevAlloc;
 	to->PrevAlloc->NextAlloc = to->NextAlloc;
@@ -208,9 +208,9 @@ struct split_entries_result{
  requested memory size
 */
 INTERNAL_FUNCTION split_entries_result SplitMemoryEntry(
-mem_box* box,
-mem_entry* toSplit,
-u32 SplitOffset)
+                                                        mem_box* box,
+                                                        mem_entry* toSplit,
+                                                        u32 SplitOffset)
 {
 	/*
   NOTE(dima): If equal then second block will be 0 bytes,
@@ -261,9 +261,9 @@ u32 SplitOffset)
  contatains merged block.
 */
 INTERNAL_FUNCTION mem_entry* MergeMemoryEntries(
-mem_box* box, 
-mem_entry* First,
-mem_entry* Second) 
+                                                mem_box* box, 
+                                                mem_entry* First,
+                                                mem_entry* Second) 
 {
 	Assert(First->Next == Second);
     
@@ -278,9 +278,9 @@ mem_entry* Second)
 }
 
 mem_entry* AllocateMemoryFromBox(
-mem_box* box,
-u32 RequestMemorySize,
-u32 Align)
+                                 mem_box* box,
+                                 u32 RequestMemorySize,
+                                 u32 Align)
 {
 	mem_entry* Result = 0;
     
@@ -370,7 +370,7 @@ void ReleaseMemoryFromBox(mem_box* box, mem_entry* memEntry) {
     PushToReleasedList(box, memEntry);
 }
 
-mem_box InitMemoryBox(mem_region* Region, u32 BoxSizeInBytes){
+mem_box InitMemoryBox(mem_arena* Arena, u32 BoxSizeInBytes){
     
     mem_box Result = {};
     
@@ -383,14 +383,14 @@ mem_box InitMemoryBox(mem_region* Region, u32 BoxSizeInBytes){
     Result.Use.Next = &Result.Use;
     Result.Use.Prev = &Result.Use;
     
-    Result.Region = Region;
+    Result.Arena = Arena;
     
     Result.First = AllocateMemoryEntry(&Result);
     Result.First->Next = 0;
     Result.First->Prev = 0;
     Result.First->NextReleased = 0;
     Result.First->PrevReleased = 0;
-    Result.First->_InternalData = PushSomeMem(Region, BoxSizeInBytes, 16);
+    Result.First->_InternalData = PushSomeMem(Arena, BoxSizeInBytes, 16);
     Result.First->_InternalDataSize = BoxSizeInBytes;
     Result.First->State = MemoryEntry_Released;
     Result.FirstReleased = Result.First;

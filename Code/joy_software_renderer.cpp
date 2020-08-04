@@ -1,8 +1,8 @@
 #include "joy_software_renderer_functions.cpp"
 
 void SoftwareRenderStackToOutput(render_state* Render, bmp_info* buf, rc2 clipRect){
-    u8* At = (u8*)Render->StackRegion.CreationBlock.Base;
-	u8* RenderEnd = (u8*)Render->StackRegion.CreationBlock.Base + Render->StackRegion.CreationBlock.Used;
+    u8* At = (u8*)Render->StackArena.CreationBlock.Base;
+	u8* RenderEnd = (u8*)Render->StackArena.CreationBlock.Base + Render->StackArena.CreationBlock.Used;
     
 	while (At < RenderEnd) {
         render_entry_header* header = (render_entry_header*)At;

@@ -178,7 +178,7 @@ struct win_state{
     int WindowHeight;
     b32 ToggledFullscreen;
     
-    std::vector<std::string> LoadedStringsHolder;
+    //std::vector<std::string> LoadedStringsHolder;
     b32 InListFilesBlock;
     
     b32 OpenFilesNextFound;

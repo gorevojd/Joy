@@ -53,7 +53,7 @@ INTERNAL_FUNCTION void AddBitmapToAtlas(Asset_Atlas* atlas,
     atlas->MaxInRowHeight = Max(atlas->MaxInRowHeight, ActualHeight);
 }
 
-INTERNAL_FUNCTION Asset_Atlas InitAtlas(mem_region* Region, int Dim){
+INTERNAL_FUNCTION Asset_Atlas InitAtlas(mem_arena* Region, int Dim){
     Asset_Atlas atlas = {};
     
     mi LargeAtlasMemNeeded = Dim * Dim * 4;
@@ -389,7 +389,7 @@ void ImportAssetDirectly(asset_system* Assets,
                          asset* Asset, 
                          void* Data, 
                          u64 DataSize,
-                         mem_region* TempStorageBlock)
+                         mem_arena* TempStorageBlock)
 {
     asset_header* Header = &Asset->Header;
     asset_file_source* FileSource = Asset->FileSource;
@@ -482,7 +482,8 @@ void ImportAssetDirectly(asset_system* Assets,
             Result->KerningPairs = KerningPairs;
         }break;
         
-        case AssetType_Model:{
+        case AssetType_Model:
+        {
             model_info* Result = GET_ASSET_PTR_MEMBER(Asset, model_info);
             asset_model* Src = &Header->Model;
             
@@ -494,7 +495,6 @@ void ImportAssetDirectly(asset_system* Assets,
                 
                 IntegrateIDs(Result->MeshIDs, Src->MeshCount, FileSource);
             }
-            
             
             Result->MaterialIDs = 0;
             if(Src->MaterialCount){
@@ -543,7 +543,8 @@ void ImportAssetDirectly(asset_system* Assets,
             }
         }break;
         
-        case AssetType_NodeAnimation:{
+        case AssetType_NodeAnimation:
+        {
             node_animation* NodeAnim = GET_ASSET_PTR_MEMBER(Asset, node_animation);
             asset_node_animation* Src = &Header->NodeAnim;
             
@@ -601,7 +602,8 @@ void ImportAssetDirectly(asset_system* Assets,
             
         }break;
         
-        case AssetType_AnimationClip:{
+        case AssetType_AnimationClip:
+        {
             animation_clip* Clip = GET_ASSET_PTR_MEMBER(Asset, animation_clip);
             asset_animation_clip* Src = &Header->AnimationClip;
             
@@ -618,7 +620,8 @@ void ImportAssetDirectly(asset_system* Assets,
             }
         }break;
         
-        case AssetType_Skeleton:{
+        case AssetType_Skeleton:
+        {
             skeleton_info* Result = GET_ASSET_PTR_MEMBER(Asset, skeleton_info);
             asset_skeleton* Src = &Header->Skeleton;
             
@@ -651,9 +654,9 @@ PLATFORM_CALLBACK(ImportAssetCallback){
     asset* Asset = CallbackData->Asset;
     asset_system* Assets = CallbackData->Assets;
     
-    mem_region TempRegion = CreateInRestOfRegion(&CallbackData->Task->Region);
+    mem_arena TempArena = CreateInRestOfRegion(&CallbackData->Task->Arena);
     
-    ImportAssetDirectly(Assets, Asset, DestData, DataSize, &TempRegion);
+    ImportAssetDirectly(Assets, Asset, DestData, DataSize, &TempArena);
     
     EndTaskData(&Assets->ImportTasksPool, CallbackData->Task);
 }
@@ -684,7 +687,7 @@ void ImportAsset(asset_system* Assets, asset* Asset, b32 Immediate){
             task_data* TempTask = BeginTaskData(&Assets->ImportTaskPoolMainThread);
             Assert(TempTask);
             
-            ImportAssetDirectly(Assets, Asset, Data, DataSize, &TempTask->Region);
+            ImportAssetDirectly(Assets, Asset, Data, DataSize, &TempTask->Arena);
             
             EndTaskData(&Assets->ImportTaskPoolMainThread, TempTask);
         }
@@ -692,7 +695,7 @@ void ImportAsset(asset_system* Assets, asset* Asset, b32 Immediate){
             task_data* Task = BeginTaskData(&Assets->ImportTasksPool);
             
             if(Task){
-                import_asset_callback_data* CallbackData = PushStruct(&Task->Region, import_asset_callback_data);
+                import_asset_callback_data* CallbackData = PushStruct(&Task->Arena, import_asset_callback_data);
                 
                 // TODO(Dima): Change this
                 // TODO(Dima): For small sizes use layered allocator
@@ -898,7 +901,7 @@ INTERNAL_FUNCTION void InitAssets(asset_system* Assets)
     
     InitCorrespondingEntries(Assets);
     
-    mem_region AssetInitMem = {};
+    mem_arena AssetInitMem = {};
     
     // NOTE(Dima): Init first null asset
     Assets->AssetBlocks[0].BlockAssets = PushArray(Assets->Memory, asset, MAX_ASSETS_IN_ASSET_BLOCK);

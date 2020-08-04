@@ -582,7 +582,7 @@ static void InitExtColors(Color_State* colorState) {
 
 
 
-void InitColorsState(Color_State* state, mem_region* colorsMemory) {
+void InitColorsState(Color_State* state, mem_arena* colorsMemory) {
     
     state->colorsMem = colorsMemory;
     

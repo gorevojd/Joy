@@ -215,14 +215,14 @@ GenerateSphereDistribution(
     return(Result);
 }
 
-INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
+INTERNAL_FUNCTION void ShowSphereDistributions(asset_system* Assets,
                                                render_state* Render,
                                                sphere_distribution* Distr,
                                                u32 SphereID,
                                                v3 SphereCenter, 
                                                float SphereRad)
 {
-    PushOrLoadMesh(Game->Assets, Render, 
+    PushOrLoadMesh(Assets, Render, 
                    SphereID, 
                    SphereCenter, 
                    QuatI(), 
@@ -235,8 +235,8 @@ INTERNAL_FUNCTION void ShowSphereDistributions(game_state* Game,
     {
         v3 TargetP = SphereCenter + Distr->Samples[SampleIndex] * SphereRad;
         
-        PushOrLoadMesh(Game->Assets, Render, 
-                       GetFirst(Game->Assets, AssetEntry_Cube),
+        PushOrLoadMesh(Assets, Render, 
+                       GetFirst(Assets, AssetEntry_Cube),
                        TargetP, 
                        QuatI(), 
                        V3(0.05f),
@@ -644,8 +644,12 @@ GAME_MODE_UPDATE(TestUpdate){
     
     GAME_GET_MODE_STATE(test_game_mode_state, State);
     
-    render_state* Render = Game->Render;
     asset_system* Assets = Game->Assets;
+    anim_system* Anim = Game->Anim;
+    
+    render_state* Render = TempState->Render;
+    input_state* Input = TempState->Input;
+    gui_state* Gui = TempState->Gui;
     
     if(!State->Initialized){
         
@@ -659,8 +663,8 @@ GAME_MODE_UPDATE(TestUpdate){
         
         int SphereDistributionsmaxCount = 1024;
         
-        State->SphereDistributionsTrig = PushArray(&Mode->Memory, v3, SphereDistributionsmaxCount);
-        State->SphereDistributionsFib = PushArray(&Mode->Memory, v3, SphereDistributionsmaxCount);
+        State->SphereDistributionsTrig = PushArray(&Mode->Arena, v3, SphereDistributionsmaxCount);
+        State->SphereDistributionsFib = PushArray(&Mode->Arena, v3, SphereDistributionsmaxCount);
         
         State->SphereDistributionTrig = GenerateSphereDistribution(GenTrigonometricSphereDistributions,
                                                                    SphereDistributionsmaxCount,
@@ -670,9 +674,9 @@ GAME_MODE_UPDATE(TestUpdate){
                                                                   SphereDistributionsmaxCount,
                                                                   State->SphereDistributionsFib);
         
-        State->PlayerControl = InitPlayerControl(Game->Anim, Game->Assets, "PlayerControl");
-        State->FriendControl = InitFriendControl(Game->Anim, Game->Assets, "FriendControl");
-        State->CaterpillarControl = InitCaterpillarControl(Game->Anim, Game->Assets, "CaterpillarControl");
+        State->PlayerControl = InitPlayerControl(Anim, Assets, "PlayerControl");
+        State->FriendControl = InitFriendControl(Anim, Assets, "FriendControl");
+        State->CaterpillarControl = InitCaterpillarControl(Anim, Assets, "CaterpillarControl");
         
 #if 0        
         model_info* PlayerInfo = GET_ASSET_DATA_BY_ID(model_info, AssetType_Model, 
@@ -695,7 +699,7 @@ GAME_MODE_UPDATE(TestUpdate){
             
             int CharType = CharIndex % 11;
             
-            InitCharacter(Game->Assets, 
+            InitCharacter(Assets, 
                           Char,
                           CharType,
                           State->FriendControl,
@@ -706,7 +710,7 @@ GAME_MODE_UPDATE(TestUpdate){
                           false);
         }
         
-        InitCharacter(Game->Assets, &State->Caterpillar,
+        InitCharacter(Assets, &State->Caterpillar,
                       TagCharacter_Caterpillar,
                       State->CaterpillarControl,
                       V3(-10.0f, 10.0f, 10.0f), 
@@ -717,7 +721,7 @@ GAME_MODE_UPDATE(TestUpdate){
         State->Initialized = true;
     }
     
-    f64 DeltaTime = Game->Render->FrameInfo.dt;
+    f64 DeltaTime = Render->FrameInfo.dt;
     State->GameDeltaTime = DeltaTime * State->WorldSpeedUp;
     State->GameTime += DeltaTime * State->WorldSpeedUp;
     
@@ -726,18 +730,18 @@ GAME_MODE_UPDATE(TestUpdate){
     
     float CamSpeed = State->CameraSpeed;
     
-    if(KeyIsDown(Game->Input, Key_Shift)){
+    if(KeyIsDown(Input, Key_Shift)){
         CamSpeed *= 8.0f;
     }
     
-    if(KeyIsDown(Game->Input, Key_Space)){
+    if(KeyIsDown(Input, Key_Space)){
         CamSpeed *= 10.0f;
     }
     
-    float DeltaMouseX = GetMoveAxis(Game->Input, MoveAxis_MouseX) * State->MouseSencitivity;
-    float DeltaMouseY = GetMoveAxis(Game->Input, MoveAxis_MouseY) * State->MouseSencitivity;
+    float DeltaMouseX = GetMoveAxis(Input, MoveAxis_MouseX) * State->MouseSencitivity;
+    float DeltaMouseY = GetMoveAxis(Input, MoveAxis_MouseY) * State->MouseSencitivity;
     
-    if(Game->Input->CapturingMouse){
+    if(Input->CapturingMouse){
         
         UpdateCameraRotation(Camera, 
                              -DeltaMouseY, 
@@ -745,7 +749,7 @@ GAME_MODE_UPDATE(TestUpdate){
                              0.0f);
     }
     
-    v3 MoveVector = GetMoveVector(Game->Input, -1);
+    v3 MoveVector = GetMoveVector(Input, -1);
     
     m33 CamTransform = (Quat2M33(Camera->Rotation));
     v3 AccVector = MoveVector * CamTransform * CamSpeed;
@@ -763,8 +767,8 @@ GAME_MODE_UPDATE(TestUpdate){
     m44 CameraTransform = GetCameraMatrix(Camera);
     
     
-    int Width = Game->Render->FrameInfo.InitWidth;
-    int Height = Game->Render->FrameInfo.InitHeight;
+    int Width = Render->FrameInfo.InitWidth;
+    int Height = Render->FrameInfo.InitHeight;
     
     render_camera_setup CamSetup = DefaultPerspSetup(Render, CameraTransform);
     
@@ -778,92 +782,92 @@ GAME_MODE_UPDATE(TestUpdate){
                   Camera->P.y,
                   Camera->P.z);
     
-    ShowText(Game->Gui, CameraInfo);
+    ShowText(Gui, CameraInfo);
     
     char MouseInfo[256];
     stbsp_sprintf(MouseInfo,
                   "Delta mouse X: %.2f", 
                   DeltaMouseX);
-    ShowText(Game->Gui, MouseInfo);
+    ShowText(Gui, MouseInfo);
     stbsp_sprintf(MouseInfo, 
                   "Delta mouse Y: %.2f",
                   DeltaMouseY);
-    ShowText(Game->Gui, MouseInfo);
+    ShowText(Gui, MouseInfo);
     
     static float FindSphereQuality = 0.5f;
-    SliderFloat(Game->Gui, 
+    SliderFloat(Gui, 
                 &FindSphereQuality, 
                 0.0f, 1.0f,
                 "LOD");
     
-    SliderFloat(Game->Gui,
+    SliderFloat(Gui,
                 &State->WorldSpeedUp,
                 0.1f, 3.0f,
                 "World speedup");
     
-    SliderFloat(Game->Gui,
-                &Game->Render->FogGradient,
+    SliderFloat(Gui,
+                &Render->FogGradient,
                 0.1f, 10.0f,
                 "Fog gradient");
     
-    SliderFloat(Game->Gui,
-                &Game->Render->FogDensity,
+    SliderFloat(Gui,
+                &Render->FogDensity,
                 0.0f, 0.5f,
                 "Fog density");
     
     
-    SliderFloat(Game->Gui,
-                &Game->Render->FogColor.r,
+    SliderFloat(Gui,
+                &Render->FogColor.r,
                 0.0f, 1.0f,
                 "Fog color R");
     
-    SliderFloat(Game->Gui,
-                &Game->Render->FogColor.g,
+    SliderFloat(Gui,
+                &Render->FogColor.g,
                 0.0f, 1.0f,
                 "Fog color G");
     
-    SliderFloat(Game->Gui,
-                &Game->Render->FogColor.b,
+    SliderFloat(Gui,
+                &Render->FogColor.b,
                 0.0f, 1.0f,
                 "Fog color B");
     
-    BoolButtonOnOff(Game->Gui, "Fog enabled", &Game->Render->FogEnabled);
+    BoolButtonOnOff(Gui, "Fog enabled", &Render->FogEnabled);
     
-    SliderFloat(Game->Gui,
-                &Game->Render->SSAOKernelRadius,
+    SliderFloat(Gui,
+                &Render->SSAOKernelRadius,
                 0.2f, 1.5f,
                 "SSAO Kernel Radius");
     
-    SliderInt(Game->Gui,
-              &Game->Render->SSAOKernelSampleCount,
+    SliderInt(Gui,
+              &Render->SSAOKernelSampleCount,
               1, SSAO_KERNEL_MAX_SIZE,
               "SSAO Kernel Samples");
     
-    SliderFloat(Game->Gui,
-                &Game->Render->SSAOContribution,
+    SliderFloat(Gui,
+                &Render->SSAOContribution,
                 0.01f, 1.0f,
                 "SSAO Contrib");
     
-    SliderFloat(Game->Gui,
-                &Game->Render->SSAORangeCheck,
+    SliderFloat(Gui,
+                &Render->SSAORangeCheck,
                 0.01f, 10.0f,
                 "SSAO Range check");
     
-    BeginRow(Game->Gui);
-    ShowText(Game->Gui, "SSAO Filter");
-    ShowText(Game->Gui, (char*)Game->Render->FilterNames[Game->Render->SSAOFilterType]);
-    EndRow(Game->Gui);
+    BeginRow(Gui);
+    ShowText(Gui, "SSAO Filter");
+    ShowText(Gui, (char*)Render->FilterNames[Render->SSAOFilterType]);
+    EndRow(Gui);
     
     u32 FindTagTypes[1] = {AssetTag_LOD};
     asset_tag_value FindTagValues[1] = {FindSphereQuality};
     
-    u32 SphereID = GetBestByTags(Game->Assets,
+    u32 SphereID = GetBestByTags(Assets,
                                  AssetEntry_Sphere,
                                  FindTagTypes,
                                  FindTagValues,
                                  1);
     
-    u32 CylID = GetBestByTags(Game->Assets,
+    u32 CylID = GetBestByTags(Assets,
                               AssetEntry_Cylynder,
                               FindTagTypes,
                               FindTagValues,
@@ -926,7 +930,7 @@ GAME_MODE_UPDATE(TestUpdate){
                 V3(1.2f, 0.0f, 0.0f) * InLayerIndex;
             
             
-            PushOrLoadMesh(Game->Assets, Stack, 
+            PushOrLoadMesh(Assets, Stack, 
                            SphereID,
                            SphereP, QuatI(), V3(1.0f),
                            ASSET_IMPORT_DEFERRED);
@@ -935,13 +939,13 @@ GAME_MODE_UPDATE(TestUpdate){
 #endif
     
     f32 VelocityLen = 0.0f;
-    if(KeyIsDown(Game->Input, Key_Space)){
+    if(KeyIsDown(Input, Key_Space)){
         VelocityLen = 1.0f;
     }
     
 #if 0    
-    State->PlayerModel = LoadModel(Game->Assets,
-                                   GetFirst(Game->Assets, AssetEntry_Man),
+    State->PlayerModel = LoadModel(Assets,
+                                   GetFirst(Assets, AssetEntry_Man),
                                    ASSET_IMPORT_DEFERRED);
     
     if(State->PlayerModel){
@@ -973,17 +977,17 @@ GAME_MODE_UPDATE(TestUpdate){
         CharIndex < TEMP_CHARACTERS_COUNT;
         CharIndex++)
     {
-        UpdateCharacter(Game->Assets,
+        UpdateCharacter(Assets,
                         Render,
-                        Game->Input,
+                        Input,
                         &State->Characters[CharIndex],
                         State->GameTime,
                         State->GameDeltaTime);
     }
     
-    UpdateCharacter(Game->Assets,
+    UpdateCharacter(Assets,
                     Render,
-                    Game->Input,
+                    Input,
                     &State->Caterpillar,
                     State->GameTime,
                     State->GameDeltaTime);
@@ -1015,7 +1019,7 @@ GAME_MODE_UPDATE(TestUpdate){
             v3 P = V3(-(float)RowIndex, 0.0f, (float)ColIndex);
             
             model_info* Model = LoadModel(Assets, 
-                                          GetFirst(Game->Assets, AssetEntry_UtahTeapot), 
+                                          GetFirst(Assets, AssetEntry_UtahTeapot), 
                                           ASSET_IMPORT_DEFERRED);
             
             obj_transform Transform;
@@ -1048,8 +1052,8 @@ GAME_MODE_UPDATE(TestUpdate){
     {
         v3 TargetP = SphereCenter + Render->SSAOKernelSamples[SampleIndex] * SphereRad;
         
-        PushOrLoadMesh(Game->Assets, Render, 
-                       GetFirst(Game->Assets, AssetEntry_Cube),
+        PushOrLoadMesh(Assets, Render, 
+                       GetFirst(Assets, AssetEntry_Cube),
                        TargetP, 
                        QuatI(), 
                        V3(0.05f),
@@ -1059,39 +1063,39 @@ GAME_MODE_UPDATE(TestUpdate){
 #endif
     
 #if 1
-    PushOrLoadMesh(Game->Assets, Render, 
-                   GetFirst(Game->Assets, AssetEntry_Cube),
-                   V3(5.0f, 1.0f + Sin(Game->Input->Time * 2.0f) * 0.5f, 0.0f), 
+    PushOrLoadMesh(Assets, Render, 
+                   GetFirst(Assets, AssetEntry_Cube),
+                   V3(5.0f, 1.0f + Sin(Input->Time * 2.0f) * 0.5f, 0.0f), 
                    QuatI(), V3(1.0f), 
                    ASSET_IMPORT_DEFERRED);
     
-    PushOrLoadMesh(Game->Assets, Render, 
-                   GetFirst(Game->Assets, AssetEntry_Cube),
-                   V3(0.0f, 1.0f + Sin(Game->Input->Time * 3.0f) * 0.5f, 0.0f), 
+    PushOrLoadMesh(Assets, Render, 
+                   GetFirst(Assets, AssetEntry_Cube),
+                   V3(0.0f, 1.0f + Sin(Input->Time * 3.0f) * 0.5f, 0.0f), 
                    QuatI(), V3(1.0f), 
                    ASSET_IMPORT_DEFERRED);
     
-    PushOrLoadMesh(Game->Assets, Render, 
+    PushOrLoadMesh(Assets, Render, 
                    CylID,
                    V3(-10.0f, 1.0f, 0.0f), 
-                   Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), V3(2.0f),
+                   Quat(V3(1.0f, 0.0f, 0.0f), Input->Time), V3(2.0f),
                    ASSET_IMPORT_DEFERRED);
     
     
-    PushOrLoadMesh(Game->Assets, Render, 
-                   GetFirst(Game->Assets, AssetEntry_Cylynder),
+    PushOrLoadMesh(Assets, Render, 
+                   GetFirst(Assets, AssetEntry_Cylynder),
                    V3(-13.0f, 1.0f, 0.0f),
-                   Quat(V3(1.0f, 0.0f, 0.0f), Game->Input->Time), 
+                   Quat(V3(1.0f, 0.0f, 0.0f), Input->Time), 
                    V3(1.0f), 
                    ASSET_IMPORT_DEFERRED);
     
-    PushOrLoadMesh(Game->Assets, Render, 
-                   SphereID,V3(0.0f, 1.0f + Sin(Game->Input->Time * 4.0f), 5.0f), 
+    PushOrLoadMesh(Assets, Render, 
+                   SphereID,V3(0.0f, 1.0f + Sin(Input->Time * 4.0f), 5.0f), 
                    QuatI(), V3(1.0f),
                    ASSET_IMPORT_DEFERRED);
     
-    PushOrLoadMesh(Game->Assets, Render, 
-                   GetFirst(Game->Assets, AssetEntry_Plane),
+    PushOrLoadMesh(Assets, Render, 
+                   GetFirst(Assets, AssetEntry_Plane),
                    V3(0.0f, 0.0f, 0.0f), 
                    QuatI(), V3(100.0f),
                    ASSET_IMPORT_DEFERRED);
@@ -1103,17 +1107,17 @@ GAME_MODE_UPDATE(TestUpdate){
 GAME_MODE_UPDATE(ChangingPicturesUpdate){
     GAME_GET_MODE_STATE(image_swapper_state, State);
     
-    render_state* Render = Game->Render;
+    render_state* Render = TempState->Render;
     asset_system* Assets = Game->Assets;
     
-    asset_id ArrID = GetFirst(Game->Assets, AssetEntry_FadeoutBmps);
-    asset* Asset = GetAssetByID(Game->Assets, ArrID);
+    asset_id ArrID = GetFirst(Assets, AssetEntry_FadeoutBmps);
+    asset* Asset = GetAssetByID(Assets, ArrID);
     ASSERT(Asset->Type == AssetType_Array);
     
     array_info* Arr = GET_ASSET_PTR_MEMBER(Asset, array_info);
     
     
-    render_camera_setup CamSetup = DefaultOrthoSetup(Game->Render, Identity());
+    render_camera_setup CamSetup = DefaultOrthoSetup(Render, Identity());
     
     //BeginRenderPass(Render, CamSetup);
     
@@ -1135,11 +1139,11 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     u32 ToShowID = Arr->FirstID + State->ShowIndex;
     u32 ToShowNextID = Arr->FirstID + State->ShowNextIndex;
     
-    bmp_info* ToShow = LoadBmp(Game->Assets, ToShowID, ASSET_IMPORT_DEFERRED);
-    bmp_info* ToShowNext = LoadBmp(Game->Assets, ToShowNextID, ASSET_IMPORT_DEFERRED);
+    bmp_info* ToShow = LoadBmp(Assets, ToShowID, ASSET_IMPORT_DEFERRED);
+    bmp_info* ToShowNext = LoadBmp(Assets, ToShowNextID, ASSET_IMPORT_DEFERRED);
     
-    int Width = Game->Render->FrameInfo.Width;
-    int Height = Game->Render->FrameInfo.Height;
+    int Width = Render->FrameInfo.Width;
+    int Height = Render->FrameInfo.Height;
     
     float FadeoutAlpha = Clamp01((State->TimeSinceShow - State->ShowTime) / State->FadeoutTime);
     
@@ -1168,7 +1172,7 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
                    V4(1.0f, 1.0f, 1.0f, FadeoutAlpha));
     }
     
-    State->TimeSinceShow += Game->Render->FrameInfo.dt * State->ShowSpeed;
+    State->TimeSinceShow += Render->FrameInfo.dt * State->ShowSpeed;
     if(State->TimeSinceShow > State->ShowTime + State->FadeoutTime){
         State->ShowIndex = State->ShowNextIndex;
         State->ShowNextIndex = (State->ShowIndex + 1) % ToShowCount;

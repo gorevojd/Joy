@@ -1,5 +1,5 @@
 // NOTE(Dima): Returns newly pushed window array
-INTERNAL_FUNCTION Gui_Window* GuiGrowWindowFreePool(gui_state* Gui, mem_region* mem,  int count){
+INTERNAL_FUNCTION Gui_Window* GuiGrowWindowFreePool(gui_state* Gui, mem_arena* mem,  int count){
     Gui_Window* windowFreePoolArray = PushArray(mem, Gui_Window, count);
     
     for(int index = 0; 
@@ -70,7 +70,7 @@ INTERNAL_FUNCTION gui_element* GuiAllocateElement(
     
     if(DLIST_FREE_IS_EMPTY(Gui->FreeSentinel, NextAlloc)){
         const int count = 128;
-        gui_element* elemPoolArray = PushArray(Gui->Mem, gui_element, count);
+        gui_element* elemPoolArray = PushArray(Gui->Arena, gui_element, count);
         
         for(int index = 0; 
             index < count;
@@ -318,7 +318,7 @@ INTERNAL_FUNCTION Gui_Window* GuiAllocateWindows(gui_state* Gui, int count)
     
     int toAllocateCount = Max(128, count - canAllocateCount);
     if(!canAllocateArray){
-        GuiGrowWindowFreePool(Gui, Gui->Mem, toAllocateCount);
+        GuiGrowWindowFreePool(Gui, Gui->Arena, toAllocateCount);
     }
     
     // NOTE(Dima): Return list shoud be empty before return
@@ -449,7 +449,7 @@ void InitGui(gui_state* Gui,
     DLIST_REFLECT_PTRS(Gui->windowUseSentinel, NextAlloc, PrevAlloc);
     DLIST_REFLECT_PTRS(Gui->windowFreeSentinel, NextAlloc, PrevAlloc);
     
-    GuiGrowWindowFreePool(Gui, Gui->Mem, 128);
+    GuiGrowWindowFreePool(Gui, Gui->Arena, 128);
     
     // NOTE(Dima): Init window sentinel for returning windows
     // NOTE(Dima): as list when we allocate multiple of them.
@@ -475,7 +475,7 @@ void InitGui(gui_state* Gui,
     Gui->CurElement = Gui->RootElement;
     
     // NOTE(Dima): Initializing colors
-    InitColorsState(&Gui->colorState, Gui->Mem);
+    InitColorsState(&Gui->colorState, Gui->Arena);
     Gui->colors[GuiColor_Text] = GUI_GETCOLOR_COLSYS(Color_White);
     Gui->colors[GuiColor_Borders] = GUI_GETCOLOR_COLSYS(Color_Black);
     Gui->colors[GuiColor_SliderValue] = GUI_GETCOLOR_COLSYS(Color_DarkMagenta);
@@ -987,7 +987,7 @@ void BeginLayout(gui_state* Gui, char* name, u32 layoutType, v2* P, v2* Dim){
     }
     
     if(!FoundLayout){
-        FoundLayout = PushStruct(Gui->Mem, gui_layout);
+        FoundLayout = PushStruct(Gui->Arena, gui_layout);
         
         CopyStringsSafe(FoundLayout->Name, sizeof(FoundLayout->Name), name);
         FoundLayout->ID = nameID;

@@ -310,7 +310,7 @@ inline int GetPrevPlayingIndex(int Index){
 }
 
 struct anim_system{
-    mem_region* Region;
+    mem_arena* Arena;
     
     random_generation Random;
     

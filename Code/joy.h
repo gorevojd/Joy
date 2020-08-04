@@ -17,7 +17,7 @@ struct task_data{
     task_data* Next;
     task_data* Prev;
     
-    mem_region Region;
+    mem_arena Arena;
 };
 
 struct task_data_pool{
@@ -32,7 +32,7 @@ struct task_data_pool{
     task_data FreeSentinel;
 };
 
-struct game_init_params{
+struct init_params{
     int InitWindowWidth;
     int InitWindowHeight;
 };
@@ -52,7 +52,7 @@ struct game_init_params{
 #define GAME_GET_MODE_STATE(state_type, state_var_name) \
 state_type* state_var_name = (state_type*)Mode->ModeState;\
 if(!state_var_name){\
-state_var_name = PushStruct(&Mode->Memory, state_type);\
+state_var_name = PushStruct(&Mode->Arena, state_type);\
 Mode->ModeState = state_var_name;\
 }
 
@@ -64,51 +64,66 @@ typedef INIT_MODES(init_modes);
 
 INIT_MODES(INIT_MODES_FUNC_NAME);
 
-#define GAME_MODE_UPDATE(name) void name(struct game_state* Game, struct game_mode* Mode)
+#define GAME_MODE_UPDATE(name) void name(struct game_state* Game, struct temp_state* TempState, struct game_mode* Mode)
 typedef GAME_MODE_UPDATE(game_mode_update_prototype);
 
 struct game_mode{
     char Name[128];
     game_mode_update_prototype* Update;
     
-    mem_region Memory;
+    mem_arena Arena;
     
     void* ModeState;
     
     int NextModeIndex;
 };
 
-struct game_state{
-#define MAX_GAME_MODE_COUNT 128
-    game_mode Modes[MAX_GAME_MODE_COUNT];
-    int ModesCount;
-    
-    int CurrentModeIndex;
+struct temp_state
+{
+    mem_arena* Arena;
     
     // NOTE(Dima): Engine systems
-    mem_region GuiMemory;
-    mem_region InputMemory;
-    mem_region RenderMemory;
-    mem_region AssetsMemory;
-    mem_region AnimMemory;
+    mem_arena GuiMemory;
+    mem_arena InputMemory;
+    mem_arena RenderMemory;
 #if defined(JOY_INTERNAL)
-    mem_region DEBUGMemory;
+    mem_arena DEBUGMemory;
 #endif
     
     gui_state* Gui;
     input_state* Input;
     render_state* Render;
-    asset_system* Assets;
-    anim_system* Anim;
 #if defined(JOY_INTERNAL)
     debug_state* DEBUG;
 #endif
 };
 
+struct game_state
+{
+    mem_arena* Arena;
+    
+    mem_arena AssetsMemory;
+    mem_arena AnimMemory;
+    
+    asset_system* Assets;
+    anim_system* Anim;
+    
+#define MAX_GAME_MODE_COUNT 128
+    game_mode Modes[MAX_GAME_MODE_COUNT];
+    int ModesCount;
+    
+    int CurrentModeIndex;
+};
+
 // NOTE(Dima): Game API
-void GameInit(game_state* Game, game_init_params Params);
-void GameUpdate(game_state* Game, render_frame_info FrameInfo);
-void GameFree(game_state* Game);
+game_state* GameStateInit(mem_arena* Arena);
+temp_state* TempStateInit(mem_arena* Arena, 
+                          int InitWindowWidth,
+                          int InitWindowHeight,
+                          asset_system* Assets);
+void UpdateGameAndEngine(game_state* Game, temp_state* TempState, render_frame_info FrameInfo);
+void GameStateFree(game_state* Game);
+void TempStateFree(temp_state* TempState);
 
 // NOTE(Dima): API for modes abstraction
 game_mode* DescribeGameMode(game_state* Game, char* Name, game_mode_update_prototype* Update);
@@ -118,7 +133,7 @@ void SetGameMode(game_state* Game, char* ModeName);
 task_data* BeginTaskData(task_data_pool* Pool);
 void EndTaskData(task_data_pool* Pool, task_data* Task);
 void InitTaskDataPool(task_data_pool* Pool,
-                      mem_region* Region,
+                      mem_arena* Region,
                       int TasksDatasCount,
                       mi OneSize);
 

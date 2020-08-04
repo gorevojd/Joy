@@ -392,7 +392,7 @@ struct gui_state{
     int Width;
     int Height;
     
-    mem_region* Mem;
+    mem_arena* Arena;
     
     gui_interaction_ctx HotInteraction;
     gui_interaction_ctx ActiveInteraction;

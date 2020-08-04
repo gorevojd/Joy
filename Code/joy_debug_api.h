@@ -196,7 +196,7 @@ struct debug_menu{
 #define DEBUG_RECORD_INDEX_MASK 0x7FFFFFFF
 
 struct debug_global_table{
-    mem_region* Region;
+    mem_arena* Arena;
     
     void* MenuDataSources[DebugMenu_Count];
     

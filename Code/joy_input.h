@@ -260,7 +260,7 @@ struct input_controller{
 
 struct input_state{
     // NOTE(Dima): Put here for later usage
-    mem_region* Region;
+    mem_arena* Arena;
     
     keyboard_controller Keyboard;
     

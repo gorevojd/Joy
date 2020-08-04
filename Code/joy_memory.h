@@ -1,7 +1,7 @@
 #ifndef JOY_MEMORY_H
 #define JOY_MEMORY_H
 
-struct mem_region{
+struct mem_arena{
     mem_block_entry* Block;
     
     b32 CreatedInsideBlock;
@@ -21,15 +21,15 @@ struct mem_layer_entry{
 };
 
 struct layered_mem{
-    mem_region* Region;
+    mem_arena* Arena;
     
     mem_layer_entry* LayersSentinels;
     mem_layer_entry* FreeSentinels;
     int LayersCount;
 };
 
-inline void RegionSetGrowSize(mem_region* Region, u32 GrowSize){
-    Region->GrowSize = GrowSize;
+inline void RegionSetGrowSize(mem_arena* Arena, u32 GrowSize){
+    Arena->GrowSize = GrowSize;
 }
 
 enum memory_entry_state{
@@ -60,7 +60,7 @@ struct mem_entry{
 };
 
 struct mem_box{
-    mem_region* Region;
+    mem_arena* Arena;
     mem_entry Use;
     mem_entry Free;
     
@@ -92,16 +92,16 @@ inline mi HowMuchLeft(mem_block* Block){
     return(Result);
 }
 
-inline mi HowMuchLeft(mem_region* Region){
+inline mi HowMuchLeft(mem_arena* Arena){
     
     mi Result = 0;
     
-    if(Region->CreatedInsideBlock){
-        Result = HowMuchLeft(&Region->CreationBlock);
+    if(Arena->CreatedInsideBlock){
+        Result = HowMuchLeft(&Arena->CreationBlock);
     }
     else{
-        if(Region->Block){
-            Result = HowMuchLeft(&Region->Block->Block);
+        if(Arena->Block){
+            Result = HowMuchLeft(&Arena->Block->Block);
         }
         else{
             Result = 0;
@@ -118,8 +118,8 @@ inline mi AdvancePointerToAlign(void* Address, int Align){
     return(AlignedPos);
 }
 
-inline mem_region CreateInsideBlock(void* Base, mi Size){
-    mem_region Result = {};
+inline mem_arena CreateInsideBlock(void* Base, mi Size){
+    mem_arena Result = {};
     
     Result.CreatedInsideBlock = true;
     
@@ -130,15 +130,15 @@ inline mem_region CreateInsideBlock(void* Base, mi Size){
     return(Result);
 }
 
-inline mem_block* GetRegionBlock(mem_region* Region){
+inline mem_block* GetRegionBlock(mem_arena* Arena){
     mem_block* Block = 0;
     
-    if(Region->CreatedInsideBlock){
-        Block = &Region->CreationBlock;
+    if(Arena->CreatedInsideBlock){
+        Block = &Arena->CreationBlock;
     }
     else{
-        if(Region->Block){
-            Block = &Region->Block->Block;
+        if(Arena->Block){
+            Block = &Arena->Block->Block;
         }
         else{
             // NOTE(Dima): Need to allocate new block and set 
@@ -151,8 +151,8 @@ inline mem_block* GetRegionBlock(mem_region* Region){
     return(Block);
 }
 
-inline void* GetRegionBase(mem_region* Region){
-    mem_block* Block = GetRegionBlock(Region);
+inline void* GetRegionBase(mem_arena* Arena){
+    mem_block* Block = GetRegionBlock(Arena);
     
     void* Base = 0;
     if(Block){
@@ -162,9 +162,9 @@ inline void* GetRegionBase(mem_region* Region){
     return(Base);
 }
 
-inline mem_region CreateInRestOfRegion(mem_region* Region, mi Align = 8){
-    mi LeftInRegion = HowMuchLeft(Region);
-    void* Base = GetRegionBase(Region);
+inline mem_arena CreateInRestOfRegion(mem_arena* Arena, mi Align = 8){
+    mi LeftInRegion = HowMuchLeft(Arena);
+    void* Base = GetRegionBase(Arena);
     
     Assert(Base);
     
@@ -176,17 +176,17 @@ inline mem_region CreateInRestOfRegion(mem_region* Region, mi Align = 8){
     
     Assert(ActualLeft > 0);
     
-    mem_region Result = CreateInsideBlock(NewBase, ActualLeft);
+    mem_arena Result = CreateInsideBlock(NewBase, ActualLeft);
     
     return(Result);
 }
 
 #define MINIMUM_MEMORY_REGION_SIZE Mibibytes(1)
-inline void* PushSomeMem(mem_region* Region, mi Size, mi Align = 8){
+inline void* PushSomeMem(mem_arena* Arena, mi Size, mi Align = 8){
     void* Result = 0;
     
     b32 NeedNewBlock = false;
-    mem_block* Block = GetRegionBlock(Region);
+    mem_block* Block = GetRegionBlock(Arena);
     
     mi InitBlockUsed = 0;
     mi InitBlockBase = 0;
@@ -205,33 +205,33 @@ inline void* PushSomeMem(mem_region* Region, mi Size, mi Align = 8){
     mi ToAllocateSize = AdvancedByAlign + Size;
     mi NewUsedCount = InitBlockUsed + ToAllocateSize;
     
-    if((Region->CreatedInsideBlock == false) && Region->Block){
-        if(NewUsedCount > Region->Block->Block.Total){
+    if((Arena->CreatedInsideBlock == false) && Arena->Block){
+        if(NewUsedCount > Arena->Block->Block.Total){
             // NOTE(Dima): Need to allocate new block and set current
             // NOTE(Dima): block as old for new one.
             
             NeedNewBlock = true;
             
             // NOTE(Dima): Finding empty but not used blocks
-            while(Region->Block->Next != 0){
-                if(Size <= Region->Block->Block.Total){
+            while(Arena->Block->Next != 0){
+                if(Size <= Arena->Block->Block.Total){
                     NeedNewBlock = false;
                     
                     break;
                 }
                 
-                Region->Block = Region->Block->Next;
+                Arena->Block = Arena->Block->Next;
             }
         }
     }
     
     if(NeedNewBlock){
-        Assert(Region->CreatedInsideBlock == false);
+        Assert(Arena->CreatedInsideBlock == false);
         
         // NOTE(Dima): Calculate this if we need to allocate new block
         size_t NewBlockSize;
         
-        u32 MinRegionSize = Region->GrowSize;
+        u32 MinRegionSize = Arena->GrowSize;
         if(!MinRegionSize){
             MinRegionSize = MINIMUM_MEMORY_REGION_SIZE;
         }
@@ -244,17 +244,17 @@ inline void* PushSomeMem(mem_region* Region, mi Size, mi Align = 8){
         }
         
         mem_block_entry* NewBlock = Platform.MemAlloc(NewBlockSize);
-        NewBlock->Old = Region->Block; // NOTE(Dima): Region->Block is ZERO
+        NewBlock->Old = Arena->Block; // NOTE(Dima): Arena->Block is ZERO
         NewBlock->Next = 0;
         
-        if(Region->Block){
-            Region->Block->Next = NewBlock;
+        if(Arena->Block){
+            Arena->Block->Next = NewBlock;
         }
         
-        Region->Block = NewBlock;
+        Arena->Block = NewBlock;
         
-        Result = Region->Block->Block.Base;
-        Region->Block->Block.Used = Size;
+        Result = Arena->Block->Block.Base;
+        Arena->Block->Block.Used = Size;
     }
     else{
         // NOTE(Dima): Everything is OK. We can allocate here
@@ -268,63 +268,76 @@ inline void* PushSomeMem(mem_region* Region, mi Size, mi Align = 8){
 }
 
 // NOTE(Dima): This function deallocates all region
-inline void Free(mem_region* Region){
-    if(Region->CreatedInsideBlock){
-        Region->CreationBlock.Used = 0;
+inline void Free(mem_arena* Arena){
+    if(Arena->CreatedInsideBlock){
+        Arena->CreationBlock.Used = 0;
     }
     else{
-        while(Region->Block){
-            mem_block_entry* OldBlock = Region->Block->Old;
+        while(Arena->Block){
+            mem_block_entry* OldBlock = Arena->Block->Old;
             
-            Platform.MemFree(Region->Block);
+            Platform.MemFree(Arena->Block);
             
-            Region->Block = OldBlock;
+            Arena->Block = OldBlock;
             
-            if(Region->Block){
-                Region->Block->Next = 0;
+            if(Arena->Block){
+                Arena->Block->Next = 0;
             }
         }
         
-        Region->Block = 0;
+        Arena->Block = 0;
     }
 }
 
 // NOTE(Dima): This function frees all region but not deallocates 
 // NOTE(Dima): its blocks but just zeroes them
-inline void FreeNoDealloc(mem_region* Region){
-    if(Region->CreatedInsideBlock){
-        Region->CreationBlock.Used = 0;
+inline void FreeNoDealloc(mem_arena* Arena){
+    if(Arena->CreatedInsideBlock){
+        Arena->CreationBlock.Used = 0;
     }
     else{
-        mem_block_entry* LastValid = Region->Block;
+        mem_block_entry* LastValid = Arena->Block;
         
-        while(Region->Block){
-            Platform.MemZero(Region->Block);
-            Region->Block->Block.Used = 0;
+        while(Arena->Block){
+            Platform.MemZero(Arena->Block);
+            Arena->Block->Block.Used = 0;
             
-            LastValid = Region->Block;
+            LastValid = Arena->Block;
             
-            Region->Block = Region->Block->Old;
+            Arena->Block = Arena->Block->Old;
         }
         
-        Region->Block = LastValid;
+        Arena->Block = LastValid;
     }
 }
 
-inline mem_region PushSplit(mem_region* Region, mi Size)
+inline mem_arena PushSplit(mem_arena* Arena, mi Size)
 {
-    void* ResultBase = PushSomeMem(Region, Size);
+    void* ResultBase = PushSomeMem(Arena, Size);
     
-    mem_region Result = CreateInsideBlock(ResultBase, Size);
+    mem_arena Result = CreateInsideBlock(ResultBase, Size);
     
     return(Result);
 }
 
+inline void* PushInMemoryStruct_(mem_arena* Arena, mi SizeOfType, mi OffsetOfArenaMember)
+{
+    void* Result = PushSomeMem(Arena, SizeOfType);
+    mi* Ptr = (mi*)((u8*)Result + OffsetOfArenaMember);
+    *(Ptr) = (mi)Arena;
+    
+    return(Result);
+}
+
+#define PushInMemoryStruct(arena, type, arena_member_name) (type*)PushInMemoryStruct_(arena, sizeof(type), offsetof(type, arena_member_name))
+
+#if 0
 #define PushMemoryStruct(region, type, name, region_member_name) \
 {\
 name = PushStruct(region, type);\
 name->##region_member_name = region;\
 }
+#endif
 
 // NOTE(Dima): Definitions
 #define PushSize(region, size) PushSomeMem(region, size)
@@ -334,13 +347,13 @@ name->##region_member_name = region;\
 #define PushStringSize(region, text, textlen) (char*)PushSomeMem(region, (textlen) + 1)
 
 // NOTE(Dima): Memory box
-mem_box InitMemoryBox(mem_region* Region, u32 BoxSizeInBytes);
+mem_box InitMemoryBox(mem_arena* Arena, u32 BoxSizeInBytes);
 mem_entry* AllocateMemoryFromBox(mem_box* box, u32 RequestMemorySize);
 void ReleaseMemoryFromBox(mem_box* box, mem_entry* memEntry);
 
 // NOTE(Dima): Layered
 void InitLayeredMem(layered_mem* Mem, 
-                    mem_region* Region,
+                    mem_arena* Arena,
                     u32* LayersSizes,
                     int LayersSizesCount);
 

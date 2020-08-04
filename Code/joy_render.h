@@ -275,7 +275,7 @@ struct render_frame_info{
 };
 
 struct render_state{
-    mem_region* MemRegion;
+    mem_arena* Arena;
     
     render_camera_setup CameraSetups[RENDER_MAX_CAMERA_SETUPS];
     int CameraSetupsCount;
@@ -288,7 +288,7 @@ struct render_state{
     
     Asset_Atlas* CurAtlas;
     b32 IsSoftwareRenderer;
-    mem_region StackRegion;
+    mem_arena StackArena;
     int EntryCount;
     
     int InitWindowWidth;
@@ -324,7 +324,7 @@ struct render_state{
 
 
 inline void* RenderPushMem(render_state* State, mi Size, mi Align = 8){
-    void* Result = PushSomeMem(&State->StackRegion, Size, Align);
+    void* Result = PushSomeMem(&State->StackArena, Size, Align);
     
     return(Result);
 }
@@ -365,10 +365,10 @@ inline render_lines_chunk* AllocateAndInitLinesChunk(render_state* Render,
                                                      int MaxLinesCount,
                                                      b32 HasDepth)
 {
-    render_lines_chunk* Chunk = PushStruct(Render->MemRegion, render_lines_chunk);
+    render_lines_chunk* Chunk = PushStruct(Render->Arena, render_lines_chunk);
     
-    Chunk->Lines = PushArray(Render->MemRegion, render_line_primitive, MaxLinesCount);
-    Chunk->Colors = PushArray(Render->MemRegion, v3, MaxLinesCount);
+    Chunk->Lines = PushArray(Render->Arena, render_line_primitive, MaxLinesCount);
+    Chunk->Colors = PushArray(Render->Arena, v3, MaxLinesCount);
     
     Chunk->Count = 0;
     Chunk->MaxCount = MaxLinesCount;

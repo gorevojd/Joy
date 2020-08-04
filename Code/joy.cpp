@@ -30,7 +30,7 @@ task_data* BeginTaskData(task_data_pool* Pool)
         DLIST_REMOVE_ENTRY(Result, Next, Prev);
         DLIST_INSERT_BEFORE_SENTINEL(Result, Pool->UseSentinel, Next, Prev);
         
-        Free(&Result->Region);
+        Free(&Result->Arena);
         
         --Pool->FreeTasksCount;
     }
@@ -47,13 +47,13 @@ void EndTaskData(task_data_pool* Pool, task_data* Task)
     DLIST_INSERT_BEFORE_SENTINEL(Task, Pool->FreeSentinel, Next, Prev);
     ++Pool->FreeTasksCount;
     
-    Free(&Task->Region);
+    Free(&Task->Arena);
     
     Platform.UnlockMutex(&Pool->Mutex);
 }
 
 void InitTaskDataPool(task_data_pool* Pool,
-                      mem_region* Region,
+                      mem_arena* Arena,
                       int TasksDatasCount,
                       mi OneSize)
 {
@@ -68,7 +68,7 @@ void InitTaskDataPool(task_data_pool* Pool,
     Pool->FreeTasksCount = TasksDatasCount;
     Pool->TotalTasksCount = TasksDatasCount;
     
-    task_data* PoolArray = PushArray(Region, task_data, TasksDatasCount);
+    task_data* PoolArray = PushArray(Arena, task_data, TasksDatasCount);
     
     for(int NewIndex = 0;
         NewIndex < TasksDatasCount;
@@ -76,7 +76,7 @@ void InitTaskDataPool(task_data_pool* Pool,
     {
         task_data* Task = PoolArray + NewIndex;
         
-        Task->Region = PushSplit(Region, OneSize);
+        Task->Arena = PushSplit(Arena, OneSize);
         
         DLIST_INSERT_BEFORE_SENTINEL(Task, 
                                      Pool->FreeSentinel, 
@@ -138,55 +138,89 @@ INTERNAL_FUNCTION inline b32 AdvanceGameMode(game_state* Game){
     return(Result);
 }
 
-void GameInit(game_state* Game, game_init_params Params){
+temp_state* TempStateInit(mem_arena* Arena, 
+                          int InitWindowWidth,
+                          int InitWindowHeight,
+                          asset_system* Assets)
+{
+    temp_state* TempState = PushInMemoryStruct(Arena, temp_state, Arena);
+    
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!
     // NOTE(Dima): Init engine systems
     // NOTE(Dima): !!!!!!!!!!!!!!!!!!!
     
     // NOTE(Dima): Input
-    Game->InputMemory = {};
-    PushMemoryStruct(&Game->InputMemory, input_state, Game->Input, Region);
-    InitInput(Game->Input);
-    
-    // NOTE(Dima): Assets
-    Game->AssetsMemory = {};
-    PushMemoryStruct(&Game->AssetsMemory, asset_system, Game->Assets, Memory);
-    InitAssets(Game->Assets);
+    TempState->InputMemory = {};
+    TempState->Input = PushInMemoryStruct(&TempState->InputMemory, input_state, Arena);
+    InitInput(TempState->Input);
     
     // NOTE(Dima): Render
-    Game->RenderMemory = {};
-    PushMemoryStruct(&Game->RenderMemory, render_state, Game->Render, MemRegion);
-    RenderInit(Game->Render,
-               Params.InitWindowWidth,
-               Params.InitWindowHeight,
+    TempState->RenderMemory = {};
+    TempState->Render = PushInMemoryStruct(&TempState->RenderMemory, render_state, Arena);
+    RenderInit(TempState->Render,
+               InitWindowWidth, 
+               InitWindowHeight,
                Platform.RenderAPI);
     
-    // NOTE(Dima): Init platform render stuff
-    
     // NOTE(Dima): Gui
-    Game->GuiMemory = {};
-    PushMemoryStruct(&Game->GuiMemory, gui_state, Game->Gui, Mem);
-    InitGui(Game->Gui, Game->Assets);
-    
-    // NOTE(Dima): Animations
-    Game->AnimMemory = {};
-    PushMemoryStruct(&Game->AnimMemory, anim_system, Game->Anim, Region);
-    InitAnimSystem(Game->Anim);
+    TempState->GuiMemory = {};
+    TempState->Gui = PushInMemoryStruct(&TempState->GuiMemory, gui_state, Arena);
+    InitGui(TempState->Gui, Assets);
     
     // NOTE(Dima): DEBUG
 #if defined(JOY_INTERNAL)
-    Game->DEBUGMemory = {};
-    PushMemoryStruct(&Game->DEBUGMemory, debug_state, Game->DEBUG, Region);
-    DEBUGInit(Game->DEBUG, 
-              Game->Render,
-              Game->Gui,
-              Game->Input);
+    TempState->DEBUGMemory = {};
+    TempState->DEBUG = PushInMemoryStruct(&TempState->DEBUGMemory, debug_state, Arena);
+    DEBUGInit(TempState->DEBUG, 
+              TempState->Render,
+              TempState->Gui,
+              TempState->Input);
 #endif
     
-    INIT_MODES_FUNC_NAME(Game);
+    return(TempState);
 }
 
-INTERNAL_FUNCTION void UpdateGameInput(input_state* Input){
+void TempStateFree(temp_state* TempState)
+{
+    Free(&TempState->GuiMemory);
+    Free(&TempState->InputMemory);
+    Free(&TempState->RenderMemory);
+#if defined(JOY_INTERNAL)
+    Free(&TempState->DEBUGMemory);
+#endif
+}
+
+game_state* GameStateInit(mem_arena* Arena)
+{
+    game_state* Game = PushInMemoryStruct(Arena, game_state, Arena);
+    
+    // NOTE(Dima): Assets
+    Game->AssetsMemory = {};
+    Game->Assets = PushInMemoryStruct(&Game->AssetsMemory, asset_system, Memory);
+    InitAssets(Game->Assets);
+    
+    // NOTE(Dima): Animations
+    Game->AnimMemory = {};
+    Game->Anim = PushInMemoryStruct(&Game->AnimMemory, anim_system, Arena);
+    InitAnimSystem(Game->Anim);
+    
+    INIT_MODES_FUNC_NAME(Game);
+    
+    return(Game);
+}
+
+void GameStateFree(game_state* Game)
+{
+    // NOTE(Dima): Freing all the memories :)
+    Free(&Game->AssetsMemory);
+    Free(&Game->AnimMemory);
+}
+
+INTERNAL_FUNCTION void UpdateGameInput(temp_state* TempState)
+{
+    input_state* Input = TempState->Input;
+    render_state* Render = TempState->Render;
+    
     DEBUGSetMenuDataSource(DebugMenu_Input, Input);
     
     if(KeyWentDown(Input, Key_Control)){
@@ -197,68 +231,76 @@ INTERNAL_FUNCTION void UpdateGameInput(input_state* Input){
         Input->QuitRequested = true;
     }
     
+#if defined(JOY_INTERNAL)
+    if(KeyWentDown(Input, Key_F1)){
+        if(KeyIsDown(Input, Key_Shift))
+        {
+            if(Render->SSAOFilterType == 0)
+            {
+                Render->SSAOFilterType = RenderFilter_Count;
+            }
+            Render->SSAOFilterType = (Render->SSAOFilterType - 1) % RenderFilter_Count;
+        }
+        else 
+        {
+            Render->SSAOFilterType = (Render->SSAOFilterType + 1) % RenderFilter_Count;
+        }
+    }
+    
+    if(KeyWentDown(Input, Key_F2)){
+        if(KeyIsDown(Input, Key_Shift))
+        {
+            if(Render->ToShowBufferType == 0)
+            {
+                Render->ToShowBufferType = RenderShowBuffer_Count;
+            }
+            Render->ToShowBufferType = (Render->ToShowBufferType - 1) % RenderShowBuffer_Count;
+        }
+        else 
+        {
+            Render->ToShowBufferType = (Render->ToShowBufferType + 1) % RenderShowBuffer_Count;
+        }
+    }
+#endif
+    
     Platform.ProcessInput(Input);
 }
 
-void GameUpdate(game_state* Game, render_frame_info FrameInfo){
-    
+void UpdateGameAndEngine(game_state* Game, temp_state* TempState, render_frame_info FrameInfo)
+{
     game_mode* CurMode = &Game->Modes[Game->CurrentModeIndex];
+    
+    asset_system* Assets = Game->Assets;
+    
+    render_state* Render = TempState->Render;
+    input_state* Input = TempState->Input;
+    gui_state* Gui = TempState->Gui;
     
     {
         BLOCK_TIMING("Frame: Input");
         
-        UpdateGameInput(Game->Input);
+        UpdateGameInput(TempState);
     }
     
-    RenderBeginFrame(Game->Render);
-    RenderSetFrameInfo(Game->Render, FrameInfo);
+    RenderBeginFrame(Render);
+    RenderSetFrameInfo(Render, FrameInfo);
     
     gui_frame_info GuiFrameInfo = {};
-    GuiFrameInfo.RenderState = Game->Render;
-    GuiFrameInfo.Input = Game->Input;
+    GuiFrameInfo.RenderState = Render;
+    GuiFrameInfo.Input = Input;
     GuiFrameInfo.Width = FrameInfo.InitWidth;
     GuiFrameInfo.Height = FrameInfo.InitHeight;
     GuiFrameInfo.DeltaTime = FrameInfo.dt;
     
-    GuiFrameBegin(Game->Gui, GuiFrameInfo);
+    GuiFrameBegin(Gui, GuiFrameInfo);
     
     if(CurMode->Update){
         BLOCK_TIMING("Frame: GameModeUpdate");
         
-        CurMode->Update(Game, CurMode);
+        CurMode->Update(Game, TempState, CurMode);
     }
     
 #if defined(JOY_INTERNAL)
-    if(KeyWentDown(Game->Input, Key_F1)){
-        if(KeyIsDown(Game->Input, Key_Shift))
-        {
-            if(Game->Render->SSAOFilterType == 0)
-            {
-                Game->Render->SSAOFilterType = RenderFilter_Count;
-            }
-            Game->Render->SSAOFilterType = (Game->Render->SSAOFilterType - 1) % RenderFilter_Count;
-        }
-        else 
-        {
-            Game->Render->SSAOFilterType = (Game->Render->SSAOFilterType + 1) % RenderFilter_Count;
-        }
-    }
-    
-    if(KeyWentDown(Game->Input, Key_F2)){
-        if(KeyIsDown(Game->Input, Key_Shift))
-        {
-            if(Game->Render->ToShowBufferType == 0)
-            {
-                Game->Render->ToShowBufferType = RenderShowBuffer_Count;
-            }
-            Game->Render->ToShowBufferType = (Game->Render->ToShowBufferType - 1) % RenderShowBuffer_Count;
-        }
-        else 
-        {
-            Game->Render->ToShowBufferType = (Game->Render->ToShowBufferType + 1) % RenderShowBuffer_Count;
-        }
-    }
-    
     {
         BLOCK_TIMING("Frame: DEBUG");
         
@@ -266,34 +308,23 @@ void GameUpdate(game_state* Game, render_frame_info FrameInfo){
         NOTE(Dima): DEBUGUpdate outputs debug geometry, so it needs to calculate before render
         and after Game Mode update.
         */
-        DEBUGUpdate(Game->DEBUG);
+        DEBUGUpdate(TempState->DEBUG);
     }
 #endif
     
     {
         BLOCK_TIMING("Frame: Render");
         
-        GuiFramePrepare4Render(Game->Gui);
-        RenderEverything(Game->Render);
+        GuiFramePrepare4Render(Gui);
+        RenderEverything(Render);
     }
     
-    GuiFrameEnd(Game->Gui);
-    RenderEndFrame(Game->Render);
+    GuiFrameEnd(Gui);
+    RenderEndFrame(Render);
     
     {
         BLOCK_TIMING("Frame: SwapBuffers");
         
-        RenderSwapBuffers(Game->Render);
+        RenderSwapBuffers(Render);
     }
-}
-
-void GameFree(game_state* Game)
-{
-    // NOTE(Dima): Freing all the memories :)
-    Free(&Game->GuiMemory);
-    Free(&Game->InputMemory);
-    Free(&Game->RenderMemory);
-    Free(&Game->AssetsMemory);
-    Free(&Game->AnimMemory);
-    Free(&Game->DEBUGMemory);
 }

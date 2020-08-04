@@ -1599,8 +1599,8 @@ INTERNAL_FUNCTION void GlOutputRender(gl_state* GL, render_state* Render){
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     GlOutputPass(GL, Render,
-                 Render->StackRegion.CreationBlock.Base,
-                 (void*)((u8*)Render->StackRegion.CreationBlock.Base + Render->StackRegion.CreationBlock.Used),
+                 Render->StackArena.CreationBlock.Base,
+                 (void*)((u8*)Render->StackArena.CreationBlock.Base + Render->StackArena.CreationBlock.Used),
                  RenderPass_Main,
                  &Render->CameraSetups[0]);
     

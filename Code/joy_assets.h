@@ -111,7 +111,7 @@ struct asset_block{
 // NOTE(dima): Bitmaps are stored in gamma-corrected premultiplied alpha format
 struct asset_system
 {
-    mem_region* Memory;
+    mem_arena* Memory;
     layered_mem LayeredMemory;
     
     Asset_Atlas MainLargeAtlas;

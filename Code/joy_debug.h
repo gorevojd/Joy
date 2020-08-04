@@ -97,7 +97,7 @@ enum debug_profile_menu_type{
 };
 
 struct debug_state{
-    mem_region* Region;
+    mem_arena* Arena;
     
     render_state* Render;
     gui_state* Gui;

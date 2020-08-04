@@ -141,10 +141,10 @@ INTERNAL_FUNCTION void RenderInitGuiGeom(render_state* Render){
     Render->GuiGeom.IndicesCount = 0;
     Render->GuiGeom.TriangleGeomTypesCount = 0;
     
-    Render->GuiGeom.Vertices = PushArray(Render->MemRegion, render_gui_geom_vertex, VerticesCount);
-    Render->GuiGeom.Indices = PushArray(Render->MemRegion, u32, IndCount);
+    Render->GuiGeom.Vertices = PushArray(Render->Arena, render_gui_geom_vertex, VerticesCount);
+    Render->GuiGeom.Indices = PushArray(Render->Arena, u32, IndCount);
     Render->GuiGeom.TriangleGeomTypes = PushArray(
-                                                  Render->MemRegion, u8, 
+                                                  Render->Arena, u8, 
                                                   Render->GuiGeom.MaxTriangleGeomTypesCount);
     
     // NOTE(Dima): Init GUI lines
@@ -156,9 +156,9 @@ INTERNAL_FUNCTION void RenderInitGuiGeom(render_state* Render){
     Render->GuiGeom.LinePointsCount = 0;
     Render->GuiGeom.LineColorsCount = 0;
     
-    Render->GuiGeom.LinePoints = PushArray(Render->MemRegion, v2, 
+    Render->GuiGeom.LinePoints = PushArray(Render->Arena, v2, 
                                            Render->GuiGeom.MaxLinePointsCount);
-    Render->GuiGeom.LineColors = PushArray(Render->MemRegion, v4,
+    Render->GuiGeom.LineColors = PushArray(Render->Arena, v4,
                                            Render->GuiGeom.MaxLineColorsCount);
 }
 
@@ -241,7 +241,7 @@ INTERNAL_FUNCTION void RenderInit(render_state* Render,
     // NOTE(Dima): Init render API
     Render->PlatformRenderAPI = API;
     
-    Render->StackRegion = PushSplit(Render->MemRegion, Megabytes(5));
+    Render->StackArena = PushSplit(Render->Arena, Megabytes(5));
     
     
 #if 0    
@@ -370,7 +370,7 @@ INTERNAL_FUNCTION void RenderBeginFrame(render_state* Render){
     }
     
     // NOTE(Dima): Render stack begin frame
-    Render->StackRegion.CreationBlock.Used = 0;
+    Render->StackArena.CreationBlock.Used = 0;
     Render->EntryCount = 0;
     
     Render->CurAtlas = 0;

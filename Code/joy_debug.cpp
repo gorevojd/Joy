@@ -12,7 +12,7 @@ inline debug_primitive* DEBUGAddPrimitive(v3 Color,
                                           u32 Type)
 {
     DLIST_ALLOCATE_FUNCTION_BODY(debug_primitive, 
-                                 DEBUGGlobalTable->Region,
+                                 DEBUGGlobalTable->Arena,
                                  Next, Prev,
                                  DEBUGGlobalTable->PrimitiveFree,
                                  DEBUGGlobalTable->PrimitiveUse,
@@ -571,7 +571,7 @@ INTERNAL_FUNCTION inline
 debug_profiled_tree_node* AllocateTreeNode(debug_state* State, 
                                            debug_thread_frame* Frame)
 {
-    DLIST_ALLOCATE_FUNCTION_BODY(debug_profiled_tree_node, State->Region,
+    DLIST_ALLOCATE_FUNCTION_BODY(debug_profiled_tree_node, State->Arena,
                                  NextAlloc, PrevAlloc, 
                                  State->TreeNodeFree,
                                  Frame->RootTreeNodeUse,
@@ -744,7 +744,7 @@ CreateOrFindThreadForID(debug_state* State, u16 ThreadID)
     
     if(!Found){
         // NOTE(Dima): Allocate the thread
-        Found = PushStruct(State->Region, debug_thread);
+        Found = PushStruct(State->Arena, debug_thread);
         
         // NOTE(Dima): Init the debug thread
         DLIST_INSERT_BEFORE_SENTINEL(Found, State->ThreadSentinel, 
@@ -755,7 +755,7 @@ CreateOrFindThreadForID(debug_state* State, u16 ThreadID)
         Found->NextInHash = State->ThreadHashTable[Key];
         State->ThreadHashTable[Key] = Found;
         
-        Found->Frames = PushArray(State->Region, debug_thread_frame, 
+        Found->Frames = PushArray(State->Arena, debug_thread_frame, 
                                   DEBUG_PROFILED_FRAMES_COUNT);
         for(int FrameIndex = 0;
             FrameIndex < DEBUG_PROFILED_FRAMES_COUNT;
@@ -776,7 +776,7 @@ CreateOrFindThreadForID(debug_state* State, u16 ThreadID)
 INTERNAL_FUNCTION debug_timing_stat* AllocateTimingStat(debug_state* State,
                                                         debug_thread_frame* Frame)
 {
-    DLIST_ALLOCATE_FUNCTION_BODY(debug_timing_stat, State->Region,
+    DLIST_ALLOCATE_FUNCTION_BODY(debug_timing_stat, State->Arena,
                                  Next, Prev, 
                                  State->StatFree,
                                  Frame->StatUse,
@@ -1039,16 +1039,16 @@ INTERNAL_FUNCTION void DEBUGProcessRecords(debug_state* State){
     }
 }
 
-void DEBUGInitGlobalTable(mem_region* Region){
+void DEBUGInitGlobalTable(mem_arena* Arena){
     // NOTE(Dima): Initialize record arrays
     int RecordArrayCount = 1000000;
     DEBUGGlobalTable->TableMaxRecordCount = RecordArrayCount;
     DEBUGGlobalTable->RecordAndTableIndex = 0;
-    DEBUGGlobalTable->RecordTables[0] = PushArray(Region, debug_record, RecordArrayCount);
-    DEBUGGlobalTable->RecordTables[1] = PushArray(Region, debug_record, RecordArrayCount);
+    DEBUGGlobalTable->RecordTables[0] = PushArray(Arena, debug_record, RecordArrayCount);
+    DEBUGGlobalTable->RecordTables[1] = PushArray(Arena, debug_record, RecordArrayCount);
     
     // NOTE(Dima): Init memory region
-    DEBUGGlobalTable->Region = Region;
+    DEBUGGlobalTable->Arena = Arena;
     
     // NOTE(Dima): Set pointers on primitive sentinels
     DLIST_REFLECT_PTRS(DEBUGGlobalTable->PrimitiveUse, Next, Prev);

@@ -8,12 +8,6 @@
 #include "joy_dirx.h"
 #endif
 
-#if 0
-#define STB_SPRINTF_STATIC
-#define STB_SPRINTF_IMPLEMENTATION
-#include "stb_sprintf.h"
-#endif
-
 /*
 // TODO(Dima): 
 
@@ -22,15 +16,17 @@ Per-tag asset ids storage
 dima privet , kak dela? i tebia lybly
 */
 
-GLOBAL_VARIABLE mem_region gMem = {};
+GLOBAL_VARIABLE mem_arena gMem = {};
 GLOBAL_VARIABLE win_state GlobalWin32;
 GLOBAL_VARIABLE b32 GlobalRunning;
 GLOBAL_VARIABLE DSound_State GlobalDirectSound;
-GLOBAL_VARIABLE mem_region GlobalMem;
-GLOBAL_VARIABLE game_state* GlobalGame;
+GLOBAL_VARIABLE mem_arena GlobalMem;
 
 GLOBAL_VARIABLE f64 Time = 0.0f;
 GLOBAL_VARIABLE f64 DeltaTime = 0.0f;
+
+GLOBAL_VARIABLE game_state* GameState;
+GLOBAL_VARIABLE temp_state* TempState;
 
 #if JOY_USE_OPENGL
 GLOBAL_VARIABLE gl_state GlobalGL;
@@ -39,10 +35,13 @@ GLOBAL_VARIABLE gl_state GlobalGL;
 GLOBAL_VARIABLE DirX_State GlobalDirX;
 #endif
 
+
 platform_api Platform;
+
 #if defined(JOY_INTERNAL)
 debug_global_table* DEBUGGlobalTable;
 #endif
+
 
 BOOL CALLBACK DirectSoundEnumerateCallback( 
                                            LPGUID lpGuid, 
@@ -1616,7 +1615,7 @@ RENDER_PLATFORM_CALLBACK(Win32SoftwareRender){
     int WindowWidth = Win->WindowWidth;
     int WindowHeight = Win->WindowHeight;
     
-    RenderMultithreaded(&GlobalWin32.ImmediateQueue, GlobalGame->Render, &GlobalWin32.Bitmap);
+    RenderMultithreaded(&GlobalWin32.ImmediateQueue, TempState->Render, &GlobalWin32.Bitmap);
     RenderMultithreadedRGBA2BGRA(&GlobalWin32.ImmediateQueue, &GlobalWin32.Bitmap);
     
     DWORD Style = GetWindowLong(Win->Window, GWL_STYLE);
@@ -1657,7 +1656,7 @@ RENDER_PLATFORM_CALLBACK(Win32OpenGLRenderInit){
     GlobalWin32.glDC = GetDC(GlobalWin32.Window);
     GlobalWin32.renderCtx = Win32InitOpenGL(GlobalWin32.glDC);
     
-    GlInit(&GlobalGL, GlobalGame->Render, GlobalGame->Assets);
+    GlInit(&GlobalGL, Render, GameState->Assets);
 }
 
 RENDER_PLATFORM_CALLBACK(Win32OpenGLRenderFree){
@@ -1670,7 +1669,7 @@ RENDER_PLATFORM_CALLBACK(Win32OpenGLRenderFree){
 }
 
 RENDER_PLATFORM_CALLBACK(Win32OpenGLRender){
-    GlOutputRender(&GlobalGL, GlobalGame->Render);
+    GlOutputRender(&GlobalGL, TempState->Render);
 }
 
 INTERNAL_FUNCTION void
@@ -2308,7 +2307,7 @@ Win32WindowProcessing(
         }break;
         
         case WM_CHAR:{
-            input_state* Input = GlobalGame->Input;
+            input_state* Input = TempState->Input;
             Input->FrameInput[Input->FrameInputLen++] = (char)WParam;
             Input->FrameInput[Input->FrameInputLen] = 0;
         }break;
@@ -2479,12 +2478,14 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     int WindowHeight = 768;
     Win32InitWindow(hInstance, WindowWidth, WindowHeight);
     
-    GlobalGame = PushStruct(&GlobalMem, game_state);
+    mem_arena PermanentStorage = {};
+    mem_arena TemporalStorage = {};
     
-    game_init_params GameParams = {};
-    GameParams.InitWindowWidth = WindowWidth;
-    GameParams.InitWindowHeight = WindowHeight;
-    GameInit(GlobalGame, GameParams);
+    GameState = GameStateInit(&PermanentStorage);
+    TempState = TempStateInit(&TemporalStorage, 
+                              GlobalWin32.InitWindowWidth, 
+                              GlobalWin32.InitWindowHeight,
+                              GameState->Assets);
     
     // NOTE(Dima): Xinput Init
     for(int ControllerIndex = 0;
@@ -2529,12 +2530,13 @@ int APIENTRY WinMain(HINSTANCE hInstance,
         FrameInfo.dt = DeltaTime;
         FrameInfo.RendererType = Renderer_OpenGL;
         
-        GameUpdate(GlobalGame, FrameInfo);
+        UpdateGameAndEngine(GameState, TempState, FrameInfo);
         
         END_TIMING();
     }
     
-    GameFree(GlobalGame);
+    GameStateFree(GameState);
+    TempStateFree(TempState);
     
     DSoundFree(&GlobalDirectSound);
     

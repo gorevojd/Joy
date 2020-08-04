@@ -1947,7 +1947,7 @@ anim_calculated_pose UpdateModelAnimation(asset_system* Assets,
 
 INTERNAL_FUNCTION anim_controller* AllocateAnimController(anim_system* Anim){
     DLIST_ALLOCATE_FUNCTION_BODY(anim_controller, 
-                                 Anim->Region,
+                                 Anim->Arena,
                                  Next, Prev,
                                  Anim->ControlFree,
                                  Anim->ControlUse,
@@ -2037,7 +2037,7 @@ void InitAnimComponent(animated_component* AC,
     
     // NOTE(Dima): Init animations based on animations sources in anim controller
     AC->AnimsCount = Control->AnimSourcesCount;
-    AC->Anims = PushArray(Control->AnimSystem->Region,
+    AC->Anims = PushArray(Control->AnimSystem->Arena,
                           playing_anim,
                           Control->AnimSourcesCount);
     
@@ -2099,7 +2099,7 @@ void ClearStateAnimations(animated_component* AC){
 // NOTE(Dima): !!!!!!!!!!!!!!!!!
 INTERNAL_FUNCTION anim_state* AllocateAnimState(anim_system* Anim){
     DLIST_ALLOCATE_FUNCTION_BODY(anim_state,
-                                 Anim->Region,
+                                 Anim->Arena,
                                  NextAlloc, PrevAlloc,
                                  Anim->StateFree,
                                  Anim->StateUse,
@@ -2287,7 +2287,7 @@ void EndAnimStateQueue(anim_controller* Control)
 INTERNAL_FUNCTION anim_variable* AllocateVariable(anim_system* Anim)
 {
     DLIST_ALLOCATE_FUNCTION_BODY(anim_variable, 
-                                 Anim->Region,
+                                 Anim->Arena,
                                  NextAlloc, PrevAlloc,
                                  Anim->VariableFree,
                                  Anim->VariableUse,
@@ -2385,7 +2385,7 @@ FindVariable(animated_component* AC, char* Name)
 INTERNAL_FUNCTION anim_animid* AllocateAnimID(anim_system* Anim)
 {
     DLIST_ALLOCATE_FUNCTION_BODY(anim_animid, 
-                                 Anim->Region,
+                                 Anim->Arena,
                                  NextAlloc, PrevAlloc,
                                  Anim->AnimIDFree,
                                  Anim->AnimIDUse,
@@ -2491,7 +2491,7 @@ anim_animid* FindAnimID(animated_component* AC, char* Name){
 INTERNAL_FUNCTION anim_transition* AllocateTransition(anim_system* Anim)
 {
     DLIST_ALLOCATE_FUNCTION_BODY(anim_transition,
-                                 Anim->Region,
+                                 Anim->Arena,
                                  NextAlloc, PrevAlloc,
                                  Anim->TransitionFree,
                                  Anim->TransitionUse,
