@@ -108,7 +108,7 @@ struct render_entry_clear_color{
 };
 
 struct render_entry_bitmap{
-    bmp_info* Bitmap;
+    render_primitive_bitmap* Bitmap;
     v2 P;
     float PixelHeight;
     v4 ModulationColor01;
@@ -155,15 +155,15 @@ struct render_entry_in_atlas_bmp{
 };
 
 struct render_entry_mesh{
-    mesh_info* Mesh;
-    material_info* Material;
+    render_primitive_mesh* Mesh;
+    render_primitive_material* Material;
     
     m44 Transform;
     
     m44* BoneTransforms;
     int BoneCount;
     
-    v3 AlbedoColor;
+    v3 ModColor;
 };
 
 struct render_entry_gui_chunk{
@@ -685,7 +685,7 @@ inline void PushClearColor(render_state* State, v3 color){
     entry->clearColor01 = color;
 }
 
-inline void PushBitmap(render_state* State, bmp_info* bitmap, v2 p, float height, v4 multColor){
+inline void PushBitmap(render_state* State, render_primitive_bitmap* bitmap, v2 p, float height, v4 multColor){
     render_entry_bitmap* entry = PUSH_RENDER_ENTRY(State, RenderEntry_Bitmap, render_entry_bitmap);
     
     entry->Bitmap = bitmap;
@@ -779,7 +779,7 @@ inline void PushRectInnerOutline(render_state* State, rc2 rect, int pixelWidth, 
 
 inline void PushGlyph(render_state* State, 
                       v2 P, v2 Dim, 
-                      bmp_info* Bitmap, 
+                      render_primitive_bitmap* Bitmap, 
                       v2 MinUV, v2 MaxUV,
                       v4 ModColor = V4(1.0f, 1.0f, 1.0f, 1.0f))
 {
@@ -797,10 +797,10 @@ inline void PushGlyph(render_state* State,
 }
 
 inline void PushMesh(render_state* State,
-                     mesh_info* Mesh,
+                     render_primitive_mesh* Mesh,
                      m44 Transform,
+                     render_primitive_material* Material = 0,
                      v3 Color = V3(1.0f, 0.0f, 1.0f),
-                     material_info* Material = 0,
                      m44* BoneTransforms = 0,
                      int BoneCount = 0)
 {
@@ -810,16 +810,14 @@ inline void PushMesh(render_state* State,
     entry->Mesh = Mesh;
     entry->BoneCount = BoneCount;
     entry->BoneTransforms = BoneTransforms;
-    entry->AlbedoColor = Color;
+    entry->ModColor = Color;
     entry->Material = Material;
     entry->Transform = Transform;
 }
 
 inline void PushMesh(render_state* State,
-                     mesh_info* Mesh,
-                     v3 P,
-                     quat R,
-                     v3 S,
+                     render_primitive_mesh* Mesh,
+                     v3 P, quat R, v3 S,
                      v3 Color = V3(1.0f, 0.0f, 1.0f))
 {
     m44 Matrix = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);

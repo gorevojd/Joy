@@ -284,18 +284,13 @@ added_asset AddMaterialAsset(asset_system* System,
     // NOTE(Dima): Setting file header
     asset_material* MatHeader = &FileHeader->Material;
     
-    for(int BitmapArrayIndex = 0; 
-        BitmapArrayIndex < MaterialTexture_Count;
-        BitmapArrayIndex++)
+    for(int ChannelIndex = 0; 
+        ChannelIndex < MaterialChannel_Count;
+        ChannelIndex++)
     {
-        MatHeader->BitmapArrayIDs[BitmapArrayIndex] = 
-            Material->BitmapArrayIDs[BitmapArrayIndex];
+        MatHeader->TextureIDs[ChannelIndex] = Material->MaterialTextureIDs[ChannelIndex];
+        MatHeader->PackedColors[ChannelIndex] = Material->PackedColors[ChannelIndex];
     }
-    
-    MatHeader->ColorDiffuse = Material->ColorDiffusePacked;
-    MatHeader->ColorSpecular = Material->ColorSpecularPacked;
-    MatHeader->ColorAmbient = Material->ColorAmbientPacked;
-    MatHeader->ColorEmissive = Material->ColorEmissivePacked;
     
     return(Added);
 }

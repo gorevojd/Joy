@@ -1,6 +1,6 @@
 #include "joy_software_renderer_functions.cpp"
 
-void SoftwareRenderStackToOutput(render_state* Render, bmp_info* buf, rc2 clipRect){
+void SoftwareRenderStackToOutput(render_state* Render, render_primitive_bitmap* buf, rc2 clipRect){
     u8* At = (u8*)Render->StackArena.CreationBlock.Base;
 	u8* RenderEnd = (u8*)Render->StackArena.CreationBlock.Base + Render->StackArena.CreationBlock.Used;
     
@@ -104,7 +104,7 @@ void SoftwareRenderStackToOutput(render_state* Render, bmp_info* buf, rc2 clipRe
 }
 
 struct Render_Queue_Work_Data{
-    bmp_info* buf;
+    render_primitive_bitmap* buf;
     rc2 clipRect;
     render_state* Render;
 };
@@ -119,7 +119,7 @@ PLATFORM_CALLBACK(RenderQueueWork){
 }
 
 struct Render_Queue_rgba2bgra_Work{
-    bmp_info* buf;
+    render_primitive_bitmap* buf;
     rc2 clipRect;
 };
 
@@ -134,7 +134,7 @@ PLATFORM_CALLBACK(RenderQueueRGBA2BGRAWork){
 }
 
 #define TILES_COUNT 32
-void RenderMultithreaded(platform_job_queue* queue, render_state* Render, bmp_info* buf) {
+void RenderMultithreaded(platform_job_queue* queue, render_state* Render, render_primitive_bitmap* buf) {
     
 #if 0
     rc2 clipRect;
@@ -220,7 +220,7 @@ void RenderMultithreaded(platform_job_queue* queue, render_state* Render, bmp_in
 #endif
 }
 
-void RenderMultithreadedRGBA2BGRA(platform_job_queue* queue, bmp_info* buf) {
+void RenderMultithreadedRGBA2BGRA(platform_job_queue* queue, render_primitive_bitmap* buf) {
     
     Render_Queue_rgba2bgra_Work works[TILES_COUNT];
     

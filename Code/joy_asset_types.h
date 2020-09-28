@@ -9,18 +9,7 @@ struct array_info{
 };
 
 struct bmp_info{
-    void* Pixels;
-    int Width;
-    int Height;
-    int Pitch;
-    float WidthOverHeight;
-    
-    // NOTE(Dima): In atlas info
-    v2 MinUV;
-    v2 MaxUV;
-    
-    // NOTE(Dima): Handle reserved for Graphics API
-    mi Handle;
+    render_primitive_bitmap Prim;
 };
 
 struct sound_info{
@@ -94,33 +83,10 @@ inline size_t GetComponentCount4VertLayout(u32 VertLayout){
 }
 #endif
 
-enum mesh_handles_types{
-    MeshHandle_None,
-    MeshHandle_VertexArray,
-    MeshHandle_Buffer,
-};
-
-#define MESH_HANDLES_COUNT 8
-struct mesh_handles{
-    size_t Handles[MESH_HANDLES_COUNT];
-    int HandlesTypes[MESH_HANDLES_COUNT];
-    int Count;
-    
-    b32 Allocated;
-};
-
 struct mesh_info{
-    u32* Indices;
-    int IndicesCount;
+    render_primitive_mesh Prim;
     
-    void* Vertices;
-    int VerticesCount;
-    
-    u32 MaterialIndex;
-    
-    mesh_type_context TypeCtx;
-    
-    mesh_handles Handles;
+    int MaterialIndexInModel;
 };
 
 struct glyph_info{
@@ -168,36 +134,13 @@ struct skeleton_info{
     int BoneCount;
 };
 
-
-#if 0
-enum materal_texture_type
-{
-    MaterialTexture_Albedo,
-    MaterialTexture_Ambient,
-    MaterialTexture_Specular,
-    MaterialTexture_Normal,
-    MaterialTexture_Metal,
-    MaterialTexture_Roughness,
-    MaterialTexture_Height,
-    
-    MaterialTexture_Count,
-};
-#endif
-
 struct material_info{
-    v3 ModColor;
+    //u32 BitmapIDs[MaterialTexture_Count];
     
-#if 0    
-    v3 Colors[MaterialTexture_Count];
-    bmp_info* Bitmaps[MaterialTexture_Count];
-#endif
+    //v3 Colors[MaterialTexture_Count];
+    //bmp_info* Textures[MaterialTexture_Count];
     
-    v3 ColorDiffuse;
-    v3 ColorSpecular;
-    v3 ColorAmbient;
-    v3 ColorEmissive;
-    
-    bmp_info* Textures[MaterialTexture_Count];
+    render_primitive_material Prim;
 };
 
 struct model_info{

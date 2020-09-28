@@ -486,13 +486,14 @@ INTERNAL_FUNCTION void UpdateModel(asset_system* Assets,
             
             if(Mesh){
                 material_info* Material = LoadMaterial(Assets, 
-                                                       Model->MaterialIDs[Mesh->MaterialIndex],
+                                                       Model->MaterialIDs[Mesh->MaterialIndexInModel],
                                                        ASSET_IMPORT_DEFERRED);
                 
-                PushMesh(Render, Mesh, 
+                PushMesh(Render, 
+                         &Mesh->Prim, 
                          NodeTran, 
+                         &Material->Prim,
                          Color,
-                         Material,
                          CalcPose.BoneTransforms, 
                          CalcPose.BoneTransformsCount);
             }
@@ -1149,12 +1150,12 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     
     if(ToShow){
         float ToShowH = CalcScreenFitHeight(
-                                            ToShow->Width, 
-                                            ToShow->Height,
+                                            ToShow->Prim.Width, 
+                                            ToShow->Prim.Height,
                                             Width, Height);
         
         PushBitmap(Render, 
-                   ToShow, 
+                   &ToShow->Prim, 
                    V2(0.0f, 0.0f), 
                    ToShowH, 
                    V4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -1162,11 +1163,12 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     
     if(ToShowNext){
         float ToShowNextH = CalcScreenFitHeight(
-                                                ToShowNext->Width, ToShowNext->Height,
+                                                ToShowNext->Prim.Width, 
+                                                ToShowNext->Prim.Height,
                                                 Width, Height);
         
         PushBitmap(Render, 
-                   ToShowNext, 
+                   &ToShowNext->Prim, 
                    V2(0.0f, 0.0f), 
                    ToShowNextH, 
                    V4(1.0f, 1.0f, 1.0f, FadeoutAlpha));

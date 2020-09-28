@@ -2,9 +2,9 @@
 #define JOY_SOFTWARE_RENDERER_FUNCTIONS_H
 
 #include "joy_math.h"
-#include "joy_render_stack.h"
 #include "joy_platform.h"
 
+#if 0
 
 void RenderClear(bmp_info* buf, v3 color, rc2 clipRect);
 #if defined(JOY_AVX)
@@ -69,6 +69,7 @@ void RenderRectSSE(
                    v2 dim,
                    v4 modulationColor01,
                    rc2 clipRect);
+#endif
 #endif
 
 #endif

@@ -11,7 +11,7 @@ inline bmp_info* PushOrLoadBitmap(asset_system* Assets,
     bmp_info* Bmp = LoadBmp(Assets, BmpID, Immediate);
     
     if(Bmp){
-        PushBitmap(State, Bmp, P, Dim.y, ModColor);
+        PushBitmap(State, &Bmp->Prim, P, Dim.y, ModColor);
     }
     
     return(Bmp);
@@ -27,11 +27,11 @@ inline bmp_info* PushOrLoadGlyph(asset_system* Assets,
     bmp_info* Bmp = LoadBmp(Assets, BmpID, Immediate);
     
     if(Bmp){
-        v2 MinUV = Bmp->MinUV;
-        v2 MaxUV = Bmp->MaxUV;
+        v2 MinUV = Bmp->Prim.MinUV;
+        v2 MaxUV = Bmp->Prim.MaxUV;
         
-        PushGlyph(State, P, Dim, Bmp, 
-                  Bmp->MinUV, Bmp->MaxUV,
+        PushGlyph(State, P, Dim, &Bmp->Prim, 
+                  Bmp->Prim.MinUV, Bmp->Prim.MaxUV,
                   ModColor);
     }
     
@@ -47,7 +47,7 @@ inline mesh_info* PushOrLoadMesh(asset_system* Assets,
     mesh_info* Mesh = LoadMesh(Assets, MeshID, Immediate);
     
     if(Mesh){
-        PushMesh(State, Mesh, P, R, S);
+        PushMesh(State, &Mesh->Prim, P, R, S);
     }
     
     return(Mesh);
@@ -62,7 +62,7 @@ inline mesh_info* PushOrLoadMesh(asset_system* Assets,
     mesh_info* Mesh = LoadMesh(Assets, MeshID, Immediate);
     
     if(Mesh){
-        PushMesh(State, Mesh, Transformation);
+        PushMesh(State, &Mesh->Prim, Transformation);
     }
     
     return(Mesh);

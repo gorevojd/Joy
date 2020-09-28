@@ -198,13 +198,16 @@ inline void* LoadAssetTypeInternal(asset_system* Assets,
                                    b32 Immediate)
 {
     asset* Asset = GetAssetByID(Assets, ID);
-    ASSERT(Asset->Type == CompareAssetType);
-    
-    ImportAsset(Assets, Asset, Immediate);
     
     void* Result = 0;
-    if(PotentiallyLoadedAsset(Asset, Immediate)){
-        Result = Asset->Data.Stub;
+    if(Asset->Type != AssetType_None){
+        ASSERT(Asset->Type == CompareAssetType);
+        
+        ImportAsset(Assets, Asset, Immediate);
+        
+        if(PotentiallyLoadedAsset(Asset, Immediate)){
+            Result = Asset->Data.Stub;
+        }
     }
     
     return(Result);

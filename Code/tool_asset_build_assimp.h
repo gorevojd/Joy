@@ -19,6 +19,7 @@
 #include <assimp/scene.h>           // Output data structure
 #include <assimp/postprocess.h>     // Post processing flags
 
+#if 0
 GLOBAL_VARIABLE aiTextureType SupportedTexturesTypes[] = {
     aiTextureType_DIFFUSE,
     aiTextureType_SPECULAR,
@@ -33,6 +34,7 @@ GLOBAL_VARIABLE aiTextureType SupportedTexturesTypes[] = {
     aiTextureType_REFLECTION,
     aiTextureType_UNKNOWN,
 };
+#endif
 
 struct loaded_mat_texture{
     tool_bmp_info Bmp;
@@ -70,6 +72,7 @@ struct loaded_node{
 struct loaded_mat{
     char Name[256];
     
+#if 0    
     int TextureFirstIndexOfTypeInArray[ArrayCount(SupportedTexturesTypes)];
     int TextureCountOfType[ArrayCount(SupportedTexturesTypes)];
     
@@ -77,6 +80,10 @@ struct loaded_mat{
     u32 ColorAmbientPacked;
     u32 ColorSpecularPacked;
     u32 ColorEmissivePacked;
+#endif
+    
+    u32 TextureIndices[MaterialChannel_Count];
+    u32 ColorsPacked[MaterialChannel_Count];
     
     /*
     I store here an array of paths to textures.

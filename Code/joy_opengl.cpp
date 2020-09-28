@@ -437,7 +437,7 @@ INTERNAL_FUNCTION void FreeVertexAttrib(GLint AttrLoc){
     }
 }
 
-INTERNAL_FUNCTION GLuint GlAllocateTexture(bmp_info* bmp){
+INTERNAL_FUNCTION GLuint GlAllocateTexture(render_primitive_bitmap* bmp){
     GLuint GenerateTex = 0;
     
     if(!bmp->Handle){
@@ -454,7 +454,7 @@ INTERNAL_FUNCTION GLuint GlAllocateTexture(bmp_info* bmp){
                      0,
                      GL_RGBA,
                      GL_UNSIGNED_BYTE,
-                     bmp->Pixels);
+                     bmp->Data);
         
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -516,10 +516,10 @@ INTERNAL_FUNCTION inline void GlFreeMeshHandles(mesh_handles* Handles){
     Handles->Allocated = false;
 }
 
-INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
+INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, render_primitive_mesh* Mesh){
     mesh_handles* Result = &Mesh->Handles;
     
-    if(!Mesh->Handles.Allocated){
+    if(!Result->Allocated){
         *Result = {};
         
         GLuint VAO, VBO, EBO;
@@ -587,8 +587,8 @@ INTERNAL_FUNCTION mesh_handles* GlAllocateMesh(gl_state* GL, mesh_info* Mesh){
 
 
 INTERNAL_FUNCTION void GlInit(gl_state* GL, 
-                              render_state* Render, 
-                              asset_system* Assets)
+                              render_state* Render,
+                              render_primitive_bitmap* AtlasBitmap)
 {
     GL->ProgramsCount = 0;
     LoadScreenShader(GL, 
@@ -671,7 +671,7 @@ INTERNAL_FUNCTION void GlInit(gl_state* GL,
     glBindVertexArray(0);
     
     // NOTE(Dima): Init LargeAtlas bitmap
-    GL->LargeAtlasHandle = GlAllocateTexture(&Assets->MainLargeAtlas.Bitmap);
+    GL->LargeAtlasHandle = GlAllocateTexture(AtlasBitmap);
     
     // NOTE(Dima): Binding gui shader texture to 0 unit
     UseShader(&GL->GuiRectShader.Shader);
@@ -889,7 +889,8 @@ INTERNAL_FUNCTION void GlRenderGuiRect(gl_state* GL,
 }
 
 
-INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, bmp_info* bmp){
+#if 0
+INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, render_primitive_bitmap* bmp){
     
     // NOTE(Dima): Blit texture load
     GLuint BlitTex;
@@ -928,6 +929,7 @@ INTERNAL_FUNCTION void GlShowDynamicBitmap(gl_state* GL, bmp_info* bmp){
     // NOTE(Dima): Freeing blit texture
     glDeleteTextures(1, &BlitTex);
 }
+#endif
 
 void GlOutputPass(gl_state* GL, render_state* Render, 
                   void* Begin, void* EndExcl,
@@ -1038,7 +1040,7 @@ void GlOutputPass(gl_state* GL, render_state* Render,
                 {
                     RENDER_GET_ENTRY(render_entry_mesh);
                     
-                    mesh_info* Mesh = Entry->Mesh;
+                    render_primitive_mesh* Mesh = Entry->Mesh;
                     
                     GlAllocateMesh(GL, Mesh);
                     
@@ -1076,13 +1078,12 @@ void GlOutputPass(gl_state* GL, render_state* Render,
                     b32 EmissiveIsSet = 0;
                     
                     if(Entry->Material){
-                        material_info* Mat = Entry->Material;
+                        render_primitive_material* Mat = Entry->Material;
                         
-                        bmp_info* Albedo = Mat->Textures[MaterialTexture_Diffuse];
-                        bmp_info* Normals = Mat->Textures[MaterialTexture_Normals];
-                        bmp_info* Specular = Mat->Textures[MaterialTexture_Specular];
-                        bmp_info* Emissive = Mat->Textures[MaterialTexture_Emissive];
-                        
+                        render_primitive_bitmap* Albedo = Mat->Textures[MaterialChannel_Albedo];
+                        render_primitive_bitmap* Normals = Mat->Textures[MaterialChannel_Normal];
+                        render_primitive_bitmap* Specular = Mat->Textures[MaterialChannel_Specular];
+                        render_primitive_bitmap* Emissive = Mat->Textures[MaterialChannel_Emissive];
                         
                         if(Albedo){
                             AlbedoIsSet = 1;
@@ -1118,7 +1119,7 @@ void GlOutputPass(gl_state* GL, render_state* Render,
                                             (SpecularIsSet << 2) |
                                             (EmissiveIsSet << 3));
                     
-                    UniformVec3(GL->SimpleShader.AlbedoColorLoc, Entry->AlbedoColor);
+                    UniformVec3(GL->SimpleShader.AlbedoColorLoc, Entry->ModColor);
                     UniformInt(GL->SimpleShader.TexturesSetFlagsLoc, TexturesSetFlags);
                     
                     glBindVertexArray(Mesh->Handles.Handles[0]);

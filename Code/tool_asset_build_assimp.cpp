@@ -3,56 +3,39 @@
 #include "tool_asset_build_loading.cpp"
 #include "tool_asset_build_commands.cpp"
 
-inline int ConvertAssimpToOurTextureType(u32 Assimp){
-    int Result = MaterialTexture_Unknown;
+inline aiTextureType ConvertOurToAssimp(u32 Our)
+{
+    aiTextureType Result = aiTextureType_UNKNOWN;
     
-    switch(Assimp){
-        case aiTextureType_DIFFUSE:{
-            Result = MaterialTexture_Diffuse;
+    switch(Our){
+        case MaterialChannel_Albedo:{
+            Result = aiTextureType_DIFFUSE;
         }break;
         
-        case aiTextureType_SPECULAR:{
-            Result = MaterialTexture_Specular;
+        case MaterialChannel_Specular:{
+            Result = aiTextureType_SPECULAR;
         }break;
         
-        case aiTextureType_AMBIENT:{
-            Result = MaterialTexture_Ambient;
+        case MaterialChannel_Ambient:{
+            Result = aiTextureType_AMBIENT;
         }break;
         
-        case aiTextureType_EMISSIVE:{
-            Result = MaterialTexture_Emissive;
+        case MaterialChannel_Emissive:{
+            Result = aiTextureType_EMISSIVE;
         }break;
         
-        case aiTextureType_HEIGHT:{
-            Result = MaterialTexture_Height;
+        case MaterialChannel_Normal:{
+            Result = aiTextureType_NORMALS;
         }break;
         
-        case aiTextureType_NORMALS:{
-            Result = MaterialTexture_Normals;
+        case MaterialChannel_Metal:
+        {
+            Result = aiTextureType_SPECULAR;
         }break;
         
-        case aiTextureType_SHININESS:{
-            Result = MaterialTexture_Shininess;
-        }break;
-        
-        case aiTextureType_OPACITY:{
-            Result = MaterialTexture_Opacity;
-        }break;
-        
-        case aiTextureType_DISPLACEMENT:{
-            Result = MaterialTexture_Displacement;
-        }break;
-        
-        case aiTextureType_LIGHTMAP:{
-            Result = MaterialTexture_Lightmap;
-        }break;
-        
-        case aiTextureType_REFLECTION:{
-            Result = MaterialTexture_Reflection;
-        }break;
-        
-        case aiTextureType_UNKNOWN:{
-            Result = MaterialTexture_Unknown;
+        case MaterialChannel_Roughness:
+        {
+            Result = aiTextureType_SPECULAR;
         }break;
     }
     
@@ -80,31 +63,19 @@ void ReplaceSpecialPath(std::string& Path,
     }
 }
 
-/*
-This function should return the first index of Type textures that
-were pushed in array
-*/
-struct assimp_loaded_textures_for_type{
-    u32 FirstID;
-    int Count;
-};
-
-INTERNAL_FUNCTION assimp_loaded_textures_for_type
-AiLoadMatTexturesForType(loaded_model* Model,
+INTERNAL_FUNCTION u32
+LoadTextureForAssimpType(loaded_model* Model,
                          loaded_mat* OurMat,
                          model_loading_context* Ctx,
                          aiMaterial* Mat,
                          aiTextureType Type)
 {
-    assimp_loaded_textures_for_type Result = {};
+    u32 Result = -1;
     
     int TextureCountForType = Mat->GetTextureCount(Type);
     
-    Result.FirstID = -1;
-    Result.Count = TextureCountForType;
-    
     for(int TextureIndex = 0;
-        TextureIndex < TextureCountForType;
+        TextureIndex < Min(TextureCountForType, 1);
         TextureIndex++)
     {
         aiString TexturePath;
@@ -193,9 +164,7 @@ AiLoadMatTexturesForType(loaded_model* Model,
         
         // NOTE(Dima): If this is the first texture of type 
         // NOTE(Dima): than return it
-        if(TextureIndex == 0){
-            Result.FirstID = OurMat->TextureSourceArray.size();
-        }
+        Result = OurMat->TextureSourceArray.size();
         
         OurMat->TextureSourceArray.push_back(MatTexSource);
     }
@@ -401,37 +370,32 @@ loaded_model LoadModelByASSIMP(char* FileName, u32 Flags,
                 SpecularColorVector = Assimp2JoyColor3(AssimpSpecularColor);
             }
             
-            
             v3 EmissiveColorVector = V3(0.0f, 0.0f, 0.0f);
             aiColor3D AssimpEmissiveColor;
             if(AssimpMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, AssimpEmissiveColor) == AI_SUCCESS){
                 EmissiveColorVector = Assimp2JoyColor3(AssimpEmissiveColor);
             }
             
-            u32 DiffuseColor = PackRGB_R10G12B10(DiffuseColorVector);
-            u32 AmbientColor = PackRGB_R10G12B10(AmbientColorVector);
-            u32 SpecularColor = PackRGB_R10G12B10(SpecularColorVector);
-            u32 EmissiveColor = PackRGB_R10G12B10(EmissiveColorVector);
-            
-            NewMaterial.ColorDiffusePacked = DiffuseColor;
-            NewMaterial.ColorAmbientPacked = AmbientColor;
-            NewMaterial.ColorSpecularPacked = SpecularColor;
-            NewMaterial.ColorEmissivePacked = EmissiveColor;
+            NewMaterial.ColorsPacked[MaterialChannel_Albedo] = PackRGB_R10G12B10(DiffuseColorVector);
+            NewMaterial.ColorsPacked[MaterialChannel_Ambient] = PackRGB_R10G12B10(AmbientColorVector);
+            NewMaterial.ColorsPacked[MaterialChannel_Specular] = PackRGB_R10G12B10(SpecularColorVector);
+            NewMaterial.ColorsPacked[MaterialChannel_Emissive] = PackRGB_R10G12B10(EmissiveColorVector);
+            NewMaterial.ColorsPacked[MaterialChannel_Metal] = PackRGB_R10G12B10(V3_Zero());
+            NewMaterial.ColorsPacked[MaterialChannel_Roughness] = PackRGB_R10G12B10(V3_One());
+            NewMaterial.ColorsPacked[MaterialChannel_Normal] = PackRGB_R10G12B10(V3(0.0f, 0.0f, 1.0f));
             
             // NOTE(Dima): Loading textures for supported Assimp textures types
             for(int TTypeIndex = 0;
-                TTypeIndex < ARRAY_COUNT(SupportedTexturesTypes);
+                TTypeIndex < MaterialChannel_Count;
                 TTypeIndex++)
             {
-                assimp_loaded_textures_for_type LoadedRes = AiLoadMatTexturesForType(
-                                                                                     &Result, 
-                                                                                     &NewMaterial,
-                                                                                     LoadingCtx, 
-                                                                                     AssimpMaterial, 
-                                                                                     SupportedTexturesTypes[TTypeIndex]);
+                u32 TextureIndex = LoadTextureForAssimpType(&Result, 
+                                                            &NewMaterial,
+                                                            LoadingCtx, 
+                                                            AssimpMaterial,
+                                                            ConvertOurToAssimp(TTypeIndex));
                 
-                NewMaterial.TextureFirstIndexOfTypeInArray[TTypeIndex] = LoadedRes.FirstID;
-                NewMaterial.TextureCountOfType[TTypeIndex] = LoadedRes.Count;
+                NewMaterial.TextureIndices[TTypeIndex] = TextureIndex;
             }
             
             Result.Materials.push_back(NewMaterial);
@@ -1077,23 +1041,23 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
         Material->ToolMaterialInfo = LoadedToToolMaterialInfo(Material);
         tool_material_info* ToolMatInfo = &Material->ToolMaterialInfo;
         
-        for(int TextureTypeIndex = 0;
-            TextureTypeIndex < ArrayCount(SupportedTexturesTypes);
-            TextureTypeIndex++)
+        for(int ChannelIndex = 0;
+            ChannelIndex < MaterialChannel_Count;
+            ChannelIndex++)
         {
             // NOTE(Dima): Getting needed values
-            int Count = Material->TextureCountOfType[TextureTypeIndex];
-            int FirstIDInArray = Material->TextureFirstIndexOfTypeInArray[TextureTypeIndex];
+            int TextureIndex = Material->TextureIndices[ChannelIndex];
+            u32 TextureID = 0;
             
             // NOTE(Dima): Adding bitmap arrays if needed
-            BeginAsset(System, AssetEntry_Type_BitmapArray);
             u32 AddedArrayID = 0;
             
-            if(Count && (FirstIDInArray != -1)){
+            if(TextureIndex != -1)
+            {
                 // NOTE(Dima): Getting first bitmap ID for bitmap array
                 // NOTE(Dima): A lot of lookups
                 loaded_mat_texture* CorrespondingTexture = 0;
-                mat_texture_source* TexSource = &Material->TextureSourceArray[FirstIDInArray];
+                mat_texture_source* TexSource = &Material->TextureSourceArray[TextureIndex];
                 if(TexSource->IsEmbeded){
                     CorrespondingTexture = &Model->EmbededTextures[TexSource->EmbedIndex];
                 }
@@ -1101,18 +1065,12 @@ INTERNAL_FUNCTION void StoreModelAsset(asset_system* System,
                     CorrespondingTexture = &Context->PathToTextureMap[TexSource->Path];
                 }
                 
-                u32 FirstIDInBitmaps = CorrespondingTexture->StoredBitmapID;
-                
-                // NOTE(Dima): Adding bitmap array to asset system
-                added_asset AddedArray = AddArrayAsset(System, FirstIDInBitmaps, Count);
-                AddedArrayID = AddedArray.ID;
+                TextureID = CorrespondingTexture->StoredBitmapID;
             }
-            EndAsset(System);
             
             // NOTE(Dima): Setting corresponding array id in material info
-            int OurTextureType = ConvertAssimpToOurTextureType(
-                                                               SupportedTexturesTypes[TextureTypeIndex]);
-            ToolMatInfo->BitmapArrayIDs[OurTextureType] = AddedArrayID;
+            ToolMatInfo->MaterialTextureIDs[ChannelIndex] = TextureID;
+            ToolMatInfo->PackedColors[ChannelIndex] = Material->ColorsPacked[ChannelIndex];
         }
         
         BeginAsset(System, AssetEntry_Type_Material);

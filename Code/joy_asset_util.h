@@ -8,13 +8,13 @@
 inline bmp_info AllocateBitmapInternal(u32 Width, u32 Height, void* pixelsData) {
 	bmp_info res = {};
     
-	res.Width = Width;
-	res.Height = Height;
-	res.Pitch = 4 * Width;
+    res.Prim.LayoutType = BmpDataLayout_RGBA;
+	res.Prim.Data = pixelsData;
+	res.Prim.Width = Width;
+	res.Prim.Height = Height;
     
-	res.WidthOverHeight = (float)Width / (float)Height;
-    
-	res.Pixels = pixelsData;
+	res.Prim.Pitch = 4 * Width;
+	res.Prim.WidthOverHeight = (float)Width / (float)Height;
     
 	return(res);
 }

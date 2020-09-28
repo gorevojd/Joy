@@ -18,8 +18,8 @@ INTERNAL_FUNCTION void AddBitmapToAtlas(Asset_Atlas* atlas,
     
     int Border = 3;
     
-    int ActualWidth = bmp->Width + Border * 2;
-    int ActualHeight = bmp->Height + Border * 2;
+    int ActualWidth = bmp->Prim.Width + Border * 2;
+    int ActualHeight = bmp->Prim.Height + Border * 2;
     
     if(atlas->AtX + ActualWidth > atlas->Dim){
         atlas->AtX = 0;
@@ -31,23 +31,23 @@ INTERNAL_FUNCTION void AddBitmapToAtlas(Asset_Atlas* atlas,
     
     float OneOverDim = atlas->OneOverDim;
     
-    for (int YIndex = 0; YIndex < bmp->Height; YIndex++) {
+    for (int YIndex = 0; YIndex < bmp->Prim.Height; YIndex++) {
         
-        for (int XIndex = 0; XIndex < bmp->Width; XIndex++) {
-            u32* At = (u32*)bmp->Pixels + YIndex * bmp->Width + XIndex;
-            u32* To = (u32*)atlas->Bitmap.Pixels + (atlas->AtY + YIndex + Border) * atlas->Dim + atlas->AtX + XIndex + Border;
+        for (int XIndex = 0; XIndex < bmp->Prim.Width; XIndex++) {
+            u32* At = (u32*)bmp->Prim.Data + YIndex * bmp->Prim.Width + XIndex;
+            u32* To = (u32*)atlas->Bitmap.Prim.Data + (atlas->AtY + YIndex + Border) * atlas->Dim + atlas->AtX + XIndex + Border;
             
             *To = *At;
         }
     }
     
-    bmp->MinUV = V2(
-                    (float)(atlas->AtX + Border) * OneOverDim, 
-                    (float)(atlas->AtY + Border) * OneOverDim);
+    bmp->Prim.MinUV = V2(
+                         (float)(atlas->AtX + Border) * OneOverDim, 
+                         (float)(atlas->AtY + Border) * OneOverDim);
     
-    bmp->MaxUV = V2(
-                    (float)(atlas->AtX + Border + bmp->Width) * OneOverDim,
-                    (float)(atlas->AtY + Border + bmp->Height) * OneOverDim);
+    bmp->Prim.MaxUV = V2(
+                         (float)(atlas->AtX + Border + bmp->Prim.Width) * OneOverDim,
+                         (float)(atlas->AtY + Border + bmp->Prim.Height) * OneOverDim);
     
     atlas->AtX += ActualWidth;
     atlas->MaxInRowHeight = Max(atlas->MaxInRowHeight, ActualHeight);
@@ -434,8 +434,8 @@ void ImportAssetDirectly(asset_system* Assets,
             void* Vertices = GET_DATA(void, Src->DataOffsetToVertices);
             u32* Indices = GET_DATA(u32, Src->DataOffsetToIndices);
             
-            Result->Vertices = Vertices;
-            Result->Indices = Indices;
+            Result->Prim.Vertices = Vertices;
+            Result->Prim.Indices = Indices;
         }break;
         
         case AssetType_Sound:{
@@ -783,20 +783,16 @@ material_info* LoadMaterial(asset_system* Assets,
     asset_material* Src = &Asset->Header.Material;
     
     if(Result){
-        for(int TextureIndex = 0;
-            TextureIndex < MaterialTexture_Count;
-            TextureIndex++)
+        for(int ChannelIndex = 0;
+            ChannelIndex < MaterialChannel_Count;
+            ChannelIndex++)
         {
             // NOTE(Dima): I only use first texture index of array
-            u32 ActualArrayIndex = FileToIntegratedID(Asset->FileSource, 
-                                                      Src->BitmapArrayIDs[TextureIndex]);
+            u32 TextureBmpID = FileToIntegratedID(Asset->FileSource, 
+                                                  Src->TextureIDs[ChannelIndex]);
             
-            if(ActualArrayIndex){
-                
-                array_info* TextureArray = LoadArray(Assets, ActualArrayIndex);
-                Result->Textures[TextureIndex] = LoadBmp(Assets, TextureArray->FirstID, 
-                                                         Immediate);
-            }
+            bmp_info* LoadedBitmap = LoadBmp(Assets, TextureBmpID, Immediate);
+            Result->Prim.Textures[ChannelIndex] = &LoadedBitmap->Prim;
         }
     }
     
@@ -1126,13 +1122,13 @@ corresponding asset groups (Main groups, and tag groups for each tag
                             mesh_info* Result = ALLOC_ASS_PTR_MEMBER(mesh_info);
                             asset_mesh* Src = &AssetHeader.Mesh;
                             
-                            Result->MaterialIndex = Src->MaterialIndex;
-                            Result->VerticesCount = Src->VerticesCount;
-                            Result->IndicesCount = Src->IndicesCount;
-                            Result->TypeCtx = Src->TypeCtx;
+                            Result->MaterialIndexInModel = Src->MaterialIndex;
+                            Result->Prim.VerticesCount = Src->VerticesCount;
+                            Result->Prim.IndicesCount = Src->IndicesCount;
+                            Result->Prim.TypeCtx = Src->TypeCtx;
                             
                             // NOTE(Dima): Checking correctness of loaded vertices type sizes
-                            switch(Result->TypeCtx.MeshType){
+                            switch(Result->Prim.TypeCtx.MeshType){
                                 case Mesh_Simple:{
                                     ASSERT(Src->TypeCtx.VertexTypeSize == sizeof(vertex_info));
                                 }break;
@@ -1185,10 +1181,13 @@ corresponding asset groups (Main groups, and tag groups for each tag
                             material_info* Result = ALLOC_ASS_PTR_MEMBER(material_info);
                             asset_material* Src = &AssetHeader.Material;
                             
-                            Result->ColorDiffuse = UnpackRGB_R10G12B10(Src->ColorDiffuse);
-                            Result->ColorAmbient = UnpackRGB_R10G12B10(Src->ColorAmbient);
-                            Result->ColorSpecular = UnpackRGB_R10G12B10(Src->ColorSpecular);
-                            Result->ColorEmissive = UnpackRGB_R10G12B10(Src->ColorEmissive);
+                            for(int ChannelIndex = 0;
+                                ChannelIndex < MaterialChannel_Count;
+                                ChannelIndex++)
+                            {
+                                Result->Prim.Colors[ChannelIndex] = UnpackRGB_R10G12B10(Src->PackedColors[ChannelIndex]);
+                                Result->Prim.Textures[ChannelIndex] = 0;
+                            }
                         }break;
                         
                         case AssetType_Model:{

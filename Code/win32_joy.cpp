@@ -1615,16 +1615,18 @@ RENDER_PLATFORM_CALLBACK(Win32SoftwareRender){
     int WindowWidth = Win->WindowWidth;
     int WindowHeight = Win->WindowHeight;
     
-    RenderMultithreaded(&GlobalWin32.ImmediateQueue, TempState->Render, &GlobalWin32.Bitmap);
-    RenderMultithreadedRGBA2BGRA(&GlobalWin32.ImmediateQueue, &GlobalWin32.Bitmap);
+    RenderMultithreaded(&GlobalWin32.ImmediateQueue, TempState->Render, &GlobalWin32.Bitmap.Prim);
+    RenderMultithreadedRGBA2BGRA(&GlobalWin32.ImmediateQueue, &GlobalWin32.Bitmap.Prim);
     
     DWORD Style = GetWindowLong(Win->Window, GWL_STYLE);
     if (Style & WS_OVERLAPPEDWINDOW)
     {
         StretchDIBits(WindowDC,
                       0, 0, WindowWidth, WindowHeight,
-                      0, 0, Win->Bitmap.Width, Win->Bitmap.Height,
-                      Win->Bitmap.Pixels, &Win->bmi,
+                      0, 0, 
+                      Win->Bitmap.Prim.Width, 
+                      Win->Bitmap.Prim.Height,
+                      Win->Bitmap.Prim.Data, &Win->bmi,
                       DIB_RGB_COLORS, SRCCOPY);
     }
     else
@@ -1636,8 +1638,9 @@ RENDER_PLATFORM_CALLBACK(Win32SoftwareRender){
                       MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
                       MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
                       MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
-                      0, 0, Win->Bitmap.Width, Win->Bitmap.Height,
-                      Win->Bitmap.Pixels, &Win->bmi,
+                      0, 0, Win->Bitmap.Prim.Width, 
+                      Win->Bitmap.Prim.Height,
+                      Win->Bitmap.Prim.Data, &Win->bmi,
                       DIB_RGB_COLORS, SRCCOPY);
     }
     
@@ -1656,7 +1659,7 @@ RENDER_PLATFORM_CALLBACK(Win32OpenGLRenderInit){
     GlobalWin32.glDC = GetDC(GlobalWin32.Window);
     GlobalWin32.renderCtx = Win32InitOpenGL(GlobalWin32.glDC);
     
-    GlInit(&GlobalGL, Render, GameState->Assets);
+    GlInit(&GlobalGL, Render, &GameState->Assets->MainLargeAtlas.Bitmap.Prim);
 }
 
 RENDER_PLATFORM_CALLBACK(Win32OpenGLRenderFree){

@@ -32,13 +32,10 @@ typedef u32 asset_id;
 #define GET_ASSET_PTR_MEMBER(asset, data_type) ((asset)->Data.Ptr_##data_type)
 
 struct asset_material{
-    u32 BitmapArrayIDs[MaterialTexture_Count];
+    u32 TextureIDs[MaterialChannel_Count];
     
     // NOTE(Dima): These are packed R10 G12 B10
-    u32 ColorDiffuse;
-    u32 ColorAmbient;
-    u32 ColorSpecular;
-    u32 ColorEmissive;
+    u32 PackedColors[MaterialChannel_Count];
 };
 
 struct asset_node{

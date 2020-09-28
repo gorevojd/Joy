@@ -41,7 +41,6 @@ struct init_params{
 
 #include "joy_input.h"
 #include "joy_assets.h"
-#include "joy_render_stack.h"
 #include "joy_render.h"
 #include "joy_assets_render.h"
 #include "joy_gui.h"

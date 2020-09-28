@@ -3,10 +3,12 @@
 
 #include "joy_types.h"
 #include "joy_math.h"
+#include "joy_render_primitives.h"
 
 #define MAX_CHANNELS_PER_BONE 4
 #define MAX_WEIGHTS_PER_VERTEX 4
 
+#if 0
 enum material_texture_type{
     MaterialTexture_Diffuse,
     MaterialTexture_Specular,
@@ -23,23 +25,7 @@ enum material_texture_type{
     
     MaterialTexture_Count,
 };
-
-struct mesh_type_context{
-    u16 VertexTypeSize;
-    u16 OffsetP;
-    u16 OffsetUV;
-    u16 OffsetN;
-    u16 OffsetT;
-    u16 OffsetWeights;
-    u16 OffsetBoneIDs;
-    
-    u8 MeshType;
-};
-
-enum Mesh_Type{
-    Mesh_Simple,
-    Mesh_Skinned,
-};
+#endif
 
 struct vertex_info{
     v3 P;
@@ -86,7 +72,6 @@ inline mesh_type_context MeshSkinnedType(){
     
     return(Result);
 }
-
 
 struct animation_vector_key{
     v3 Value;
