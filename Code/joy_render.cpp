@@ -243,7 +243,6 @@ INTERNAL_FUNCTION void RenderInit(render_state* Render,
     
     Render->StackArena = PushSplit(Render->Arena, Megabytes(5));
     
-    
 #if 0    
     // NOTE(Dima): Init SSAO kernel
     for(int KernelSampleIndex = 0;
@@ -325,7 +324,7 @@ INTERNAL_FUNCTION void RenderInit(render_state* Render,
     Render->BoxBlur5 = 1.0f / 25.0f;
     Render->BoxBlur3 = 1.0f / 9.0f;
     
-    Render->ToShowBufferType = RenderShowBuffer_SSAO;
+    Render->ToShowBufferType = RenderShowBuffer_Main;
     
     Render->FilterNames[RenderFilter_GaussianBlur5x5] = "Gaussian blur 5x5";
     Render->FilterNames[RenderFilter_GaussianBlur3x3] = "Gaussian blur 3x3";

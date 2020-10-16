@@ -1,11 +1,5 @@
-struct game_camera{
-    v3 P;
-    v3 dP;
-    
-    Euler_Angles Angles;
-    
-    quat Rotation;
-};
+#include "joy_gameplay.cpp"
+#include "joy_frogjump_tileedit.cpp"
 
 struct sphere_distribution{
     int Count;
@@ -94,36 +88,6 @@ struct image_swapper_state{
     
     b32 Initialized;
 };
-
-// NOTE(Dima): Updating camera rotation 
-void UpdateCameraRotation(game_camera* camera,
-                          float dPitch,
-                          float dYaw,
-                          float dRoll)
-{
-    float LockEdge = 89.0f * JOY_DEG2RAD;
-    
-    camera->Angles.Pitch += dPitch * JOY_DEG2RAD;
-    camera->Angles.Yaw += dYaw * JOY_DEG2RAD;
-    camera->Angles.Roll += dRoll * JOY_DEG2RAD;
-    
-    camera->Angles.Pitch = Clamp(camera->Angles.Pitch, -LockEdge, LockEdge);
-    
-    v3 Front;
-    Front.x = Sin(camera->Angles.Yaw) * Cos(camera->Angles.Pitch);
-    Front.y = Sin(camera->Angles.Pitch);
-    Front.z = Cos(camera->Angles.Yaw) * Cos(camera->Angles.Pitch);
-    Front = NOZ(Front);
-    
-    camera->Rotation = QuatLookAt(Front, V3(0.0f, 1.0f, 0.0f));
-}
-
-// NOTE(Dima): Look at matrix
-m44 GetCameraMatrix(game_camera* camera){
-    m44 Result = InverseTranslationMatrix(camera->P) * Transpose(Quat2M44(camera->Rotation));
-    
-    return(Result);
-}
 
 // NOTE(Dima): Returns how manu distributions were actually generated
 // NOTE(Dima): Should not return more than ToGenerateEstimateCount
@@ -972,7 +936,7 @@ GAME_MODE_UPDATE(TestUpdate){
 #if 1
     int MainQueueIndex = AddRenderQueue(Render);
     
-    PushBeginQueue(Render, MainQueueIndex);
+    PushRenderBeginQueue(Render, MainQueueIndex);
     
     for(int CharIndex = 0;
         CharIndex < TEMP_CHARACTERS_COUNT;
@@ -1039,7 +1003,7 @@ GAME_MODE_UPDATE(TestUpdate){
         }
     }
     
-    PushEndQueue(Render, MainQueueIndex);
+    PushRenderEndQueue(Render, MainQueueIndex);
     
     PushRenderPass(Render, MainCamSetupIndex, MainQueueIndex);
 #endif
@@ -1120,8 +1084,6 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     
     render_camera_setup CamSetup = DefaultOrthoSetup(Render, Identity());
     
-    //BeginRenderPass(Render, CamSetup);
-    
     PushClearColor(Render, V3(1.0f, 0.5f, 0.0f));
     
     int ToShowCount = Arr->Count;
@@ -1182,9 +1144,13 @@ GAME_MODE_UPDATE(ChangingPicturesUpdate){
     }
 }
 
+
 IMPLEMENT_INIT_MODES(){
     DescribeGameMode(Game, "Test", TestUpdate);
     DescribeGameMode(Game, "Changing pictures", ChangingPicturesUpdate);
+    DescribeGameMode(Game, "FrogJumpTileEditor", FrogJumpTileEditor);
     
-    SetGameMode(Game, "Test");
+    SetGameMode(Game, "FrogJumpTileEditor");
+    
+    //SetGameMode(Game, "Test");
 }

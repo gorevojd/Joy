@@ -2477,7 +2477,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
     QueryPerformanceFrequency(&GlobalWin32.PerformanceFreqLI);
     GlobalWin32.OneOverPerformanceFreq = 1.0 / (double)GlobalWin32.PerformanceFreqLI.QuadPart;
     
-    int WindowWidth = 1366;
+    int WindowWidth = 1360;
     int WindowHeight = 768;
     Win32InitWindow(hInstance, WindowWidth, WindowHeight);
     

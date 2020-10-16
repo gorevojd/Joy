@@ -38,6 +38,24 @@ inline bmp_info* PushOrLoadGlyph(asset_system* Assets,
     return(Bmp);
 }
 
+
+inline mesh_info* PushOrLoadMesh(asset_system* Assets, 
+                                 render_state* State,
+                                 asset_id MeshID,
+                                 v3 P, quat R, v3 S,
+                                 v3 ModColor = V3(1.0f, 1.0f, 1.0f),
+                                 b32 Immediate = false)
+{
+    mesh_info* Mesh = LoadMesh(Assets, MeshID, Immediate);
+    
+    if(Mesh){
+        PushMesh(State, &Mesh->Prim, P, R, S, ModColor);
+    }
+    
+    return(Mesh);
+}
+
+
 inline mesh_info* PushOrLoadMesh(asset_system* Assets, 
                                  render_state* State,
                                  asset_id MeshID,

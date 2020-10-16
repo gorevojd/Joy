@@ -821,7 +821,7 @@ inline void PushMesh(render_state* State,
                      v3 Color = V3(1.0f, 0.0f, 1.0f))
 {
     m44 Matrix = ScalingMatrix(S) * RotationMatrix(R) * TranslationMatrix(P);
-    PushMesh(State, Mesh, Matrix);
+    PushMesh(State, Mesh, Matrix, 0, Color);
 }
 
 inline b32 CameraSetupIsValid(render_state* Render, int SetupIndex){
@@ -872,8 +872,8 @@ inline b32 ProcessQueueEntry(render_state* Render,
     return(Result);
 }
 
-inline void PushBeginQueue(render_state* Render,
-                           int QueueIndex)
+inline void PushRenderBeginQueue(render_state* Render,
+                                 int QueueIndex)
 {
     b32 IsValid = RenderQueueIsValid(Render, QueueIndex);
     Assert(IsValid);
@@ -887,8 +887,8 @@ inline void PushBeginQueue(render_state* Render,
     }
 }
 
-inline void PushEndQueue(render_state* Render,
-                         int QueueIndex)
+inline void PushRenderEndQueue(render_state* Render,
+                               int QueueIndex)
 {
     b32 IsValid = RenderQueueIsValid(Render, QueueIndex);
     Assert(IsValid);
