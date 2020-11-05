@@ -1150,7 +1150,8 @@ IMPLEMENT_INIT_MODES(){
     DescribeGameMode(Game, "Changing pictures", ChangingPicturesUpdate);
     DescribeGameMode(Game, "FrogJumpTileEditor", FrogJumpTileEditor);
     
-    SetGameMode(Game, "FrogJumpTileEditor");
+    //SetGameMode(Game, "FrogJumpTileEditor");
+    SetGameMode(Game, "Test");
     
     //SetGameMode(Game, "Test");
 }

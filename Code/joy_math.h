@@ -353,80 +353,127 @@ inline v3 V3_Zero()
     return(Res);
 }
 
+inline v3 V3_Up()
+{
+    v3 Result = {0.0f, 1.0f, 0.0f};
+    
+    return(Result);
+}
+
+inline v3 V3_Down()
+{
+    v3 Result = {0.0f, -1.0f, 0.0f};
+    
+    return(Result);
+}
+
+
+inline v3 V3_Left()
+{
+    v3 Result = {1.0f, 0.0f, 0.0f};
+    
+    return(Result);
+}
+
+
+inline v3 V3_Right()
+{
+    v3 Result = {-1.0f, 0.0f, 0.0f};
+    
+    return(Result);
+}
+
+
+inline v3 V3_Forward()
+{
+    v3 Result = {0.0f, 0.0f, 1.0f};
+    
+    return(Result);
+}
+
+
+inline v3 V3_Back()
+{
+    v3 Result = {0.0f, 0.0f, -1.0f};
+    
+    return(Result);
+}
+
+
 inline v4 V4(float Value) {
-	v4 res;
-	res.x = Value;
-	res.y = Value;
-	res.z = Value;
-	res.w = Value;
-	return(res);
+    v4 res;
+    res.x = Value;
+    res.y = Value;
+    res.z = Value;
+    res.w = Value;
+    return(res);
 }
 
 inline v4 V4(float x, float y, float z, float w) {
-	v4 res;
+    v4 res;
     
-	res.x = x;
-	res.y = y;
-	res.z = z;
-	res.w = w;
+    res.x = x;
+    res.y = y;
+    res.z = z;
+    res.w = w;
     
-	return(res);
+    return(res);
 }
 
 inline v4 V4(v3 InitVector, float w) {
-	v4 res;
-	res.x = InitVector.x;
-	res.y = InitVector.y;
-	res.z = InitVector.z;
-	res.w = w;
-	return(res);
+    v4 res;
+    res.x = InitVector.x;
+    res.y = InitVector.y;
+    res.z = InitVector.z;
+    res.w = w;
+    return(res);
 }
 
 inline quat IdentityQuaternion(){
     quat res;
     
-	res.x = 0.0f;
-	res.y = 0.0f;
-	res.z = 0.0f;
-	res.w = 1.0f;
+    res.x = 0.0f;
+    res.y = 0.0f;
+    res.z = 0.0f;
+    res.w = 1.0f;
     
-	return(res);
+    return(res);
 }
 
 inline quat QuatI(){
-	quat res;
+    quat res;
     
-	res.x = 0.0f;
-	res.y = 0.0f;
-	res.z = 0.0f;
-	res.w = 1.0f;
+    res.x = 0.0f;
+    res.y = 0.0f;
+    res.z = 0.0f;
+    res.w = 1.0f;
     
-	return(res);
+    return(res);
 }
 
 inline quat Quat(float x, float y, float z, float w){
-	quat res;
+    quat res;
     
-	res.x = x;
-	res.y = y;
-	res.z = z;
-	res.w = w;
+    res.x = x;
+    res.y = y;
+    res.z = z;
+    res.w = w;
     
-	return(res);
+    return(res);
 }
 
 inline quat Quat(v3 Axis, float Angle){
-	quat res;
+    quat res;
     
     float HalfAngle = Angle * 0.5f;
     
-	float S = Sin(HalfAngle);
-	res.x = Axis.x * S;
-	res.y = Axis.y * S;
-	res.z = Axis.z * S;
-	res.w = Cos(HalfAngle);
+    float S = Sin(HalfAngle);
+    res.x = Axis.x * S;
+    res.y = Axis.y * S;
+    res.z = Axis.z * S;
+    res.w = Cos(HalfAngle);
     
-	return(res);
+    return(res);
 }
 
 inline m33 M33I(){
@@ -860,6 +907,7 @@ inline v2 Lerp(v2 A, v2 B, float t) { return((1.0f - t) * A + B * t); }
 inline v3 Lerp(v3 A, v3 B, float t) { return((1.0f - t) * A + B * t); }
 inline v4 Lerp(v4 A, v4 B, float t) { return((1.0f - t) * A + B * t); }
 
+
 /*Quaternion operations*/
 inline quat Conjugate(quat Q){
     quat res = {};
@@ -925,6 +973,39 @@ inline quat Slerp(quat A, quat B, float t){
     return(Result);
 }
 
+
+/* Cosine lerp. Takes float as input that will be clamped to [0, 1] inside */
+inline float CosLerp01(float t){
+    float result = Cos(Clamp01(t) * JOY_PI * 0.5f);
+    
+    return(result);
+}
+
+inline v2 CosLerp(v2 a, v2 b, float t){
+    float factor = CosLerp01(t);
+    
+    v2 Result = Lerp(a, b, t);
+    
+    return(Result);
+}
+
+
+inline v3 CosLerp(v3 a, v3 b, float t){
+    float factor = CosLerp01(t);
+    
+    v3 Result = Lerp(a, b, t);
+    
+    return(Result);
+}
+
+inline v4 CosLerp(v4 a, v4 b, float t){
+    float factor = CosLerp01(t);
+    
+    v4 Result = Lerp(a, b, t);
+    
+    return(Result);
+}
+
 /*Matrix operations*/
 inline m44 Identity(){
     m44 Result = {};
@@ -950,19 +1031,19 @@ inline m44 Floats2Matrix(float Array[16]){
 inline m44 TranslationMatrix(v3 Translation){
     m44 Result = Identity();
     
-	Result.e[12] = Translation.x;
-	Result.e[13] = Translation.y;
-	Result.e[14] = Translation.z;
+    Result.e[12] = Translation.x;
+    Result.e[13] = Translation.y;
+    Result.e[14] = Translation.z;
     
-	return(Result);
+    return(Result);
 }
 
 inline m44 InverseTranslationMatrix(v3 Translation){
     m44 Result = Identity();
     
-	Result.e[12] = -Translation.x;
-	Result.e[13] = -Translation.y;
-	Result.e[14] = -Translation.z;
+    Result.e[12] = -Translation.x;
+    Result.e[13] = -Translation.y;
+    Result.e[14] = -Translation.z;
     
     return(Result);
 }
